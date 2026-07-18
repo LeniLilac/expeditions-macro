@@ -73,6 +73,77 @@ public sealed class CameraAlignmentTests
     }
 
     [Fact]
+    public async Task Calibrate_WhenGoalFallsBetweenCoarseSamples_RefinesTheExactFullYaw()
+    {
+        ImageFrame goal = VisionScorerTests.Pattern(96, 72);
+        ImageFrame degradedGoal = Shift(goal, 1, 0);
+        ImageFrame firstStep = Shift(goal, 13, 0);
+        ImageFrame wrong = Blank(96, 72);
+        ImageFrame reference = VisionScorer.PrepareGray(goal);
+        double degradedScore = VisionScorer.ScoreFrame(reference, degradedGoal);
+        Assert.InRange(degradedScore, 0.82, 0.9049);
+
+        FakeAutomation? automation = null;
+        automation = new FakeAutomation(goal)
+        {
+            FullYawPixels = 197,
+            CaptureAtYaw = yaw => automation!.Drags.Count == 0
+                ? goal
+                : yaw switch
+                {
+                    0 => goal,
+                    11 or 16 => firstStep,
+                    192 => degradedGoal,
+                    _ => wrong,
+                },
+        };
+        List<MacroProgress> updates = [];
+        CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
+
+        CameraModel model = await engine.CalibrateAsync(
+            new ScreenRegion(315, 220, 96, 72),
+            CalibrationSettings("Degraded return", maximumSamples: 15),
+            new InlineProgress<MacroProgress>(updates.Add));
+
+        Assert.Equal(197, model.Manifest.FullYawPixels);
+        Assert.True(model.Manifest.ScanScores[^1] > 0.95, $"Refined score was {model.Manifest.ScanScores[^1]:P1}.");
+        Assert.Equal(0, automation.YawPixels);
+        Assert.Contains(updates, update => update.Message.Contains("Verified full-turn return", StringComparison.Ordinal));
+        Assert.Contains(updates, update => update.Message.Contains("Refined full turn from 192 to 197", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Calibrate_DoesNotAcceptADegradedLookalikeWithoutTheFollowingYawView()
+    {
+        ImageFrame goal = VisionScorerTests.Pattern(96, 72);
+        ImageFrame degradedGoal = Shift(goal, 1, 0);
+        ImageFrame firstStep = Shift(goal, 13, 0);
+        ImageFrame wrong = Blank(96, 72);
+        FakeAutomation? automation = null;
+        automation = new FakeAutomation(goal)
+        {
+            FullYawPixels = 389,
+            CaptureAtYaw = yaw => automation!.Drags.Count == 0
+                ? goal
+                : yaw switch
+                {
+                    0 => goal,
+                    11 or 16 => firstStep,
+                    192 or 384 => degradedGoal,
+                    _ => wrong,
+                },
+        };
+        CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
+
+        CameraModel model = await engine.CalibrateAsync(
+            new ScreenRegion(315, 220, 96, 72),
+            CalibrationSettings("Repeated landmark", maximumSamples: 30));
+
+        Assert.Equal(389, model.Manifest.FullYawPixels);
+        Assert.Equal(0, automation.YawPixels);
+    }
+
+    [Fact]
     public async Task Align_WhenFastMatchIsLow_FullTurnFallbackFindsTheGoal()
     {
         ImageFrame goal = VisionScorerTests.Pattern(96, 72);
@@ -148,8 +219,36 @@ public sealed class CameraAlignmentTests
             atlas);
     }
 
+    private static CameraCalibrationSettings CalibrationSettings(string name, int maximumSamples) => new()
+    {
+        Name = name,
+        CaptureCount = 2,
+        CaptureDuration = TimeSpan.Zero,
+        CoarseStepPixels = 16,
+        FineStepPixels = 1,
+        SettleMilliseconds = 25,
+        MaximumSamples = maximumSamples,
+    };
+
     private static ImageFrame Blank(int width, int height) =>
         new(width, height, PixelFormat.Rgb24, new byte[width * height * 3], takeOwnership: true);
+
+    private static ImageFrame Shift(ImageFrame source, int dx, int dy)
+    {
+        byte[] output = new byte[source.Pixels.Length];
+        for (int y = 0; y < source.Height; y++)
+        {
+            for (int x = 0; x < source.Width; x++)
+            {
+                int sourceX = (x + dx) % source.Width;
+                int sourceY = (y + dy) % source.Height;
+                int destination = (y * source.Width + x) * 3;
+                int origin = (sourceY * source.Width + sourceX) * 3;
+                Buffer.BlockCopy(source.Pixels, origin, output, destination, 3);
+            }
+        }
+        return new ImageFrame(source.Width, source.Height, source.Format, output, takeOwnership: true);
+    }
 
     private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
     {

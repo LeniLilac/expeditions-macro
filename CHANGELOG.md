@@ -2,6 +2,13 @@
 
 All notable changes to Expeditions Macro are documented here.
 
+## [1.0.4] - 2026-07-18
+
+### Fixed
+
+- Allowed camera-model setup to recognize a degraded full-turn return when the following yaw view also repeats the start of the scan, while rejecting isolated lookalike landmarks.
+- Added a fine-drag sweep around the detected wraparound so camera models store the measured full-yaw circumference and finish setup at the highest-confidence goal position.
+
 ## [1.0.3] - 2026-07-18
 
 ### Added
@@ -54,6 +61,7 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
+[1.0.4]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.4
 [1.0.3]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.3
 [1.0.2]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.2
 [1.0.1]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.1

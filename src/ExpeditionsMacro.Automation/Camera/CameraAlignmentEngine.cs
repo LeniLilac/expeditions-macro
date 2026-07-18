@@ -250,7 +250,9 @@ public sealed class CameraAlignmentEngine
         List<double> scores = [baseline];
         List<ImageFrame> atlas = [VisionScorer.MakeThumbnail(reference)];
         bool departed = false;
-        double returnLevel = Math.Max(0.68, baseline - 0.075);
+        double directReturnLevel = Math.Max(0.68, baseline - 0.075);
+        double verifiedReturnLevel = Math.Max(0.72, baseline - 0.18);
+        double nearExactReturnLevel = Math.Max(directReturnLevel, baseline - 0.015);
         int scanned = 0;
         progress?.Report(new MacroProgress("Camera setup", 23, "Learning one full yaw turn with right-mouse drags."));
         for (int step = 1; step <= settings.MaximumSamples; step++)
@@ -265,22 +267,143 @@ public sealed class CameraAlignmentEngine
             progress?.Report(new MacroProgress("Camera setup", 23 + (int)Math.Round(70d * step / settings.MaximumSamples), $"Learning yaw sample {step}. Confidence: {score:P0}", Confidence: score));
             if (score < baseline - 0.09) departed = true;
             int minimumSteps = Math.Max(12, (int)Math.Round(180d / Math.Max(1, settings.CoarseStepPixels)));
-            if (departed && step >= minimumSteps && score >= returnLevel) return (step * settings.CoarseStepPixels, scores, atlas);
+            if (departed && step >= minimumSteps && score >= nearExactReturnLevel)
+            {
+                return await RefineFullTurnReturnAsync(
+                    window,
+                    region,
+                    reference,
+                    step * settings.CoarseStepPixels,
+                    score,
+                    settings,
+                    scores,
+                    atlas,
+                    progress,
+                    cancellationToken).ConfigureAwait(false);
+            }
             if (departed && scores.Count >= 4 && step - 1 >= minimumSteps)
             {
                 double previous = scores[^2];
-                if (previous >= returnLevel - 0.02 && previous > scores[^3] && previous > score)
+                bool localPeak = previous >= scores[^3] && previous > score;
+                if (localPeak && previous >= directReturnLevel - 0.02)
                 {
                     await MoveAsync(window, -settings.CoarseStepPixels, settings.SettleMilliseconds, settings.CoarseStepPixels, cancellationToken).ConfigureAwait(false);
                     scores.RemoveAt(scores.Count - 1);
                     atlas.RemoveAt(atlas.Count - 1);
-                    return ((step - 1) * settings.CoarseStepPixels, scores, atlas);
+                    return await RefineFullTurnReturnAsync(
+                        window,
+                        region,
+                        reference,
+                        (step - 1) * settings.CoarseStepPixels,
+                        previous,
+                        settings,
+                        scores,
+                        atlas,
+                        progress,
+                        cancellationToken).ConfigureAwait(false);
+                }
+                if (localPeak && previous >= verifiedReturnLevel)
+                {
+                    // A real wraparound repeats both the goal view and the view immediately
+                    // after it. This lets setup tolerate a degraded goal frame (lighting,
+                    // particles, or coarse-step quantization) without accepting a visually
+                    // similar landmark elsewhere in the turn.
+                    double continuation = VisionScorer.RobustSimilarity(atlas[1], atlas[^1]);
+                    double continuationLevel = Math.Max(0.70, Math.Min(0.90, score + 0.04));
+                    if (continuation >= continuationLevel)
+                    {
+                        progress?.Report(new MacroProgress(
+                            "Camera setup",
+                            23 + (int)Math.Round(70d * step / settings.MaximumSamples),
+                            $"Verified full-turn return at {previous:P0} confidence ({continuation:P0} continuation match).",
+                            Confidence: previous));
+                        await MoveAsync(window, -settings.CoarseStepPixels, settings.SettleMilliseconds, settings.CoarseStepPixels, cancellationToken).ConfigureAwait(false);
+                        scores.RemoveAt(scores.Count - 1);
+                        atlas.RemoveAt(atlas.Count - 1);
+                        return await RefineFullTurnReturnAsync(
+                            window,
+                            region,
+                            reference,
+                            (step - 1) * settings.CoarseStepPixels,
+                            previous,
+                            settings,
+                            scores,
+                            atlas,
+                            progress,
+                            cancellationToken).ConfigureAwait(false);
+                    }
                 }
             }
         }
         progress?.Report(new MacroProgress("Camera setup", 94, "A complete turn was not recognized. Returning toward the goal."));
         if (scanned > 0) await MoveAsync(window, -scanned * settings.CoarseStepPixels, settings.SettleMilliseconds, settings.CoarseStepPixels, cancellationToken).ConfigureAwait(false);
         throw new InvalidOperationException("Could not recognize a full yaw turn. Increase maximum samples, reduce coarse drag pixels, or increase settle time, then retry.");
+    }
+
+    private async Task<(int FullYawPixels, IReadOnlyList<double> Scores, IReadOnlyList<ImageFrame> Atlas)> RefineFullTurnReturnAsync(
+        RobloxWindow window,
+        ScreenRegion region,
+        ImageFrame reference,
+        int coarseYawPixels,
+        double coarseScore,
+        CameraCalibrationSettings settings,
+        List<double> scores,
+        List<ImageFrame> atlas,
+        IProgress<MacroProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        int fineStep = Math.Max(1, Math.Min(settings.FineStepPixels, settings.CoarseStepPixels));
+        int stepsPerSide = Math.Max(2, (int)Math.Ceiling((double)settings.CoarseStepPixels / fineStep));
+        int radius = stepsPerSide * fineStep;
+        int sampleCount = stepsPerSide * 2 + 1;
+        progress?.Report(new MacroProgress(
+            "Camera setup",
+            94,
+            $"Full turn found near {coarseYawPixels} px. Refining with {fineStep}-px mouse drags.",
+            Confidence: coarseScore));
+
+        await MoveAsync(window, -radius, settings.SettleMilliseconds, fineStep, cancellationToken).ConfigureAwait(false);
+        int bestOffset = 0;
+        double bestScore = double.NegativeInfinity;
+        for (int index = 0; index < sampleCount; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (index > 0)
+            {
+                await MoveAsync(window, fineStep, settings.SettleMilliseconds, fineStep, cancellationToken).ConfigureAwait(false);
+            }
+
+            int offset = -radius + index * fineStep;
+            (ImageFrame _, double score) = await StablePreparedScoreAsync(reference, region, 2, cancellationToken).ConfigureAwait(false);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestOffset = offset;
+            }
+            progress?.Report(new MacroProgress(
+                "Camera setup",
+                94 + (int)Math.Round(3d * (index + 1) / sampleCount),
+                $"Fine yaw {offset:+#;-#;0} px. Best confidence: {bestScore:P0}",
+                Confidence: bestScore));
+        }
+
+        int currentOffset = radius;
+        if (bestOffset != currentOffset)
+        {
+            await MoveAsync(window, bestOffset - currentOffset, settings.SettleMilliseconds, fineStep, cancellationToken).ConfigureAwait(false);
+        }
+        (ImageFrame refinedFrame, double refinedScore) = await StablePreparedScoreAsync(reference, region, 3, cancellationToken).ConfigureAwait(false);
+        int refinedYawPixels = coarseYawPixels + bestOffset;
+        if (refinedYawPixels <= 0) throw new InvalidOperationException("The refined full-yaw measurement was invalid. Increase the coarse drag size and retry.");
+
+        scores[^1] = refinedScore;
+        atlas[^1] = VisionScorer.MakeThumbnail(refinedFrame);
+        progress?.Report(new MacroProgress(
+            "Camera setup",
+            98,
+            $"Refined full turn from {coarseYawPixels} to {refinedYawPixels} mouse pixels at {refinedScore:P0} confidence.",
+            Confidence: refinedScore));
+        return (refinedYawPixels, scores, atlas);
     }
 
     private async Task<double> ScanFullTurnAsync(
@@ -409,6 +532,23 @@ public sealed class CameraAlignmentEngine
         }
         double[] sorted = scores.Order().ToArray();
         return sorted.Length % 2 == 1 ? sorted[sorted.Length / 2] : (sorted[sorted.Length / 2 - 1] + sorted[sorted.Length / 2]) / 2;
+    }
+
+    private async Task<(ImageFrame Frame, double Score)> StablePreparedScoreAsync(
+        ImageFrame reference,
+        ScreenRegion region,
+        int count,
+        CancellationToken cancellationToken)
+    {
+        List<ImageFrame> frames = [];
+        for (int index = 0; index < count; index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            frames.Add(VisionScorer.PrepareGray(_automation.CaptureScreen(region), reference.Width, reference.Height));
+            if (index + 1 < count) await Task.Delay(60, cancellationToken).ConfigureAwait(false);
+        }
+        ImageFrame stable = VisionScorer.Median(frames);
+        return (stable, VisionScorer.RobustSimilarity(reference, stable));
     }
 
     private double Score(ImageFrame reference, ScreenRegion region) => VisionScorer.ScoreFrame(reference, _automation.CaptureScreen(region));
