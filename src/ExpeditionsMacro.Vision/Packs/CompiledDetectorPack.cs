@@ -11,13 +11,47 @@ public sealed class CompiledDetectorPack : IDetectorPack
 {
     private static readonly string[] RecoveryStates = ["disconnect", "lobby", "play", "map_select", "map_preview"];
     private static readonly (int X, int Y)[] DifficultyLayoutOffsets = Enumerable.Range(-8, 17).Select(y => (0, y)).ToArray();
+    private static readonly ScreenRegion HotbarAnchorRegion = new(154, 536, 500, 62);
+    private static readonly ScreenRegion NodeBarAnchorRegion = new(220, 53, 370, 32);
     private readonly IReadOnlyDictionary<string, StateRuntime> _states;
     private readonly IReadOnlyDictionary<int, SelectionRuntime> _maps;
     private readonly IReadOnlyDictionary<int, SelectionRuntime> _difficulties;
     private readonly ImageFrame _emptyHotbar;
+    private readonly ImageFrame _hotbarReference;
+    private readonly ImageFrame _nodeBarReference;
 
     private sealed record StateRuntime(DetectorStateDefinition Definition, IReadOnlyList<ImageFrame> References);
     private sealed record SelectionRuntime(SelectionDetectorDefinition Definition, ImageFrame Reference);
+    private sealed record AdaptiveStateMatch(
+        double Score,
+        IReadOnlyList<(DetectorRegionReference Definition, AdaptiveRegionMatch Match)> Regions)
+    {
+        public (int X, int Y) MapNearestPoint(int x, int y)
+        {
+            (DetectorRegionReference Definition, AdaptiveRegionMatch Match) nearest = Regions
+                .OrderBy(region => DistanceSquared(region.Definition.Region, x, y))
+                .First();
+            return nearest.Match.MapPoint(x, y);
+        }
+
+        public (int X, int Y) MapGlobalPoint(int x, int y)
+        {
+            double scaleX = Median(Regions.Select(region => region.Match.ScaleX).ToArray());
+            double scaleY = Median(Regions.Select(region => region.Match.ScaleY).ToArray());
+            double translateX = Median(Regions.Select(region => region.Match.MatchedRegion.X - region.Definition.Region.X * scaleX).ToArray());
+            double translateY = Median(Regions.Select(region => region.Match.MatchedRegion.Y - region.Definition.Region.Y * scaleY).ToArray());
+            return (
+                (int)Math.Round(x * scaleX + translateX, MidpointRounding.AwayFromZero),
+                (int)Math.Round(y * scaleY + translateY, MidpointRounding.AwayFromZero));
+        }
+
+        private static double DistanceSquared(ScreenRegion region, int x, int y)
+        {
+            double nearestX = Math.Clamp(x, region.X, region.Right - 1);
+            double nearestY = Math.Clamp(y, region.Y, region.Bottom - 1);
+            return Math.Pow(x - nearestX, 2) + Math.Pow(y - nearestY, 2);
+        }
+    }
 
     public CompiledDetectorPack(string directory, DetectorPackManifest manifest)
     {
@@ -37,6 +71,8 @@ public sealed class CompiledDetectorPack : IDetectorPack
             selection => selection.Value,
             selection => new SelectionRuntime(selection, ImageCodec.Load(Resolve(selection.File), PixelFormat.Gray8)));
         _emptyHotbar = ImageCodec.Load(Resolve(manifest.EmptyHotbarReferenceFile), PixelFormat.Rgb24);
+        _hotbarReference = VisionScorer.PrepareGray(_emptyHotbar.Crop(HotbarAnchorRegion));
+        _nodeBarReference = VisionScorer.PrepareGray(_emptyHotbar.Crop(NodeBarAnchorRegion));
     }
 
     public string Directory { get; }
@@ -46,15 +82,21 @@ public sealed class CompiledDetectorPack : IDetectorPack
     public IReadOnlyDictionary<string, double> ScoreStates(ImageFrame clientImage)
     {
         ValidateClient(clientImage);
-        bool useStartDialogDetector = Manifest.PackId.Equals(
+        bool useSpecializedDetectors = Manifest.PackId.Equals(
             AnimeExpeditionsDetectorSpec.PackId,
             StringComparison.OrdinalIgnoreCase);
         Dictionary<string, double> scores = _states.ToDictionary(
             pair => pair.Key,
-            pair => useStartDialogDetector && pair.Key.Equals("start", StringComparison.OrdinalIgnoreCase)
-                ? StartDialogDetector.Score(clientImage)
-                : ScoreState(pair.Value, clientImage, [(0, 0)]),
+            pair => ScoreConfiguredState(pair.Key, pair.Value, clientImage, useSpecializedDetectors),
             StringComparer.OrdinalIgnoreCase);
+        if (useSpecializedDetectors && Classify(scores) is null)
+        {
+            foreach ((string name, StateRuntime runtime) in _states
+                         .Where(pair => pair.Key is "lobby" or "play"))
+            {
+                scores[name] = Math.Max(scores[name], ScoreAdaptiveState(name, runtime, clientImage));
+            }
+        }
         return scores;
     }
 
@@ -70,9 +112,26 @@ public sealed class CompiledDetectorPack : IDetectorPack
     public string? RecoveryState(ImageFrame clientImage)
     {
         ValidateClient(clientImage);
+        bool useSpecializedDetectors = Manifest.PackId.Equals(AnimeExpeditionsDetectorSpec.PackId, StringComparison.OrdinalIgnoreCase);
+        Dictionary<string, double> scores = [];
         foreach (string name in RecoveryStates)
         {
-            if (_states.TryGetValue(name, out StateRuntime? state) && ScoreState(state, clientImage, [(0, 0)]) >= state.Definition.Threshold) return name;
+            if (!_states.TryGetValue(name, out StateRuntime? state)) continue;
+            double score = ScoreConfiguredState(name, state, clientImage, useSpecializedDetectors);
+            scores[name] = score;
+            if (score >= state.Definition.Threshold) return name;
+        }
+        if (useSpecializedDetectors)
+        {
+            foreach (string name in RecoveryStates.Where(name => name is "lobby" or "play"))
+            {
+                StateRuntime state = _states[name];
+                scores[name] = Math.Max(scores.GetValueOrDefault(name), ScoreAdaptiveState(name, state, clientImage));
+            }
+            foreach (string name in RecoveryStates)
+            {
+                if (scores.GetValueOrDefault(name) >= _states[name].Definition.Threshold) return name;
+            }
         }
         return null;
     }
@@ -80,7 +139,14 @@ public sealed class CompiledDetectorPack : IDetectorPack
     public string? CurrentNodeType(ImageFrame clientImage)
     {
         ValidateClient(clientImage);
-        double? hue = NodeHue(clientImage);
+        ScreenRegion hueRegion = Manifest.NodeHueRegion;
+        if (Manifest.PackId.Equals(AnimeExpeditionsDetectorSpec.PackId, StringComparison.OrdinalIgnoreCase))
+        {
+            AdaptiveRegionMatch anchor = AdaptiveUiMatcher.Find(_nodeBarReference, clientImage, NodeBarAnchorRegion, 42, 32);
+            ScreenRegion mapped = anchor.MapRegion(Manifest.NodeHueRegion);
+            if (anchor.Score >= 0.28 && mapped.FitsWithin(clientImage.Width, clientImage.Height)) hueRegion = mapped;
+        }
+        double? hue = NodeHue(clientImage, hueRegion);
         if (hue is null) return null;
         (double Distance, string Name)[] ranked = Manifest.NodeHuePrototypes
             .Select(pair => (HueDistance(hue.Value, pair.Value), pair.Key))
@@ -90,30 +156,49 @@ public sealed class CompiledDetectorPack : IDetectorPack
         return ranked[0].Name;
     }
 
-    public int? SelectedMap(ImageFrame clientImage) => BestSelection(_maps, clientImage, 0.90, 0.10, [(0, 0)]);
+    public int? SelectedMap(ImageFrame clientImage)
+    {
+        int? selected = BestSelection(_maps, clientImage, 0.90, 0.10, [(0, 0)]);
+        return selected ?? BestAdaptiveSelection(_maps, clientImage, 0.90, 0.10);
+    }
 
     public int? SelectedDifficulty(ImageFrame clientImage)
     {
         ValidateClient(clientImage);
-        (bool observed, int? selected) = DifficultyFromHue(clientImage);
-        if (observed) return selected;
+        (bool observed, int? selected) = DifficultyFromHue(clientImage, Manifest.DifficultyHueRegion);
+        if (selected is not null) return selected;
+
+        (SelectionRuntime Runtime, AdaptiveRegionMatch Match)? adaptiveLayout = BestAdaptiveLayout(_difficulties, clientImage);
+        if (adaptiveLayout is not null && Manifest.DifficultyHueRegion is ScreenRegion configuredHue)
+        {
+            ScreenRegion mappedHue = adaptiveLayout.Value.Match.MapRegion(configuredHue);
+            (bool adaptiveObserved, int? adaptiveSelected) = DifficultyFromHue(clientImage, mappedHue);
+            observed |= adaptiveObserved;
+            if (adaptiveSelected is not null) return adaptiveSelected;
+        }
 
         // Roblox can shift the whole difficulty control slightly between UI revisions.
         // Pick one shared layout offset from the fixed frame/buttons, then compare all
         // difficulty references at that same offset. This keeps the active center slot
         // authoritative instead of following labels as they move through the carousel.
-        return BestSelectionAtSharedOffset(_difficulties, clientImage, 0.97, 0.01, DifficultyLayoutOffsets);
+        int? templateSelected = BestSelectionAtSharedOffset(_difficulties, clientImage, 0.97, 0.01, DifficultyLayoutOffsets);
+        if (templateSelected is not null) return templateSelected;
+        return observed ? null : BestAdaptiveSelection(_difficulties, clientImage, 0.91, 0.015);
     }
 
     public IReadOnlyList<int> RemainingUnitKeys(ImageFrame clientImage, IReadOnlySet<int> unitKeys)
     {
         ValidateClient(clientImage);
+        AdaptiveRegionMatch hotbar = AdaptiveUiMatcher.Find(_hotbarReference, clientImage, HotbarAnchorRegion, 36, 42);
+        bool useAdaptiveHotbar = hotbar.Score >= 0.32;
         List<int> remaining = [];
         foreach (int unitKey in unitKeys.OrderBy(key => key == 0 ? 10 : key))
         {
             int slotIndex = unitKey == 0 ? 9 : unitKey - 1;
             ScreenRegion region = new(161 + slotIndex * 49, 542, 46, 50);
-            ImageFrame current = clientImage.Crop(region);
+            ScreenRegion currentRegion = useAdaptiveHotbar ? hotbar.MapRegion(region) : region;
+            if (!currentRegion.FitsWithin(clientImage.Width, clientImage.Height)) currentRegion = region;
+            ImageFrame current = ResizeRgb(clientImage.Crop(currentRegion), region.Width, region.Height);
             ImageFrame empty = _emptyHotbar.Crop(region);
             double difference = 0;
             for (int index = 0; index < current.Pixels.Length; index++) difference += Math.Abs(current.Pixels[index] - empty.Pixels[index]);
@@ -123,8 +208,41 @@ public sealed class CompiledDetectorPack : IDetectorPack
         return remaining;
     }
 
-    public (int X, int Y) ActionFor(string state)
+    public (int X, int Y) ActionFor(string state, ImageFrame? clientImage = null)
     {
+        bool useSpecializedDetectors = clientImage is not null &&
+            Manifest.PackId.Equals(AnimeExpeditionsDetectorSpec.PackId, StringComparison.OrdinalIgnoreCase);
+        if (useSpecializedDetectors)
+        {
+            ValidateClient(clientImage!);
+            (int X, int Y)? startAction = state.Equals("start", StringComparison.OrdinalIgnoreCase) ? StartDialogDetector.ActionFor(clientImage!) : null;
+            if (startAction is not null) return startAction.Value;
+            (int X, int Y)? pauseAction = PauseButtonDetector.ActionFor(clientImage!, state);
+            if (pauseAction is not null) return pauseAction.Value;
+            (int X, int Y)? buttonAction = ActionButtonDetector.ActionFor(clientImage!, state);
+            if (buttonAction is not null) return buttonAction.Value;
+            if (state.Equals("reward", StringComparison.OrdinalIgnoreCase) && RewardScreenDetector.ActionFor(clientImage!) is (int X, int Y) rewardAction) return rewardAction;
+            if (_states.TryGetValue(state, out StateRuntime? adaptiveState))
+            {
+                AdaptiveStateMatch match = MatchState(adaptiveState, clientImage!);
+                if (match.Score >= adaptiveState.Definition.Threshold * 0.70)
+                {
+                    return match.MapNearestPoint(adaptiveState.Definition.ActionX, adaptiveState.Definition.ActionY);
+                }
+            }
+            if (Manifest.ExtraActions.TryGetValue(state, out int[]? adaptivePoint) && adaptivePoint.Length >= 2)
+            {
+                if (state is "difficulty_minus" or "difficulty_plus" && BestAdaptiveLayout(_difficulties, clientImage!) is { } difficulty)
+                {
+                    return difficulty.Match.MapPoint(adaptivePoint[0], adaptivePoint[1]);
+                }
+                if (_states.TryGetValue("map_select", out StateRuntime? mapSelect))
+                {
+                    AdaptiveStateMatch match = MatchState(mapSelect, clientImage!);
+                    if (match.Score >= mapSelect.Definition.Threshold * 0.60) return match.MapGlobalPoint(adaptivePoint[0], adaptivePoint[1]);
+                }
+            }
+        }
         if (Manifest.ExtraActions.TryGetValue(state, out int[]? point) && point.Length >= 2) return (point[0], point[1]);
         if (_states.TryGetValue(state, out StateRuntime? runtime)) return (runtime.Definition.ActionX, runtime.Definition.ActionY);
         throw new KeyNotFoundException($"Detector pack does not define an action for '{state}'.");
@@ -152,6 +270,46 @@ public sealed class CompiledDetectorPack : IDetectorPack
             if (valid && scores.Count != 0) best = Math.Max(best, Median(scores));
         }
         return best;
+    }
+
+    private static AdaptiveStateMatch MatchState(StateRuntime runtime, ImageFrame image)
+    {
+        List<(DetectorRegionReference Definition, AdaptiveRegionMatch Match)> regions = [];
+        for (int index = 0; index < runtime.Definition.Regions.Count; index++)
+        {
+            DetectorRegionReference definition = runtime.Definition.Regions[index];
+            AdaptiveRegionMatch match = AdaptiveUiMatcher.Find(runtime.References[index], image, definition.Region);
+            regions.Add((definition, match));
+        }
+        return new AdaptiveStateMatch(Median(regions.Select(region => region.Match.Score).ToArray()), regions);
+    }
+
+    private static double ScoreAdaptiveState(string name, StateRuntime runtime, ImageFrame image)
+    {
+        double score = MatchState(runtime, image).Score;
+        if (name is "map_select" or "map_preview" or "confirm" or "extract_confirm" or "disconnect")
+        {
+            score = Math.Max(score, ActionButtonDetector.Score(image, name));
+        }
+        return score;
+    }
+
+    private double ScoreConfiguredState(string name, StateRuntime runtime, ImageFrame image, bool useSpecializedDetectors)
+    {
+        double fixedScore = ScoreState(runtime, image, [(0, 0)]);
+        if (useSpecializedDetectors)
+        {
+            if (name.Equals("start", StringComparison.OrdinalIgnoreCase)) return StartDialogDetector.Score(image);
+            if (name.Equals("checkpoint", StringComparison.OrdinalIgnoreCase)) return PauseButtonDetector.ScoreCheckpoint(image);
+            if (name.Equals("continue", StringComparison.OrdinalIgnoreCase)) return PauseButtonDetector.ScoreContinue(image);
+            if (name.Equals("reward", StringComparison.OrdinalIgnoreCase)) return Math.Max(fixedScore, RewardScreenDetector.Score(image));
+            if (name is "victory" or "defeat") return Math.Max(fixedScore, TerminalScreenDetector.Score(image, name));
+            if (name is "map_select" or "map_preview" or "confirm" or "extract_confirm" or "disconnect")
+            {
+                return Math.Max(fixedScore, ActionButtonDetector.Score(image, name));
+            }
+        }
+        return fixedScore;
     }
 
     private int? BestSelection(
@@ -195,6 +353,32 @@ public sealed class CompiledDetectorPack : IDetectorPack
         return ranked[0].Value;
     }
 
+    private int? BestAdaptiveSelection(
+        IReadOnlyDictionary<int, SelectionRuntime> selections,
+        ImageFrame image,
+        double minimumScore,
+        double minimumGap)
+    {
+        ValidateClient(image);
+        (double Score, int Value)[] ranked = selections
+            .Select(pair => (AdaptiveUiMatcher.Find(pair.Value.Reference, image, pair.Value.Definition.Region).Score, pair.Key))
+            .OrderByDescending(value => value.Item1)
+            .ToArray();
+        if (ranked.Length < 2 || ranked[0].Score < minimumScore || ranked[0].Score - ranked[1].Score < minimumGap) return null;
+        return ranked[0].Value;
+    }
+
+    private static (SelectionRuntime Runtime, AdaptiveRegionMatch Match)? BestAdaptiveLayout(
+        IReadOnlyDictionary<int, SelectionRuntime> selections,
+        ImageFrame image)
+    {
+        (SelectionRuntime Runtime, AdaptiveRegionMatch Match)[] ranked = selections.Values
+            .Select(runtime => (runtime, AdaptiveUiMatcher.Find(runtime.Reference, image, runtime.Definition.Region)))
+            .OrderByDescending(value => value.Item2.Score)
+            .ToArray();
+        return ranked.Length == 0 || ranked[0].Match.Score < 0.35 ? null : ranked[0];
+    }
+
     private static double ScoreSelection(SelectionRuntime runtime, ImageFrame image, IReadOnlyList<(int X, int Y)> offsets)
     {
         double best = 0;
@@ -208,10 +392,10 @@ public sealed class CompiledDetectorPack : IDetectorPack
         return best;
     }
 
-    private (bool Observed, int? Selected) DifficultyFromHue(ImageFrame image)
+    private (bool Observed, int? Selected) DifficultyFromHue(ImageFrame image, ScreenRegion? candidateRegion)
     {
         IReadOnlyDictionary<int, double>? prototypes = Manifest.DifficultyHuePrototypes;
-        ScreenRegion? configuredRegion = Manifest.DifficultyHueRegion;
+        ScreenRegion? configuredRegion = candidateRegion;
         if ((prototypes is null || configuredRegion is null) && Manifest.PackId.Equals(AnimeExpeditionsDetectorSpec.PackId, StringComparison.OrdinalIgnoreCase))
         {
             prototypes = AnimeExpeditionsDetectorSpec.DifficultyHuePrototypes;
@@ -255,9 +439,10 @@ public sealed class CompiledDetectorPack : IDetectorPack
         return (true, ranked[0].Value);
     }
 
-    private double? NodeHue(ImageFrame image)
+    private static double? NodeHue(ImageFrame image, ScreenRegion region)
     {
-        ImageFrame crop = image.Crop(Manifest.NodeHueRegion);
+        if (!region.FitsWithin(image.Width, image.Height)) return null;
+        ImageFrame crop = image.Crop(region);
         using Mat rgb = ImageCodec.ToMat(crop);
         using Mat hsv = new();
         Cv2.CvtColor(rgb, hsv, ColorConversionCodes.RGB2HSV);
@@ -275,6 +460,16 @@ public sealed class CompiledDetectorPack : IDetectorPack
         if (hues.Count < 12) return null;
         hues.Sort();
         return hues[hues.Count / 2];
+    }
+
+    private static ImageFrame ResizeRgb(ImageFrame image, int width, int height)
+    {
+        if (image.Format != PixelFormat.Rgb24) throw new ArgumentException("Resize input must be RGB.", nameof(image));
+        if (image.Width == width && image.Height == height) return image;
+        using Mat source = ImageCodec.ToMat(image);
+        using Mat resized = new();
+        Cv2.Resize(source, resized, new Size(width, height), 0, 0, image.Width > width || image.Height > height ? InterpolationFlags.Area : InterpolationFlags.Linear);
+        return ImageCodec.FromMat(resized, PixelFormat.Rgb24);
     }
 
     private void ValidateClient(ImageFrame image)

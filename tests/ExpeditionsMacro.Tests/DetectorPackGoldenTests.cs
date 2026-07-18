@@ -4,6 +4,7 @@ using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
 using ExpeditionsMacro.Vision.Infrastructure;
 using ExpeditionsMacro.Vision.Packs;
+using OpenCvSharp;
 
 namespace ExpeditionsMacro.Tests;
 
@@ -59,8 +60,40 @@ public sealed class DetectorPackGoldenTests
             }
         }
 
-        Assert.Equal(196, checkedImages);
+        Assert.Equal(197, checkedImages);
         Assert.True(failures.Length == 0, $"Compiled detector regressions:{Environment.NewLine}{failures}");
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void EveryCapturedUiDataset_ClassifiesAsItsExpectedState()
+    {
+        if (!DatasetsAvailable()) return;
+        CompiledDetectorPack pack = Pack.Value;
+        StringBuilder failures = new();
+        int checkedImages = 0;
+        foreach ((string expected, string[] datasets) in StateDatasets)
+        {
+            foreach (string dataset in datasets)
+            {
+                foreach (string file in Pngs(dataset))
+                {
+                    IReadOnlyDictionary<string, double> scores = pack.ScoreStates(ImageCodec.Load(file));
+                    string? actual = pack.Classify(scores);
+                    checkedImages++;
+                    if (!string.Equals(expected, actual, StringComparison.OrdinalIgnoreCase))
+                    {
+                        string passing = string.Join(", ", pack.Manifest.States
+                            .Where(state => scores[state.Name] >= state.Threshold)
+                            .Select(state => $"{state.Name}={scores[state.Name]:P1}"));
+                        failures.AppendLine($"expected {expected,-16} got {actual ?? "none",-16} {dataset}/{Path.GetFileName(file)}; passing: {passing}");
+                    }
+                }
+            }
+        }
+
+        Assert.Equal(197, checkedImages);
+        Assert.True(failures.Length == 0, $"Cross-state detector regressions:{Environment.NewLine}{failures}");
     }
 
     [Fact]
@@ -113,6 +146,160 @@ public sealed class DetectorPackGoldenTests
         }
 
         Assert.Empty(failures);
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void PauseButtonDetectors_DoNotMatchOtherCapturedUiStates()
+    {
+        if (!DatasetsAvailable()) return;
+        CompiledDetectorPack pack = Pack.Value;
+        double continueThreshold = pack.Manifest.States.Single(value => value.Name == "continue").Threshold;
+        double checkpointThreshold = pack.Manifest.States.Single(value => value.Name == "checkpoint").Threshold;
+        List<string> failures = [];
+        foreach ((string state, string[] datasets) in StateDatasets.Where(pair => pair.Key is not "continue" and not "checkpoint"))
+        {
+            foreach (string dataset in datasets)
+            {
+                foreach (string file in Pngs(dataset))
+                {
+                    IReadOnlyDictionary<string, double> scores = pack.ScoreStates(ImageCodec.Load(file));
+                    if (scores["continue"] >= continueThreshold) failures.Add($"continue matched {state}: {scores["continue"]:P1} {dataset}/{Path.GetFileName(file)}");
+                    if (scores["checkpoint"] >= checkpointThreshold) failures.Add($"checkpoint matched {state}: {scores["checkpoint"]:P1} {dataset}/{Path.GetFileName(file)}");
+                }
+            }
+        }
+
+        Assert.Empty(failures);
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void ContinueDetector_TracksTheMovedButtonFromTheReportedClip()
+    {
+        if (!DatasetsAvailable()) return;
+        string file = Pngs("Expedition_Continue_Button").Last();
+        ImageFrame image = ImageCodec.Load(file);
+        CompiledDetectorPack pack = Pack.Value;
+
+        Assert.True(pack.ScoreStates(image)["continue"] >= 0.99);
+        (int x, int y) = pack.ActionFor("continue", image);
+        Assert.InRange(x, 398, 407);
+        Assert.InRange(y, 476, 487);
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void CheckpointDetector_UsesTheVisibleExtractAndContinuePair()
+    {
+        if (!DatasetsAvailable()) return;
+        ImageFrame image = ImageCodec.Load(Pngs("Expedition_Checkpoint").First());
+        CompiledDetectorPack pack = Pack.Value;
+
+        Assert.True(pack.ScoreStates(image)["checkpoint"] >= 0.99);
+        (int continueX, int continueY) = pack.ActionFor("checkpoint", image);
+        (int extractX, int extractY) = pack.ActionFor("extract", image);
+        Assert.InRange(continueX, 442, 453);
+        Assert.InRange(extractX, 354, 365);
+        Assert.InRange(Math.Abs(continueY - extractY), 0, 2);
+    }
+
+    [Theory]
+    [InlineData("disconnect", "Roblox_Disconnect")]
+    [InlineData("lobby", "Lobby_UI")]
+    [InlineData("play", "Play_UI")]
+    [InlineData("map_select", "Expedition_Map_Select_Map1")]
+    [InlineData("map_preview", "Expedition_Map_Preview_Map1")]
+    [InlineData("victory", "Expedition_Victory_UI")]
+    [InlineData("defeat", "Expedition_Defeat_UI")]
+    [InlineData("extract_confirm", "Expedition_Checkpoint_Extract_Confirm")]
+    [InlineData("reward", "Expedition_Reward_Select")]
+    [InlineData("confirm", "Expedition_Continue_Button_Confirm")]
+    [InlineData("checkpoint", "Expedition_Checkpoint")]
+    [InlineData("start", "Expedition_Map1_Prestart")]
+    [InlineData("continue", "Expedition_Continue_Button")]
+    [Trait("Category", "Golden")]
+    public void StateDetectionAndActions_TolerateTwentyPixelVerticalTranslation(string state, string dataset)
+    {
+        if (!DatasetsAvailable()) return;
+        AssertTransformedState(state, dataset, scale: 1, deltaX: 0, deltaY: -20);
+    }
+
+    [Theory]
+    [InlineData("disconnect", "Roblox_Disconnect")]
+    [InlineData("lobby", "Lobby_UI")]
+    [InlineData("play", "Play_UI")]
+    [InlineData("map_select", "Expedition_Map_Select_Map1")]
+    [InlineData("map_preview", "Expedition_Map_Preview_Map1")]
+    [InlineData("victory", "Expedition_Victory_UI")]
+    [InlineData("defeat", "Expedition_Defeat_UI")]
+    [InlineData("extract_confirm", "Expedition_Checkpoint_Extract_Confirm")]
+    [InlineData("reward", "Expedition_Reward_Select")]
+    [InlineData("confirm", "Expedition_Continue_Button_Confirm")]
+    [InlineData("checkpoint", "Expedition_Checkpoint")]
+    [InlineData("start", "Expedition_Map1_Prestart")]
+    [InlineData("continue", "Expedition_Continue_Button")]
+    [Trait("Category", "Golden")]
+    public void StateDetectionAndActions_TolerateTenPercentUiScaleDifference(string state, string dataset)
+    {
+        if (!DatasetsAvailable()) return;
+        AssertTransformedState(state, dataset, scale: 0.90, deltaX: 0, deltaY: 0);
+    }
+
+    [Theory]
+    [InlineData("disconnect", "Roblox_Disconnect")]
+    [InlineData("lobby", "Lobby_UI")]
+    [InlineData("play", "Play_UI")]
+    [InlineData("map_select", "Expedition_Map_Select_Map1")]
+    [InlineData("map_preview", "Expedition_Map_Preview_Map1")]
+    [InlineData("victory", "Expedition_Victory_UI")]
+    [InlineData("defeat", "Expedition_Defeat_UI")]
+    [InlineData("extract_confirm", "Expedition_Checkpoint_Extract_Confirm")]
+    [InlineData("reward", "Expedition_Reward_Select")]
+    [InlineData("confirm", "Expedition_Continue_Button_Confirm")]
+    [InlineData("checkpoint", "Expedition_Checkpoint")]
+    [InlineData("start", "Expedition_Map1_Prestart")]
+    [InlineData("continue", "Expedition_Continue_Button")]
+    [Trait("Category", "Golden")]
+    public void StateDetectionAndActions_TolerateCombinedScaleAndTranslation(string state, string dataset)
+    {
+        if (!DatasetsAvailable()) return;
+        AssertTransformedState(state, dataset, scale: 0.90, deltaX: 0, deltaY: -12);
+    }
+
+    [Theory]
+    [InlineData("disconnect", "Roblox_Disconnect")]
+    [InlineData("lobby", "Lobby_UI")]
+    [InlineData("play", "Play_UI")]
+    [InlineData("map_select", "Expedition_Map_Select_Map1")]
+    [InlineData("map_preview", "Expedition_Map_Preview_Map1")]
+    [Trait("Category", "Golden")]
+    public void RecoveryDetection_ToleratesTranslatedAndScaledLayout(string expected, string dataset)
+    {
+        if (!DatasetsAvailable()) return;
+        ImageFrame transformed = Transform(ImageCodec.Load(Pngs(dataset).First()), 0.90, 0, -12);
+        Assert.Equal(expected, Pack.Value.RecoveryState(transformed));
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void MapControls_ClickTheirTransformedLocations()
+    {
+        if (!DatasetsAvailable()) return;
+        CompiledDetectorPack pack = Pack.Value;
+        ImageFrame original = ImageCodec.Load(Pngs("Expedition_Map_Select_Map1").First());
+        const double scale = 0.90;
+        const int deltaX = 0;
+        const int deltaY = -12;
+        ImageFrame transformed = Transform(original, scale, deltaX, deltaY);
+        foreach (string action in new[] { "map_1", "map_2", "map_3", "difficulty_minus", "difficulty_plus", "select_stage" })
+        {
+            (int originalX, int originalY) = pack.ActionFor(action, original);
+            (int expectedX, int expectedY) = TransformPoint(originalX, originalY, original.Width, original.Height, scale, deltaX, deltaY);
+            (int actualX, int actualY) = pack.ActionFor(action, transformed);
+            double distance = Math.Sqrt(Math.Pow(actualX - expectedX, 2) + Math.Pow(actualY - expectedY, 2));
+            Assert.True(distance <= 14, $"{action} transformed action was ({actualX}, {actualY}); expected near ({expectedX}, {expectedY}).");
+        }
     }
 
     [Fact]
@@ -194,6 +381,93 @@ public sealed class DetectorPackGoldenTests
             Assert.Empty(Pack.Value.RemainingUnitKeys(ImageCodec.Load(file), configured));
         }
     }
+
+    [Theory]
+    [InlineData(1, "Expedition_Map_Select_Map1")]
+    [InlineData(2, "Expedition_Map_Select_Map2")]
+    [InlineData(3, "Expedition_Map_Select_Map3")]
+    [Trait("Category", "Golden")]
+    public void SelectedMap_ToleratesTranslatedAndScaledLayout(int expected, string dataset)
+    {
+        if (!DatasetsAvailable()) return;
+        ImageFrame transformed = Transform(ImageCodec.Load(Pngs(dataset).First()), 0.90, 0, -12);
+        Assert.Equal(expected, Pack.Value.SelectedMap(transformed));
+    }
+
+    [Theory]
+    [InlineData(1, "Expedition_Map_Select_Difficultly1")]
+    [InlineData(2, "Expedition_Map_Select_Difficultly2")]
+    [InlineData(3, "Expedition_Map_Select_Difficultly3")]
+    [Trait("Category", "Golden")]
+    public void SelectedDifficulty_ToleratesTranslatedAndScaledLayout(int expected, string dataset)
+    {
+        if (!DatasetsAvailable()) return;
+        ImageFrame transformed = Transform(ImageCodec.Load(Pngs(dataset).First()), 0.90, 0, -12);
+        Assert.Equal(expected, Pack.Value.SelectedDifficulty(transformed));
+    }
+
+    [Theory]
+    [InlineData("defense", "Expedition_Defense_Node")]
+    [InlineData("assault", "Expedition_Assault_Node")]
+    [InlineData("elite", "Expedition_Elite_Node")]
+    [InlineData("boss", "Expedition_Boss_Node")]
+    [InlineData("checkpoint", "Expedition_Checkpoint_Node")]
+    [Trait("Category", "Golden")]
+    public void NodeHue_ToleratesTranslatedAndScaledProgressBar(string expected, string dataset)
+    {
+        if (!DatasetsAvailable()) return;
+        ImageFrame transformed = Transform(ImageCodec.Load(Pngs(dataset).First()), 0.90, 0, -12);
+        Assert.Equal(expected, Pack.Value.CurrentNodeType(transformed));
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void EmptyHotbar_ToleratesTranslatedAndScaledLayout()
+    {
+        if (!DatasetsAvailable()) return;
+        HashSet<int> configured = [1, 2, 3, 4, 5, 6];
+        ImageFrame transformed = Transform(ImageCodec.Load(Pngs("Expedition_Empty_Unit_Bar").First()), 0.90, 0, -12);
+        Assert.Empty(Pack.Value.RemainingUnitKeys(transformed, configured));
+    }
+
+    private static void AssertTransformedState(string expectedState, string dataset, double scale, int deltaX, int deltaY)
+    {
+        CompiledDetectorPack pack = Pack.Value;
+        ImageFrame original = ImageCodec.Load(Pngs(dataset).First());
+        ImageFrame transformed = Transform(original, scale, deltaX, deltaY);
+        IReadOnlyDictionary<string, double> scores = pack.ScoreStates(transformed);
+        DetectorStateDefinition definition = pack.Manifest.States.Single(value => value.Name == expectedState);
+        Assert.True(scores[expectedState] >= definition.Threshold, $"{expectedState} transformed score was {scores[expectedState]:P1}.");
+        Assert.Equal(expectedState, pack.Classify(scores));
+
+        (int originalX, int originalY) = pack.ActionFor(expectedState, original);
+        (int expectedX, int expectedY) = TransformPoint(originalX, originalY, original.Width, original.Height, scale, deltaX, deltaY);
+        (int actualX, int actualY) = pack.ActionFor(expectedState, transformed);
+        double distance = Math.Sqrt(Math.Pow(actualX - expectedX, 2) + Math.Pow(actualY - expectedY, 2));
+        Assert.True(distance <= 12, $"{expectedState} transformed action was ({actualX}, {actualY}); expected near ({expectedX}, {expectedY}).");
+    }
+
+    private static ImageFrame Transform(ImageFrame image, double scale, int deltaX, int deltaY)
+    {
+        using Mat source = ImageCodec.ToMat(image);
+        using Mat target = new(image.Height, image.Width, source.Type(), Scalar.Black);
+        double translateX = (1 - scale) * (image.Width - 1) / 2d + deltaX;
+        double translateY = (1 - scale) * (image.Height - 1) / 2d + deltaY;
+        using Mat matrix = new(2, 3, MatType.CV_64F);
+        matrix.Set(0, 0, scale);
+        matrix.Set(0, 1, 0d);
+        matrix.Set(0, 2, translateX);
+        matrix.Set(1, 0, 0d);
+        matrix.Set(1, 1, scale);
+        matrix.Set(1, 2, translateY);
+        Cv2.WarpAffine(source, target, matrix, new Size(image.Width, image.Height), InterpolationFlags.Linear, BorderTypes.Constant, Scalar.Black);
+        return ImageCodec.FromMat(target, PixelFormat.Rgb24);
+    }
+
+    private static (int X, int Y) TransformPoint(int x, int y, int width, int height, double scale, int deltaX, int deltaY) =>
+        (
+            (int)Math.Round((x - (width - 1) / 2d) * scale + (width - 1) / 2d + deltaX, MidpointRounding.AwayFromZero),
+            (int)Math.Round((y - (height - 1) / 2d) * scale + (height - 1) / 2d + deltaY, MidpointRounding.AwayFromZero));
 
     private static CompiledDetectorPack LoadPack()
     {

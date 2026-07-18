@@ -31,7 +31,7 @@ public interface IDetectorPack
 
     IReadOnlyList<int> RemainingUnitKeys(ExpeditionsMacro.Core.Imaging.ImageFrame clientImage, IReadOnlySet<int> unitKeys);
 
-    (int X, int Y) ActionFor(string state);
+    (int X, int Y) ActionFor(string state, ExpeditionsMacro.Core.Imaging.ImageFrame? clientImage = null);
 }
 
 public interface IDetectorPackRepository

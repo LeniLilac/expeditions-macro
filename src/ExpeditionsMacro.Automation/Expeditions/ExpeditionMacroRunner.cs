@@ -283,14 +283,14 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
             if (state == "reward")
             {
                 report("Reward", 0, "Selecting the first available reward card.", state, score);
-                await ClickActionAsync(window, detector, "reward", cancellationToken).ConfigureAwait(false);
+                await ClickActionAsync(window, detector, "reward", frame, cancellationToken).ConfigureAwait(false);
                 await Task.Delay(4300, cancellationToken).ConfigureAwait(false);
                 continue;
             }
             if (state == "confirm")
             {
                 report("Transition", 0, "Confirming the node transition.", state, score);
-                await ClickActionAsync(window, detector, "confirm", cancellationToken).ConfigureAwait(false);
+                await ClickActionAsync(window, detector, "confirm", frame, cancellationToken).ConfigureAwait(false);
                 await Task.Delay(2200, cancellationToken).ConfigureAwait(false);
                 continue;
             }
@@ -298,7 +298,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
             {
                 if (ExpeditionRunPolicy.ShouldExtract(preset, bosses))
                 {
-                    await ClickActionAsync(window, detector, "extract_confirm", cancellationToken).ConfigureAwait(false);
+                    await ClickActionAsync(window, detector, "extract_confirm", frame, cancellationToken).ConfigureAwait(false);
                     await Task.Delay(2200, cancellationToken).ConfigureAwait(false);
                 }
                 else
@@ -313,12 +313,14 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                 if (state == "checkpoint" && ExpeditionRunPolicy.ShouldExtract(preset, bosses))
                 {
                     report("Extraction", 0, $"Extraction target met after {bosses} boss node(s).", state, score);
-                    bool requested = await ExtractAtCheckpointAsync(window, detector, preset, report, log, cancellationToken).ConfigureAwait(false);
+                    bool requested = await ExtractAtCheckpointAsync(window, detector, preset, frame, report, log, cancellationToken).ConfigureAwait(false);
                     await Task.Delay(requested ? 1200 : 500, cancellationToken).ConfigureAwait(false);
                     continue;
                 }
                 await RetryRemainingUnitsAsync(window, placement, preset, detector, frame, log, cancellationToken).ConfigureAwait(false);
                 report("Transition", 0, $"Continuing from the {state} pause.", state, score);
+                // Placement retries can take several seconds. Re-capture the pause so
+                // the click follows its current control rather than a stale frame.
                 await ClickActionAsync(window, detector, state, cancellationToken).ConfigureAwait(false);
                 if (state is "checkpoint" or "continue") await WaitForConfirmationAsync(window, detector, preset, report, log, cancellationToken).ConfigureAwait(false);
                 await Task.Delay(2300, cancellationToken).ConfigureAwait(false);
@@ -330,12 +332,13 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         RobloxWindow window,
         IDetectorPack detector,
         ExpeditionPreset preset,
+        ImageFrame checkpointFrame,
         Action<string, int, string, string?, double?> report,
         Action<string, MacroEventLevel, string?, double?> log,
         CancellationToken cancellationToken)
     {
         log("Checkpoint has an Extract button; opening extraction confirmation.", MacroEventLevel.Information, "checkpoint", null);
-        await ClickActionAsync(window, detector, "extract", cancellationToken).ConfigureAwait(false);
+        await ClickActionAsync(window, detector, "extract", checkpointFrame, cancellationToken).ConfigureAwait(false);
         bool found = await WaitForStateWithTimeoutAsync(window, detector, "extract_confirm", TimeSpan.FromSeconds(6), preset, report, cancellationToken).ConfigureAwait(false);
         if (!found)
         {
@@ -664,10 +667,19 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         }
     }
 
-    private async Task ClickActionAsync(RobloxWindow window, IDetectorPack detector, string state, CancellationToken cancellationToken)
+    private Task ClickActionAsync(RobloxWindow window, IDetectorPack detector, string state, CancellationToken cancellationToken) =>
+        ClickActionAsync(window, detector, state, clientImage: null, cancellationToken);
+
+    private async Task ClickActionAsync(
+        RobloxWindow window,
+        IDetectorPack detector,
+        string state,
+        ImageFrame? clientImage,
+        CancellationToken cancellationToken)
     {
         Focus(window);
-        (int x, int y) = detector.ActionFor(state);
+        ImageFrame actionFrame = clientImage ?? CaptureClient(window, detector);
+        (int x, int y) = detector.ActionFor(state, actionFrame);
         await _automation.ClickClientAsync(window, x, y, cancellationToken).ConfigureAwait(false);
     }
 

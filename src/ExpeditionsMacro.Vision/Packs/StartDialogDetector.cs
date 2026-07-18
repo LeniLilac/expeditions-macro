@@ -9,9 +9,21 @@ internal static class StartDialogDetector
 
     private readonly record struct GreenComponent(int Count, int Left, int Top, int Width, int Height);
 
-    public static double Score(ImageFrame image)
+    private readonly record struct ButtonMatch(double Score, GreenComponent Component);
+
+    public static double Score(ImageFrame image) => Find(image)?.Score ?? 0;
+
+    public static (int X, int Y)? ActionFor(ImageFrame image)
     {
-        if (image.Format != PixelFormat.Rgb24 || !SearchRegion.FitsWithin(image.Width, image.Height)) return 0;
+        if (Find(image) is not ButtonMatch match) return null;
+        return (
+            (int)Math.Round(match.Component.Left + (match.Component.Width - 1) / 2d, MidpointRounding.AwayFromZero),
+            (int)Math.Round(match.Component.Top + (match.Component.Height - 1) / 2d, MidpointRounding.AwayFromZero));
+    }
+
+    private static ButtonMatch? Find(ImageFrame image)
+    {
+        if (image.Format != PixelFormat.Rgb24 || !SearchRegion.FitsWithin(image.Width, image.Height)) return null;
 
         int width = SearchRegion.Width;
         int height = SearchRegion.Height;
@@ -32,7 +44,7 @@ internal static class StartDialogDetector
             }
         }
 
-        double best = 0;
+        ButtonMatch? best = null;
         for (int start = 0; start < green.Length; start++)
         {
             if (!green[start] || visited[start]) continue;
@@ -70,7 +82,8 @@ internal static class StartDialogDetector
                 SearchRegion.Y + minimumY,
                 maximumX - minimumX + 1,
                 maximumY - minimumY + 1);
-            best = Math.Max(best, ScoreComponent(image, component));
+            double score = ScoreComponent(image, component);
+            if (score > 0 && (best is null || score > best.Value.Score)) best = new ButtonMatch(score, component);
 
             void Enqueue(int index)
             {
@@ -93,7 +106,7 @@ internal static class StartDialogDetector
         double centerY = component.Top + (component.Height - 1) / 2d;
         double normalizedDistance = Math.Sqrt(
             Math.Pow((centerX - 404) / 45, 2) +
-            Math.Pow((centerY - 180) / 28, 2));
+            Math.Pow((centerY - 180) / 45, 2));
         double centerScore = Math.Clamp(1 - normalizedDistance, 0, 1);
         if (centerScore == 0) return 0;
 
