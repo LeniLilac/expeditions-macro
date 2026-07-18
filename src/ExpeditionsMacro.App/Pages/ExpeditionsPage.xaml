@@ -81,7 +81,7 @@
                 <Grid>
                     <StackPanel>
                         <TextBlock Style="{StaticResource SectionTitle}" Text="Timing and camera preparation" />
-                        <TextBlock Margin="0,4,0,0" Style="{StaticResource Caption}" Text="Safe defaults match the prototype. Adjust only when a server or machine needs more time." />
+                        <TextBlock Margin="0,4,0,0" Style="{StaticResource Caption}" Text="Safe defaults work for most systems. Adjust only when a server or machine needs more time." />
                     </StackPanel>
                     <Button x:Name="TuningToggle" HorizontalAlignment="Right" Height="34" Content="Show tuning" Click="TuningToggle_Click" />
                 </Grid>

@@ -27,7 +27,6 @@ It uses screen capture and ordinary Windows input. It does not inject into Roblo
 1. Open the [latest GitHub Release](https://github.com/LeniLilac/expeditions-macro/releases/latest).
 2. Download `ExpeditionsMacro-<version>-win-x64-setup.exe`, or the portable ZIP.
 3. Verify the file against `SHA256SUMS.txt` if desired.
-4. Close the old Python prototype before normal use. The new app can still start when another tool owns F6, using a non-exclusive fallback listener.
 
 Windows 10 or Windows 11 x64 is required. Release builds are self-contained; a separate .NET installation is not required.
 
@@ -53,9 +52,9 @@ Camera regions are saved relative to the Roblox client. When aligning, the app t
 4. For each unit, press its top-row number and click the placement location.
 5. Press **F6** again to finish and save.
 
-Every row can be edited afterward: unit key, client-relative X/Y, and delay. **Test playback** uses the same model and the Roblox-compatible click path, including the small pre-click mouse movement needed for Roblox to register the destination.
+Every row can be edited afterward: unit key, client-relative X/Y, and delay. **Test playback** replays the model through the same input path used during an Expedition run.
 
-Saving the same name overwrites the prior model atomically.
+Saving the same name replaces the previous model.
 
 ### 3. Configure Expeditions
 
@@ -69,7 +68,7 @@ Saving the same name overwrites the prior model atomically.
 5. Optionally paste a standard, Canary, or PTB Discord webhook.
 6. Save the preset and press **F6**.
 
-One match in the fixed active-difficulty slot is sufficient. Transition frames are ignored while the carousel animation settles; the app does not click away merely to obtain a second matching frame.
+The app waits for the difficulty carousel animation to settle and verifies the active difficulty before continuing.
 
 ## Runtime behavior
 
@@ -113,7 +112,7 @@ dotnet build ExpeditionsMacro.slnx -c Debug
 dotnet test tests/ExpeditionsMacro.Tests/ExpeditionsMacro.Tests.csproj -c Debug --filter "Category!=Golden"
 ```
 
-The local 270-image golden suite also validates every supplied state, map, difficulty, animation, reward rarity, node hue, and empty-hotbar capture. Raw gameplay datasets are excluded from the public repository; see [datasets/README.md](datasets/README.md).
+The public test command skips optional golden-image regressions because raw gameplay captures are not redistributed. Maintainers can provide the local dataset described in [datasets/README.md](datasets/README.md) to run the complete detector regression suite.
 
 Build release artifacts:
 
