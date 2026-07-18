@@ -1,0 +1,122 @@
+<UserControl x:Class="ExpeditionsMacro.App.Pages.ExpeditionsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Grid Margin="34,27,40,28" MaxWidth="1060" HorizontalAlignment="Left">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <Grid Margin="0,0,0,22">
+            <StackPanel>
+                <TextBlock Style="{StaticResource PageTitle}" Text="Expeditions" />
+                <TextBlock Margin="0,7,0,0" Style="{StaticResource PageSubtitle}" Text="Prepare camera and units, advance every node, recover from lobby or disconnects, then repeat." />
+            </StackPanel>
+            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                <Button x:Name="StartButton" Style="{StaticResource PrimaryButton}" Content="Start macro  F6" Click="Start_Click" />
+                <Button x:Name="StopButton" Margin="8,0,0,0" Style="{StaticResource DangerButton}" Content="Stop and restore  F6" IsEnabled="False" Click="Stop_Click" />
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="1" Padding="0,0,0,18" Margin="0,0,0,18" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="90" /><ColumnDefinition Width="290" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Preset" />
+                <ComboBox x:Name="PresetCombo" Grid.Column="1" DisplayMemberPath="Name" SelectionChanged="PresetCombo_SelectionChanged" />
+                <Button Grid.Column="2" Margin="8,0,0,0" Content="Save preset" Click="SavePreset_Click" />
+                <Button Grid.Column="3" Margin="8,0,0,0" Content="New" Click="NewPreset_Click" />
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="24" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Style="{StaticResource SectionTitle}" Text="Route and completion" />
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="125" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="48" /><RowDefinition Height="48" /><RowDefinition Height="48" /><RowDefinition Height="48" /><RowDefinition Height="48" /></Grid.RowDefinitions>
+                    <TextBlock Style="{StaticResource FieldLabel}" Text="Preset name" /><TextBox x:Name="PresetNameText" Grid.Column="1" Text="Expedition route" />
+                    <TextBlock Grid.Row="1" Style="{StaticResource FieldLabel}" Text="Map" />
+                    <ComboBox x:Name="MapCombo" Grid.Row="1" Grid.Column="1" SelectedIndex="0"><ComboBoxItem Tag="1" Content="Map 1 · School Grounds" /><ComboBoxItem Tag="2" Content="Map 2 · Flower Forest" /><ComboBoxItem Tag="3" Content="Map 3 · Rose Kingdom" /></ComboBox>
+                    <TextBlock Grid.Row="2" Style="{StaticResource FieldLabel}" Text="Difficulty" />
+                    <ComboBox x:Name="DifficultyCombo" Grid.Row="2" Grid.Column="1" SelectedIndex="0"><ComboBoxItem Tag="1" Content="Difficulty 1" /><ComboBoxItem Tag="2" Content="Difficulty 2" /><ComboBoxItem Tag="3" Content="Difficulty 3" /></ComboBox>
+                    <CheckBox x:Name="ExtractCheck" Grid.Row="3" Grid.ColumnSpan="2" VerticalAlignment="Center" IsChecked="True" Content="Extract at a checkpoint" Checked="ExtractCheck_Changed" Unchecked="ExtractCheck_Changed" />
+                    <Grid Grid.Row="4" Grid.ColumnSpan="2">
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Boss nodes before extract" />
+                        <TextBox x:Name="BossTargetText" Width="76" HorizontalAlignment="Right" Text="1" />
+                    </Grid>
+                </Grid>
+                <CheckBox x:Name="AutoRecoverCheck" Margin="0,12,0,0" IsChecked="True" Content="Return to the configured route after lobby or disconnect" />
+                <TextBlock Margin="25,5,0,0" Style="{StaticResource Caption}" Text="A target of 0 extracts at the first real in-run checkpoint. The spawn is ignored because no Extract button is present." />
+            </StackPanel>
+
+            <StackPanel Grid.Column="2">
+                <TextBlock Style="{StaticResource SectionTitle}" Text="Models and detection" />
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="125" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="52" /><RowDefinition Height="52" /><RowDefinition Height="52" /></Grid.RowDefinitions>
+                    <TextBlock Style="{StaticResource FieldLabel}" Text="Camera model" /><ComboBox x:Name="CameraCombo" Grid.Column="1" DisplayMemberPath="Name" />
+                    <TextBlock Grid.Row="1" Style="{StaticResource FieldLabel}" Text="Placement model" /><ComboBox x:Name="PlacementCombo" Grid.Row="1" Grid.Column="1" DisplayMemberPath="Name" />
+                    <TextBlock Grid.Row="2" Style="{StaticResource FieldLabel}" Text="Detector pack" />
+                    <ComboBox x:Name="DetectorCombo" Grid.Row="2" Grid.Column="1">
+                        <ComboBox.ItemTemplate><DataTemplate><TextBlock Text="{Binding Version}" /></DataTemplate></ComboBox.ItemTemplate>
+                    </ComboBox>
+                </Grid>
+                <TextBlock Margin="0,12,0,0" Style="{StaticResource FieldLabel}" Text="Discord webhook, optional" />
+                <Grid Margin="0,7,0,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="86" /></Grid.ColumnDefinitions>
+                    <PasswordBox x:Name="WebhookPassword" />
+                    <TextBox x:Name="WebhookVisible" Visibility="Collapsed" />
+                    <CheckBox x:Name="ShowWebhookCheck" Grid.Column="1" Margin="10,0,0,0" Content="Show" Checked="ShowWebhook_Changed" Unchecked="ShowWebhook_Changed" />
+                </Grid>
+                <TextBlock Margin="0,7,0,0" Style="{StaticResource Caption}" Text="Victory, defeat, and unexpected recovery messages include runtime, totals, and a Roblox screenshot." />
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="3" Margin="0,20,0,18" Padding="0,16,0,18" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,1">
+            <StackPanel>
+                <Grid>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Timing and camera preparation" />
+                        <TextBlock Margin="0,4,0,0" Style="{StaticResource Caption}" Text="Safe defaults match the prototype. Adjust only when a server or machine needs more time." />
+                    </StackPanel>
+                    <Button x:Name="TuningToggle" HorizontalAlignment="Right" Height="34" Content="Show tuning" Click="TuningToggle_Click" />
+                </Grid>
+                <Grid x:Name="TuningPanel" Margin="0,15,0,0" Visibility="Collapsed">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="12" /><ColumnDefinition Width="*" /><ColumnDefinition Width="12" /><ColumnDefinition Width="*" /><ColumnDefinition Width="12" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <StackPanel><TextBlock Style="{StaticResource FieldLabel}" Text="Zoom ticks" /><TextBox x:Name="ZoomTicksText" Margin="0,7,0,0" Text="30" /></StackPanel>
+                    <StackPanel Grid.Column="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Pitch drag, px" /><TextBox x:Name="PitchPixelsText" Margin="0,7,0,0" Text="1800" /></StackPanel>
+                    <StackPanel Grid.Column="4"><TextBlock Style="{StaticResource FieldLabel}" Text="Detection, ms" /><TextBox x:Name="PollText" Margin="0,7,0,0" Text="450" /></StackPanel>
+                    <StackPanel Grid.Column="6"><TextBlock Style="{StaticResource FieldLabel}" Text="Stable frames" /><TextBox x:Name="StableText" Margin="0,7,0,0" Text="2" /></StackPanel>
+                    <StackPanel Grid.Row="1" Margin="0,12,0,0"><TextBlock Style="{StaticResource FieldLabel}" Text="Key hold, ms" /><TextBox x:Name="KeyHoldText" Margin="0,7,0,0" Text="110" /></StackPanel>
+                    <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,12,0,0"><TextBlock Style="{StaticResource FieldLabel}" Text="Key-to-click, ms" /><TextBox x:Name="KeyDelayText" Margin="0,7,0,0" Text="250" /></StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="4">
+            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+            <Grid>
+                <StackPanel>
+                    <TextBlock x:Name="PhaseText" FontSize="15" FontWeight="SemiBold" Text="Ready to start." />
+                    <TextBlock x:Name="DetectionText" Margin="0,4,0,0" Style="{StaticResource Caption}" Text="Last detection: none" />
+                </StackPanel>
+                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                    <StackPanel Width="112"><TextBlock Style="{StaticResource Caption}" Text="Runtime" /><TextBlock x:Name="RuntimeText" Margin="0,3,0,0" FontWeight="SemiBold" Text="00:00:00" /></StackPanel>
+                    <StackPanel Width="92"><TextBlock Style="{StaticResource Caption}" Text="Repeats" /><TextBlock x:Name="RepeatsText" Margin="0,3,0,0" FontWeight="SemiBold" Text="0" /></StackPanel>
+                    <StackPanel Width="92"><TextBlock Style="{StaticResource Caption}" Text="Victories" /><TextBlock x:Name="VictoriesText" Margin="0,3,0,0" FontWeight="SemiBold" Foreground="{DynamicResource SuccessBrush}" Text="0" /></StackPanel>
+                    <StackPanel Width="92"><TextBlock Style="{StaticResource Caption}" Text="Defeats" /><TextBlock x:Name="DefeatsText" Margin="0,3,0,0" FontWeight="SemiBold" Foreground="{DynamicResource ErrorBrush}" Text="0" /></StackPanel>
+                    <StackPanel Width="92"><TextBlock Style="{StaticResource Caption}" Text="Recoveries" /><TextBlock x:Name="RecoveriesText" Margin="0,3,0,0" FontWeight="SemiBold" Foreground="{DynamicResource WarningBrush}" Text="0" /></StackPanel>
+                </StackPanel>
+            </Grid>
+            <ProgressBar x:Name="MacroProgress" Grid.Row="1" Margin="0,13,0,12" Minimum="0" Maximum="100" />
+            <Border Grid.Row="2" MinHeight="110" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
+                <TextBox x:Name="LogText" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" BorderThickness="0" FontFamily="Cascadia Mono, Consolas" FontSize="11" />
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

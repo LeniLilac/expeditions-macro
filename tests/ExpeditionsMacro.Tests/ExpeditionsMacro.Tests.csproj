@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ExpeditionsMacro.Automation\ExpeditionsMacro.Automation.csproj" />
+    <ProjectReference Include="..\..\src\ExpeditionsMacro.Core\ExpeditionsMacro.Core.csproj" />
+    <ProjectReference Include="..\..\src\ExpeditionsMacro.Vision\ExpeditionsMacro.Vision.csproj" />
+    <ProjectReference Include="..\..\src\ExpeditionsMacro.Windows\ExpeditionsMacro.Windows.csproj" />
+    <Using Include="Xunit" />
+  </ItemGroup>
+</Project>

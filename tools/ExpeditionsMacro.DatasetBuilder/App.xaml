@@ -1,0 +1,35 @@
+<Application x:Class="ExpeditionsMacro.DatasetBuilder.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <SolidColorBrush x:Key="CanvasBrush" Color="#0F1010" />
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#181819" />
+        <SolidColorBrush x:Key="RaisedBrush" Color="#252528" />
+        <SolidColorBrush x:Key="BorderBrush" Color="#333438" />
+        <SolidColorBrush x:Key="TextBrush" Color="#F0F1F2" />
+        <SolidColorBrush x:Key="MutedBrush" Color="#A1A4A8" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#6C7CFF" />
+        <Style TargetType="Window">
+            <Setter Property="FontFamily" Value="Segoe UI Variable Text, Segoe UI" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Background" Value="{StaticResource CanvasBrush}" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Height" Value="38" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="CaretBrush" Value="{StaticResource TextBrush}" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Height" Value="38" />
+            <Setter Property="MinWidth" Value="90" />
+            <Setter Property="Padding" Value="14,0" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="Background" Value="{StaticResource RaisedBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+        </Style>
+    </Application.Resources>
+</Application>

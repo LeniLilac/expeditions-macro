@@ -1,0 +1,93 @@
+using ExpeditionsMacro.Core.Geometry;
+using ExpeditionsMacro.Core.Imaging;
+using ExpeditionsMacro.Core.Models;
+
+namespace ExpeditionsMacro.Core.Abstractions;
+
+public readonly record struct RobloxWindow(nint Handle, string Title);
+
+public interface IRobloxAutomation
+{
+    RobloxWindow? FindWindow(string titleFragment = "Roblox");
+
+    RobloxWindow? ForegroundWindow();
+
+    ClientBounds GetClientBounds(RobloxWindow window);
+
+    WindowBounds GetWindowBounds(RobloxWindow window);
+
+    bool Focus(RobloxWindow window);
+
+    Task ResizeClientAsync(RobloxWindow window, int width, int height, CancellationToken cancellationToken);
+
+    void RestoreWindowBounds(RobloxWindow window, WindowBounds bounds);
+
+    ImageFrame CaptureScreen(ScreenRegion region);
+
+    ImageFrame CaptureClient(RobloxWindow window);
+
+    Task MoveCursorToClientCenterAsync(RobloxWindow window, CancellationToken cancellationToken);
+
+    Task ClickClientAsync(RobloxWindow window, int x, int y, CancellationToken cancellationToken);
+
+    Task DragCameraAsync(RobloxWindow window, int deltaX, int deltaY, int chunkPixels, CancellationToken cancellationToken);
+
+    Task ZoomOutFullyAsync(RobloxWindow window, int ticks, CancellationToken cancellationToken);
+
+    Task TapLeftControlAsync(RobloxWindow window, CancellationToken cancellationToken);
+
+    Task TapUnitKeyAsync(RobloxWindow window, int unitKey, int holdMilliseconds, CancellationToken cancellationToken);
+}
+
+public interface IGlobalHotkeyService : IDisposable
+{
+    event EventHandler? F6Pressed;
+
+    bool IsRegistered { get; }
+
+    void Start();
+
+    void Stop();
+}
+
+public interface IPlacementCaptureService
+{
+    Task<(int ClientWidth, int ClientHeight, IReadOnlyList<PlacementCapture> Captures)> RecordAsync(
+        RobloxWindow window,
+        Action<PlacementCapture>? captured,
+        Action<string>? status,
+        CancellationToken cancellationToken);
+}
+
+public interface ISecretProtector
+{
+    string Protect(string plaintext);
+
+    string Unprotect(string protectedValue);
+}
+
+public interface IDiscordNotifier
+{
+    Task SendAsync(DiscordNotification notification, CancellationToken cancellationToken);
+}
+
+public sealed record DiscordNotification
+{
+    public required string WebhookUrl { get; init; }
+
+    public required string Event { get; init; }
+
+    public required TimeSpan Runtime { get; init; }
+
+    public required int Victories { get; init; }
+
+    public required int Defeats { get; init; }
+
+    public required int MapNumber { get; init; }
+
+    public required int Difficulty { get; init; }
+
+    public required string Detail { get; init; }
+
+    public ImageFrame? Screenshot { get; init; }
+}

@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>ExpeditionsMacro.App</RootNamespace>
+    <AssemblyName>ExpeditionsMacro</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <Product>Expeditions Macro</Product>
+    <Description>A dependable Windows automation utility for Anime Expeditions.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ExpeditionsMacro.Automation\ExpeditionsMacro.Automation.csproj" />
+    <ProjectReference Include="..\ExpeditionsMacro.Core\ExpeditionsMacro.Core.csproj" />
+    <ProjectReference Include="..\ExpeditionsMacro.Vision\ExpeditionsMacro.Vision.csproj" />
+    <ProjectReference Include="..\ExpeditionsMacro.Windows\ExpeditionsMacro.Windows.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="..\..\assets\app.ico"><Link>Resources\app.ico</Link></Resource>
+    <Resource Include="..\..\assets\app-preview.png"><Link>Resources\app-preview.png</Link></Resource>
+    <Content Include="..\..\detector-packs\anime-expeditions-expeditions\1.0.0\**\*">
+      <Link>Resources\DetectorPacks\anime-expeditions-expeditions\1.0.0\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <RootNamespace>ExpeditionsMacro.Automation</RootNamespace>
+    <AssemblyName>ExpeditionsMacro.Automation</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ExpeditionsMacro.Core\ExpeditionsMacro.Core.csproj" />
+    <ProjectReference Include="..\ExpeditionsMacro.Vision\ExpeditionsMacro.Vision.csproj" />
+    <ProjectReference Include="..\ExpeditionsMacro.Windows\ExpeditionsMacro.Windows.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,804 @@
+using System.Diagnostics;
+using ExpeditionsMacro.Automation.Camera;
+using ExpeditionsMacro.Automation.Placement;
+using ExpeditionsMacro.Core.Abstractions;
+using ExpeditionsMacro.Core.Geometry;
+using ExpeditionsMacro.Core.Imaging;
+using ExpeditionsMacro.Core.Models;
+using ExpeditionsMacro.Core.Runtime;
+
+namespace ExpeditionsMacro.Automation.Expeditions;
+
+public sealed class ExpeditionMacroRunner : IGameModeWorkflow
+{
+    private static readonly HashSet<string> RecoveryStates = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "disconnect", "lobby", "play", "map_select", "map_preview",
+    };
+
+    private readonly IRobloxAutomation _automation;
+    private readonly CameraAlignmentEngine _camera;
+    private readonly PlacementService _placements;
+    private readonly IDiscordNotifier _discord;
+    private readonly object _notificationGate = new();
+    private readonly HashSet<Task> _pendingNotifications = [];
+
+    public ExpeditionMacroRunner(
+        IRobloxAutomation automation,
+        CameraAlignmentEngine camera,
+        PlacementService placements,
+        IDiscordNotifier discord)
+    {
+        _automation = automation;
+        _camera = camera;
+        _placements = placements;
+        _discord = discord;
+    }
+
+    public string GameId => "anime-expeditions";
+
+    public string ModeId => "expeditions";
+
+    public async Task RunAsync(
+        ExpeditionPreset preset,
+        CameraModel cameraModel,
+        PlacementModel placementModel,
+        IDetectorPack detector,
+        string webhookUrl,
+        IProgress<MacroProgress>? progress = null,
+        Action<MacroEvent>? log = null,
+        Action<ExpeditionRunSummary>? summaryChanged = null,
+        CancellationToken cancellationToken = default)
+    {
+        preset.Validate();
+        cameraModel.Manifest.Validate();
+        placementModel.Validate();
+        ValidateCompatibility(preset, cameraModel, placementModel, detector.Manifest);
+        RobloxWindow window = _automation.FindWindow() ?? throw new InvalidOperationException("No visible Roblox window was found.");
+        WindowBounds original = _automation.GetWindowBounds(window);
+        DateTimeOffset startedAt = DateTimeOffset.UtcNow;
+        Stopwatch runtime = Stopwatch.StartNew();
+        int repeats = 0;
+        int victories = 0;
+        int defeats = 0;
+        int recoveries = 0;
+        int bossesSeen = 0;
+        bool shiftLockEnabled = false;
+
+        void Write(string message, MacroEventLevel level = MacroEventLevel.Information, string? state = null, double? confidence = null) =>
+            log?.Invoke(new MacroEvent(DateTimeOffset.Now, level, message, state, confidence));
+        void PublishSummary() => summaryChanged?.Invoke(new ExpeditionRunSummary(startedAt, runtime.Elapsed, repeats, victories, defeats, recoveries, bossesSeen));
+        void Report(string phase, int percent, string message, string? state = null, double? confidence = null) =>
+            progress?.Report(new MacroProgress(phase, percent, message, state, confidence));
+
+        Write($"Using Roblox window '{window.Title}'.");
+        PublishSummary();
+        try
+        {
+            Focus(window);
+            await EnsureClientSizeAsync(window, detector.Manifest.ClientWidth, detector.Manifest.ClientHeight, Write, cancellationToken).ConfigureAwait(false);
+            string? initial = ProbeRecoveryState(window, detector);
+            if (initial is not null)
+            {
+                if (!preset.AutoRecover) throw new InvalidOperationException($"{Label(initial)} was recognized, but automatic recovery is disabled.");
+                bool unexpected = initial.Equals("disconnect", StringComparison.OrdinalIgnoreCase);
+                if (unexpected)
+                {
+                    recoveries++;
+                    PublishSummary();
+                }
+                await RecoverToPrestartAsync(window, initial, preset, detector, webhookUrl, unexpected, runtime, victories, defeats, Report, Write, cancellationToken).ConfigureAwait(false);
+            }
+
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                bossesSeen = 0;
+                PublishSummary();
+                try
+                {
+                    Report("Waiting", 0, "Waiting for the Expedition prestart screen.");
+                    await WaitForStateAsync(window, detector, "start", preset, Report, Write, cancellationToken).ConfigureAwait(false);
+                    Write("Prestart screen recognized. Preparing camera.", MacroEventLevel.Success);
+                    await PrepareCameraAsync(window, preset, cameraModel, value => shiftLockEnabled = value, progress, Write, cancellationToken).ConfigureAwait(false);
+                    shiftLockEnabled = false;
+                    ThrowIfRecovery(window, detector);
+
+                    Report("Placement", 0, "Placing the recorded prestart units.");
+                    await PlaceStepsAsync(window, placementModel, placementModel.Steps, preset, Write, cancellationToken).ConfigureAwait(false);
+                    Write($"Preplace pass sent {placementModel.Steps.Count} placement(s).");
+                    ThrowIfRecovery(window, detector);
+
+                    Report("Starting node", 0, "Starting the Expedition node.");
+                    await ClickActionAsync(window, detector, "start", cancellationToken).ConfigureAwait(false);
+                    await Task.Delay(2600, cancellationToken).ConfigureAwait(false);
+                    RunTerminal terminal = await MonitorUntilRunEndAsync(
+                        window,
+                        preset,
+                        placementModel,
+                        detector,
+                        value => { bossesSeen = value; PublishSummary(); },
+                        Report,
+                        Write,
+                        cancellationToken).ConfigureAwait(false);
+
+                    if (terminal.State == "victory") victories++;
+                    else defeats++;
+                    repeats++;
+                    PublishSummary();
+                    string detail = terminal.State == "victory" ? "The run reached the Victory screen." : "The run reached the Defeat screen.";
+                    QueueNotification(webhookUrl, terminal.State, detail, terminal.Frame, runtime.Elapsed, victories, defeats, preset, Write);
+                    if (terminal.State == "victory") Report("Completed", 100, "Extraction victory recognized. Repeating the stage.");
+                    else if (ExpeditionRunPolicy.IsEarlyDefeat(preset, bossesSeen))
+                    {
+                        Report("Completed", 100, "Early defeat recognized before the extraction target. Repeating.");
+                        Write($"Run ended after {bossesSeen} boss node(s), before the target of {preset.BossesBeforeExtract}.", MacroEventLevel.Warning);
+                    }
+                    else Report("Completed", 100, "Defeat recognized. Repeating the stage.");
+                    await ClickActionAsync(window, detector, terminal.State, cancellationToken).ConfigureAwait(false);
+                    await Task.Delay(4500, cancellationToken).ConfigureAwait(false);
+                }
+                catch (RecoveryNeededException recovery)
+                {
+                    if (!preset.AutoRecover) throw new InvalidOperationException($"{Label(recovery.State)} was recognized, but automatic recovery is disabled.", recovery);
+                    recoveries++;
+                    PublishSummary();
+                    await RecoverToPrestartAsync(window, recovery.State, preset, detector, webhookUrl, notify: true, runtime, victories, defeats, Report, Write, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch
+                {
+                    string? recovery = ProbeRecoveryState(window, detector);
+                    if (!preset.AutoRecover || recovery is null) throw;
+                    recoveries++;
+                    PublishSummary();
+                    Write("An action failed while a recovery screen was visible; switching to automatic recovery.", MacroEventLevel.Warning);
+                    await RecoverToPrestartAsync(window, recovery, preset, detector, webhookUrl, notify: true, runtime, victories, defeats, Report, Write, cancellationToken).ConfigureAwait(false);
+                }
+            }
+        }
+        finally
+        {
+            if (shiftLockEnabled)
+            {
+                try
+                {
+                    _automation.Focus(window);
+                    await _automation.TapLeftControlAsync(window, CancellationToken.None).ConfigureAwait(false);
+                }
+                catch
+                {
+                    // Window restoration still proceeds.
+                }
+            }
+            try
+            {
+                _automation.RestoreWindowBounds(window, original);
+                Write("Restored the original Roblox window bounds.");
+            }
+            catch (Exception error)
+            {
+                Write($"Could not restore the original Roblox window bounds: {error.Message}", MacroEventLevel.Warning);
+            }
+            await FlushNotificationsAsync(Write).ConfigureAwait(false);
+        }
+    }
+
+    private async Task PrepareCameraAsync(
+        RobloxWindow window,
+        ExpeditionPreset preset,
+        CameraModel model,
+        Action<bool> shiftLock,
+        IProgress<MacroProgress>? progress,
+        Action<string, MacroEventLevel, string?, double?> log,
+        CancellationToken cancellationToken)
+    {
+        Focus(window);
+        await _automation.MoveCursorToClientCenterAsync(window, cancellationToken).ConfigureAwait(false);
+        await Task.Delay(120, cancellationToken).ConfigureAwait(false);
+        progress?.Report(new MacroProgress("Camera preparation", 10, "Zooming out fully."));
+        await _automation.ZoomOutFullyAsync(window, preset.ZoomTicks, cancellationToken).ConfigureAwait(false);
+        progress?.Report(new MacroProgress("Camera preparation", 25, "Enabling shift lock and clamping camera pitch."));
+        await _automation.TapLeftControlAsync(window, cancellationToken).ConfigureAwait(false);
+        shiftLock(true);
+        try
+        {
+            await Task.Delay(250, cancellationToken).ConfigureAwait(false);
+            await _automation.DragCameraAsync(window, 0, preset.PitchDragPixels, 90, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(450, cancellationToken).ConfigureAwait(false);
+            double score = await _camera.AlignAsync(model, window, restoreWindow: false, progress, cancellationToken).ConfigureAwait(false);
+            log($"Camera alignment finished at {score:P0} confidence.", MacroEventLevel.Information, null, score);
+        }
+        finally
+        {
+            try
+            {
+                _automation.Focus(window);
+                await _automation.TapLeftControlAsync(window, CancellationToken.None).ConfigureAwait(false);
+            }
+            finally
+            {
+                shiftLock(false);
+            }
+        }
+        await Task.Delay(350, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<RunTerminal> MonitorUntilRunEndAsync(
+        RobloxWindow window,
+        ExpeditionPreset preset,
+        PlacementModel placement,
+        IDetectorPack detector,
+        Action<int> bossesChanged,
+        Action<string, int, string, string?, double?> report,
+        Action<string, MacroEventLevel, string?, double?> log,
+        CancellationToken cancellationToken)
+    {
+        StableStateTracker<string> stateTracker = new(preset.StableDetections);
+        StableStateTracker<string> nodeTracker = new(preset.StableDetections);
+        string? currentNode = null;
+        int bosses = 0;
+        report("Gameplay", 0, "Gameplay active. Watching node type, pauses, rewards, and run end.", null, null);
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ImageFrame frame = CaptureClient(window, detector);
+            string? stableNode = nodeTracker.Update(detector.CurrentNodeType(frame));
+            if (stableNode is not null && !stableNode.Equals(currentNode, StringComparison.OrdinalIgnoreCase))
+            {
+                currentNode = stableNode;
+                log($"Progress bar: current node is {stableNode}.", MacroEventLevel.Information, stableNode, null);
+                if (stableNode == "boss")
+                {
+                    bosses++;
+                    bossesChanged(bosses);
+                    log($"Boss node count is now {bosses}.", MacroEventLevel.Information, stableNode, null);
+                }
+            }
+
+            IReadOnlyDictionary<string, double> scores = detector.ScoreStates(frame);
+            string? candidate = detector.Classify(scores);
+            ThrowForRecovery(candidate);
+            if (candidate is not null) report("Gameplay", 0, $"Detected {Label(candidate)}.", candidate, scores[candidate]);
+            string? state = stateTracker.Update(candidate);
+            if (state is null)
+            {
+                await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+
+            stateTracker.Reset();
+            double score = scores[state];
+            log($"Recognized {state} at {score:P0} confidence.", MacroEventLevel.Success, state, score);
+            if (state is "defeat" or "victory") return new RunTerminal(state, frame.Clone());
+            if (state == "reward")
+            {
+                report("Reward", 0, "Selecting the first available reward card.", state, score);
+                await ClickActionAsync(window, detector, "reward", cancellationToken).ConfigureAwait(false);
+                await Task.Delay(4300, cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+            if (state == "confirm")
+            {
+                report("Transition", 0, "Confirming the node transition.", state, score);
+                await ClickActionAsync(window, detector, "confirm", cancellationToken).ConfigureAwait(false);
+                await Task.Delay(2200, cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+            if (state == "extract_confirm")
+            {
+                if (ExpeditionRunPolicy.ShouldExtract(preset, bosses))
+                {
+                    await ClickActionAsync(window, detector, "extract_confirm", cancellationToken).ConfigureAwait(false);
+                    await Task.Delay(2200, cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    log("Extraction confirmation appeared while extraction is disabled.", MacroEventLevel.Warning, state, score);
+                    await Task.Delay(800, cancellationToken).ConfigureAwait(false);
+                }
+                continue;
+            }
+            if (state is "start" or "checkpoint" or "continue")
+            {
+                if (state == "checkpoint" && ExpeditionRunPolicy.ShouldExtract(preset, bosses))
+                {
+                    report("Extraction", 0, $"Extraction target met after {bosses} boss node(s).", state, score);
+                    bool requested = await ExtractAtCheckpointAsync(window, detector, preset, report, log, cancellationToken).ConfigureAwait(false);
+                    await Task.Delay(requested ? 1200 : 500, cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+                await RetryRemainingUnitsAsync(window, placement, preset, detector, frame, log, cancellationToken).ConfigureAwait(false);
+                report("Transition", 0, $"Continuing from the {state} pause.", state, score);
+                await ClickActionAsync(window, detector, state, cancellationToken).ConfigureAwait(false);
+                if (state is "checkpoint" or "continue") await WaitForConfirmationAsync(window, detector, preset, report, log, cancellationToken).ConfigureAwait(false);
+                await Task.Delay(2300, cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task<bool> ExtractAtCheckpointAsync(
+        RobloxWindow window,
+        IDetectorPack detector,
+        ExpeditionPreset preset,
+        Action<string, int, string, string?, double?> report,
+        Action<string, MacroEventLevel, string?, double?> log,
+        CancellationToken cancellationToken)
+    {
+        log("Checkpoint has an Extract button; opening extraction confirmation.", MacroEventLevel.Information, "checkpoint", null);
+        await ClickActionAsync(window, detector, "extract", cancellationToken).ConfigureAwait(false);
+        bool found = await WaitForStateWithTimeoutAsync(window, detector, "extract_confirm", TimeSpan.FromSeconds(6), preset, report, cancellationToken).ConfigureAwait(false);
+        if (!found)
+        {
+            log("Extraction confirmation was not recognized; the checkpoint will be retried.", MacroEventLevel.Warning, "checkpoint", null);
+            return false;
+        }
+        await ClickActionAsync(window, detector, "extract_confirm", cancellationToken).ConfigureAwait(false);
+        log("Extraction confirmed. Waiting for Victory or an early Defeat screen.", MacroEventLevel.Success, "extract_confirm", null);
+        return true;
+    }
+
+    private async Task RetryRemainingUnitsAsync(
+        RobloxWindow window,
+        PlacementModel placement,
+        ExpeditionPreset preset,
+        IDetectorPack detector,
+        ImageFrame frame,
+        Action<string, MacroEventLevel, string?, double?> log,
+        CancellationToken cancellationToken)
+    {
+        HashSet<int> keys = placement.Steps.Select(step => step.UnitKey).ToHashSet();
+        IReadOnlyList<int> remaining = detector.RemainingUnitKeys(frame, keys);
+        if (remaining.Count == 0)
+        {
+            log("Hotbar check: all recorded unit slots are empty.", MacroEventLevel.Success, null, null);
+            return;
+        }
+        log($"Hotbar check: retrying unit key(s) {string.Join(", ", remaining)}.", MacroEventLevel.Warning, null, null);
+        PlacementStep[] steps = placement.Steps.Where(step => remaining.Contains(step.UnitKey)).ToArray();
+        await PlaceStepsAsync(window, placement, steps, preset, log, cancellationToken).ConfigureAwait(false);
+    }
+
+    private Task PlaceStepsAsync(
+        RobloxWindow window,
+        PlacementModel placement,
+        IReadOnlyList<PlacementStep> steps,
+        ExpeditionPreset preset,
+        Action<string, MacroEventLevel, string?, double?> log,
+        CancellationToken cancellationToken) =>
+        _placements.PlayStepsAsync(
+            window,
+            placement,
+            steps,
+            useDefaultInterval: false,
+            defaultIntervalMilliseconds: 0,
+            preset.UnitKeyHoldMilliseconds,
+            preset.UnitSelectDelayMilliseconds,
+            stepSent: null,
+            status: message => log(message, MacroEventLevel.Information, null, null),
+            restoreWindow: false,
+            cancellationToken);
+
+    private async Task RecoverToPrestartAsync(
+        RobloxWindow window,
+        string initialState,
+        ExpeditionPreset preset,
+        IDetectorPack detector,
+        string webhookUrl,
+        bool notify,
+        Stopwatch runtime,
+        int victories,
+        int defeats,
+        Action<string, int, string, string?, double?> report,
+        Action<string, MacroEventLevel, string?, double?> log,
+        CancellationToken cancellationToken)
+    {
+        string state = initialState;
+        log($"Automatic recovery started from {Label(state)}. Target: map {preset.MapNumber}, difficulty {preset.Difficulty}.", MacroEventLevel.Warning, state, null);
+        if (notify)
+        {
+            ImageFrame? screenshot = TryCaptureClient(window, detector);
+            QueueNotification(webhookUrl, "recovery", $"Automatic rejoin was needed after {Label(initialState)} was recognized.", screenshot, runtime.Elapsed, victories, defeats, preset, log);
+        }
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            switch (state)
+            {
+                case "disconnect":
+                    report("Recovery", 0, "Disconnected. Clicking Reconnect and waiting for Roblox.", state, null);
+                    if (!await TryClickRecoveryAsync(window, detector, "disconnect", log, cancellationToken).ConfigureAwait(false)) break;
+                    state = await WaitForRecoveryChangeAsync(window, detector, "disconnect", TimeSpan.FromSeconds(12), preset, report, log, cancellationToken).ConfigureAwait(false) ?? state;
+                    break;
+                case "lobby":
+                    report("Recovery", 0, "Lobby recognized. Opening Play from the left navigation.", state, null);
+                    if (!await TryClickRecoveryAsync(window, detector, "lobby", log, cancellationToken).ConfigureAwait(false)) break;
+                    state = await WaitForRecoveryChangeAsync(window, detector, "lobby", TimeSpan.FromSeconds(15), preset, report, log, cancellationToken).ConfigureAwait(false) ?? state;
+                    break;
+                case "play":
+                    report("Recovery", 0, "Play screen recognized. Opening Expeditions.", state, null);
+                    if (!await TryClickRecoveryAsync(window, detector, "play", log, cancellationToken).ConfigureAwait(false)) break;
+                    state = await WaitForRecoveryChangeAsync(window, detector, "play", TimeSpan.FromSeconds(15), preset, report, log, cancellationToken).ConfigureAwait(false) ?? state;
+                    break;
+                case "map_select":
+                    await ConfigureMapAndDifficultyAsync(window, preset, detector, report, log, cancellationToken).ConfigureAwait(false);
+                    report("Recovery", 0, "Map and difficulty verified. Selecting the stage.", state, null);
+                    if (!await TryClickRecoveryAsync(window, detector, "select_stage", log, cancellationToken).ConfigureAwait(false)) break;
+                    state = await WaitForRecoveryChangeAsync(window, detector, "map_select", TimeSpan.FromSeconds(15), preset, report, log, cancellationToken).ConfigureAwait(false) ?? state;
+                    break;
+                case "map_preview":
+                    report("Recovery", 0, "Teleport preview recognized. Starting the private stage.", state, null);
+                    if (!await TryClickRecoveryAsync(window, detector, "map_preview", log, cancellationToken).ConfigureAwait(false)) break;
+                    state = await WaitForRecoveryChangeAsync(window, detector, "map_preview", TimeSpan.FromSeconds(20), preset, report, log, cancellationToken).ConfigureAwait(false) ?? state;
+                    break;
+                case "start":
+                    report("Recovery", 100, "Returned to the configured Expedition prestart screen.", state, null);
+                    log("Automatic recovery completed.", MacroEventLevel.Success, state, null);
+                    return;
+                default:
+                    state = await WaitForRecoveryChangeAsync(window, detector, string.Empty, TimeSpan.FromSeconds(20), preset, report, log, cancellationToken).ConfigureAwait(false) ?? state;
+                    break;
+            }
+        }
+    }
+
+    private async Task ConfigureMapAndDifficultyAsync(
+        RobloxWindow window,
+        ExpeditionPreset preset,
+        IDetectorPack detector,
+        Action<string, int, string, string?, double?> report,
+        Action<string, MacroEventLevel, string?, double?> log,
+        CancellationToken cancellationToken)
+    {
+        for (int attempt = 1; attempt <= 3; attempt++)
+        {
+            ImageFrame current = CaptureClient(window, detector);
+            int? selected = detector.SelectedMap(current);
+            if (selected == preset.MapNumber) break;
+            report("Recovery", 0, $"Selecting Expedition map {preset.MapNumber}.", "map_select", null);
+            await ClickActionAsync(window, detector, $"map_{preset.MapNumber}", cancellationToken).ConfigureAwait(false);
+            if (await WaitForSelectionAsync(window, detector, value => detector.SelectedMap(value), preset.MapNumber, TimeSpan.FromSeconds(3), cancellationToken).ConfigureAwait(false)) break;
+            log($"Map selection did not register (attempt {attempt}/3).", MacroEventLevel.Warning, "map_select", null);
+            if (attempt == 3) throw new InvalidOperationException($"Map {preset.MapNumber} could not be selected. It may still be locked.");
+        }
+
+        for (int attempt = 1; attempt <= 3; attempt++)
+        {
+            report("Recovery", 0, $"Selecting difficulty {preset.Difficulty}.", "map_select", null);
+            ImageFrame current = CaptureClient(window, detector);
+            int? selected = detector.SelectedDifficulty(current);
+            if (selected == preset.Difficulty) return;
+
+            if (selected is null)
+            {
+                for (int index = 0; index < 3; index++)
+                {
+                    await ClickActionAsync(window, detector, "difficulty_minus", cancellationToken).ConfigureAwait(false);
+                    await Task.Delay(300, cancellationToken).ConfigureAwait(false);
+                }
+                for (int index = 1; index < preset.Difficulty; index++)
+                {
+                    await ClickActionAsync(window, detector, "difficulty_plus", cancellationToken).ConfigureAwait(false);
+                    await Task.Delay(350, cancellationToken).ConfigureAwait(false);
+                }
+            }
+            else
+            {
+                string action = selected < preset.Difficulty ? "difficulty_plus" : "difficulty_minus";
+                for (int index = 0; index < Math.Abs(preset.Difficulty - selected.Value); index++)
+                {
+                    await ClickActionAsync(window, detector, action, cancellationToken).ConfigureAwait(false);
+                    await Task.Delay(350, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            // One positive active-difficulty match is sufficient. Transition frames are
+            // ignored until the animation settles, so the macro never clicks away from
+            // an already selected target merely to obtain a second matching frame.
+            if (await WaitForSelectionAsync(window, detector, value => detector.SelectedDifficulty(value), preset.Difficulty, TimeSpan.FromSeconds(4.5), cancellationToken).ConfigureAwait(false)) return;
+            log($"Difficulty selection did not register (attempt {attempt}/3).", MacroEventLevel.Warning, "map_select", null);
+        }
+        throw new InvalidOperationException($"Difficulty {preset.Difficulty} could not be selected.");
+    }
+
+    private async Task<bool> WaitForSelectionAsync(
+        RobloxWindow window,
+        IDetectorPack detector,
+        Func<ImageFrame, int?> selector,
+        int target,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ImageFrame frame = CaptureClient(window, detector);
+            string? recovery = detector.RecoveryState(frame);
+            if (recovery is not null && recovery != "map_select") throw new RecoveryNeededException(recovery);
+            if (selector(frame) == target) return true;
+            await Task.Delay(180, cancellationToken).ConfigureAwait(false);
+        }
+        return false;
+    }
+
+    private async Task<string?> WaitForRecoveryChangeAsync(
+        RobloxWindow window,
+        IDetectorPack detector,
+        string excluded,
+        TimeSpan timeout,
+        ExpeditionPreset preset,
+        Action<string, int, string, string?, double?> report,
+        Action<string, MacroEventLevel, string?, double?> log,
+        CancellationToken cancellationToken)
+    {
+        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
+        StableStateTracker<string> tracker = new(preset.StableDetections);
+        bool captureErrorReported = false;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                ImageFrame frame = CaptureClient(window, detector);
+                IReadOnlyDictionary<string, double> scores = detector.ScoreStates(frame);
+                string? state = detector.Classify(scores);
+                if (state is not null) report("Recovery", 0, $"Detected {Label(state)}.", state, scores[state]);
+                if ((!RecoveryStates.Contains(state ?? string.Empty) && state != "start")) tracker.Reset();
+                else
+                {
+                    string? stable = tracker.Update(state);
+                    if (stable is not null && !stable.Equals(excluded, StringComparison.OrdinalIgnoreCase)) return stable;
+                }
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                if (!captureErrorReported)
+                {
+                    log($"Waiting for Roblox during recovery: {error.Message}", MacroEventLevel.Warning, null, null);
+                    captureErrorReported = true;
+                }
+            }
+            await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
+        }
+        return null;
+    }
+
+    private async Task WaitForStateAsync(
+        RobloxWindow window,
+        IDetectorPack detector,
+        string desired,
+        ExpeditionPreset preset,
+        Action<string, int, string, string?, double?> report,
+        Action<string, MacroEventLevel, string?, double?> log,
+        CancellationToken cancellationToken)
+    {
+        StableStateTracker<string> tracker = new(preset.StableDetections);
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ImageFrame frame = CaptureClient(window, detector);
+            IReadOnlyDictionary<string, double> scores = detector.ScoreStates(frame);
+            string? state = detector.Classify(scores);
+            ThrowForRecovery(state);
+            if (state is not null) report("Waiting", 0, $"Detected {Label(state)}.", state, scores[state]);
+            if (tracker.Update(state) == desired)
+            {
+                log($"Recognized {desired} at {scores[desired]:P0} confidence.", MacroEventLevel.Success, desired, scores[desired]);
+                return;
+            }
+            await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<bool> WaitForStateWithTimeoutAsync(
+        RobloxWindow window,
+        IDetectorPack detector,
+        string desired,
+        TimeSpan timeout,
+        ExpeditionPreset preset,
+        Action<string, int, string, string?, double?> report,
+        CancellationToken cancellationToken)
+    {
+        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
+        StableStateTracker<string> tracker = new(preset.StableDetections);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            ImageFrame frame = CaptureClient(window, detector);
+            IReadOnlyDictionary<string, double> scores = detector.ScoreStates(frame);
+            string? state = detector.Classify(scores);
+            ThrowForRecovery(state);
+            if (state is not null) report("Waiting", 0, $"Detected {Label(state)}.", state, scores[state]);
+            if (tracker.Update(state) == desired) return true;
+            await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
+        }
+        return false;
+    }
+
+    private async Task WaitForConfirmationAsync(
+        RobloxWindow window,
+        IDetectorPack detector,
+        ExpeditionPreset preset,
+        Action<string, int, string, string?, double?> report,
+        Action<string, MacroEventLevel, string?, double?> log,
+        CancellationToken cancellationToken)
+    {
+        if (await WaitForStateWithTimeoutAsync(window, detector, "confirm", TimeSpan.FromSeconds(6), preset, report, cancellationToken).ConfigureAwait(false))
+        {
+            await ClickActionAsync(window, detector, "confirm", cancellationToken).ConfigureAwait(false);
+            await Task.Delay(1800, cancellationToken).ConfigureAwait(false);
+        }
+        else log("Confirmation was not recognized within 6 seconds; returning to state monitoring.", MacroEventLevel.Warning, null, null);
+    }
+
+    private async Task<bool> TryClickRecoveryAsync(
+        RobloxWindow window,
+        IDetectorPack detector,
+        string state,
+        Action<string, MacroEventLevel, string?, double?> log,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await ClickActionAsync(window, detector, state, cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception error)
+        {
+            log($"Recovery click '{state}' failed and will be retried: {error.Message}", MacroEventLevel.Warning, state, null);
+            await Task.Delay(750, cancellationToken).ConfigureAwait(false);
+            return false;
+        }
+    }
+
+    private async Task ClickActionAsync(RobloxWindow window, IDetectorPack detector, string state, CancellationToken cancellationToken)
+    {
+        Focus(window);
+        (int x, int y) = detector.ActionFor(state);
+        await _automation.ClickClientAsync(window, x, y, cancellationToken).ConfigureAwait(false);
+    }
+
+    private ImageFrame CaptureClient(RobloxWindow window, IDetectorPack detector)
+    {
+        Focus(window);
+        ClientBounds bounds = _automation.GetClientBounds(window);
+        if (bounds.Width != detector.Manifest.ClientWidth || bounds.Height != detector.Manifest.ClientHeight) throw new InvalidOperationException("Roblox no longer matches the detector pack client size.");
+        return _automation.CaptureClient(window);
+    }
+
+    private ImageFrame? TryCaptureClient(RobloxWindow window, IDetectorPack detector)
+    {
+        try { return CaptureClient(window, detector); }
+        catch { return null; }
+    }
+
+    private string? ProbeRecoveryState(RobloxWindow window, IDetectorPack detector)
+    {
+        try { return detector.RecoveryState(CaptureClient(window, detector)); }
+        catch { return null; }
+    }
+
+    private void ThrowIfRecovery(RobloxWindow window, IDetectorPack detector)
+    {
+        string? state = ProbeRecoveryState(window, detector);
+        if (state is not null) throw new RecoveryNeededException(state);
+    }
+
+    private static void ThrowForRecovery(string? state)
+    {
+        if (state is not null && RecoveryStates.Contains(state)) throw new RecoveryNeededException(state);
+    }
+
+    private async Task EnsureClientSizeAsync(
+        RobloxWindow window,
+        int width,
+        int height,
+        Action<string, MacroEventLevel, string?, double?> log,
+        CancellationToken cancellationToken)
+    {
+        ClientBounds bounds = _automation.GetClientBounds(window);
+        if (bounds.Width == width && bounds.Height == height) return;
+        log($"Restoring Roblox client size to {width} × {height}.", MacroEventLevel.Information, null, null);
+        await _automation.ResizeClientAsync(window, width, height, cancellationToken).ConfigureAwait(false);
+        await Task.Delay(250, cancellationToken).ConfigureAwait(false);
+    }
+
+    private void QueueNotification(
+        string webhookUrl,
+        string eventName,
+        string detail,
+        ImageFrame? screenshot,
+        TimeSpan runtime,
+        int victories,
+        int defeats,
+        ExpeditionPreset preset,
+        Action<string, MacroEventLevel, string?, double?> log)
+    {
+        if (string.IsNullOrWhiteSpace(webhookUrl)) return;
+        log($"Queued Discord {eventName} notification.", MacroEventLevel.Information, null, null);
+        DiscordNotification notification = new()
+        {
+            WebhookUrl = webhookUrl,
+            Event = eventName,
+            Runtime = runtime,
+            Victories = victories,
+            Defeats = defeats,
+            MapNumber = preset.MapNumber,
+            Difficulty = preset.Difficulty,
+            Detail = detail,
+            Screenshot = screenshot?.Clone(),
+        };
+        Task sendTask = Task.Run(async () =>
+        {
+            try
+            {
+                await _discord.SendAsync(notification, CancellationToken.None).ConfigureAwait(false);
+                log($"Discord {eventName} notification sent.", MacroEventLevel.Success, null, null);
+            }
+            catch (Exception error)
+            {
+                log($"Discord {eventName} notification failed: {error.Message}", MacroEventLevel.Warning, null, null);
+            }
+        });
+        lock (_notificationGate) _pendingNotifications.Add(sendTask);
+        _ = sendTask.ContinueWith(
+            completed =>
+            {
+                lock (_notificationGate) _pendingNotifications.Remove(completed);
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
+    }
+
+    private async Task FlushNotificationsAsync(Action<string, MacroEventLevel, string?, double?> log)
+    {
+        Task[] pending;
+        lock (_notificationGate) pending = _pendingNotifications.ToArray();
+        if (pending.Length == 0) return;
+
+        Task all = Task.WhenAll(pending);
+        Task completed = await Task.WhenAny(all, Task.Delay(TimeSpan.FromSeconds(3))).ConfigureAwait(false);
+        if (completed != all)
+        {
+            log($"Stopped with {pending.Count(task => !task.IsCompleted)} Discord notification(s) still in flight.", MacroEventLevel.Warning, null, null);
+            return;
+        }
+        await all.ConfigureAwait(false);
+    }
+
+    private static string Label(string value) => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '));
+
+    private void Focus(RobloxWindow window)
+    {
+        if (!_automation.Focus(window)) throw new InvalidOperationException("Windows could not focus Roblox.");
+    }
+
+    private static void ValidateCompatibility(ExpeditionPreset preset, CameraModel camera, PlacementModel placement, DetectorPackManifest detector)
+    {
+        if (!string.Equals(preset.CameraModelId, camera.Manifest.Id, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("The preset camera model does not match the loaded model.");
+        if (!string.Equals(preset.PlacementModelId, placement.Id, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("The preset placement model does not match the loaded model.");
+        if (!string.Equals(preset.DetectorPackId, detector.PackId, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("The preset detector pack does not match the loaded pack.");
+        if (camera.Manifest.ClientWidth != detector.ClientWidth || camera.Manifest.ClientHeight != detector.ClientHeight) throw new InvalidDataException("Camera model and detector pack use different Roblox client sizes.");
+        if (placement.ClientWidth != detector.ClientWidth || placement.ClientHeight != detector.ClientHeight) throw new InvalidDataException("Placement model and detector pack use different Roblox client sizes.");
+    }
+
+    private sealed record RunTerminal(string State, ImageFrame Frame);
+
+    private sealed class RecoveryNeededException : Exception
+    {
+        public RecoveryNeededException(string state) : base($"Recovery screen recognized: {state}.")
+        {
+            State = state;
+        }
+
+        public string State { get; }
+    }
+}

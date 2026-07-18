@@ -1,0 +1,16 @@
+<Window x:Class="ExpeditionsMacro.App.Windows.RegionSelectionWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True"
+        Background="#56000000" Topmost="True" ShowInTaskbar="False"
+        Cursor="Cross" KeyDown="Window_KeyDown"
+        MouseLeftButtonDown="Window_MouseLeftButtonDown"
+        MouseMove="Window_MouseMove"
+        MouseLeftButtonUp="Window_MouseLeftButtonUp">
+    <Canvas>
+        <Border x:Name="SelectionBorder" Visibility="Collapsed" BorderBrush="#F0F1F2" BorderThickness="1" Background="#16000000" />
+        <Border Canvas.Left="24" Canvas.Top="24" Padding="13,9" Background="#E8181819" CornerRadius="4">
+            <TextBlock Foreground="#F0F1F2" Text="Drag a stable, UI-free Roblox region. Press Esc to cancel." />
+        </Border>
+    </Canvas>
+</Window>

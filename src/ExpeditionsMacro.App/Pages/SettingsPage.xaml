@@ -1,0 +1,93 @@
+<UserControl x:Class="ExpeditionsMacro.App.Pages.SettingsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Margin="34,28,42,34" MaxWidth="900" HorizontalAlignment="Left">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <StackPanel Margin="0,0,0,28">
+                <TextBlock Style="{StaticResource PageTitle}" Text="Settings" />
+                <TextBlock Margin="0,7,0,0" Style="{StaticResource PageSubtitle}" Text="Appearance, local data, detector packs, and runtime diagnostics." />
+            </StackPanel>
+
+            <Border Grid.Row="1" Style="{StaticResource SectionDivider}">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Appearance" />
+                        <TextBlock Margin="0,5,24,0" Style="{StaticResource Caption}" Text="System follows the Windows app theme and updates while the utility is open." />
+                    </StackPanel>
+                    <Grid Grid.Column="1">
+                        <Grid.RowDefinitions><RowDefinition Height="48" /><RowDefinition Height="48" /></Grid.RowDefinitions>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Theme" />
+                        <ComboBox x:Name="ThemeCombo" Width="180" HorizontalAlignment="Right" SelectionChanged="ThemeCombo_SelectionChanged" />
+                        <CheckBox x:Name="MinimizeCheck" Grid.Row="1" VerticalAlignment="Center" Content="Minimize this utility while automation is running" Checked="MinimizeCheck_Changed" Unchecked="MinimizeCheck_Changed" />
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="2" Style="{StaticResource SectionDivider}">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Local data" />
+                        <TextBlock Margin="0,5,24,0" Style="{StaticResource Caption}" Text="Models, presets, detector packs, secrets, and logs stay under your Windows profile." />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBox x:Name="DataPath" IsReadOnly="True" />
+                        <StackPanel Margin="0,10,0,0" Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Content="Open data folder" Click="OpenData_Click" />
+                            <Button Margin="8,0,0,0" Content="Open logs" Click="OpenLogs_Click" />
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="3" Style="{StaticResource SectionDivider}">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Detector pack" />
+                        <TextBlock Margin="0,5,24,0" Style="{StaticResource Caption}" Text="Compact references are loaded locally. An installed pack is never replaced during an active run." />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <Border Padding="12" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
+                            <StackPanel>
+                                <TextBlock x:Name="DetectorTitle" FontWeight="SemiBold" Text="Loading detector pack" />
+                                <TextBlock x:Name="DetectorDetail" Margin="0,4,0,0" Style="{StaticResource Caption}" />
+                            </StackPanel>
+                        </Border>
+                        <Grid Margin="0,10,0,0">
+                            <CheckBox x:Name="AutoUpdateCheck" VerticalAlignment="Center" Content="Check once per day" Checked="AutoUpdateCheck_Changed" Unchecked="AutoUpdateCheck_Changed" />
+                            <Button HorizontalAlignment="Right" Content="Check for updates" Click="RefreshDetector_Click" />
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="4">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="Diagnostics" />
+                    <TextBlock Margin="0,5,24,0" Style="{StaticResource Caption}" Text="Read-only checks for the local automation environment." />
+                </StackPanel>
+                <Border Grid.Column="1" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
+                    <StackPanel>
+                        <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Application" /><TextBlock x:Name="VersionText" HorizontalAlignment="Right" /></Grid>
+                        <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                        <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Roblox window" /><TextBlock x:Name="RobloxText" HorizontalAlignment="Right" /></Grid>
+                        <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                        <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Global hotkey" /><TextBlock x:Name="HotkeyText" HorizontalAlignment="Right" /></Grid>
+                        <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                        <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Runtime" /><TextBlock HorizontalAlignment="Right" Text=".NET 10, Windows x64" /></Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

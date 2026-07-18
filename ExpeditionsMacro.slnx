@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ExpeditionsMacro.App/ExpeditionsMacro.App.csproj" />
+    <Project Path="src/ExpeditionsMacro.Automation/ExpeditionsMacro.Automation.csproj" />
+    <Project Path="src/ExpeditionsMacro.Core/ExpeditionsMacro.Core.csproj" />
+    <Project Path="src/ExpeditionsMacro.Vision/ExpeditionsMacro.Vision.csproj" />
+    <Project Path="src/ExpeditionsMacro.Windows/ExpeditionsMacro.Windows.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ExpeditionsMacro.Tests/ExpeditionsMacro.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/ExpeditionsMacro.DatasetBuilder/ExpeditionsMacro.DatasetBuilder.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,160 @@
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Windows.Threading;
+
+namespace ExpeditionsMacro.App.Services;
+
+public enum OperationState
+{
+    Idle,
+    Armed,
+    Running,
+    Stopping,
+}
+
+public sealed class OperationCoordinator : INotifyPropertyChanged
+{
+    private readonly Dispatcher _dispatcher;
+    private readonly object _gate = new();
+    private Func<CancellationToken, Task>? _armedAction;
+    private CancellationTokenSource? _cancellation;
+    private OperationState _state;
+    private string _description = "Ready";
+
+    public OperationCoordinator(Dispatcher dispatcher)
+    {
+        _dispatcher = dispatcher;
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public event EventHandler? StateChanged;
+
+    public event EventHandler<Exception>? OperationFailed;
+
+    public Func<Task>? DefaultIdleF6Action { get; set; }
+
+    public OperationState State
+    {
+        get => _state;
+        private set
+        {
+            if (_state == value) return;
+            _state = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsBusy));
+            StateChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+
+    public string Description
+    {
+        get => _description;
+        private set
+        {
+            if (_description == value) return;
+            _description = value;
+            OnPropertyChanged();
+        }
+    }
+
+    public bool IsBusy => State is not OperationState.Idle;
+
+    public void Arm(string description, Func<CancellationToken, Task> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        lock (_gate)
+        {
+            if (State != OperationState.Idle) throw new InvalidOperationException("Another workflow already owns Roblox input.");
+            _armedAction = action;
+            Description = $"{description}: press F6 to begin";
+            State = OperationState.Armed;
+        }
+    }
+
+    public Task RunNowAsync(string description, Func<CancellationToken, Task> action)
+    {
+        lock (_gate)
+        {
+            if (State != OperationState.Idle) throw new InvalidOperationException("Another workflow already owns Roblox input.");
+            _armedAction = action;
+        }
+        return BeginAsync(description);
+    }
+
+    public void Cancel()
+    {
+        lock (_gate)
+        {
+            if (State == OperationState.Armed)
+            {
+                _armedAction = null;
+                Description = "Ready";
+                State = OperationState.Idle;
+                return;
+            }
+            if (State != OperationState.Running) return;
+            State = OperationState.Stopping;
+            Description = "Stopping and restoring Roblox";
+            _cancellation?.Cancel();
+        }
+    }
+
+    public void HandleF6()
+    {
+        if (!_dispatcher.CheckAccess())
+        {
+            _dispatcher.BeginInvoke(HandleF6);
+            return;
+        }
+        if (State == OperationState.Armed)
+        {
+            _ = BeginAsync(Description.Replace(": press F6 to begin", string.Empty, StringComparison.Ordinal));
+        }
+        else if (State is OperationState.Running)
+        {
+            Cancel();
+        }
+        else if (State == OperationState.Idle && DefaultIdleF6Action is not null)
+        {
+            _ = DefaultIdleF6Action();
+        }
+    }
+
+    private async Task BeginAsync(string description)
+    {
+        Func<CancellationToken, Task> action;
+        lock (_gate)
+        {
+            action = _armedAction ?? throw new InvalidOperationException("No operation is armed.");
+            _armedAction = null;
+            _cancellation = new CancellationTokenSource();
+            Description = description;
+            State = OperationState.Running;
+        }
+        try
+        {
+            await action(_cancellation.Token);
+        }
+        catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
+        {
+            // User-requested cancellation is an expected terminal state.
+        }
+        catch (Exception error)
+        {
+            OperationFailed?.Invoke(this, error);
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                _cancellation.Dispose();
+                _cancellation = null;
+                Description = "Ready";
+                State = OperationState.Idle;
+            }
+        }
+    }
+
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+}

@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.302
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+      - name: Restore
+        run: dotnet restore ExpeditionsMacro.slnx --locked-mode
+      - name: Build
+        run: dotnet build ExpeditionsMacro.slnx -c Release --no-restore
+      - name: Test
+        run: dotnet test tests/ExpeditionsMacro.Tests/ExpeditionsMacro.Tests.csproj -c Release --no-build --filter "Category!=Golden" --logger "trx;LogFileName=ci-tests.trx"
+      - name: Render dark and light UI snapshots
+        shell: pwsh
+        run: ./scripts/Render-UiSnapshots.ps1 -Configuration Release
+      - name: Upload UI snapshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-snapshots
+          path: artifacts/ui-snapshots/*.png
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/TestResults/*.trx'
+          if-no-files-found: ignore
