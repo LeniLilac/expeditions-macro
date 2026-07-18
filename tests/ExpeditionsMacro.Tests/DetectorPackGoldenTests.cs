@@ -59,8 +59,60 @@ public sealed class DetectorPackGoldenTests
             }
         }
 
-        Assert.Equal(195, checkedImages);
+        Assert.Equal(196, checkedImages);
         Assert.True(failures.Length == 0, $"Compiled detector regressions:{Environment.NewLine}{failures}");
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void StartDetector_IgnoresThePlayerAvatarRow()
+    {
+        if (!DatasetsAvailable()) return;
+        string file = Pngs("Expedition_Map1_Prestart").Last();
+        ImageFrame original = ImageCodec.Load(file);
+        byte[] pixels = original.Pixels.ToArray();
+        for (int y = 141; y < 168; y++)
+        {
+            for (int x = 330; x < 478; x++)
+            {
+                int offset = (y * original.Width + x) * 3;
+                bool alternate = (x + y) % 2 == 0;
+                pixels[offset] = alternate ? (byte)255 : (byte)225;
+                pixels[offset + 1] = alternate ? (byte)0 : (byte)225;
+                pixels[offset + 2] = alternate ? (byte)220 : (byte)225;
+            }
+        }
+        ImageFrame changedAvatar = new(original.Width, original.Height, original.Format, pixels, takeOwnership: true);
+
+        double originalScore = Pack.Value.ScoreStates(original)["start"];
+        double changedScore = Pack.Value.ScoreStates(changedAvatar)["start"];
+        double threshold = Pack.Value.Manifest.States.Single(value => value.Name == "start").Threshold;
+
+        Assert.True(originalScore >= Math.Max(threshold, 0.95), $"Avatar-variant score was {originalScore:P1}.");
+        Assert.Equal(originalScore, changedScore, precision: 12);
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void StartDetector_DoesNotMatchOtherCapturedUiStates()
+    {
+        if (!DatasetsAvailable()) return;
+        CompiledDetectorPack pack = Pack.Value;
+        double threshold = pack.Manifest.States.Single(value => value.Name == "start").Threshold;
+        List<string> failures = [];
+        foreach ((string state, string[] datasets) in StateDatasets.Where(pair => pair.Key != "start"))
+        {
+            foreach (string dataset in datasets)
+            {
+                foreach (string file in Pngs(dataset))
+                {
+                    double score = pack.ScoreStates(ImageCodec.Load(file))["start"];
+                    if (score >= threshold) failures.Add($"{state}: {score:P1} {dataset}/{Path.GetFileName(file)}");
+                }
+            }
+        }
+
+        Assert.Empty(failures);
     }
 
     [Fact]

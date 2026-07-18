@@ -46,7 +46,16 @@ public sealed class CompiledDetectorPack : IDetectorPack
     public IReadOnlyDictionary<string, double> ScoreStates(ImageFrame clientImage)
     {
         ValidateClient(clientImage);
-        return _states.ToDictionary(pair => pair.Key, pair => ScoreState(pair.Value, clientImage, [(0, 0)]), StringComparer.OrdinalIgnoreCase);
+        bool useStartDialogDetector = Manifest.PackId.Equals(
+            AnimeExpeditionsDetectorSpec.PackId,
+            StringComparison.OrdinalIgnoreCase);
+        Dictionary<string, double> scores = _states.ToDictionary(
+            pair => pair.Key,
+            pair => useStartDialogDetector && pair.Key.Equals("start", StringComparison.OrdinalIgnoreCase)
+                ? StartDialogDetector.Score(clientImage)
+                : ScoreState(pair.Value, clientImage, [(0, 0)]),
+            StringComparer.OrdinalIgnoreCase);
+        return scores;
     }
 
     public string? Classify(IReadOnlyDictionary<string, double> scores)
