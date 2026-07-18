@@ -89,7 +89,7 @@ public sealed class AppServices : IDisposable
     {
         IReadOnlyList<DetectorPackManifest> installed = await DetectorPacks.ListAsync();
         if (installed.Any(pack => pack.PackId == AnimeExpeditionsDetectorSpec.PackId)) return;
-        string source = Path.Combine(AppContext.BaseDirectory, "Resources", "DetectorPacks", AnimeExpeditionsDetectorSpec.PackId, "1.0.0");
+        string source = Path.Combine(AppContext.BaseDirectory, "Resources", "DetectorPacks", AnimeExpeditionsDetectorSpec.PackId, AnimeExpeditionsDetectorSpec.BundledPackVersion);
         if (!Directory.Exists(source)) throw new DirectoryNotFoundException("The bundled detector pack is missing from this build.");
         await DetectorPacks.InstallDirectoryAsync(source);
     }

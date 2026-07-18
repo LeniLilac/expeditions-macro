@@ -13,10 +13,23 @@ public sealed record DatasetStateSpec(
 public static class AnimeExpeditionsDetectorSpec
 {
     public const string PackId = "anime-expeditions-expeditions";
+    public const string BundledPackVersion = "1.0.1";
     public const int ClientWidth = 808;
     public const int ClientHeight = 611;
 
     public static ScreenRegion NodeBarRegion { get; } = new(236, 63, 62, 9);
+
+    // Covers the colored center control at both the original position and the
+    // six-pixel-up layout introduced by the July 2026 game UI revision.
+    public static ScreenRegion DifficultyHueRegion { get; } = new(672, 376, 80, 59);
+
+    // OpenCV hue values use a circular 0..179 scale.
+    public static IReadOnlyDictionary<int, double> DifficultyHuePrototypes { get; } = new Dictionary<int, double>
+    {
+        [1] = 45,
+        [2] = 0,
+        [3] = 140,
+    };
 
     public static IReadOnlyList<DatasetStateSpec> States { get; } =
     [

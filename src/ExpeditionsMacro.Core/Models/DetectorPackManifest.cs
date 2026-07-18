@@ -56,6 +56,10 @@ public sealed record DetectorPackManifest
 
     public required IReadOnlyList<SelectionDetectorDefinition> DifficultySelections { get; init; }
 
+    public IReadOnlyDictionary<int, double>? DifficultyHuePrototypes { get; init; }
+
+    public ScreenRegion? DifficultyHueRegion { get; init; }
+
     public required IReadOnlyDictionary<string, double> NodeHuePrototypes { get; init; }
 
     public required ScreenRegion NodeHueRegion { get; init; }
@@ -74,5 +78,7 @@ public sealed record DetectorPackManifest
         if (string.IsNullOrWhiteSpace(PackId) || string.IsNullOrWhiteSpace(Version)) throw new InvalidDataException("Detector pack identity is missing.");
         if (ClientWidth <= 0 || ClientHeight <= 0) throw new InvalidDataException("Detector pack client size is invalid.");
         if (States.Count == 0 || Files.Count == 0) throw new InvalidDataException("Detector pack is incomplete.");
+        if ((DifficultyHuePrototypes is null) != (DifficultyHueRegion is null)) throw new InvalidDataException("Difficulty color detection is incomplete.");
+        if (DifficultyHuePrototypes is not null && DifficultyHuePrototypes.Count != DifficultySelections.Count) throw new InvalidDataException("Difficulty color detection does not cover every selection.");
     }
 }

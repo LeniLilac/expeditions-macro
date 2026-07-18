@@ -52,7 +52,7 @@
                 <TextBox x:Name="OutputPath" Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" />
                 <Button Grid.Row="1" Grid.Column="2" Margin="8,5,0,5" Content="Browse" Click="BrowseOutput_Click" />
                 <TextBlock Grid.Row="2" VerticalAlignment="Center" Foreground="{StaticResource MutedBrush}" Text="Version" />
-                <TextBox x:Name="VersionText" Grid.Row="2" Grid.Column="1" Width="180" HorizontalAlignment="Left" VerticalAlignment="Center" Text="1.0.0" />
+                <TextBox x:Name="VersionText" Grid.Row="2" Grid.Column="1" Width="180" HorizontalAlignment="Left" VerticalAlignment="Center" Text="1.0.1" />
             </Grid>
             <Border Grid.Row="4" Margin="0,20,0,18" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="4">
                 <TextBox x:Name="LogText" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" BorderThickness="0" FontFamily="Cascadia Mono, Consolas" FontSize="12" />

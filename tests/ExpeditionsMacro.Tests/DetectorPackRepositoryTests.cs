@@ -19,14 +19,14 @@ public sealed class DetectorPackRepositoryTests
             CopyDirectory(TestPaths.DetectorPack, modified);
             string manifestPath = Path.Combine(modified, "manifest.json");
             DetectorPackManifest manifest = (await JsonFileStore.ReadAsync<DetectorPackManifest>(manifestPath))!;
-            await JsonFileStore.WriteAtomicAsync(manifestPath, manifest with { Version = "1.0.1" });
+            await JsonFileStore.WriteAtomicAsync(manifestPath, manifest with { Version = "1.0.2" });
 
             await repository.InstallDirectoryAsync(modified);
-            Assert.Equal("1.0.1", Assert.Single(await repository.ListAsync()).Version);
+            Assert.Equal("1.0.2", Assert.Single(await repository.ListAsync()).Version);
 
             await repository.RollbackAsync(AnimeExpeditionsDetectorSpec.PackId);
 
-            Assert.Equal("1.0.0", Assert.Single(await repository.ListAsync()).Version);
+            Assert.Equal("1.0.1", Assert.Single(await repository.ListAsync()).Version);
             Assert.NotNull(await repository.LoadAsync(AnimeExpeditionsDetectorSpec.PackId));
         }
         finally

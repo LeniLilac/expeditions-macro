@@ -2,6 +2,19 @@
 
 All notable changes to Expeditions Macro are documented here.
 
+## [1.0.2] - 2026-07-18
+
+### Added
+
+- Added shifted-layout difficulty captures to the public golden-image regression dataset.
+- Added detector pack 1.0.1 with explicit difficulty hue metadata.
+
+### Fixed
+
+- Replaced fragile grayscale-only difficulty verification with fast green, red, and magenta active-state detection that tolerates the game's six-pixel UI shift.
+- Displayed only saved names in preset, camera-model, and placement-model selectors.
+- Prevented placement status text and Expeditions status content from overlapping nearby action controls at constrained widths.
+
 ## [1.0.1] - 2026-07-18
 
 ### Fixed
@@ -25,5 +38,6 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
+[1.0.2]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.2
 [1.0.1]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.1
 [1.0.0]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.0

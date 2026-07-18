@@ -110,6 +110,8 @@ public sealed class DetectorPackBuilder
                 States = states,
                 MapSelections = mapSelections,
                 DifficultySelections = difficultySelections,
+                DifficultyHuePrototypes = AnimeExpeditionsDetectorSpec.DifficultyHuePrototypes,
+                DifficultyHueRegion = AnimeExpeditionsDetectorSpec.DifficultyHueRegion,
                 NodeHuePrototypes = nodeHues,
                 NodeHueRegion = AnimeExpeditionsDetectorSpec.NodeBarRegion,
                 EmptyHotbarReferenceFile = emptyFile,
