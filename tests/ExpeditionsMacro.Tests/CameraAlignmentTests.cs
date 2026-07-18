@@ -3,6 +3,7 @@ using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
+using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision;
 
 namespace ExpeditionsMacro.Tests;
@@ -65,14 +66,65 @@ public sealed class CameraAlignmentTests
             engine.CalibrateAsync(new ScreenRegion(315, 220, 96, 72), settings));
 
         Assert.Equal("Synthetic capture failure.", error.Message);
+        Assert.Equal((808, 611), automation.ResizeRequest);
+        Assert.Equal(new WindowBounds(40, 50, 1100, 800), automation.RestoredBounds);
         Assert.Equal(1, automation.MoveToCenterCount);
         Assert.Equal(2, automation.LeftControlTapCount);
     }
 
-    private static CameraModel CreateModel(ImageFrame capture)
+    [Fact]
+    public async Task Align_WhenFastMatchIsLow_FullTurnFallbackFindsTheGoal()
+    {
+        ImageFrame goal = VisionScorerTests.Pattern(96, 72);
+        ImageFrame wrong = Blank(96, 72);
+        CameraModel model = CreateModel(goal, wrong, fullYawPixels: 24, coarseStepPixels: 6);
+        FakeAutomation automation = new(wrong)
+        {
+            FullYawPixels = 24,
+            YawPixels = 6,
+            CaptureAtYaw = yaw => yaw == 0 ? goal : wrong,
+        };
+        List<MacroProgress> updates = [];
+        CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
+
+        double score = await engine.AlignAsync(model, progress: new InlineProgress<MacroProgress>(updates.Add));
+
+        Assert.True(score > 0.95, $"Fallback alignment score was {score:P1}.");
+        Assert.Contains(updates, update => update.Message.Contains("Scanning one full yaw turn", StringComparison.Ordinal));
+        Assert.Contains(updates, update => update.Message.Contains("Stable goal found", StringComparison.Ordinal));
+        Assert.Equal(0, automation.YawPixels);
+    }
+
+    [Fact]
+    public async Task Align_WhenFullTurnFallbackStaysBelowTarget_StopsWithFailure()
+    {
+        ImageFrame goal = VisionScorerTests.Pattern(96, 72);
+        ImageFrame wrong = Blank(96, 72);
+        CameraModel model = CreateModel(goal, wrong, fullYawPixels: 24, coarseStepPixels: 6);
+        FakeAutomation automation = new(wrong)
+        {
+            FullYawPixels = 24,
+            YawPixels = 6,
+            CaptureAtYaw = _ => wrong,
+        };
+        CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
+
+        InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() => engine.AlignAsync(model));
+
+        Assert.Contains("Unit placement was not started", error.Message, StringComparison.Ordinal);
+        Assert.True(automation.Drags.Where(drag => drag.X > 0).Sum(drag => drag.X) >= 24);
+        Assert.Equal(2, automation.LeftControlTapCount);
+    }
+
+    private static CameraModel CreateModel(
+        ImageFrame capture,
+        ImageFrame? atlasCapture = null,
+        int fullYawPixels = 360,
+        int coarseStepPixels = 12)
     {
         ImageFrame reference = VisionScorer.PrepareGray(capture);
-        ImageFrame thumbnail = VisionScorer.MakeThumbnail(reference);
+        ImageFrame thumbnail = VisionScorer.MakeThumbnail(VisionScorer.PrepareGray(atlasCapture ?? capture));
+        ImageFrame[] atlas = [thumbnail, thumbnail, thumbnail];
         return new CameraModel(
             new CameraModelManifest
             {
@@ -83,17 +135,25 @@ public sealed class CameraAlignmentTests
                 ClientHeight = 611,
                 BaselineScore = 1,
                 SuccessThreshold = 0.80,
-                CoarseStepPixels = 12,
+                CoarseStepPixels = coarseStepPixels,
                 FineStepPixels = 1,
-                FullYawPixels = 360,
+                FullYawPixels = fullYawPixels,
                 SettleMilliseconds = 0,
-                AtlasSampleCount = 3,
+                AtlasSampleCount = atlas.Length,
                 ScanScores = [1, 0.2, 1],
                 CreatedAt = DateTimeOffset.UtcNow,
             },
             reference,
             capture,
-            [thumbnail, thumbnail, thumbnail]);
+            atlas);
+    }
+
+    private static ImageFrame Blank(int width, int height) =>
+        new(width, height, PixelFormat.Rgb24, new byte[width * height * 3], takeOwnership: true);
+
+    private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
+    {
+        public void Report(T value) => report(value);
     }
 
     private sealed class FakeAutomation(ImageFrame capture) : IRobloxAutomation
@@ -108,6 +168,9 @@ public sealed class CameraAlignmentTests
         public int MoveToCenterCount { get; private set; }
         public int LeftControlTapCount { get; private set; }
         public Exception? CaptureFailure { get; init; }
+        public Func<int, ImageFrame>? CaptureAtYaw { get; init; }
+        public int FullYawPixels { get; init; } = 360;
+        public int YawPixels { get; set; }
 
         public RobloxWindow? FindWindow(string titleFragment = "Roblox") => _window;
         public RobloxWindow? ForegroundWindow() => _window;
@@ -125,7 +188,7 @@ public sealed class CameraAlignmentTests
         {
             CapturedRegions.Add(region);
             if (CaptureFailure is not null) throw CaptureFailure;
-            return capture.Clone();
+            return (CaptureAtYaw?.Invoke(YawPixels) ?? capture).Clone();
         }
         public ImageFrame CaptureClient(RobloxWindow window) => throw new NotSupportedException();
         public Task MoveCursorToClientCenterAsync(RobloxWindow window, CancellationToken cancellationToken)
@@ -137,6 +200,7 @@ public sealed class CameraAlignmentTests
         public Task DragCameraAsync(RobloxWindow window, int deltaX, int deltaY, int chunkPixels, CancellationToken cancellationToken)
         {
             Drags.Add((deltaX, deltaY));
+            YawPixels = ((YawPixels + deltaX) % FullYawPixels + FullYawPixels) % FullYawPixels;
             return Task.CompletedTask;
         }
         public Task ZoomOutFullyAsync(RobloxWindow window, int ticks, CancellationToken cancellationToken) => Task.CompletedTask;

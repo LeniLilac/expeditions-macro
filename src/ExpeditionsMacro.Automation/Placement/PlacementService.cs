@@ -2,6 +2,7 @@ using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
+using ExpeditionsMacro.Core.Runtime;
 
 namespace ExpeditionsMacro.Automation.Placement;
 
@@ -31,7 +32,31 @@ public sealed class PlacementService
     {
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Enter a placement model name.", nameof(name));
         RobloxWindow window = _automation.FindWindow() ?? throw new InvalidOperationException("No visible Roblox window was found.");
-        (int width, int height, IReadOnlyList<PlacementCapture> captures) = await _capture.RecordAsync(window, captured, status, cancellationToken).ConfigureAwait(false);
+        WindowBounds original = _automation.GetWindowBounds(window);
+        ClientBounds initial = _automation.GetClientBounds(window);
+        bool resized = initial.Width != RobloxClientProfile.Width || initial.Height != RobloxClientProfile.Height;
+        (int width, int height, IReadOnlyList<PlacementCapture> captures) recording;
+        try
+        {
+            EnsureFocus(window);
+            if (resized)
+            {
+                status?.Invoke($"Temporarily resizing Roblox to {RobloxClientProfile.Width} × {RobloxClientProfile.Height}.");
+                await _automation.ResizeClientAsync(window, RobloxClientProfile.Width, RobloxClientProfile.Height, cancellationToken).ConfigureAwait(false);
+                await Task.Delay(250, cancellationToken).ConfigureAwait(false);
+            }
+            ClientBounds client = _automation.GetClientBounds(window);
+            if (client.Width != RobloxClientProfile.Width || client.Height != RobloxClientProfile.Height)
+            {
+                throw new InvalidOperationException($"Roblox did not accept the standard {RobloxClientProfile.Width} × {RobloxClientProfile.Height} client size.");
+            }
+            recording = await _capture.RecordAsync(window, captured, status, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (resized) _automation.RestoreWindowBounds(window, original);
+        }
+        (int width, int height, IReadOnlyList<PlacementCapture> captures) = recording;
         if (captures.Count == 0) throw new InvalidOperationException("Record at least one unit placement before saving.");
         string id = ModelId.FromName(name);
         PlacementModel model = new()

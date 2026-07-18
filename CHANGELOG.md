@@ -2,6 +2,22 @@
 
 All notable changes to Expeditions Macro are documented here.
 
+## [1.0.3] - 2026-07-18
+
+### Added
+
+- Added a measured full-turn camera scan when the fast yaw-atlas alignment finishes below the model target.
+
+### Changed
+
+- Standardized camera calibration and placement recording on the detector pack's 808 × 611 Roblox client size, with original window bounds restored afterward.
+- Reflowed camera and placement model guidance above their controls to give model inputs and previews the full content width.
+
+### Fixed
+
+- Prevented unit placement from starting when camera alignment remains below the model confidence target after fallback scanning.
+- Verified that Roblox accepted the required client size before the Expeditions macro continues.
+
 ## [1.0.2] - 2026-07-18
 
 ### Added
@@ -38,6 +54,7 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
+[1.0.3]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.3
 [1.0.2]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.2
 [1.0.1]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.1
 [1.0.0]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.0

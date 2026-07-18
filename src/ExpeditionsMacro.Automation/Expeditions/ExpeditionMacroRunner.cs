@@ -714,6 +714,11 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         log($"Restoring Roblox client size to {width} × {height}.", MacroEventLevel.Information, null, null);
         await _automation.ResizeClientAsync(window, width, height, cancellationToken).ConfigureAwait(false);
         await Task.Delay(250, cancellationToken).ConfigureAwait(false);
+        ClientBounds actual = _automation.GetClientBounds(window);
+        if (actual.Width != width || actual.Height != height)
+        {
+            throw new InvalidOperationException($"Roblox did not accept the required {width} × {height} client size (actual: {actual.Width} × {actual.Height}).");
+        }
     }
 
     private void QueueNotification(

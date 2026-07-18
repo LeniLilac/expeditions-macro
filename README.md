@@ -40,9 +40,9 @@ Windows 10 or Windows 11 x64 is required. Release builds are self-contained; a s
 4. Choose **Setup model**. The app arms the workflow without stealing focus.
 5. Focus Roblox and press **F6**.
 
-Leave shift lock off before pressing F6. Setup enables it automatically for stable right-mouse drags and turns it off again when setup finishes, is stopped, or fails. Setup then takes several goal captures over time and learns one full yaw turn. The resulting atlas supports large shortest-path corrections when far from the goal and one-pixel refinement near it. Lighting normalization, temporal median capture, edge/gradient comparison, and tile trimming reduce sensitivity to lighting changes and moving units.
+Leave shift lock off before pressing F6. Setup resizes the Roblox client to the standard 808 by 611 capture size, enables shift lock for stable right-mouse drags, and restores both when setup finishes, is stopped, or fails. Setup then takes several goal captures over time and learns one full yaw turn. The resulting atlas supports large shortest-path corrections when far from the goal and one-pixel refinement near it. Lighting normalization, temporal median capture, edge/gradient comparison, and tile trimming reduce sensitivity to lighting changes and moving units.
 
-Camera regions are saved relative to the Roblox client. When using **Auto align** by itself, the app also manages shift lock automatically. It temporarily restores the recorded client size and returns the window to its original bounds afterward. Use **Show 30% overlay** to visually confirm the result.
+Camera regions are saved relative to the Roblox client. When using **Auto align** by itself, the app also manages shift lock automatically. It temporarily restores the recorded client size and returns the window to its original bounds afterward. If the fast yaw estimate misses its confidence target, alignment scans one complete turn and refines the strongest match. The Expeditions workflow does not place units unless the final result meets the model target. Use **Show 30% overlay** to visually confirm the result.
 
 ### 2. Create a placement model
 
@@ -52,7 +52,7 @@ Camera regions are saved relative to the Roblox client. When using **Auto align*
 4. For each unit, press its top-row number and click the placement location.
 5. Press **F6** again to finish and save.
 
-Every row can be edited afterward: unit key, client-relative X/Y, and delay. **Test playback** replays the model through the same input path used during an Expedition run.
+Recording temporarily uses the same 808 by 611 Roblox client size as the detector pack and restores the original window afterward. Every row can be edited afterward: unit key, client-relative X/Y, and delay. **Test playback** replays the model through the same input path used during an Expedition run.
 
 Saving the same name replaces the previous model.
 
@@ -118,7 +118,7 @@ Build release artifacts:
 
 ```powershell
 .\scripts\Generate-Icon.ps1
-.\scripts\Build-Release.ps1 -Version 1.0.2
+.\scripts\Build-Release.ps1 -Version 1.0.3
 ```
 
 The release script publishes the self-contained app, creates the portable ZIP, creates the detector-pack ZIP, optionally invokes Inno Setup, and writes SHA-256 checksums plus a dependency inventory.

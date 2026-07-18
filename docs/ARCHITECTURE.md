@@ -9,6 +9,6 @@ The application separates reusable automation behavior from the WPF shell:
 - `ExpeditionsMacro.App` is the single WPF interface and exclusive input-owner coordinator.
 - `ExpeditionsMacro.DatasetBuilder` compiles a local capture corpus into a small, hashed detector pack.
 
-All saved coordinates are relative to the Roblox client. Camera and placement workflows temporarily apply the model's recorded client size, then restore the original outer window bounds in a `finally` block.
+All saved coordinates are relative to the Roblox client. Camera calibration and placement recording use the canonical 808 by 611 detector size. Playback and alignment apply the model's recorded client size, and every standalone workflow restores the original outer window bounds in a `finally` block.
 
 The workflow never reads Roblox memory or injects into the process. It observes screen pixels and emits ordinary Windows keyboard and mouse input.

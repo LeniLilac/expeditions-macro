@@ -28,20 +28,37 @@ public sealed class CameraAlignmentEngine
         settings.Validate();
         RobloxWindow window = RequireWindow();
         Focus(window);
-        ClientBounds client = _automation.GetClientBounds(window);
+        WindowBounds original = _automation.GetWindowBounds(window);
+        ClientBounds initialClient = _automation.GetClientBounds(window);
         ScreenRegion relativeRegion = new(
-            selectedScreenRegion.X - client.X,
-            selectedScreenRegion.Y - client.Y,
+            selectedScreenRegion.X - initialClient.X,
+            selectedScreenRegion.Y - initialClient.Y,
             selectedScreenRegion.Width,
             selectedScreenRegion.Height);
-        if (!relativeRegion.FitsWithin(client.Width, client.Height))
+        if (!relativeRegion.FitsWithin(initialClient.Width, initialClient.Height))
         {
             throw new InvalidOperationException("The comparison region must be completely inside the Roblox client area.");
         }
+        if (!relativeRegion.FitsWithin(RobloxClientProfile.Width, RobloxClientProfile.Height))
+        {
+            throw new InvalidOperationException($"The comparison region must fit inside the standard {RobloxClientProfile.Width} × {RobloxClientProfile.Height} Roblox client area.");
+        }
 
         bool shiftLockEnabled = false;
+        bool resized = initialClient.Width != RobloxClientProfile.Width || initialClient.Height != RobloxClientProfile.Height;
         try
         {
+            if (resized)
+            {
+                progress?.Report(new MacroProgress("Camera setup", 1, $"Temporarily resizing Roblox to {RobloxClientProfile.Width} × {RobloxClientProfile.Height}."));
+                await _automation.ResizeClientAsync(window, RobloxClientProfile.Width, RobloxClientProfile.Height, cancellationToken).ConfigureAwait(false);
+                await Task.Delay(250, cancellationToken).ConfigureAwait(false);
+            }
+            ClientBounds client = _automation.GetClientBounds(window);
+            if (client.Width != RobloxClientProfile.Width || client.Height != RobloxClientProfile.Height)
+            {
+                throw new InvalidOperationException($"Roblox did not accept the standard {RobloxClientProfile.Width} × {RobloxClientProfile.Height} client size.");
+            }
             await EnableShiftLockAsync(window, "Camera setup", 2, progress, cancellationToken).ConfigureAwait(false);
             shiftLockEnabled = true;
 
@@ -95,7 +112,14 @@ public sealed class CameraAlignmentEngine
         }
         finally
         {
-            if (shiftLockEnabled) await DisableShiftLockAsync(window).ConfigureAwait(false);
+            try
+            {
+                if (shiftLockEnabled) await DisableShiftLockAsync(window).ConfigureAwait(false);
+            }
+            finally
+            {
+                if (resized) _automation.RestoreWindowBounds(window, original);
+            }
         }
     }
 
@@ -158,11 +182,24 @@ public sealed class CameraAlignmentEngine
                 await MoveAsync(window, direction * coarsePixels, model.Manifest.SettleMilliseconds, model.Manifest.CoarseStepPixels, cancellationToken).ConfigureAwait(false);
             }
             double coarse = await StableScoreAsync(model.Reference, region, 2, cancellationToken).ConfigureAwait(false);
-            double refined = await RefineAsync(window, model, region, coarse, progress, cancellationToken).ConfigureAwait(false);
-            string message = refined >= model.Manifest.SuccessThreshold
-                ? $"Aligned with {refined:P0} confidence."
-                : $"Best view reached, but confidence is low ({refined:P0}). Recheck position, zoom, and pitch.";
-            progress?.Report(new MacroProgress("Camera alignment", 100, message, Confidence: refined));
+            double refined = await RefineAsync(window, model, region, coarse, 72, "Refining with micro mouse drags.", progress, cancellationToken).ConfigureAwait(false);
+            if (refined < model.Manifest.SuccessThreshold)
+            {
+                progress?.Report(new MacroProgress(
+                    "Camera alignment",
+                    76,
+                    $"Fast alignment reached only {refined:P0} (target {model.Manifest.SuccessThreshold:P0}). Scanning one full yaw turn.",
+                    Confidence: refined));
+                refined = await ScanFullTurnAsync(window, model, region, refined, progress, cancellationToken).ConfigureAwait(false);
+            }
+            if (refined < model.Manifest.SuccessThreshold)
+            {
+                string failure = $"Camera alignment failed at {refined:P0} confidence; the model requires {model.Manifest.SuccessThreshold:P0}. Unit placement was not started.";
+                progress?.Report(new MacroProgress("Camera alignment", 100, failure, Confidence: refined));
+                throw new InvalidOperationException(failure);
+            }
+
+            progress?.Report(new MacroProgress("Camera alignment", 100, $"Aligned with {refined:P0} confidence.", Confidence: refined));
             return refined;
         }
         finally
@@ -246,7 +283,7 @@ public sealed class CameraAlignmentEngine
         throw new InvalidOperationException("Could not recognize a full yaw turn. Increase maximum samples, reduce coarse drag pixels, or increase settle time, then retry.");
     }
 
-    private async Task<double> RefineAsync(
+    private async Task<double> ScanFullTurnAsync(
         RobloxWindow window,
         CameraModel model,
         ScreenRegion region,
@@ -254,7 +291,71 @@ public sealed class CameraAlignmentEngine
         IProgress<MacroProgress>? progress,
         CancellationToken cancellationToken)
     {
-        progress?.Report(new MacroProgress("Camera alignment", 72, "Refining with micro mouse drags."));
+        int fullTurn = model.Manifest.FullYawPixels;
+        int scanStep = Math.Max(model.Manifest.FineStepPixels + 1, model.Manifest.CoarseStepPixels);
+        int travelled = 0;
+        int bestOffset = 0;
+        double bestScore = startingScore;
+        double earlyExitThreshold = Math.Max(model.Manifest.SuccessThreshold, model.Manifest.BaselineScore - 0.025);
+
+        while (travelled < fullTurn)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            int delta = Math.Min(scanStep, fullTurn - travelled);
+            await MoveAsync(window, delta, model.Manifest.SettleMilliseconds, model.Manifest.CoarseStepPixels, cancellationToken).ConfigureAwait(false);
+            travelled += delta;
+            double score = await StableScoreAsync(model.Reference, region, 2, cancellationToken).ConfigureAwait(false);
+            int normalizedOffset = travelled == fullTurn ? 0 : travelled;
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestOffset = normalizedOffset;
+            }
+
+            int percent = 76 + (int)Math.Round(16d * travelled / fullTurn);
+            progress?.Report(new MacroProgress(
+                "Camera alignment",
+                percent,
+                $"Full-turn scan {travelled}/{fullTurn} px. Best confidence: {bestScore:P0}.",
+                Confidence: bestScore));
+
+            if (score >= earlyExitThreshold)
+            {
+                double verified = await StableScoreAsync(model.Reference, region, 3, cancellationToken).ConfigureAwait(false);
+                if (verified >= earlyExitThreshold)
+                {
+                    progress?.Report(new MacroProgress("Camera alignment", 94, $"Stable goal found during full-turn scan at {verified:P0} confidence.", Confidence: verified));
+                    return await RefineAsync(window, model, region, verified, 96, "Refining the full-turn match with micro mouse drags.", progress, cancellationToken).ConfigureAwait(false);
+                }
+            }
+        }
+
+        int correction = bestOffset <= fullTurn / 2 ? bestOffset : bestOffset - fullTurn;
+        string direction = correction < 0 ? "left" : "right";
+        progress?.Report(new MacroProgress(
+            "Camera alignment",
+            94,
+            $"Full-turn scan complete. Returning {Math.Abs(correction)} px {direction} to the best candidate ({bestScore:P0}).",
+            Confidence: bestScore));
+        if (Math.Abs(correction) > model.Manifest.FineStepPixels)
+        {
+            await MoveAsync(window, correction, model.Manifest.SettleMilliseconds, model.Manifest.CoarseStepPixels, cancellationToken).ConfigureAwait(false);
+        }
+        double candidate = await StableScoreAsync(model.Reference, region, 3, cancellationToken).ConfigureAwait(false);
+        return await RefineAsync(window, model, region, candidate, 96, "Refining the best full-turn candidate with micro mouse drags.", progress, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<double> RefineAsync(
+        RobloxWindow window,
+        CameraModel model,
+        ScreenRegion region,
+        double startingScore,
+        int progressPercent,
+        string progressMessage,
+        IProgress<MacroProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        progress?.Report(new MacroProgress("Camera alignment", progressPercent, progressMessage));
         int fine = Math.Max(1, model.Manifest.FineStepPixels);
         double best = startingScore;
         await MoveAsync(window, -fine, model.Manifest.SettleMilliseconds, fine, cancellationToken).ConfigureAwait(false);

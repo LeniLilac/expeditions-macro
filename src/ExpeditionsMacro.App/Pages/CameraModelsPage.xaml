@@ -29,13 +29,10 @@
                 </StackPanel>
 
                 <Border Grid.Row="1" Style="{StaticResource SectionDivider}">
-                    <Grid>
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="210" /><ColumnDefinition Width="430" /></Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource SectionTitle}" Text="Goal view" />
-                            <TextBlock Margin="0,5,24,0" Style="{StaticResource Caption}" Text="Choose a UI-free area with static track or map geometry. The coordinates are stored relative to Roblox." />
-                        </StackPanel>
-                        <StackPanel Grid.Column="1">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Goal view" />
+                        <TextBlock Margin="0,5,0,18" MaxWidth="640" HorizontalAlignment="Left" Style="{StaticResource Caption}" Text="Choose a UI-free area with static track or map geometry. The coordinates are stored relative to Roblox." />
+                        <StackPanel MaxWidth="640" HorizontalAlignment="Stretch">
                             <TextBlock Style="{StaticResource FieldLabel}" Text="Model name" />
                             <TextBox x:Name="ModelNameText" Margin="0,7,0,12" Text="Camera model" />
                             <Border Height="190" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
@@ -52,17 +49,14 @@
                                 </StackPanel>
                             </StackPanel>
                         </StackPanel>
-                    </Grid>
+                    </StackPanel>
                 </Border>
 
                 <Border Grid.Row="2" Style="{StaticResource SectionDivider}">
-                    <Grid>
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="210" /><ColumnDefinition Width="430" /></Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource SectionTitle}" Text="Calibration" />
-                            <TextBlock Margin="0,5,24,0" Style="{StaticResource Caption}" Text="Setup temporarily enables shift lock. More settle time helps Roblox finish rendering after each drag; fine drag controls final precision." />
-                        </StackPanel>
-                        <Grid Grid.Column="1">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Calibration" />
+                        <TextBlock Margin="0,5,0,18" MaxWidth="640" HorizontalAlignment="Left" Style="{StaticResource Caption}" Text="Setup temporarily enables shift lock. More settle time helps Roblox finish rendering after each drag; fine drag controls final precision." />
+                        <Grid MaxWidth="640" HorizontalAlignment="Stretch">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                             <Grid.RowDefinitions><RowDefinition Height="66" /><RowDefinition Height="66" /><RowDefinition Height="66" /></Grid.RowDefinitions>
                             <StackPanel><TextBlock Style="{StaticResource FieldLabel}" Text="Goal captures" /><TextBox x:Name="CaptureCountText" Margin="0,7,0,0" Text="12" /></StackPanel>
@@ -72,7 +66,7 @@
                             <StackPanel Grid.Row="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Settle time, ms" /><TextBox x:Name="SettleText" Margin="0,7,0,0" Text="350" /></StackPanel>
                             <StackPanel Grid.Row="2" Grid.Column="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Maximum yaw samples" /><TextBox x:Name="MaxSamplesText" Margin="0,7,0,0" Text="300" /></StackPanel>
                         </Grid>
-                    </Grid>
+                    </StackPanel>
                 </Border>
 
                 <Grid Grid.Row="3">

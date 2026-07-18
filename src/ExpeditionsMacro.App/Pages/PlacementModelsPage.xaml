@@ -23,21 +23,18 @@
             </StackPanel>
 
             <Border Grid.Row="1" Style="{StaticResource SectionDivider}" Padding="0,0,0,18" Margin="0,0,0,18">
-                <Grid>
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="200" /><ColumnDefinition Width="430" /></Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource SectionTitle}" Text="Model" />
-                        <TextBlock Margin="0,5,24,0" Style="{StaticResource Caption}" Text="Recording starts after F6 and ends when F6 is pressed again." />
-                    </StackPanel>
-                    <Grid Grid.Column="1">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="14" /><ColumnDefinition Width="130" /></Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="Model" />
+                    <TextBlock Margin="0,5,0,18" MaxWidth="680" HorizontalAlignment="Left" Style="{StaticResource Caption}" Text="Recording starts after F6 and ends when F6 is pressed again." />
+                    <Grid MaxWidth="680" HorizontalAlignment="Stretch">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="14" /><ColumnDefinition Width="150" /></Grid.ColumnDefinitions>
                         <Grid.RowDefinitions><RowDefinition Height="64" /><RowDefinition Height="48" /></Grid.RowDefinitions>
                         <StackPanel><TextBlock Style="{StaticResource FieldLabel}" Text="Model name" /><TextBox x:Name="ModelNameText" Margin="0,7,0,0" Text="Placement model" /></StackPanel>
                         <StackPanel Grid.Column="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Default delay, ms" /><TextBox x:Name="DefaultDelayText" Margin="0,7,0,0" Text="900" /></StackPanel>
                         <CheckBox x:Name="RecordedTimingCheck" Grid.Row="1" VerticalAlignment="Center" Content="Use recorded click-to-next-selection timing" />
                         <CheckBox x:Name="PlaybackOverrideCheck" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Content="Override test timing" IsChecked="True" />
                     </Grid>
-                </Grid>
+                </StackPanel>
             </Border>
 
             <Grid Grid.Row="2" Margin="0,0,0,10">
