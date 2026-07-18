@@ -44,13 +44,13 @@
                                     <TextBlock x:Name="PreviewPlaceholder" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource FaintBrush}" Text="No comparison region selected" />
                                 </Grid>
                             </Border>
-                            <Grid Margin="0,10,0,0">
-                                <TextBlock x:Name="RegionText" VerticalAlignment="Center" Style="{StaticResource Caption}" Text="Region: not selected" />
-                                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                            <StackPanel Margin="0,10,0,0">
+                                <TextBlock x:Name="RegionText" Style="{StaticResource Caption}" Text="Region: not selected" />
+                                <StackPanel Margin="0,8,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
                                     <Button Content="Select region" Click="SelectRegion_Click" />
                                     <Button x:Name="OverlayButton" Margin="8,0,0,0" Content="Show 30% overlay" IsEnabled="False" Click="Overlay_Click" />
                                 </StackPanel>
-                            </Grid>
+                            </StackPanel>
                         </StackPanel>
                     </Grid>
                 </Border>
@@ -60,7 +60,7 @@
                         <Grid.ColumnDefinitions><ColumnDefinition Width="210" /><ColumnDefinition Width="430" /></Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock Style="{StaticResource SectionTitle}" Text="Calibration" />
-                            <TextBlock Margin="0,5,24,0" Style="{StaticResource Caption}" Text="More settle time helps Roblox finish rendering after each drag. Fine drag controls the final alignment precision." />
+                            <TextBlock Margin="0,5,24,0" Style="{StaticResource Caption}" Text="Setup temporarily enables shift lock. More settle time helps Roblox finish rendering after each drag; fine drag controls final precision." />
                         </StackPanel>
                         <Grid Grid.Column="1">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
@@ -78,11 +78,12 @@
                 <Grid Grid.Row="3">
                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                     <Grid>
+                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                         <StackPanel>
                             <TextBlock Style="{StaticResource SectionTitle}" Text="Operation" />
                             <TextBlock x:Name="StatusText" Margin="0,5,0,0" Style="{StaticResource Caption}" Text="Select a comparison region to create a model." />
                         </StackPanel>
-                        <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                        <StackPanel Grid.Row="1" Margin="0,12,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
                             <Button x:Name="SetupButton" Style="{StaticResource PrimaryButton}" Content="Setup model" Click="Setup_Click" />
                             <Button x:Name="AlignButton" Margin="8,0,0,0" Content="Auto align" IsEnabled="False" Click="Align_Click" />
                             <Button x:Name="StopButton" Margin="8,0,0,0" Style="{StaticResource DangerButton}" Content="Stop" IsEnabled="False" Click="Stop_Click" />

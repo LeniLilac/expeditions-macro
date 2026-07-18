@@ -85,7 +85,7 @@ public partial class CameraModelsPage : UserControl, IAppPage
         {
             PreviewImage.Source = BitmapSourceFactory.Create(_services.Automation.CaptureScreen(region));
             PreviewPlaceholder.Visibility = Visibility.Collapsed;
-            StatusText.Text = "Region selected. Click Setup model, then press F6 while Roblox is ready.";
+            StatusText.Text = "Region selected. Click Setup model, then press F6 while Roblox is ready. Shift lock is automatic.";
         }
         catch (Exception error)
         {
@@ -111,8 +111,8 @@ public partial class CameraModelsPage : UserControl, IAppPage
             await Dispatcher.InvokeAsync(() => _selectedModel = model);
             await RefreshModelsAsync(model.Manifest.Id);
         });
-        StatusText.Text = "Camera setup armed. Focus Roblox and press F6 to begin.";
-        AppendLog("Setup armed. Press F6 when the goal view is ready.");
+        StatusText.Text = "Camera setup armed. Focus Roblox and press F6 to begin; the app will toggle shift lock automatically.";
+        AppendLog("Setup armed. Start with shift lock off, then press F6 when the goal view is ready. The app will enable it temporarily.");
         UpdateBusyState();
     }
 
@@ -127,7 +127,7 @@ public partial class CameraModelsPage : UserControl, IAppPage
             await Dispatcher.InvokeAsync(() => StatusText.Text = $"Alignment finished at {score:P0} confidence.");
         });
         StatusText.Text = "Alignment armed. Focus Roblox and press F6 to begin.";
-        AppendLog("Auto align armed. Press F6 when zoom and pitch match the model.");
+        AppendLog("Auto align armed. Start with shift lock off, then press F6 when zoom and pitch match the model. The app will enable it temporarily.");
         UpdateBusyState();
     }
 

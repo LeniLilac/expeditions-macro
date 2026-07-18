@@ -209,7 +209,13 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
             await Task.Delay(250, cancellationToken).ConfigureAwait(false);
             await _automation.DragCameraAsync(window, 0, preset.PitchDragPixels, 90, cancellationToken).ConfigureAwait(false);
             await Task.Delay(450, cancellationToken).ConfigureAwait(false);
-            double score = await _camera.AlignAsync(model, window, restoreWindow: false, progress, cancellationToken).ConfigureAwait(false);
+            double score = await _camera.AlignAsync(
+                model,
+                window,
+                restoreWindow: false,
+                manageShiftLock: false,
+                progress: progress,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
             log($"Camera alignment finished at {score:P0} confidence.", MacroEventLevel.Information, null, score);
         }
         finally

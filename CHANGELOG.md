@@ -2,6 +2,15 @@
 
 All notable changes to Expeditions Macro are documented here.
 
+## [1.0.1] - 2026-07-18
+
+### Fixed
+
+- Prevented camera-region details from overlapping the region and overlay controls.
+- Centered single-line input text so focused values are no longer vertically clipped at Windows display scaling.
+- Made camera-model setup and standalone alignment temporarily enable shift lock and restore it after success, cancellation, or failure.
+- Allowed the UI snapshot renderer to run while the normal single app instance is open, without changing normal single-instance behavior.
+
 ## [1.0.0] - 2026-07-18
 
 ### Added
@@ -16,4 +25,5 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
+[1.0.1]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.1
 [1.0.0]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.0

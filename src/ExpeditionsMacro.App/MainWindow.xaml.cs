@@ -15,7 +15,7 @@ public partial class MainWindow : Window
     private bool _autoMinimized;
     private bool _closingAfterStop;
 
-    public MainWindow(AppServices services)
+    public MainWindow(AppServices services, bool snapshotMode = false)
     {
         _services = services;
         InitializeComponent();
@@ -29,11 +29,14 @@ public partial class MainWindow : Window
         };
         _services.Coordinator.StateChanged += Coordinator_StateChanged;
         _services.Coordinator.OperationFailed += Coordinator_OperationFailed;
-        Loaded += async (_, _) =>
+        if (!snapshotMode)
         {
-            await ShowPageAsync("Expeditions");
-            if (_pages["Settings"] is SettingsPage settings) await settings.CheckForUpdatesAsync(automatic: true);
-        };
+            Loaded += async (_, _) =>
+            {
+                await ShowPageAsync("Expeditions");
+                if (_pages["Settings"] is SettingsPage settings) await settings.CheckForUpdatesAsync(automatic: true);
+            };
+        }
         StateChanged += (_, _) => MaximizeButton.Content = WindowState == WindowState.Maximized ? "\uE923" : "\uE922";
     }
 

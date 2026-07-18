@@ -13,9 +13,67 @@ public sealed class CameraAlignmentTests
     public async Task Align_ResizesUsesRelativeRegionAndRestoresOriginalWindow()
     {
         ImageFrame capture = VisionScorerTests.Pattern(96, 72);
+        CameraModel model = CreateModel(capture);
+        FakeAutomation automation = new(capture);
+        CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
+
+        double score = await engine.AlignAsync(model);
+
+        Assert.True(score > 0.95, $"Alignment score was {score:P1}.");
+        Assert.Equal((808, 611), automation.ResizeRequest);
+        Assert.Equal(new WindowBounds(40, 50, 1100, 800), automation.RestoredBounds);
+        Assert.All(automation.CapturedRegions, region => Assert.Equal(new ScreenRegion(315, 220, 96, 72), region));
+        Assert.NotEmpty(automation.Drags);
+        Assert.Equal(1, automation.MoveToCenterCount);
+        Assert.Equal(2, automation.LeftControlTapCount);
+    }
+
+    [Fact]
+    public async Task Align_WhenShiftLockIsAlreadyManaged_DoesNotToggleIt()
+    {
+        ImageFrame capture = VisionScorerTests.Pattern(96, 72);
+        FakeAutomation automation = new(capture);
+        CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
+
+        await engine.AlignAsync(CreateModel(capture), manageShiftLock: false);
+
+        Assert.Equal(0, automation.MoveToCenterCount);
+        Assert.Equal(0, automation.LeftControlTapCount);
+    }
+
+    [Fact]
+    public async Task Calibrate_RestoresAutomaticShiftLockWhenCaptureFails()
+    {
+        ImageFrame capture = VisionScorerTests.Pattern(96, 72);
+        FakeAutomation automation = new(capture)
+        {
+            CaptureFailure = new InvalidOperationException("Synthetic capture failure."),
+        };
+        CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
+        CameraCalibrationSettings settings = new()
+        {
+            Name = "Automatic shift lock",
+            CaptureCount = 2,
+            CaptureDuration = TimeSpan.Zero,
+            CoarseStepPixels = 16,
+            FineStepPixels = 1,
+            SettleMilliseconds = 25,
+            MaximumSamples = 12,
+        };
+
+        InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            engine.CalibrateAsync(new ScreenRegion(315, 220, 96, 72), settings));
+
+        Assert.Equal("Synthetic capture failure.", error.Message);
+        Assert.Equal(1, automation.MoveToCenterCount);
+        Assert.Equal(2, automation.LeftControlTapCount);
+    }
+
+    private static CameraModel CreateModel(ImageFrame capture)
+    {
         ImageFrame reference = VisionScorer.PrepareGray(capture);
         ImageFrame thumbnail = VisionScorer.MakeThumbnail(reference);
-        CameraModel model = new(
+        return new CameraModel(
             new CameraModelManifest
             {
                 Id = "camera-test",
@@ -36,16 +94,6 @@ public sealed class CameraAlignmentTests
             reference,
             capture,
             [thumbnail, thumbnail, thumbnail]);
-        FakeAutomation automation = new(capture);
-        CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
-
-        double score = await engine.AlignAsync(model);
-
-        Assert.True(score > 0.95, $"Alignment score was {score:P1}.");
-        Assert.Equal((808, 611), automation.ResizeRequest);
-        Assert.Equal(new WindowBounds(40, 50, 1100, 800), automation.RestoredBounds);
-        Assert.All(automation.CapturedRegions, region => Assert.Equal(new ScreenRegion(315, 220, 96, 72), region));
-        Assert.NotEmpty(automation.Drags);
     }
 
     private sealed class FakeAutomation(ImageFrame capture) : IRobloxAutomation
@@ -57,6 +105,9 @@ public sealed class CameraAlignmentTests
         public WindowBounds? RestoredBounds { get; private set; }
         public List<ScreenRegion> CapturedRegions { get; } = [];
         public List<(int X, int Y)> Drags { get; } = [];
+        public int MoveToCenterCount { get; private set; }
+        public int LeftControlTapCount { get; private set; }
+        public Exception? CaptureFailure { get; init; }
 
         public RobloxWindow? FindWindow(string titleFragment = "Roblox") => _window;
         public RobloxWindow? ForegroundWindow() => _window;
@@ -73,10 +124,15 @@ public sealed class CameraAlignmentTests
         public ImageFrame CaptureScreen(ScreenRegion region)
         {
             CapturedRegions.Add(region);
+            if (CaptureFailure is not null) throw CaptureFailure;
             return capture.Clone();
         }
         public ImageFrame CaptureClient(RobloxWindow window) => throw new NotSupportedException();
-        public Task MoveCursorToClientCenterAsync(RobloxWindow window, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task MoveCursorToClientCenterAsync(RobloxWindow window, CancellationToken cancellationToken)
+        {
+            MoveToCenterCount++;
+            return Task.CompletedTask;
+        }
         public Task ClickClientAsync(RobloxWindow window, int x, int y, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task DragCameraAsync(RobloxWindow window, int deltaX, int deltaY, int chunkPixels, CancellationToken cancellationToken)
         {
@@ -84,7 +140,11 @@ public sealed class CameraAlignmentTests
             return Task.CompletedTask;
         }
         public Task ZoomOutFullyAsync(RobloxWindow window, int ticks, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task TapLeftControlAsync(RobloxWindow window, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task TapLeftControlAsync(RobloxWindow window, CancellationToken cancellationToken)
+        {
+            LeftControlTapCount++;
+            return Task.CompletedTask;
+        }
         public Task TapUnitKeyAsync(RobloxWindow window, int unitKey, int holdMilliseconds, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 

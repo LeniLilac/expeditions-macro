@@ -40,9 +40,9 @@ Windows 10 or Windows 11 x64 is required. Release builds are self-contained; a s
 4. Choose **Setup model**. The app arms the workflow without stealing focus.
 5. Focus Roblox and press **F6**.
 
-Setup takes several goal captures over time, then learns one full yaw turn with right-mouse drags. The resulting atlas supports large shortest-path corrections when far from the goal and one-pixel refinement near it. Lighting normalization, temporal median capture, edge/gradient comparison, and tile trimming reduce sensitivity to lighting changes and moving units.
+Leave shift lock off before pressing F6. Setup enables it automatically for stable right-mouse drags and turns it off again when setup finishes, is stopped, or fails. Setup then takes several goal captures over time and learns one full yaw turn. The resulting atlas supports large shortest-path corrections when far from the goal and one-pixel refinement near it. Lighting normalization, temporal median capture, edge/gradient comparison, and tile trimming reduce sensitivity to lighting changes and moving units.
 
-Camera regions are saved relative to the Roblox client. When aligning, the app temporarily restores the recorded client size and returns the window to its original bounds afterward. Use **Show 30% overlay** to visually confirm the result.
+Camera regions are saved relative to the Roblox client. When using **Auto align** by itself, the app also manages shift lock automatically. It temporarily restores the recorded client size and returns the window to its original bounds afterward. Use **Show 30% overlay** to visually confirm the result.
 
 ### 2. Create a placement model
 
@@ -118,7 +118,7 @@ Build release artifacts:
 
 ```powershell
 .\scripts\Generate-Icon.ps1
-.\scripts\Build-Release.ps1 -Version 1.0.0
+.\scripts\Build-Release.ps1 -Version 1.0.1
 ```
 
 The release script publishes the self-contained app, creates the portable ZIP, creates the detector-pack ZIP, optionally invokes Inno Setup, and writes SHA-256 checksums plus a dependency inventory.

@@ -39,59 +39,71 @@ public sealed class CameraAlignmentEngine
             throw new InvalidOperationException("The comparison region must be completely inside the Roblox client area.");
         }
 
-        ScreenRegion captureRegion = client.ToScreen(relativeRegion);
-        progress?.Report(new MacroProgress("Camera setup", 3, $"Recorded Roblox client size {client.Width} × {client.Height} and relative region ({relativeRegion.X}, {relativeRegion.Y})."));
-        List<ImageFrame> frames = [];
-        int interval = settings.CaptureCount <= 1
-            ? 0
-            : (int)Math.Round(settings.CaptureDuration.TotalMilliseconds / (settings.CaptureCount - 1));
-        for (int index = 0; index < settings.CaptureCount; index++)
+        bool shiftLockEnabled = false;
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            frames.Add(_automation.CaptureScreen(captureRegion));
-            progress?.Report(new MacroProgress("Camera setup", 5 + (int)Math.Round(15d * (index + 1) / settings.CaptureCount), $"Capturing goal example {index + 1} of {settings.CaptureCount}"));
-            if (index + 1 < settings.CaptureCount) await Task.Delay(interval, cancellationToken).ConfigureAwait(false);
-        }
+            await EnableShiftLockAsync(window, "Camera setup", 2, progress, cancellationToken).ConfigureAwait(false);
+            shiftLockEnabled = true;
 
-        (IReadOnlyList<ImageFrame> _, ImageFrame reference, double baseline) = VisionScorer.BuildReference(frames);
-        progress?.Report(new MacroProgress("Camera setup", 21, $"Goal model ready. Baseline confidence: {baseline:P0}", Confidence: baseline));
-        (int fullYawPixels, IReadOnlyList<double> scanScores, IReadOnlyList<ImageFrame> atlas) = await LearnFullTurnAsync(
-            window,
-            captureRegion,
-            reference,
-            baseline,
-            settings,
-            progress,
-            cancellationToken).ConfigureAwait(false);
-        double threshold = VisionScorer.ChooseSuccessThreshold(baseline, scanScores);
-        string id = ModelId.FromName(settings.Name);
-        CameraModelManifest manifest = new()
+            ScreenRegion captureRegion = client.ToScreen(relativeRegion);
+            progress?.Report(new MacroProgress("Camera setup", 3, $"Recorded Roblox client size {client.Width} × {client.Height} and relative region ({relativeRegion.X}, {relativeRegion.Y})."));
+            List<ImageFrame> frames = [];
+            int interval = settings.CaptureCount <= 1
+                ? 0
+                : (int)Math.Round(settings.CaptureDuration.TotalMilliseconds / (settings.CaptureCount - 1));
+            for (int index = 0; index < settings.CaptureCount; index++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                frames.Add(_automation.CaptureScreen(captureRegion));
+                progress?.Report(new MacroProgress("Camera setup", 5 + (int)Math.Round(15d * (index + 1) / settings.CaptureCount), $"Capturing goal example {index + 1} of {settings.CaptureCount}"));
+                if (index + 1 < settings.CaptureCount) await Task.Delay(interval, cancellationToken).ConfigureAwait(false);
+            }
+
+            (IReadOnlyList<ImageFrame> _, ImageFrame reference, double baseline) = VisionScorer.BuildReference(frames);
+            progress?.Report(new MacroProgress("Camera setup", 21, $"Goal model ready. Baseline confidence: {baseline:P0}", Confidence: baseline));
+            (int fullYawPixels, IReadOnlyList<double> scanScores, IReadOnlyList<ImageFrame> atlas) = await LearnFullTurnAsync(
+                window,
+                captureRegion,
+                reference,
+                baseline,
+                settings,
+                progress,
+                cancellationToken).ConfigureAwait(false);
+            double threshold = VisionScorer.ChooseSuccessThreshold(baseline, scanScores);
+            string id = ModelId.FromName(settings.Name);
+            CameraModelManifest manifest = new()
+            {
+                Id = id,
+                Name = settings.Name.Trim(),
+                Region = relativeRegion,
+                ClientWidth = client.Width,
+                ClientHeight = client.Height,
+                BaselineScore = baseline,
+                SuccessThreshold = threshold,
+                CoarseStepPixels = settings.CoarseStepPixels,
+                FineStepPixels = settings.FineStepPixels,
+                FullYawPixels = fullYawPixels,
+                SettleMilliseconds = settings.SettleMilliseconds,
+                AtlasSampleCount = atlas.Count,
+                ScanScores = scanScores,
+                CreatedAt = DateTimeOffset.UtcNow,
+            };
+            CameraModel model = new(manifest, reference, frames[0], atlas);
+            await _models.SaveAsync(model, cancellationToken).ConfigureAwait(false);
+            progress?.Report(new MacroProgress("Camera setup", 100, $"Setup complete. '{manifest.Name}' learned {fullYawPixels} mouse pixels per turn."));
+            return model;
+        }
+        finally
         {
-            Id = id,
-            Name = settings.Name.Trim(),
-            Region = relativeRegion,
-            ClientWidth = client.Width,
-            ClientHeight = client.Height,
-            BaselineScore = baseline,
-            SuccessThreshold = threshold,
-            CoarseStepPixels = settings.CoarseStepPixels,
-            FineStepPixels = settings.FineStepPixels,
-            FullYawPixels = fullYawPixels,
-            SettleMilliseconds = settings.SettleMilliseconds,
-            AtlasSampleCount = atlas.Count,
-            ScanScores = scanScores,
-            CreatedAt = DateTimeOffset.UtcNow,
-        };
-        CameraModel model = new(manifest, reference, frames[0], atlas);
-        await _models.SaveAsync(model, cancellationToken).ConfigureAwait(false);
-        progress?.Report(new MacroProgress("Camera setup", 100, $"Setup complete. '{manifest.Name}' learned {fullYawPixels} mouse pixels per turn."));
-        return model;
+            if (shiftLockEnabled) await DisableShiftLockAsync(window).ConfigureAwait(false);
+        }
     }
 
     public async Task<double> AlignAsync(
         CameraModel model,
         RobloxWindow? existingWindow = null,
         bool restoreWindow = true,
+        bool manageShiftLock = true,
         IProgress<MacroProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -101,6 +113,7 @@ public sealed class CameraAlignmentEngine
         WindowBounds original = _automation.GetWindowBounds(window);
         ClientBounds currentClient = _automation.GetClientBounds(window);
         bool resized = currentClient.Width != model.Manifest.ClientWidth || currentClient.Height != model.Manifest.ClientHeight;
+        bool shiftLockEnabled = false;
         try
         {
             progress?.Report(new MacroProgress("Camera alignment", 2, "Starting camera alignment."));
@@ -112,6 +125,11 @@ public sealed class CameraAlignmentEngine
             }
             ClientBounds client = _automation.GetClientBounds(window);
             if (client.Width != model.Manifest.ClientWidth || client.Height != model.Manifest.ClientHeight) throw new InvalidOperationException("Roblox does not match the client size stored by the camera model.");
+            if (manageShiftLock)
+            {
+                await EnableShiftLockAsync(window, "Camera alignment", 6, progress, cancellationToken).ConfigureAwait(false);
+                shiftLockEnabled = true;
+            }
             ScreenRegion region = client.ToScreen(model.Manifest.Region);
             double initial = await StableScoreAsync(model.Reference, region, 3, cancellationToken).ConfigureAwait(false);
             ImageFrame currentThumbnail = await CurrentThumbnailAsync(model.Reference, region, model.YawAtlas[0].Width, 2, cancellationToken).ConfigureAwait(false);
@@ -149,8 +167,38 @@ public sealed class CameraAlignmentEngine
         }
         finally
         {
-            if (resized && restoreWindow) _automation.RestoreWindowBounds(window, original);
+            try
+            {
+                if (shiftLockEnabled) await DisableShiftLockAsync(window).ConfigureAwait(false);
+            }
+            finally
+            {
+                if (resized && restoreWindow) _automation.RestoreWindowBounds(window, original);
+            }
         }
+    }
+
+    private async Task EnableShiftLockAsync(
+        RobloxWindow window,
+        string operation,
+        int percent,
+        IProgress<MacroProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        progress?.Report(new MacroProgress(operation, percent, "Enabling shift lock for stable camera drags."));
+        await _automation.MoveCursorToClientCenterAsync(window, cancellationToken).ConfigureAwait(false);
+        await Task.Delay(120, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        await _automation.TapLeftControlAsync(window, CancellationToken.None).ConfigureAwait(false);
+        // The toggle has already reached Roblox. Finish this short settling period
+        // without cancellation so the caller can always mark and restore the state.
+        await Task.Delay(250, CancellationToken.None).ConfigureAwait(false);
+    }
+
+    private async Task DisableShiftLockAsync(RobloxWindow window)
+    {
+        Focus(window);
+        await _automation.TapLeftControlAsync(window, CancellationToken.None).ConfigureAwait(false);
     }
 
     private async Task<(int FullYawPixels, IReadOnlyList<double> Scores, IReadOnlyList<ImageFrame> Atlas)> LearnFullTurnAsync(

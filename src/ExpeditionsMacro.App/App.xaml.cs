@@ -19,20 +19,24 @@ public partial class App : Application
         // Startup performs file and detector-pack I/O before the first window exists.
         // Keep WPF alive across those awaits, then restore normal main-window shutdown.
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
-        _singleInstance = new Mutex(initiallyOwned: true, "Local\\ExpeditionsMacro.App", out bool created);
-        _ownsSingleInstance = created;
-        if (!created)
+        bool snapshotMode = e.Args.Length == 2 && string.Equals(e.Args[0], "--snapshot-ui", StringComparison.OrdinalIgnoreCase);
+        if (!snapshotMode)
         {
-            MessageBox.Show("Expeditions Macro is already running.", "Expeditions Macro", MessageBoxButton.OK, MessageBoxImage.Information);
-            Shutdown(2);
-            return;
+            _singleInstance = new Mutex(initiallyOwned: true, "Local\\ExpeditionsMacro.App", out bool created);
+            _ownsSingleInstance = created;
+            if (!created)
+            {
+                MessageBox.Show("Expeditions Macro is already running.", "Expeditions Macro", MessageBoxButton.OK, MessageBoxImage.Information);
+                Shutdown(2);
+                return;
+            }
         }
 
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         try
         {
             Services = await AppServices.CreateAsync(Dispatcher);
-            if (e.Args.Length == 2 && string.Equals(e.Args[0], "--snapshot-ui", StringComparison.OrdinalIgnoreCase))
+            if (snapshotMode)
             {
                 await UiSnapshotRenderer.RenderAsync(Services, e.Args[1]);
                 Shutdown(0);
