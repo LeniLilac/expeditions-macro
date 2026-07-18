@@ -14,5 +14,6 @@ All notable changes to Expeditions Macro are documented here.
 - Lobby and disconnect recovery, including direct starts from the lobby.
 - Optional Discord Components V2 reports with protected webhook storage.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
+- Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
 [1.0.0]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.0

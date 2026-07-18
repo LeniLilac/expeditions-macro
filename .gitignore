@@ -14,6 +14,5 @@ TestResults/
 Thumbs.db
 
 data/local/
-datasets/*
-!datasets/README.md
+datasets/**/manifest.json
 detector-packs/.staging/

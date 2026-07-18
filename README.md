@@ -109,10 +109,10 @@ Requirements:
 ```powershell
 dotnet restore ExpeditionsMacro.slnx
 dotnet build ExpeditionsMacro.slnx -c Debug
-dotnet test tests/ExpeditionsMacro.Tests/ExpeditionsMacro.Tests.csproj -c Debug --filter "Category!=Golden"
+dotnet test tests/ExpeditionsMacro.Tests/ExpeditionsMacro.Tests.csproj -c Debug
 ```
 
-The public test command skips optional golden-image regressions because raw gameplay captures are not redistributed. Maintainers can provide the local dataset described in [datasets/README.md](datasets/README.md) to run the complete detector regression suite.
+The repository includes the detector image dataset, so the standard test command runs both unit tests and the complete golden-image regression suite. See [datasets/README.md](datasets/README.md) for its structure and capture requirements.
 
 Build release artifacts:
 
