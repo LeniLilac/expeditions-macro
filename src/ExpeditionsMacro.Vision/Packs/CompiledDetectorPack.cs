@@ -10,6 +10,7 @@ namespace ExpeditionsMacro.Vision.Packs;
 public sealed class CompiledDetectorPack : IDetectorPack
 {
     private static readonly string[] RecoveryStates = ["disconnect", "lobby", "play", "map_select", "map_preview"];
+    private static readonly (int X, int Y)[] DifficultyLayoutOffsets = Enumerable.Range(-8, 17).Select(y => (0, y)).ToArray();
     private readonly IReadOnlyDictionary<string, StateRuntime> _states;
     private readonly IReadOnlyDictionary<int, SelectionRuntime> _maps;
     private readonly IReadOnlyDictionary<int, SelectionRuntime> _difficulties;
@@ -84,10 +85,15 @@ public sealed class CompiledDetectorPack : IDetectorPack
 
     public int? SelectedDifficulty(ImageFrame clientImage)
     {
-        // Only the fixed center slot represents the active difficulty. Searching
-        // vertically can match labels passing through during the carousel animation
-        // and make a selected difficulty look like a neighboring one.
-        return BestSelection(_difficulties, clientImage, 0.97, 0.01, [(0, 0)]);
+        ValidateClient(clientImage);
+        (bool observed, int? selected) = DifficultyFromHue(clientImage);
+        if (observed) return selected;
+
+        // Roblox can shift the whole difficulty control slightly between UI revisions.
+        // Pick one shared layout offset from the fixed frame/buttons, then compare all
+        // difficulty references at that same offset. This keeps the active center slot
+        // authoritative instead of following labels as they move through the carousel.
+        return BestSelectionAtSharedOffset(_difficulties, clientImage, 0.97, 0.01, DifficultyLayoutOffsets);
     }
 
     public IReadOnlyList<int> RemainingUnitKeys(ImageFrame clientImage, IReadOnlySet<int> unitKeys)
@@ -155,6 +161,31 @@ public sealed class CompiledDetectorPack : IDetectorPack
         return ranked[0].Value;
     }
 
+    private int? BestSelectionAtSharedOffset(
+        IReadOnlyDictionary<int, SelectionRuntime> selections,
+        ImageFrame image,
+        double minimumScore,
+        double minimumGap,
+        IReadOnlyList<(int X, int Y)> offsets)
+    {
+        ValidateClient(image);
+        (double LayoutScore, (double Score, int Value)[] Scores) bestLayout = offsets
+            .Select(offset =>
+            {
+                (double Score, int Value)[] scores = selections
+                    .Select(pair => (ScoreSelection(pair.Value, image, [offset]), pair.Key))
+                    .OrderByDescending(value => value.Item1)
+                    .ToArray();
+                return (LayoutScore: Median(scores.Select(value => value.Score).ToArray()), Scores: scores);
+            })
+            .OrderByDescending(candidate => candidate.LayoutScore)
+            .ThenByDescending(candidate => candidate.Scores[0].Score)
+            .First();
+        (double Score, int Value)[] ranked = bestLayout.Scores;
+        if (ranked.Length < 2 || ranked[0].Score < minimumScore || ranked[0].Score - ranked[1].Score < minimumGap) return null;
+        return ranked[0].Value;
+    }
+
     private static double ScoreSelection(SelectionRuntime runtime, ImageFrame image, IReadOnlyList<(int X, int Y)> offsets)
     {
         double best = 0;
@@ -166,6 +197,53 @@ public sealed class CompiledDetectorPack : IDetectorPack
             best = Math.Max(best, VisionScorer.RobustSimilarity(runtime.Reference, current));
         }
         return best;
+    }
+
+    private (bool Observed, int? Selected) DifficultyFromHue(ImageFrame image)
+    {
+        IReadOnlyDictionary<int, double>? prototypes = Manifest.DifficultyHuePrototypes;
+        ScreenRegion? configuredRegion = Manifest.DifficultyHueRegion;
+        if ((prototypes is null || configuredRegion is null) && Manifest.PackId.Equals(AnimeExpeditionsDetectorSpec.PackId, StringComparison.OrdinalIgnoreCase))
+        {
+            prototypes = AnimeExpeditionsDetectorSpec.DifficultyHuePrototypes;
+            configuredRegion = AnimeExpeditionsDetectorSpec.DifficultyHueRegion;
+        }
+        if (prototypes is null || configuredRegion is not ScreenRegion region || !region.FitsWithin(image.Width, image.Height)) return (false, null);
+
+        using Mat rgb = ImageCodec.ToMat(image.Crop(region));
+        using Mat hsv = new();
+        Cv2.CvtColor(rgb, hsv, ColorConversionCodes.RGB2HSV);
+        Dictionary<int, int> counts = prototypes.Keys.ToDictionary(value => value, _ => 0);
+        int coloredPixels = 0;
+        int rows = hsv.Rows;
+        int columns = hsv.Cols;
+        for (int y = 0; y < rows; y++)
+        {
+            for (int x = 0; x < columns; x++)
+            {
+                Vec3b pixel = hsv.At<Vec3b>(y, x);
+                if (pixel.Item1 < 140 || pixel.Item2 < 90) continue;
+                coloredPixels++;
+                double nearestDistance = double.MaxValue;
+                int nearestValue = 0;
+                foreach ((int value, double prototype) in prototypes)
+                {
+                    double distance = HueDistance(pixel.Item0, prototype);
+                    if (distance >= nearestDistance) continue;
+                    nearestDistance = distance;
+                    nearestValue = value;
+                }
+                if (nearestDistance <= 18) counts[nearestValue]++;
+            }
+        }
+
+        if (coloredPixels < 50) return (false, null);
+        (int Count, int Value)[] ranked = counts
+            .Select(pair => (pair.Value, pair.Key))
+            .OrderByDescending(value => value.Item1)
+            .ToArray();
+        if (ranked.Length < 2 || ranked[0].Count < 50 || ranked[0].Count - ranked[1].Count < 30) return (true, null);
+        return (true, ranked[0].Value);
     }
 
     private double? NodeHue(ImageFrame image)

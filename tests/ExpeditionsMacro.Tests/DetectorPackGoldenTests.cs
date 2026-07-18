@@ -94,6 +94,9 @@ public sealed class DetectorPackGoldenTests
     [InlineData(1, "Expedition_Map_Select_Difficultly1")]
     [InlineData(2, "Expedition_Map_Select_Difficultly2")]
     [InlineData(3, "Expedition_Map_Select_Difficultly3")]
+    [InlineData(1, "Expedition_Map_Select_Difficultly1_LayoutShift")]
+    [InlineData(2, "Expedition_Map_Select_Difficultly2_LayoutShift")]
+    [InlineData(3, "Expedition_Map_Select_Difficultly3_LayoutShift")]
     [Trait("Category", "Golden")]
     public void SelectedDifficulty_UsesOneActiveMatch(int expected, string dataset)
     {
@@ -103,14 +106,16 @@ public sealed class DetectorPackGoldenTests
 
     [Fact]
     [Trait("Category", "Golden")]
-    public void DifficultyAnimation_DoesNotMisidentifyAnotherDifficulty()
+    public void DifficultyAnimation_TracksTheVisibleTwoToThreeTransition()
     {
         if (!DatasetsAvailable()) return;
-        foreach (string file in Pngs("Expedition_Map_Select_Difficultly3_Animation"))
-        {
-            int? selected = Pack.Value.SelectedDifficulty(ImageCodec.Load(file));
-            Assert.True(selected is null or 3, $"Animation frame {Path.GetFileName(file)} was misidentified as difficulty {selected}.");
-        }
+        int?[] selected = Pngs("Expedition_Map_Select_Difficultly3_Animation")
+            .Select(file => Pack.Value.SelectedDifficulty(ImageCodec.Load(file)))
+            .ToArray();
+        Assert.Equal(2, selected[0]);
+        Assert.Equal(3, selected[^1]);
+        Assert.DoesNotContain(1, selected);
+        Assert.All(selected, value => Assert.True(value is 2 or 3, $"Animation produced an ambiguous difficulty value: {value?.ToString() ?? "none"}."));
     }
 
     [Theory]

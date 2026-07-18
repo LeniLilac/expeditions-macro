@@ -193,6 +193,7 @@
                                                               VerticalAlignment="Center"
                                                               Content="{Binding SelectionBoxItem, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                                               ContentTemplate="{Binding SelectionBoxItemTemplate, RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                              ContentTemplateSelector="{Binding ItemTemplateSelector, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                                               ContentStringFormat="{Binding SelectionBoxItemStringFormat, RelativeSource={RelativeSource AncestorType=ComboBox}}"
                                                               TextElement.Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ComboBox}}" />
                                             <Path Width="8" Height="5" Margin="0,0,13,0" HorizontalAlignment="Right" VerticalAlignment="Center" Data="M 0 0 L 4 4 L 8 0" Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.4" />

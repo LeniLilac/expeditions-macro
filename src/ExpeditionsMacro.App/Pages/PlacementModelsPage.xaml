@@ -61,18 +61,18 @@
             </DataGrid>
 
             <Grid Grid.Row="4" Margin="0,18,0,0">
-                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                 <StackPanel>
                     <TextBlock x:Name="StatusText" FontWeight="SemiBold" Text="Ready to record or edit a model." />
                     <TextBlock x:Name="DetailText" Margin="0,4,0,0" Style="{StaticResource Caption}" Text="Coordinates are stored relative to the recorded Roblox client size." />
                 </StackPanel>
-                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                <WrapPanel Grid.Row="1" Margin="0,12,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
                     <Button x:Name="SaveButton" Content="Save changes" Click="Save_Click" />
                     <Button x:Name="RecordButton" Margin="8,0,0,0" Style="{StaticResource PrimaryButton}" Content="Record placements" Click="Record_Click" />
                     <Button x:Name="TestButton" Margin="8,0,0,0" Content="Test playback" Click="Test_Click" />
                     <Button x:Name="StopButton" Margin="8,0,0,0" Style="{StaticResource DangerButton}" Content="Stop" IsEnabled="False" Click="Stop_Click" />
-                </StackPanel>
-                <ProgressBar x:Name="OperationProgress" Grid.Row="1" Margin="0,16,0,0" Minimum="0" Maximum="100" />
+                </WrapPanel>
+                <ProgressBar x:Name="OperationProgress" Grid.Row="2" Margin="0,16,0,0" Minimum="0" Maximum="100" />
             </Grid>
         </Grid>
     </Grid>

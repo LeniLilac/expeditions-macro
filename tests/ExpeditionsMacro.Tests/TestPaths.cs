@@ -8,7 +8,7 @@ internal static class TestPaths
         RepositoryRoot,
         "detector-packs",
         "anime-expeditions-expeditions",
-        "1.0.0");
+        "1.0.1");
 
     public static string Datasets => Path.Combine(
         RepositoryRoot,
