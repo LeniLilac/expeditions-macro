@@ -324,7 +324,10 @@ public sealed class CompiledDetectorPack : IDetectorPack
             }
             if (name.Equals("checkpoint", StringComparison.OrdinalIgnoreCase)) return PauseButtonDetector.ScoreCheckpoint(image);
             if (name.Equals("continue", StringComparison.OrdinalIgnoreCase)) return PauseButtonDetector.ScoreContinue(image);
-            if (name.Equals("reward", StringComparison.OrdinalIgnoreCase)) return Math.Max(fixedScore, RewardScreenDetector.Score(image));
+            // The legacy three-region template could correlate with ordinary units
+            // and effects during gameplay. The specialized detector requires the
+            // stable reward header and live Select Upgrade controls instead.
+            if (name.Equals("reward", StringComparison.OrdinalIgnoreCase)) return RewardScreenDetector.Score(image);
             if (name is "victory" or "defeat") return Math.Max(fixedScore, TerminalScreenDetector.Score(image, name));
             if (name is "map_select" or "map_preview" or "confirm" or "extract_confirm" or "disconnect")
             {

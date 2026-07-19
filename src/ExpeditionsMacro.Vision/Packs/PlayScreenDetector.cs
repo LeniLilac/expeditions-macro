@@ -26,6 +26,11 @@ internal static class PlayScreenDetector
 
     private static PlayMatch? Find(ImageFrame titleReference, ScreenRegion titleRegion, ImageFrame image)
     {
+        // Reward headings can briefly resemble the teal Expedition tile while cards
+        // animate. A reward is an in-match state, never a reason to rejoin through
+        // Play, so its long segmented progress header is an explicit exclusion.
+        if (RewardScreenDetector.HasHeader(image)) return null;
+
         AdaptiveRegionMatch title = AdaptiveUiMatcher.Find(
             titleReference,
             image,

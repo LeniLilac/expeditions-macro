@@ -15,10 +15,11 @@ It uses screen capture and ordinary Windows input. It does not inject into Roblo
 - Fully zooms out, toggles shift lock, sets a top-down pitch, and aligns yaw against a learned full-turn camera model.
 - Records, edits, saves, and tests Roblox-relative unit placements in one tool.
 - Detects start, checkpoint, continue, confirmation, reward, victory, defeat, lobby, disconnect, and AFK Chamber screens.
-- Detects reward cards from their repeated mouse icons, independent of card rarity color.
+- Detects reward cards from the stable reward overlay and available Select Upgrade controls, including layouts where a card is still collapsed or moving and regardless of rarity color.
 - Extracts at the first real checkpoint or after a configured number of boss nodes. The spawn is not counted because it has no Extract action.
 - Handles an early defeat even when extraction was planned later.
 - Rejoins after a Roblox disconnect, an unexpected lobby teleport, or an inactivity teleport to the AFK Chamber. From the AFK Chamber it chooses **Return to Lobby**, then navigates back to the configured map and difficulty.
+- Confirms recovery screens across consecutive captures before rejoining, so one animation frame cannot reset an active run or its checkpoint-extraction progress.
 - Optionally sends Discord Components V2 reports with runtime, victory/defeat totals, recovery notices, and a Roblox screenshot.
 - Stores webhook secrets with Windows DPAPI and emits no telemetry.
 
@@ -120,7 +121,7 @@ Build release artifacts:
 
 ```powershell
 .\scripts\Generate-Icon.ps1
-.\scripts\Build-Release.ps1 -Version 1.0.9
+.\scripts\Build-Release.ps1 -Version 1.0.10
 ```
 
 The release script publishes the self-contained app, creates the portable ZIP, creates the detector-pack ZIP, optionally invokes Inno Setup, and writes SHA-256 checksums plus a dependency inventory.

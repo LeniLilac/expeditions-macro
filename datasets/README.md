@@ -1,6 +1,6 @@
 # Detector image dataset
 
-This repository includes 255 raw Roblox client-area captures used to build and regression-test the bundled Anime Expeditions detector pack and the app's specialized UI detectors. The compiled pack in `detector-packs/` is sufficient to run the application; these images are development and test fixtures.
+This repository includes 262 raw Roblox client-area captures used to build and regression-test the bundled Anime Expeditions detector pack and the app's specialized UI detectors. The compiled pack in `detector-packs/` is sufficient to run the application; these images are development and test fixtures.
 
 Captures are 808 by 611 PNG files organized under:
 
@@ -20,6 +20,8 @@ The current builder recognizes these dataset names:
 - `Expedition_Defense_Node`, `Assault_Node`, `Elite_Node`, `Boss_Node`
 
 The three `Difficultly*_LayoutShift` folders and `AFK_Chamber` are golden-test fixtures for specialized app detectors; they are not reference-builder inputs. The `Expedition_Midgame_Start` dataset includes hovered-button frames from a reported long-running stall.
+
+`Expedition_Reward_Transition` contains purple, gold, and blue reward layouts while one card is still collapsed or moving. `Expedition_Gameplay_Negative` contains ordinary full-match frames that previously resembled the legacy three-region reward template. Both are specialized-detector regression fixtures and are not builder inputs.
 
 `Play_UI` includes different avatars, current maps, reward icons, and Roblox UI scale/layout variants. Play-screen detection must use the stable Expedition tile structure rather than those changing details.
 

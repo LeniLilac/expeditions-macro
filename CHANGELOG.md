@@ -4,6 +4,19 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.0.10] - 2026-07-19
+
+### Fixed
+
+- Recognized reward selection while one card is still collapsed or moving by combining the stable blue reward overlay, segmented progress header, and the remaining Select Upgrade controls.
+- Removed the legacy three-region reward fallback that could classify ordinary gameplay as a reward at high confidence.
+- Prevented reward animations from matching the Play screen and starting an unnecessary lobby rejoin.
+- Required recovery states to remain present across consecutive captures before abandoning a run, preserving boss-node progress and checkpoint extraction when one transient frame resembles a recovery screen.
+
+### Tests
+
+- Added reviewed purple, gold, and blue reward-transition captures plus ordinary-gameplay negatives selected from a complete manual match run.
+
 ## [1.0.9] - 2026-07-19
 
 ### Added
@@ -100,7 +113,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.0.9...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.0.10...HEAD
+[1.0.10]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.10
 [1.0.9]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.9
 [1.0.8]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.8
 [1.0.7]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.7

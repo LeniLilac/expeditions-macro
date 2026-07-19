@@ -77,7 +77,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         {
             Focus(window);
             await EnsureClientSizeAsync(window, detector.Manifest.ClientWidth, detector.Manifest.ClientHeight, Write, cancellationToken).ConfigureAwait(false);
-            string? initial = ProbeRecoveryState(window, detector);
+            string? initial = await ProbeStableRecoveryStateAsync(window, detector, preset, cancellationToken).ConfigureAwait(false);
             if (initial is not null)
             {
                 if (!preset.AutoRecover) throw new InvalidOperationException($"{Label(initial)} was recognized, but automatic recovery is disabled.");
@@ -103,12 +103,12 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                     Write("Prestart screen recognized. Preparing camera.", MacroEventLevel.Success);
                     await PrepareCameraAsync(window, preset, cameraModel, value => shiftLockEnabled = value, progress, Write, cancellationToken).ConfigureAwait(false);
                     shiftLockEnabled = false;
-                    ThrowIfRecovery(window, detector);
+                    await ThrowIfRecoveryAsync(window, detector, preset, cancellationToken).ConfigureAwait(false);
 
                     Report("Placement", 0, "Placing the recorded prestart units.");
                     await PlaceStepsAsync(window, placementModel, placementModel.Steps, preset, Write, cancellationToken).ConfigureAwait(false);
                     Write($"Preplace pass sent {placementModel.Steps.Count} placement(s).");
-                    ThrowIfRecovery(window, detector);
+                    await ThrowIfRecoveryAsync(window, detector, preset, cancellationToken).ConfigureAwait(false);
 
                     Report("Starting node", 0, "Starting the Expedition node.");
                     await ClickActionAsync(window, detector, "start", cancellationToken).ConfigureAwait(false);
@@ -152,7 +152,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                 }
                 catch
                 {
-                    string? recovery = ProbeRecoveryState(window, detector);
+                    string? recovery = await ProbeStableRecoveryStateAsync(window, detector, preset, cancellationToken).ConfigureAwait(false);
                     if (!preset.AutoRecover || recovery is null) throw;
                     recoveries++;
                     PublishSummary();
@@ -246,6 +246,9 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
     {
         StableStateTracker<string> stateTracker = new(preset.StableDetections);
         StableStateTracker<string> nodeTracker = new(preset.StableDetections);
+        // Recovery abandons the active run and resets its observed boss progress.
+        // Confirm it independently so one UI animation frame cannot trigger rejoin.
+        StableStateTracker<string> recoveryTracker = new(ExpeditionRunPolicy.RecoveryStableDetections(preset));
         string? currentNode = null;
         int bosses = 0;
         report("Gameplay", 0, "Gameplay active. Watching node type, pauses, rewards, and run end.", null, null);
@@ -268,7 +271,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
 
             IReadOnlyDictionary<string, double> scores = detector.ScoreStates(frame);
             string? candidate = detector.Classify(scores);
-            ThrowForRecovery(candidate);
+            ThrowForStableRecovery(recoveryTracker, candidate);
             if (candidate is not null) report("Gameplay", 0, $"Detected {Label(candidate)}.", candidate, scores[candidate]);
             string? state = stateTracker.Update(candidate);
             if (state is null)
@@ -475,7 +478,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
             if (selected == preset.MapNumber) break;
             report("Recovery", 0, $"Selecting Expedition map {preset.MapNumber}.", "map_select", null);
             await ClickActionAsync(window, detector, $"map_{preset.MapNumber}", cancellationToken).ConfigureAwait(false);
-            if (await WaitForSelectionAsync(window, detector, value => detector.SelectedMap(value), preset.MapNumber, TimeSpan.FromSeconds(3), cancellationToken).ConfigureAwait(false)) break;
+            if (await WaitForSelectionAsync(window, detector, value => detector.SelectedMap(value), preset.MapNumber, TimeSpan.FromSeconds(3), preset, cancellationToken).ConfigureAwait(false)) break;
             log($"Map selection did not register (attempt {attempt}/3).", MacroEventLevel.Warning, "map_select", null);
             if (attempt == 3) throw new InvalidOperationException($"Map {preset.MapNumber} could not be selected. It may still be locked.");
         }
@@ -513,7 +516,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
             // One positive active-difficulty match is sufficient. Transition frames are
             // ignored until the animation settles, so the macro never clicks away from
             // an already selected target merely to obtain a second matching frame.
-            if (await WaitForSelectionAsync(window, detector, value => detector.SelectedDifficulty(value), preset.Difficulty, TimeSpan.FromSeconds(4.5), cancellationToken).ConfigureAwait(false)) return;
+            if (await WaitForSelectionAsync(window, detector, value => detector.SelectedDifficulty(value), preset.Difficulty, TimeSpan.FromSeconds(4.5), preset, cancellationToken).ConfigureAwait(false)) return;
             log($"Difficulty selection did not register (attempt {attempt}/3).", MacroEventLevel.Warning, "map_select", null);
         }
         throw new InvalidOperationException($"Difficulty {preset.Difficulty} could not be selected.");
@@ -525,15 +528,17 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         Func<ImageFrame, int?> selector,
         int target,
         TimeSpan timeout,
+        ExpeditionPreset preset,
         CancellationToken cancellationToken)
     {
         DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
+        StableStateTracker<string> recoveryTracker = new(ExpeditionRunPolicy.RecoveryStableDetections(preset));
         while (DateTimeOffset.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = CaptureClient(window, detector);
             string? recovery = detector.RecoveryState(frame);
-            if (recovery is not null && recovery != "map_select") throw new RecoveryNeededException(recovery);
+            ThrowForStableRecovery(recoveryTracker, recovery == "map_select" ? null : recovery);
             if (selector(frame) == target) return true;
             await Task.Delay(180, cancellationToken).ConfigureAwait(false);
         }
@@ -551,7 +556,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         CancellationToken cancellationToken)
     {
         DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
-        StableStateTracker<string> tracker = new(preset.StableDetections);
+        StableStateTracker<string> tracker = new(ExpeditionRunPolicy.RecoveryStableDetections(preset));
         bool captureErrorReported = false;
         while (DateTimeOffset.UtcNow < deadline)
         {
@@ -592,13 +597,14 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         CancellationToken cancellationToken)
     {
         StableStateTracker<string> tracker = new(preset.StableDetections);
+        StableStateTracker<string> recoveryTracker = new(ExpeditionRunPolicy.RecoveryStableDetections(preset));
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = CaptureClient(window, detector);
             IReadOnlyDictionary<string, double> scores = detector.ScoreStates(frame);
             string? state = detector.Classify(scores);
-            ThrowForRecovery(state);
+            ThrowForStableRecovery(recoveryTracker, state);
             if (state is not null) report("Waiting", 0, $"Detected {Label(state)}.", state, scores[state]);
             if (tracker.Update(state) == desired)
             {
@@ -620,12 +626,13 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
     {
         DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
         StableStateTracker<string> tracker = new(preset.StableDetections);
+        StableStateTracker<string> recoveryTracker = new(ExpeditionRunPolicy.RecoveryStableDetections(preset));
         while (DateTimeOffset.UtcNow < deadline)
         {
             ImageFrame frame = CaptureClient(window, detector);
             IReadOnlyDictionary<string, double> scores = detector.ScoreStates(frame);
             string? state = detector.Classify(scores);
-            ThrowForRecovery(state);
+            ThrowForStableRecovery(recoveryTracker, state);
             if (state is not null) report("Waiting", 0, $"Detected {Label(state)}.", state, scores[state]);
             if (tracker.Update(state) == desired) return true;
             await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
@@ -703,21 +710,54 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         catch { return null; }
     }
 
-    private string? ProbeRecoveryState(RobloxWindow window, IDetectorPack detector)
+    private async Task<string?> ProbeStableRecoveryStateAsync(
+        RobloxWindow window,
+        IDetectorPack detector,
+        ExpeditionPreset preset,
+        CancellationToken cancellationToken)
     {
-        try { return detector.RecoveryState(CaptureClient(window, detector)); }
-        catch { return null; }
+        try
+        {
+            string? first = detector.RecoveryState(CaptureClient(window, detector));
+            if (first is null) return null;
+            int required = ExpeditionRunPolicy.RecoveryStableDetections(preset);
+            for (int observation = 1; observation < required; observation++)
+            {
+                await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
+                string? current = detector.RecoveryState(CaptureClient(window, detector));
+                if (!string.Equals(first, current, StringComparison.OrdinalIgnoreCase)) return null;
+            }
+            return first;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
-    private void ThrowIfRecovery(RobloxWindow window, IDetectorPack detector)
+    private async Task ThrowIfRecoveryAsync(
+        RobloxWindow window,
+        IDetectorPack detector,
+        ExpeditionPreset preset,
+        CancellationToken cancellationToken)
     {
-        string? state = ProbeRecoveryState(window, detector);
+        string? state = await ProbeStableRecoveryStateAsync(window, detector, preset, cancellationToken).ConfigureAwait(false);
         if (state is not null) throw new RecoveryNeededException(state);
     }
 
-    private static void ThrowForRecovery(string? state)
+    private static void ThrowForStableRecovery(StableStateTracker<string> tracker, string? state)
     {
-        if (state is not null && RecoveryStates.Contains(state)) throw new RecoveryNeededException(state);
+        if (state is null || !RecoveryStates.Contains(state))
+        {
+            tracker.Reset();
+            return;
+        }
+        string? stable = tracker.Update(state);
+        if (stable is not null) throw new RecoveryNeededException(stable);
     }
 
     private async Task EnsureClientSizeAsync(

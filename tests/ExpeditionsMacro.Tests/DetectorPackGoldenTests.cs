@@ -514,6 +514,42 @@ public sealed class DetectorPackGoldenTests
         }
     }
 
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void RewardDetector_RecognizesCollapsedCardTransitionsWithoutTriggeringRecovery()
+    {
+        if (!DatasetsAvailable()) return;
+        CompiledDetectorPack pack = Pack.Value;
+        DetectorStateDefinition reward = pack.Manifest.States.Single(value => value.Name == "reward");
+        foreach (string file in Pngs("Expedition_Reward_Transition"))
+        {
+            ImageFrame image = ImageCodec.Load(file);
+            IReadOnlyDictionary<string, double> scores = pack.ScoreStates(image);
+            Assert.True(scores["reward"] >= reward.Threshold, $"Transition reward score was {scores["reward"]:P1} for {Path.GetFileName(file)}.");
+            Assert.Equal("reward", pack.Classify(scores));
+            Assert.Null(pack.RecoveryState(image));
+            (int x, int y) = pack.ActionFor("reward", image);
+            Assert.InRange(x, 160, 540);
+            Assert.InRange(y, 320, 410);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void RewardAndRecoveryDetectors_IgnoreReportedGameplayFalsePositives()
+    {
+        if (!DatasetsAvailable()) return;
+        CompiledDetectorPack pack = Pack.Value;
+        DetectorStateDefinition reward = pack.Manifest.States.Single(value => value.Name == "reward");
+        foreach (string file in Pngs("Expedition_Gameplay_Negative"))
+        {
+            ImageFrame image = ImageCodec.Load(file);
+            IReadOnlyDictionary<string, double> scores = pack.ScoreStates(image);
+            Assert.True(scores["reward"] < reward.Threshold, $"Gameplay reward score was {scores["reward"]:P1} for {Path.GetFileName(file)}.");
+            Assert.Null(pack.RecoveryState(image));
+        }
+    }
+
     [Theory]
     [InlineData(1, "Expedition_Map_Select_Map1")]
     [InlineData(2, "Expedition_Map_Select_Map2")]
