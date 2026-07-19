@@ -86,6 +86,24 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public void AppPaths_CreatesTheDiagnosticsFolder()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            AppPaths paths = new(root);
+            paths.EnsureCreated();
+
+            Assert.True(Directory.Exists(paths.Diagnostics));
+            Assert.StartsWith(Path.GetFullPath(root), Path.GetFullPath(paths.Diagnostics), StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Fact]
     public async Task PlacementRepository_OverwritesTheSameNamedModelAtomically()
     {
         string root = TestPaths.NewTemporaryDirectory();

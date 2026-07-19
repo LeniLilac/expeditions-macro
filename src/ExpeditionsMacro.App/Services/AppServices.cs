@@ -32,6 +32,7 @@ public sealed class AppServices : IDisposable
         SecretProtector = new DpapiSecretProtector();
         Hotkey = new GlobalHotkeyService();
         Coordinator = new OperationCoordinator(dispatcher);
+        DiagnosticCapture = new DiagnosticCaptureService(Automation, Paths);
         PlacementCapture = new PlacementCaptureService(Automation);
         Placement = new PlacementService(Automation, PlacementCapture, PlacementModels);
         Camera = new CameraAlignmentEngine(Automation, CameraModels);
@@ -52,6 +53,7 @@ public sealed class AppServices : IDisposable
     public ISecretProtector SecretProtector { get; }
     public GlobalHotkeyService Hotkey { get; }
     public OperationCoordinator Coordinator { get; }
+    public DiagnosticCaptureService DiagnosticCapture { get; }
     public IPlacementCaptureService PlacementCapture { get; }
     public PlacementService Placement { get; }
     public CameraAlignmentEngine Camera { get; }

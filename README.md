@@ -21,6 +21,7 @@ It uses screen capture and ordinary Windows input. It does not inject into Roblo
 - Rejoins after a Roblox disconnect, an unexpected lobby teleport, or an inactivity teleport to the AFK Chamber. From the AFK Chamber it chooses **Return to Lobby**, then navigates back to the configured map and difficulty.
 - Confirms recovery screens across consecutive captures before rejoining, so one animation frame cannot reset an active run or its checkpoint-extraction progress.
 - Optionally sends Discord Components V2 reports with runtime, victory/defeat totals, recovery notices, and a Roblox screenshot.
+- Records an unlimited timed Roblox screenshot sequence from Settings and packages the frames plus a manifest into one diagnostic ZIP.
 - Stores webhook secrets with Windows DPAPI and emits no telemetry.
 
 ## Install
@@ -87,6 +88,10 @@ The main loop prepares the camera, places units, starts the node, and watches fo
 
 Stopping is cooperative. The app releases right mouse and shift-lock state where applicable, cancels pending work, and restores the original Roblox window bounds.
 
+### Diagnostic screenshot capture
+
+Open **Settings**, enter a capture name and interval under **Debug capture**, then choose **Arm capture**. Focus Roblox and press **F6** to start. Press **F6** again to stop. The app temporarily uses the standard 808 by 611 client size, restores the original Roblox bounds, and writes a same-name ZIP under `diagnostics/`. A completed same-name capture replaces the previous ZIP.
+
 ## Local files and privacy
 
 Application data is stored under `%LocalAppData%\ExpeditionsMacro`:
@@ -95,6 +100,7 @@ Application data is stored under `%LocalAppData%\ExpeditionsMacro`:
 - `placement-models/`
 - `presets/`
 - `detector-packs/`
+- `diagnostics/`
 - `logs/`
 - `settings.json`
 
@@ -121,7 +127,7 @@ Build release artifacts:
 
 ```powershell
 .\scripts\Generate-Icon.ps1
-.\scripts\Build-Release.ps1 -Version 1.0.10
+.\scripts\Build-Release.ps1 -Version 1.0.11
 ```
 
 The release script publishes the self-contained app, creates the portable ZIP, creates the detector-pack ZIP, optionally invokes Inno Setup, and writes SHA-256 checksums plus a dependency inventory.

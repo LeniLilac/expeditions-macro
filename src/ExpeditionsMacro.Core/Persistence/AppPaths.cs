@@ -11,6 +11,7 @@ public sealed class AppPaths
         PlacementModels = Path.Combine(Root, "placement-models");
         Presets = Path.Combine(Root, "presets");
         DetectorPacks = Path.Combine(Root, "detector-packs");
+        Diagnostics = Path.Combine(Root, "diagnostics");
         Logs = Path.Combine(Root, "logs");
         SettingsFile = Path.Combine(Root, "settings.json");
     }
@@ -25,6 +26,8 @@ public sealed class AppPaths
 
     public string DetectorPacks { get; }
 
+    public string Diagnostics { get; }
+
     public string Logs { get; }
 
     public string SettingsFile { get; }
@@ -36,6 +39,7 @@ public sealed class AppPaths
         Directory.CreateDirectory(PlacementModels);
         Directory.CreateDirectory(Presets);
         Directory.CreateDirectory(DetectorPacks);
+        Directory.CreateDirectory(Diagnostics);
         Directory.CreateDirectory(Logs);
     }
 }

@@ -10,13 +10,9 @@ public static class VisionScorer
     private const int TileColumns = 8;
     private const int TileRows = 6;
 
-    static VisionScorer()
-    {
-        OpenCvRuntime.Initialize();
-    }
-
     public static ImageFrame PrepareGray(ImageFrame image, int? targetWidth = null, int? targetHeight = null, int maximumWidth = MaximumReferenceWidth)
     {
+        OpenCvRuntime.Initialize();
         using Mat source = ImageCodec.ToMat(image);
         using Mat gray = new();
         if (source.Channels() == 3) Cv2.CvtColor(source, gray, ColorConversionCodes.RGB2GRAY);

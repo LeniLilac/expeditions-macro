@@ -6,13 +6,9 @@ namespace ExpeditionsMacro.Vision.Infrastructure;
 
 public static class ImageCodec
 {
-    static ImageCodec()
-    {
-        OpenCvRuntime.Initialize();
-    }
-
     public static Mat ToMat(ImageFrame image)
     {
+        OpenCvRuntime.Initialize();
         MatType type = image.Format == PixelFormat.Gray8 ? MatType.CV_8UC1 : MatType.CV_8UC3;
         Mat mat = new(image.Height, image.Width, type);
         Marshal.Copy(image.Pixels, 0, mat.Data, image.Pixels.Length);
@@ -21,6 +17,7 @@ public static class ImageCodec
 
     public static ImageFrame FromMat(Mat source, PixelFormat? desiredFormat = null)
     {
+        OpenCvRuntime.Initialize();
         using Mat converted = ConvertFormat(source, desiredFormat);
         using Mat continuous = converted.IsContinuous() ? converted.Clone() : converted.Clone();
         PixelFormat format = continuous.Channels() == 1 ? PixelFormat.Gray8 : PixelFormat.Rgb24;
@@ -31,6 +28,7 @@ public static class ImageCodec
 
     public static ImageFrame Load(string path, PixelFormat format = PixelFormat.Rgb24)
     {
+        OpenCvRuntime.Initialize();
         ImreadModes mode = format == PixelFormat.Gray8 ? ImreadModes.Grayscale : ImreadModes.Color;
         using Mat loaded = Cv2.ImRead(path, mode);
         if (loaded.Empty()) throw new InvalidDataException($"Could not read image '{path}'.");

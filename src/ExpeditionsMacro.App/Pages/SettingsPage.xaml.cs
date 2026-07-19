@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Windows;
@@ -13,6 +14,7 @@ public partial class SettingsPage : UserControl, IAppPage
 {
     private readonly AppServices _services;
     private bool _loading;
+    private bool _captureOperationActive;
 
     public SettingsPage(AppServices services)
     {
@@ -20,9 +22,17 @@ public partial class SettingsPage : UserControl, IAppPage
         InitializeComponent();
         ThemeCombo.ItemsSource = Enum.GetValues<AppTheme>();
         DataPath.Text = services.Paths.Root;
+        _services.Coordinator.StateChanged += (_, _) => Dispatcher.BeginInvoke(UpdateCaptureState);
     }
 
     public Func<Task>? IdleF6Action => null;
+
+    internal void SetSnapshotScroll(bool showDebug)
+    {
+        SettingsScroll.UpdateLayout();
+        if (showDebug) SettingsScroll.ScrollToEnd();
+        else SettingsScroll.ScrollToTop();
+    }
 
     public async Task OnShownAsync()
     {
@@ -35,6 +45,7 @@ public partial class SettingsPage : UserControl, IAppPage
         RobloxText.Text = _services.Automation.FindWindow() is { } window ? $"Found: {window.Title}" : "Not found";
         HotkeyText.Text = _services.Hotkey.IsRegistered ? "F6 registered" : "Unavailable";
         await RefreshDetectorAsync();
+        UpdateCaptureState();
     }
 
     private async void ThemeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -53,6 +64,68 @@ public partial class SettingsPage : UserControl, IAppPage
     private void OpenData_Click(object sender, RoutedEventArgs e) => OpenFolder(_services.Paths.Root);
 
     private void OpenLogs_Click(object sender, RoutedEventArgs e) => OpenFolder(_services.Paths.Logs);
+
+    private void OpenCaptures_Click(object sender, RoutedEventArgs e) => OpenFolder(_services.Paths.Diagnostics);
+
+    private void CaptureArm_Click(object sender, RoutedEventArgs e)
+    {
+        string name = CaptureNameText.Text.Trim();
+        if (!double.TryParse(CaptureIntervalText.Text, NumberStyles.Float, CultureInfo.InvariantCulture, out double seconds))
+        {
+            CaptureStatusText.Text = "Interval must be a number of seconds.";
+            return;
+        }
+
+        try
+        {
+            Progress<DiagnosticCaptureProgress> progress = new(value => CaptureStatusText.Text = value.Message);
+            _captureOperationActive = true;
+            _services.Coordinator.Arm("Diagnostic capture", async token =>
+            {
+                try
+                {
+                    DiagnosticCaptureResult result = await _services.DiagnosticCapture.CaptureAsync(name, TimeSpan.FromSeconds(seconds), progress, token);
+                    await Dispatcher.InvokeAsync(() => CaptureStatusText.Text = result.RestoreWarning is null
+                        ? $"Saved {result.Captures} screenshot(s) to {Path.GetFileName(result.ArchivePath)}."
+                        : $"Saved {result.Captures} screenshot(s). {result.RestoreWarning}");
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
+                {
+                    await Dispatcher.InvokeAsync(() => CaptureStatusText.Text = "Capture canceled before the first screenshot.");
+                    throw;
+                }
+                catch (Exception error)
+                {
+                    await Dispatcher.InvokeAsync(() => CaptureStatusText.Text = error.Message);
+                    throw;
+                }
+                finally
+                {
+                    _captureOperationActive = false;
+                }
+            });
+            CaptureStatusText.Text = "Capture armed. Focus Roblox and press F6 to begin.";
+            UpdateCaptureState();
+        }
+        catch (Exception error)
+        {
+            _captureOperationActive = false;
+            CaptureStatusText.Text = error.Message;
+            UpdateCaptureState();
+        }
+    }
+
+    private void CaptureStop_Click(object sender, RoutedEventArgs e) => _services.Coordinator.Cancel();
+
+    private void UpdateCaptureState()
+    {
+        bool busy = _services.Coordinator.IsBusy;
+        CaptureArmButton.IsEnabled = !busy;
+        CaptureNameText.IsEnabled = !busy;
+        CaptureIntervalText.IsEnabled = !busy;
+        CaptureStopButton.IsEnabled = _captureOperationActive && busy;
+        CaptureStopButton.Content = _services.Coordinator.State == OperationState.Armed ? "Cancel" : "Stop and save";
+    }
 
     private async void RefreshDetector_Click(object sender, RoutedEventArgs e) => await CheckForUpdatesAsync(automatic: false);
 

@@ -1,4 +1,5 @@
 using System.Text;
+using ExpeditionsMacro.Automation.Expeditions;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
@@ -547,6 +548,27 @@ public sealed class DetectorPackGoldenTests
             IReadOnlyDictionary<string, double> scores = pack.ScoreStates(image);
             Assert.True(scores["reward"] < reward.Threshold, $"Gameplay reward score was {scores["reward"]:P1} for {Path.GetFileName(file)}.");
             Assert.Null(pack.RecoveryState(image));
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void ActiveGameplayNavigationCollisions_CannotStartRecoveryOrClickAnAction()
+    {
+        if (!DatasetsAvailable()) return;
+        CompiledDetectorPack pack = Pack.Value;
+        foreach (string file in Pngs("Expedition_Recovery_Navigation_Negative"))
+        {
+            ImageFrame image = ImageCodec.Load(file);
+            IReadOnlyDictionary<string, double> scores = pack.ScoreStates(image);
+            string? classified = pack.Classify(scores);
+            string? active = ExpeditionRunPolicy.PreferActiveState(pack.Manifest, scores, classified);
+            string? recovery = pack.RecoveryState(image);
+
+            Assert.False(
+                ExpeditionRunPolicy.CanEnterRecoveryDuringRun(recovery),
+                $"Gameplay frame could enter recovery as {recovery} for {Path.GetFileName(file)}.");
+            Assert.Null(active);
         }
     }
 

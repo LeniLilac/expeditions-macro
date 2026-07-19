@@ -9,12 +9,13 @@ namespace ExpeditionsMacro.App.Services;
 
 internal static class UiSnapshotRenderer
 {
-    private static readonly (string Key, string File)[] Pages =
+    private static readonly (string Key, string File, bool ShowPageEnd)[] Pages =
     [
-        ("Expeditions", "expeditions"),
-        ("Camera Models", "camera-models"),
-        ("Placement Models", "placement-models"),
-        ("Settings", "settings"),
+        ("Expeditions", "expeditions", false),
+        ("Camera Models", "camera-models", false),
+        ("Placement Models", "placement-models", false),
+        ("Settings", "settings", false),
+        ("Settings", "settings-debug", true),
     ];
 
     public static async Task RenderAsync(AppServices services, string outputDirectory)
@@ -39,9 +40,9 @@ internal static class UiSnapshotRenderer
             foreach (AppTheme theme in new[] { AppTheme.Dark, AppTheme.Light })
             {
                 ThemeService.Apply(theme);
-                foreach ((string key, string file) in Pages)
+                foreach ((string key, string file, bool showPageEnd) in Pages)
                 {
-                    await window.SelectPageForSnapshotAsync(key);
+                    await window.SelectPageForSnapshotAsync(key, showPageEnd);
                     await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                     if (window.Content is not FrameworkElement root) throw new InvalidOperationException("The main window has no renderable content.");
                     Size size = new(1200, 780);

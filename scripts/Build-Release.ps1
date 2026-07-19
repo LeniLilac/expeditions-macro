@@ -37,6 +37,46 @@ if (-not $SkipTests) {
     -o $publish
 if ($LASTEXITCODE -ne 0) { throw 'Application publish failed.' }
 
+# OpenCvSharp's Windows native binding requires the Visual C++ 2015-2022 x64
+# runtime. Deploy it app-local so both the installer and portable archive work
+# on clean Windows profiles without a separate prerequisite installer.
+$vcRuntimeFiles = @(
+    'concrt140.dll',
+    'msvcp140.dll',
+    'msvcp140_1.dll',
+    'msvcp140_2.dll',
+    'msvcp140_atomic_wait.dll',
+    'msvcp140_codecvt_ids.dll',
+    'vcruntime140.dll',
+    'vcruntime140_1.dll',
+    'vcruntime140_threads.dll'
+)
+$vcRuntimeCandidates = @()
+if (-not [string]::IsNullOrWhiteSpace($env:VCToolsRedistDir)) {
+    $vcRuntimeCandidates += Join-Path $env:VCToolsRedistDir 'x64\Microsoft.VC143.CRT'
+}
+$vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+if (Test-Path -LiteralPath $vswhere) {
+    $visualStudio = & $vswhere -latest -products * -property installationPath
+    if (-not [string]::IsNullOrWhiteSpace($visualStudio)) {
+        $vcRuntimeCandidates += Get-ChildItem (Join-Path $visualStudio 'VC\Redist\MSVC') -Directory -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending |
+            ForEach-Object { Join-Path $_.FullName 'x64\Microsoft.VC143.CRT' }
+    }
+}
+$vcRuntimeCandidates += Join-Path $env:WINDIR 'System32'
+$vcRuntimeSource = $vcRuntimeCandidates |
+    Where-Object {
+        $candidate = $_
+        $missing = @($vcRuntimeFiles | Where-Object { -not (Test-Path -LiteralPath (Join-Path $candidate $_)) })
+        $missing.Count -eq 0
+    } |
+    Select-Object -First 1
+if (-not $vcRuntimeSource) { throw 'The Microsoft Visual C++ 2015-2022 x64 runtime files were not found.' }
+foreach ($file in $vcRuntimeFiles) {
+    Copy-Item -LiteralPath (Join-Path $vcRuntimeSource $file) -Destination $publish
+}
+
 Copy-Item -LiteralPath (Join-Path $repository 'README.md') -Destination $publish
 Copy-Item -LiteralPath (Join-Path $repository 'LICENSE.md') -Destination $publish
 Copy-Item -LiteralPath (Join-Path $repository 'NOTICE.md') -Destination $publish

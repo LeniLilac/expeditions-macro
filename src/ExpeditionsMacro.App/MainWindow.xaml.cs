@@ -57,7 +57,11 @@ public partial class MainWindow : Window
         await page.OnShownAsync();
     }
 
-    internal Task SelectPageForSnapshotAsync(string key) => ShowPageAsync(key);
+    internal async Task SelectPageForSnapshotAsync(string key, bool showPageEnd = false)
+    {
+        await ShowPageAsync(key);
+        if (_pages[key] is SettingsPage settings) settings.SetSnapshotScroll(showPageEnd);
+    }
 
     private void Coordinator_StateChanged(object? sender, EventArgs e)
     {

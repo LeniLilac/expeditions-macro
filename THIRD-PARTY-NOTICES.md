@@ -6,6 +6,7 @@ Expeditions Macro depends on the following packages at build or runtime:
 | --- | --- | --- | --- |
 | .NET runtime and WPF | 10 | MIT | Windows desktop runtime and UI |
 | OpenCV / OpenCvSharp4 | 4.13.0.20260627 | Apache-2.0 | Local image preparation and comparison |
+| Microsoft Visual C++ Redistributable | 2015-2022 x64 | Microsoft Software License Terms | App-local native runtime required by OpenCV |
 | Microsoft.NET.Test.Sdk | 17.14.1 | MIT | Test execution |
 | coverlet.collector | 6.0.4 | MIT | Test coverage collection |
 | xUnit.net | 2.9.3 | Apache-2.0 | Automated tests |
