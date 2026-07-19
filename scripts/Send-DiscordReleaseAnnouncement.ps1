@@ -62,6 +62,7 @@ if ($highlights.Count -gt 0) {
 $payload = [ordered]@{
     flags = 1 -shl 15
     allowed_mentions = [ordered]@{
+        parse = @()
         roles = @($RoleId)
     }
     components = @(

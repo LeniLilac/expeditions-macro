@@ -95,6 +95,7 @@ public sealed class DiscordAndWindowsTests
         Assert.Equal(1 << 15, root.GetProperty("flags").GetInt32());
         Assert.False(root.TryGetProperty("content", out _));
         Assert.False(root.TryGetProperty("embeds", out _));
+        Assert.Empty(root.GetProperty("allowed_mentions").GetProperty("parse").EnumerateArray());
         Assert.Equal("1528250880304873643", root.GetProperty("allowed_mentions").GetProperty("roles")[0].GetString());
 
         JsonElement container = root.GetProperty("components")[0];
