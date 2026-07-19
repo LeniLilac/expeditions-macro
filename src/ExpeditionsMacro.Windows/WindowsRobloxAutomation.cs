@@ -9,6 +9,8 @@ namespace ExpeditionsMacro.Windows;
 
 public sealed class WindowsRobloxAutomation : IRobloxAutomation
 {
+    private const int HoverRenderSettleMilliseconds = 50;
+
     public RobloxWindow? FindWindow(string titleFragment = "Roblox")
     {
         string fragment = titleFragment.Trim();
@@ -106,7 +108,7 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation
     {
         cancellationToken.ThrowIfCancellationRequested();
         ClientBounds bounds = GetClientBounds(window);
-        if (!NativeMethods.SetCursorPos(bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2)) throw new Win32Exception("Windows could not move the cursor to Roblox.");
+        MoveCursorWithRegisteredMotion(bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2, 1, "Windows could not move the cursor to Roblox.");
         return Task.CompletedTask;
     }
 
@@ -115,10 +117,9 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation
         cancellationToken.ThrowIfCancellationRequested();
         ClientBounds bounds = GetClientBounds(window);
         if (x < 0 || y < 0 || x >= bounds.Width || y >= bounds.Height) throw new ArgumentOutOfRangeException(nameof(x), "Click falls outside the Roblox client.");
-        if (!NativeMethods.SetCursorPos(bounds.X + x, bounds.Y + y)) throw new Win32Exception("Windows could not move the cursor to the Roblox coordinate.");
+        int clickNudge = x < bounds.Width - 1 ? 1 : -1;
+        MoveCursorWithRegisteredMotion(bounds.X + x, bounds.Y + y, clickNudge, "Windows could not move the cursor to the Roblox coordinate.");
         await Task.Delay(20, cancellationToken).ConfigureAwait(false);
-        NativeMethods.mouse_event(NativeMethods.MouseeventfMove, 1, 0, 0, 0);
-        NativeMethods.mouse_event(NativeMethods.MouseeventfMove, -1, 0, 0, 0);
         NativeMethods.mouse_event(NativeMethods.MouseeventfLeftDown, 0, 0, 0, 0);
         try
         {
@@ -127,15 +128,15 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation
         finally
         {
             NativeMethods.mouse_event(NativeMethods.MouseeventfLeftUp, 0, 0, 0, 0);
-            // Leaving the cursor over a Roblox control changes its colors and can
-            // make the next copy of that control look like a different state. Park
-            // at the client edge after every click so all subsequent captures see
-            // the stable, non-hovered appearance.
-            int parkingX = bounds.X + Math.Max(0, bounds.Width - 2);
-            int parkingY = bounds.Y + Math.Max(0, bounds.Height - 2);
-            NativeMethods.SetCursorPos(parkingX, parkingY);
+            // SetCursorPos alone can move the Windows pointer without making Roblox
+            // process a mouse-motion event. Follow the absolute park with a relative
+            // pulse so Roblox clears the control's hover state before the next capture.
+            int parkingX = bounds.X + Math.Max(0, bounds.Width - 3);
+            int parkingY = bounds.Y + Math.Max(0, bounds.Height - 3);
+            int parkingNudge = bounds.Width > 1 ? -1 : 1;
+            MoveCursorWithRegisteredMotion(parkingX, parkingY, parkingNudge, "Windows could not park the cursor away from the Roblox control.");
         }
-        await Task.Delay(10, cancellationToken).ConfigureAwait(false);
+        await Task.Delay(HoverRenderSettleMilliseconds, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task DragCameraAsync(RobloxWindow window, int deltaX, int deltaY, int chunkPixels, CancellationToken cancellationToken)
@@ -167,7 +168,7 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation
         finally
         {
             SendMouse(NativeMethods.MouseeventfRightUp);
-            if (restoreCursor) NativeMethods.SetCursorPos(original.X, original.Y);
+            if (restoreCursor) MoveCursorWithRegisteredMotion(original.X, original.Y, 1, "Windows could not restore the cursor after camera movement.");
         }
     }
 
@@ -219,6 +220,14 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation
             },
         ];
         if (NativeMethods.SendInput(1, inputs, Marshal.SizeOf<NativeMethods.Input>()) != 1) throw new Win32Exception("Windows rejected a simulated mouse input event.");
+    }
+
+    private static void MoveCursorWithRegisteredMotion(int x, int y, int nudgeX, string failureMessage)
+    {
+        if (!NativeMethods.SetCursorPos(x, y)) throw new Win32Exception(failureMessage);
+        int delta = nudgeX < 0 ? -1 : 1;
+        NativeMethods.mouse_event(NativeMethods.MouseeventfMove, delta, 0, 0, 0);
+        NativeMethods.mouse_event(NativeMethods.MouseeventfMove, -delta, 0, 0, 0);
     }
 
     private static (int X, int Y) FitOnMonitor(RobloxWindow window, int x, int y, int width, int height)

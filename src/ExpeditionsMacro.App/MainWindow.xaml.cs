@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -10,6 +11,7 @@ namespace ExpeditionsMacro.App;
 
 public partial class MainWindow : Window
 {
+    private const string DiscordInviteUrl = "https://discord.gg/7NZhJZgHN3";
     private readonly AppServices _services;
     private readonly Dictionary<string, IAppPage> _pages;
     private bool _autoMinimized;
@@ -103,6 +105,19 @@ public partial class MainWindow : Window
     private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
 
     private void Maximize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+    private void JoinDiscord_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(DiscordInviteUrl) { UseShellExecute = true });
+        }
+        catch (Exception error)
+        {
+            _services.Log.Error("Could not open the Discord invite.", error);
+            MessageBox.Show(this, $"Could not open the Discord invite.\n\n{DiscordInviteUrl}", "Join Discord", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 }

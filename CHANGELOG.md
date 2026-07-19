@@ -2,6 +2,17 @@
 
 All notable changes to Expeditions Macro are documented here.
 
+## [1.0.8] - 2026-07-18
+
+### Added
+
+- Added a persistent **Join Discord** button that opens the public Expeditions Macro community invite in the default browser.
+
+### Fixed
+
+- Followed automation cursor moves with a relative motion pulse so Roblox acknowledges the parked cursor location and reliably clears button hover styling.
+- Waited for the non-hovered button render after parking before the macro resumes visual detection.
+
 ## [1.0.7] - 2026-07-18
 
 ### Added
@@ -73,6 +84,7 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
+[1.0.8]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.8
 [1.0.7]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.7
 [1.0.4]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.4
 [1.0.3]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.3
