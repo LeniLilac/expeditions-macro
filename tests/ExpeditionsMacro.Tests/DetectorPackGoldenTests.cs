@@ -60,7 +60,7 @@ public sealed class DetectorPackGoldenTests
             }
         }
 
-        Assert.Equal(197, checkedImages);
+        Assert.Equal(201, checkedImages);
         Assert.True(failures.Length == 0, $"Compiled detector regressions:{Environment.NewLine}{failures}");
     }
 
@@ -92,7 +92,7 @@ public sealed class DetectorPackGoldenTests
             }
         }
 
-        Assert.Equal(197, checkedImages);
+        Assert.Equal(201, checkedImages);
         Assert.True(failures.Length == 0, $"Cross-state detector regressions:{Environment.NewLine}{failures}");
     }
 
@@ -127,13 +127,99 @@ public sealed class DetectorPackGoldenTests
 
     [Fact]
     [Trait("Category", "Golden")]
+    public void StartDetector_RecognizesTheHoveredButtonFromTheReportedStall()
+    {
+        if (!DatasetsAvailable()) return;
+        CompiledDetectorPack pack = Pack.Value;
+        double threshold = pack.Manifest.States.Single(value => value.Name == "start").Threshold;
+        string[] files = Pngs("Expedition_Midgame_Start")
+            .Where(path => Path.GetFileName(path).Contains("Hover", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        Assert.Equal(4, files.Length);
+        foreach (string file in files)
+        {
+            ImageFrame image = ImageCodec.Load(file);
+            IReadOnlyDictionary<string, double> scores = pack.ScoreStates(image);
+            Assert.True(scores["start"] >= threshold, $"Hovered Start score was {scores["start"]:P1} for {Path.GetFileName(file)}.");
+            Assert.Equal("start", pack.Classify(scores));
+            (int x, int y) = pack.ActionFor("start", image);
+            Assert.InRange(x, 390, 418);
+            Assert.InRange(y, 165, 195);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void AfkChamberDetector_ReturnsToLobbyAcrossTheReportedFrames()
+    {
+        if (!DatasetsAvailable()) return;
+        CompiledDetectorPack pack = Pack.Value;
+        string[] files = Pngs("AFK_Chamber").ToArray();
+
+        Assert.Equal(5, files.Length);
+        foreach (string file in files)
+        {
+            ImageFrame image = ImageCodec.Load(file);
+            IReadOnlyDictionary<string, double> scores = pack.ScoreStates(image);
+            Assert.True(scores["afk"] >= 0.84, $"AFK score was {scores["afk"]:P1} for {Path.GetFileName(file)}.");
+            Assert.Equal("afk", pack.Classify(scores));
+            Assert.Equal("afk", pack.RecoveryState(image));
+            (int x, int y) = pack.ActionFor("afk", image);
+            Assert.InRange(x, 445, 495);
+            Assert.InRange(y, 565, 602);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void AfkChamberDetector_DoesNotMatchOtherCapturedUiStates()
+    {
+        if (!DatasetsAvailable()) return;
+        CompiledDetectorPack pack = Pack.Value;
+        List<string> failures = [];
+        foreach (string[] datasets in StateDatasets.Values)
+        {
+            foreach (string dataset in datasets)
+            {
+                foreach (string file in Pngs(dataset))
+                {
+                    double score = pack.ScoreStates(ImageCodec.Load(file))["afk"];
+                    if (score >= 0.84) failures.Add($"{score:P1} {dataset}/{Path.GetFileName(file)}");
+                }
+            }
+        }
+
+        Assert.True(failures.Count == 0, $"AFK detector false matches:{Environment.NewLine}{string.Join(Environment.NewLine, failures)}");
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void AfkChamberDetector_ToleratesUiScaleAndTranslation()
+    {
+        if (!DatasetsAvailable()) return;
+        CompiledDetectorPack pack = Pack.Value;
+        ImageFrame original = ImageCodec.Load(Pngs("AFK_Chamber").First());
+        ImageFrame transformed = Transform(original, 0.90, 0, -12);
+
+        Assert.Equal("afk", pack.RecoveryState(transformed));
+        (int x, int y) = pack.ActionFor("afk", transformed);
+        (int expectedX, int expectedY) = TransformPoint(469, 584, original.Width, original.Height, 0.90, 0, -12);
+        Assert.InRange(Math.Abs(x - expectedX), 0, 14);
+        Assert.InRange(Math.Abs(y - expectedY), 0, 14);
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
     public void StartDetector_DoesNotMatchOtherCapturedUiStates()
     {
         if (!DatasetsAvailable()) return;
         CompiledDetectorPack pack = Pack.Value;
         double threshold = pack.Manifest.States.Single(value => value.Name == "start").Threshold;
         List<string> failures = [];
-        foreach ((string state, string[] datasets) in StateDatasets.Where(pair => pair.Key != "start"))
+        // Reward selection can intentionally appear over a live Start dialog.
+        // Reward has higher state priority and is covered separately below.
+        foreach ((string state, string[] datasets) in StateDatasets.Where(pair => pair.Key is not "start" and not "reward"))
         {
             foreach (string dataset in datasets)
             {
@@ -145,7 +231,20 @@ public sealed class DetectorPackGoldenTests
             }
         }
 
-        Assert.Empty(failures);
+        Assert.True(failures.Count == 0, $"Start detector false matches:{Environment.NewLine}{string.Join(Environment.NewLine, failures)}");
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void RewardSelection_RemainsAuthoritativeOverAnUnderlyingStartDialog()
+    {
+        if (!DatasetsAvailable()) return;
+        CompiledDetectorPack pack = Pack.Value;
+        ImageFrame image = ImageCodec.Load(Pngs("Expedition_Reward_Select").First());
+        IReadOnlyDictionary<string, double> scores = pack.ScoreStates(image);
+
+        Assert.True(scores["start"] >= pack.Manifest.States.Single(value => value.Name == "start").Threshold);
+        Assert.Equal("reward", pack.Classify(scores));
     }
 
     [Fact]

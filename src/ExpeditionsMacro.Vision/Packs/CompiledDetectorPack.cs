@@ -9,7 +9,7 @@ namespace ExpeditionsMacro.Vision.Packs;
 
 public sealed class CompiledDetectorPack : IDetectorPack
 {
-    private static readonly string[] RecoveryStates = ["disconnect", "lobby", "play", "map_select", "map_preview"];
+    private static readonly string[] RecoveryStates = ["afk", "disconnect", "lobby", "play", "map_select", "map_preview"];
     private static readonly (int X, int Y)[] DifficultyLayoutOffsets = Enumerable.Range(-8, 17).Select(y => (0, y)).ToArray();
     private static readonly ScreenRegion HotbarAnchorRegion = new(154, 536, 500, 62);
     private static readonly ScreenRegion NodeBarAnchorRegion = new(220, 53, 370, 32);
@@ -89,6 +89,7 @@ public sealed class CompiledDetectorPack : IDetectorPack
             pair => pair.Key,
             pair => ScoreConfiguredState(pair.Key, pair.Value, clientImage, useSpecializedDetectors),
             StringComparer.OrdinalIgnoreCase);
+        if (useSpecializedDetectors) scores["afk"] = AfkChamberDetector.Score(clientImage);
         if (useSpecializedDetectors && Classify(scores) is null)
         {
             foreach ((string name, StateRuntime runtime) in _states
@@ -102,6 +103,9 @@ public sealed class CompiledDetectorPack : IDetectorPack
 
     public string? Classify(IReadOnlyDictionary<string, double> scores)
     {
+        if (Manifest.PackId.Equals(AnimeExpeditionsDetectorSpec.PackId, StringComparison.OrdinalIgnoreCase) &&
+            scores.TryGetValue("afk", out double afkScore) &&
+            afkScore >= AfkChamberDetector.Threshold) return "afk";
         foreach (DetectorStateDefinition definition in Manifest.States)
         {
             if (scores.TryGetValue(definition.Name, out double score) && score >= definition.Threshold) return definition.Name;
@@ -113,6 +117,7 @@ public sealed class CompiledDetectorPack : IDetectorPack
     {
         ValidateClient(clientImage);
         bool useSpecializedDetectors = Manifest.PackId.Equals(AnimeExpeditionsDetectorSpec.PackId, StringComparison.OrdinalIgnoreCase);
+        if (useSpecializedDetectors && AfkChamberDetector.Score(clientImage) >= AfkChamberDetector.Threshold) return "afk";
         Dictionary<string, double> scores = [];
         foreach (string name in RecoveryStates)
         {
@@ -128,7 +133,7 @@ public sealed class CompiledDetectorPack : IDetectorPack
                 StateRuntime state = _states[name];
                 scores[name] = Math.Max(scores.GetValueOrDefault(name), ScoreAdaptiveState(name, state, clientImage));
             }
-            foreach (string name in RecoveryStates)
+            foreach (string name in RecoveryStates.Where(_states.ContainsKey))
             {
                 if (scores.GetValueOrDefault(name) >= _states[name].Definition.Threshold) return name;
             }
@@ -215,6 +220,7 @@ public sealed class CompiledDetectorPack : IDetectorPack
         if (useSpecializedDetectors)
         {
             ValidateClient(clientImage!);
+            if (state.Equals("afk", StringComparison.OrdinalIgnoreCase) && AfkChamberDetector.ActionFor(clientImage!) is { } afkAction) return afkAction;
             (int X, int Y)? startAction = state.Equals("start", StringComparison.OrdinalIgnoreCase) ? StartDialogDetector.ActionFor(clientImage!) : null;
             if (startAction is not null) return startAction.Value;
             (int X, int Y)? pauseAction = PauseButtonDetector.ActionFor(clientImage!, state);

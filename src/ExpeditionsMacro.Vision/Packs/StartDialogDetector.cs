@@ -100,7 +100,10 @@ internal static class StartDialogDetector
     {
         if (component.Width is < 135 or > 210 || component.Height is < 14 or > 30) return 0;
         double fill = (double)component.Count / (component.Width * component.Height);
-        if (fill < 0.68) return 0;
+        // The Start button loses much of its saturated green fill while hovered
+        // or while the node transition animation is fading. Geometry plus the
+        // dark dialog header remain stable and are the authoritative signals.
+        if (fill < 0.35) return 0;
 
         double centerX = component.Left + (component.Width - 1) / 2d;
         double centerY = component.Top + (component.Height - 1) / 2d;
@@ -140,20 +143,23 @@ internal static class StartDialogDetector
         double textFraction = (double)neutralTextPixels / totalPixels;
         if (darkFraction < 0.70 || textFraction < 0.02) return 0;
 
-        double fillScore = Ramp(fill, 0.68, 0.88);
+        double fillScore = Ramp(fill, 0.35, 0.88);
         double sizeScore = (
             Plateau(component.Width, 135, 155, 190, 210) +
             Plateau(component.Height, 14, 18, 24, 30)) / 2;
         double darkScore = Ramp(darkFraction, 0.70, 0.90);
         double textScore = Ramp(textFraction, 0.02, 0.055);
-        return Math.Clamp(
-            0.28 * fillScore +
-            0.16 * sizeScore +
-            0.14 * centerScore +
-            0.25 * darkScore +
-            0.17 * textScore,
+        double quality = Math.Clamp(
+            0.18 * fillScore +
+            0.18 * sizeScore +
+            0.16 * centerScore +
+            0.28 * darkScore +
+            0.20 * textScore,
             0,
             1);
+        // Once all independent gates agree this is the central Start dialog,
+        // confidence should not collapse merely because the cursor is hovering.
+        return 0.82 + 0.18 * quality;
     }
 
     private static bool IsButtonGreen(byte red, byte green, byte blue) =>

@@ -1,6 +1,6 @@
 # Expeditions Macro
 
-Expeditions Macro is a Windows desktop utility for repeatable Anime Expeditions runs in Roblox. It combines camera yaw alignment, editable unit placement, UI-state detection, lobby/disconnect recovery, checkpoint extraction, and optional Discord reporting in one native app.
+Expeditions Macro is a Windows desktop utility for repeatable Anime Expeditions runs in Roblox. It combines camera yaw alignment, editable unit placement, UI-state detection, lobby/disconnect/AFK recovery, checkpoint extraction, and optional Discord reporting in one native app.
 
 ![Expeditions Macro in dark mode](docs/images/app-dark.png)
 
@@ -14,11 +14,11 @@ It uses screen capture and ordinary Windows input. It does not inject into Roblo
 - Can begin from the Roblox lobby and navigate to the configured Expeditions map and difficulty.
 - Fully zooms out, toggles shift lock, sets a top-down pitch, and aligns yaw against a learned full-turn camera model.
 - Records, edits, saves, and tests Roblox-relative unit placements in one tool.
-- Detects start, checkpoint, continue, confirmation, reward, victory, defeat, lobby, and disconnect screens from a compact local detector pack.
+- Detects start, checkpoint, continue, confirmation, reward, victory, defeat, lobby, disconnect, and AFK Chamber screens.
 - Detects reward cards from their repeated mouse icons, independent of card rarity color.
 - Extracts at the first real checkpoint or after a configured number of boss nodes. The spawn is not counted because it has no Extract action.
 - Handles an early defeat even when extraction was planned later.
-- Rejoins after a Roblox disconnect and returns from an unexpected lobby teleport.
+- Rejoins after a Roblox disconnect, an unexpected lobby teleport, or an inactivity teleport to the AFK Chamber. From the AFK Chamber it chooses **Return to Lobby**, then navigates back to the configured map and difficulty.
 - Optionally sends Discord Components V2 reports with runtime, victory/defeat totals, recovery notices, and a Roblox screenshot.
 - Stores webhook secrets with Windows DPAPI and emits no telemetry.
 
@@ -64,7 +64,7 @@ Saving the same name replaces the previous model.
    - `0`: extract at the first real in-run checkpoint.
    - `1`: extract at the first checkpoint after one boss node.
    - A high value, or disabling extraction: continue until defeat/victory.
-4. Leave automatic lobby/disconnect recovery enabled unless you intend to supervise navigation.
+4. Leave automatic lobby/disconnect/AFK recovery enabled unless you intend to supervise navigation.
 5. Optionally paste a standard, Canary, or PTB Discord webhook.
 6. Save the preset and press **F6**.
 
@@ -80,7 +80,7 @@ The main loop prepares the camera, places units, starts the node, and watches fo
 - unplaced hotbar units that need retrying;
 - extraction when the boss target is met;
 - victory or defeat, followed by retry;
-- lobby or disconnect recovery.
+- lobby, disconnect, or AFK Chamber recovery.
 
 Stopping is cooperative. The app releases right mouse and shift-lock state where applicable, cancels pending work, and restores the original Roblox window bounds.
 
@@ -118,7 +118,7 @@ Build release artifacts:
 
 ```powershell
 .\scripts\Generate-Icon.ps1
-.\scripts\Build-Release.ps1 -Version 1.0.6
+.\scripts\Build-Release.ps1 -Version 1.0.7
 ```
 
 The release script publishes the self-contained app, creates the portable ZIP, creates the detector-pack ZIP, optionally invokes Inno Setup, and writes SHA-256 checksums plus a dependency inventory.

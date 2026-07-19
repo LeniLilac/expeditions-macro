@@ -14,7 +14,7 @@
             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
             <StackPanel Margin="0,0,20,0">
                 <TextBlock Style="{StaticResource PageTitle}" Text="Expeditions" />
-                <TextBlock Margin="0,7,0,0" Style="{StaticResource PageSubtitle}" Text="Prepare camera and units, advance every node, recover from lobby or disconnects, then repeat." />
+                <TextBlock Margin="0,7,0,0" Style="{StaticResource PageSubtitle}" Text="Prepare camera and units, advance every node, recover from lobby, disconnects, or the AFK Chamber, then repeat." />
             </StackPanel>
             <StackPanel Grid.Column="1" HorizontalAlignment="Right" Orientation="Horizontal">
                 <Button x:Name="StartButton" Style="{StaticResource PrimaryButton}" Content="Start macro  F6" Click="Start_Click" />
@@ -50,7 +50,7 @@
                         <TextBox x:Name="BossTargetText" Width="76" HorizontalAlignment="Right" Text="1" />
                     </Grid>
                 </Grid>
-                <CheckBox x:Name="AutoRecoverCheck" Margin="0,12,0,0" IsChecked="True" Content="Return to the configured route after lobby or disconnect" />
+                <CheckBox x:Name="AutoRecoverCheck" Margin="0,12,0,0" IsChecked="True" Content="Return to the configured route after lobby, disconnect, or AFK teleport" />
                 <TextBlock Margin="25,5,0,0" Style="{StaticResource Caption}" Text="A target of 0 extracts at the first real in-run checkpoint. The spawn is ignored because no Extract button is present." />
             </StackPanel>
 

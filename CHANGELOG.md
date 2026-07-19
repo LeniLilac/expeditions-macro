@@ -2,6 +2,18 @@
 
 All notable changes to Expeditions Macro are documented here.
 
+## [1.0.7] - 2026-07-18
+
+### Added
+
+- Added inactivity recovery from the AFK Chamber through Return to Lobby and the existing configured-route rejoin flow.
+- Added public AFK Chamber and hovered Start-button regression captures from the reported long-running session.
+
+### Fixed
+
+- Moved the cursor to a neutral client edge after every simulated click so hover styling cannot poison later button detection.
+- Recognized the Start Game button while hovered or during its transition animation without matching unrelated captured UI states.
+
 ## [1.0.4] - 2026-07-18
 
 ### Fixed
@@ -61,6 +73,7 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
+[1.0.7]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.7
 [1.0.4]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.4
 [1.0.3]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.3
 [1.0.2]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.2

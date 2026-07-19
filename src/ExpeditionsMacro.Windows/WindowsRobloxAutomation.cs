@@ -127,6 +127,13 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation
         finally
         {
             NativeMethods.mouse_event(NativeMethods.MouseeventfLeftUp, 0, 0, 0, 0);
+            // Leaving the cursor over a Roblox control changes its colors and can
+            // make the next copy of that control look like a different state. Park
+            // at the client edge after every click so all subsequent captures see
+            // the stable, non-hovered appearance.
+            int parkingX = bounds.X + Math.Max(0, bounds.Width - 2);
+            int parkingY = bounds.Y + Math.Max(0, bounds.Height - 2);
+            NativeMethods.SetCursorPos(parkingX, parkingY);
         }
         await Task.Delay(10, cancellationToken).ConfigureAwait(false);
     }

@@ -13,7 +13,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
 {
     private static readonly HashSet<string> RecoveryStates = new(StringComparer.OrdinalIgnoreCase)
     {
-        "disconnect", "lobby", "play", "map_select", "map_preview",
+        "afk", "disconnect", "lobby", "play", "map_select", "map_preview",
     };
 
     private readonly IRobloxAutomation _automation;
@@ -81,7 +81,8 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
             if (initial is not null)
             {
                 if (!preset.AutoRecover) throw new InvalidOperationException($"{Label(initial)} was recognized, but automatic recovery is disabled.");
-                bool unexpected = initial.Equals("disconnect", StringComparison.OrdinalIgnoreCase);
+                bool unexpected = initial.Equals("disconnect", StringComparison.OrdinalIgnoreCase) ||
+                    initial.Equals("afk", StringComparison.OrdinalIgnoreCase);
                 if (unexpected)
                 {
                     recoveries++;
@@ -417,6 +418,11 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
             cancellationToken.ThrowIfCancellationRequested();
             switch (state)
             {
+                case "afk":
+                    report("Recovery", 0, "AFK Chamber recognized. Returning to the lobby before rejoining the configured route.", state, null);
+                    if (!await TryClickRecoveryAsync(window, detector, "afk", log, cancellationToken).ConfigureAwait(false)) break;
+                    state = await WaitForRecoveryChangeAsync(window, detector, "afk", TimeSpan.FromSeconds(20), preset, report, log, cancellationToken).ConfigureAwait(false) ?? state;
+                    break;
                 case "disconnect":
                     report("Recovery", 0, "Disconnected. Clicking Reconnect and waiting for Roblox.", state, null);
                     if (!await TryClickRecoveryAsync(window, detector, "disconnect", log, cancellationToken).ConfigureAwait(false)) break;
@@ -797,7 +803,9 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         await all.ConfigureAwait(false);
     }
 
-    private static string Label(string value) => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '));
+    private static string Label(string value) => value.Equals("afk", StringComparison.OrdinalIgnoreCase)
+        ? "AFK Chamber"
+        : System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '));
 
     private void Focus(RobloxWindow window)
     {
