@@ -223,6 +223,17 @@ public sealed class CompiledDetectorPack : IDetectorPack
             if (state.Equals("afk", StringComparison.OrdinalIgnoreCase) && AfkChamberDetector.ActionFor(clientImage!) is { } afkAction) return afkAction;
             (int X, int Y)? startAction = state.Equals("start", StringComparison.OrdinalIgnoreCase) ? StartDialogDetector.ActionFor(clientImage!) : null;
             if (startAction is not null) return startAction.Value;
+            if (state.Equals("play", StringComparison.OrdinalIgnoreCase) && _states.TryGetValue(state, out StateRuntime? playState))
+            {
+                (ScreenRegion Region, ImageFrame Reference) title = PlayTitleReference(playState);
+                (int X, int Y)? playAction = PlayScreenDetector.ActionFor(
+                    title.Reference,
+                    title.Region,
+                    clientImage!,
+                    playState.Definition.ActionX,
+                    playState.Definition.ActionY);
+                if (playAction is not null) return playAction.Value;
+            }
             (int X, int Y)? pauseAction = PauseButtonDetector.ActionFor(clientImage!, state);
             if (pauseAction is not null) return pauseAction.Value;
             (int X, int Y)? buttonAction = ActionButtonDetector.ActionFor(clientImage!, state);
@@ -306,6 +317,11 @@ public sealed class CompiledDetectorPack : IDetectorPack
         if (useSpecializedDetectors)
         {
             if (name.Equals("start", StringComparison.OrdinalIgnoreCase)) return StartDialogDetector.Score(image);
+            if (name.Equals("play", StringComparison.OrdinalIgnoreCase))
+            {
+                (ScreenRegion Region, ImageFrame Reference) title = PlayTitleReference(runtime);
+                return Math.Max(fixedScore, PlayScreenDetector.Score(title.Reference, title.Region, image));
+            }
             if (name.Equals("checkpoint", StringComparison.OrdinalIgnoreCase)) return PauseButtonDetector.ScoreCheckpoint(image);
             if (name.Equals("continue", StringComparison.OrdinalIgnoreCase)) return PauseButtonDetector.ScoreContinue(image);
             if (name.Equals("reward", StringComparison.OrdinalIgnoreCase)) return Math.Max(fixedScore, RewardScreenDetector.Score(image));
@@ -316,6 +332,14 @@ public sealed class CompiledDetectorPack : IDetectorPack
             }
         }
         return fixedScore;
+    }
+
+    private static (ScreenRegion Region, ImageFrame Reference) PlayTitleReference(StateRuntime runtime)
+    {
+        int index = Enumerable.Range(0, runtime.Definition.Regions.Count)
+            .OrderBy(candidate => runtime.Definition.Regions[candidate].Region.Width * runtime.Definition.Regions[candidate].Region.Height)
+            .First();
+        return (runtime.Definition.Regions[index].Region, runtime.References[index]);
     }
 
     private int? BestSelection(

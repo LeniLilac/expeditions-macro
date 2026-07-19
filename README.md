@@ -42,7 +42,7 @@ Join the public [Expeditions Macro Discord](https://discord.gg/7NZhJZgHN3) for s
 4. Choose **Setup model**. The app arms the workflow without stealing focus.
 5. Focus Roblox and press **F6**.
 
-Leave shift lock off before pressing F6. Setup resizes the Roblox client to the standard 808 by 611 capture size, enables shift lock for stable right-mouse drags, and restores both when setup finishes, is stopped, or fails. Setup then takes several goal captures over time and learns one full yaw turn. The resulting atlas supports large shortest-path corrections when far from the goal and one-pixel refinement near it. Lighting normalization, temporal median capture, edge/gradient comparison, and tile trimming reduce sensitivity to lighting changes and moving units.
+Leave shift lock off before pressing F6. Setup resizes the Roblox client to the standard 808 by 611 capture size, enables shift lock for stable right-mouse drags, and restores both when setup finishes, is stopped, or fails. Setup then takes several goal captures over time and learns one full yaw turn. If the coarse scan only finds a degraded wraparound view, setup verifies the following yaw view, fine-sweeps the provisional peak, and still requires a strong refined match before accepting it. The resulting atlas supports large shortest-path corrections when far from the goal and one-pixel refinement near it. Lighting normalization, temporal median capture, edge/gradient comparison, and tile trimming reduce sensitivity to lighting changes and moving units.
 
 Camera regions are saved relative to the Roblox client. When using **Auto align** by itself, the app also manages shift lock automatically. It temporarily restores the recorded client size and returns the window to its original bounds afterward. If the fast yaw estimate misses its confidence target, alignment scans one complete turn and refines the strongest match. The Expeditions workflow does not place units unless the final result meets the model target. Use **Show 30% overlay** to visually confirm the result.
 
@@ -120,7 +120,7 @@ Build release artifacts:
 
 ```powershell
 .\scripts\Generate-Icon.ps1
-.\scripts\Build-Release.ps1 -Version 1.0.8
+.\scripts\Build-Release.ps1 -Version 1.0.9
 ```
 
 The release script publishes the self-contained app, creates the portable ZIP, creates the detector-pack ZIP, optionally invokes Inno Setup, and writes SHA-256 checksums plus a dependency inventory.

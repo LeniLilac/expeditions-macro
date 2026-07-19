@@ -60,7 +60,7 @@ public sealed class DetectorPackGoldenTests
             }
         }
 
-        Assert.Equal(201, checkedImages);
+        Assert.Equal(202, checkedImages);
         Assert.True(failures.Length == 0, $"Compiled detector regressions:{Environment.NewLine}{failures}");
     }
 
@@ -92,7 +92,7 @@ public sealed class DetectorPackGoldenTests
             }
         }
 
-        Assert.Equal(201, checkedImages);
+        Assert.Equal(202, checkedImages);
         Assert.True(failures.Length == 0, $"Cross-state detector regressions:{Environment.NewLine}{failures}");
     }
 
@@ -123,6 +123,39 @@ public sealed class DetectorPackGoldenTests
 
         Assert.True(originalScore >= Math.Max(threshold, 0.95), $"Avatar-variant score was {originalScore:P1}.");
         Assert.Equal(originalScore, changedScore, precision: 12);
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void PlayDetector_RecognizesVariableMapContentAndUiScale()
+    {
+        if (!DatasetsAvailable()) return;
+        CompiledDetectorPack pack = Pack.Value;
+        ImageFrame image = ImageCodec.Load(Pngs("Play_UI").Last());
+        double threshold = pack.Manifest.States.Single(value => value.Name == "play").Threshold;
+        IReadOnlyDictionary<string, double> scores = pack.ScoreStates(image);
+
+        Assert.True(scores["play"] >= threshold, $"Variable Play-screen score was {scores["play"]:P1}.");
+        Assert.Equal("play", pack.Classify(scores));
+        Assert.Equal("play", pack.RecoveryState(image));
+        (int x, int y) = pack.ActionFor("play", image);
+        Assert.InRange(x, 650, 730);
+        Assert.InRange(y, 200, 260);
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void PlayDetector_DoesNotStealAScaledLobbyFrame()
+    {
+        if (!DatasetsAvailable()) return;
+        CompiledDetectorPack pack = Pack.Value;
+        ImageFrame lobby = ImageCodec.Load(Pngs("Lobby_UI").First());
+        ImageFrame transformed = Transform(lobby, 0.90, 0, -12);
+        double playThreshold = pack.Manifest.States.Single(value => value.Name == "play").Threshold;
+        double playScore = pack.ScoreStates(transformed)["play"];
+
+        Assert.True(playScore < playThreshold, $"Scaled lobby received a {playScore:P1} Play score.");
+        Assert.Equal("lobby", pack.RecoveryState(transformed));
     }
 
     [Fact]

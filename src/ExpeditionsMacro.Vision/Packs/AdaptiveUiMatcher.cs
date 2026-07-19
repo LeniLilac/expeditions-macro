@@ -40,16 +40,19 @@ internal static class AdaptiveUiMatcher
         ImageFrame image,
         ScreenRegion sourceRegion,
         int horizontalRadius = 48,
-        int verticalRadius = 40)
+        int verticalRadius = 40,
+        IReadOnlyList<double>? requestedScales = null)
     {
         if (reference.Format != PixelFormat.Gray8) throw new ArgumentException("Adaptive UI references must be grayscale.", nameof(reference));
         if (image.Format != PixelFormat.Rgb24) throw new ArgumentException("Adaptive UI input must be RGB.", nameof(image));
+        IReadOnlyList<double> scales = requestedScales ?? Scales;
+        if (scales.Count == 0 || scales.Any(scale => scale <= 0)) throw new ArgumentException("Adaptive UI scales must be positive.", nameof(requestedScales));
 
         List<Candidate> candidates = [];
         if (sourceRegion.FitsWithin(image.Width, image.Height)) candidates.Add(new Candidate(-1, sourceRegion));
 
-        int maximumWidth = (int)Math.Ceiling(reference.Width * Scales.Max());
-        int maximumHeight = (int)Math.Ceiling(reference.Height * Scales.Max());
+        int maximumWidth = (int)Math.Ceiling(reference.Width * scales.Max());
+        int maximumHeight = (int)Math.Ceiling(reference.Height * scales.Max());
         int searchLeft = Math.Max(0, sourceRegion.X - horizontalRadius - Math.Max(0, maximumWidth - sourceRegion.Width));
         int searchTop = Math.Max(0, sourceRegion.Y - verticalRadius - Math.Max(0, maximumHeight - sourceRegion.Height));
         int searchRight = Math.Min(image.Width, sourceRegion.Right + horizontalRadius + Math.Max(0, maximumWidth - sourceRegion.Width));
@@ -59,7 +62,7 @@ internal static class AdaptiveUiMatcher
         ImageFrame preparedSearch = VisionScorer.PrepareGray(image.Crop(searchRegion), maximumWidth: int.MaxValue);
         using Mat search = ImageCodec.ToMat(preparedSearch);
         using Mat referenceMat = ImageCodec.ToMat(reference);
-        foreach (double requestedScale in Scales)
+        foreach (double requestedScale in scales)
         {
             int width = Math.Max(8, (int)Math.Round(reference.Width * requestedScale));
             int height = Math.Max(8, (int)Math.Round(reference.Height * requestedScale));

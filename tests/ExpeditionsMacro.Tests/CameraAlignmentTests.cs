@@ -113,12 +113,51 @@ public sealed class CameraAlignmentTests
     }
 
     [Fact]
-    public async Task Calibrate_DoesNotAcceptADegradedLookalikeWithoutTheFollowingYawView()
+    public async Task Calibrate_WhenVerifiedCoarseWrapPeaksAtSeventyEightPercent_RefinesTheExactFullYaw()
     {
         ImageFrame goal = VisionScorerTests.Pattern(96, 72);
-        ImageFrame degradedGoal = Shift(goal, 1, 0);
+        (ImageFrame provisionalGoal, double provisionalScore) = ProvisionalGoal(goal);
         ImageFrame firstStep = Shift(goal, 13, 0);
         ImageFrame wrong = Blank(96, 72);
+        Assert.InRange(provisionalScore, 0.75, 0.80);
+
+        FakeAutomation? automation = null;
+        automation = new FakeAutomation(goal)
+        {
+            FullYawPixels = 197,
+            CaptureAtYaw = yaw => automation!.Drags.Count == 0
+                ? goal
+                : yaw switch
+                {
+                    0 => goal,
+                    11 or 16 => firstStep,
+                    192 => provisionalGoal,
+                    _ => wrong,
+                },
+        };
+        List<MacroProgress> updates = [];
+        CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
+
+        CameraModel model = await engine.CalibrateAsync(
+            new ScreenRegion(315, 220, 96, 72),
+            CalibrationSettings("Provisional return", maximumSamples: 15),
+            new InlineProgress<MacroProgress>(updates.Add));
+
+        Assert.Equal(197, model.Manifest.FullYawPixels);
+        Assert.True(model.Manifest.ScanScores[^1] > 0.95, $"Refined score was {model.Manifest.ScanScores[^1]:P1}.");
+        Assert.Equal(0, automation.YawPixels);
+        Assert.Contains(updates, update => update.Message.Contains("Verified full-turn return", StringComparison.Ordinal));
+        Assert.Contains(updates, update => update.Message.Contains("Refined full turn from 192 to 197", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Calibrate_DoesNotAcceptASeventyEightPercentLookalikeWithoutTheFollowingYawView()
+    {
+        ImageFrame goal = VisionScorerTests.Pattern(96, 72);
+        (ImageFrame provisionalGoal, double provisionalScore) = ProvisionalGoal(goal);
+        ImageFrame firstStep = Shift(goal, 13, 0);
+        ImageFrame wrong = Blank(96, 72);
+        Assert.InRange(provisionalScore, 0.75, 0.80);
         FakeAutomation? automation = null;
         automation = new FakeAutomation(goal)
         {
@@ -129,7 +168,7 @@ public sealed class CameraAlignmentTests
                 {
                     0 => goal,
                     11 or 16 => firstStep,
-                    192 or 384 => degradedGoal,
+                    192 or 384 => provisionalGoal,
                     _ => wrong,
                 },
         };
@@ -232,6 +271,25 @@ public sealed class CameraAlignmentTests
 
     private static ImageFrame Blank(int width, int height) =>
         new(width, height, PixelFormat.Rgb24, new byte[width * height * 3], takeOwnership: true);
+
+    private static (ImageFrame Frame, double Score) ProvisionalGoal(ImageFrame goal)
+    {
+        ImageFrame reference = VisionScorer.PrepareGray(goal);
+        for (int shift = 1; shift <= 6; shift++)
+        {
+            ImageFrame shifted = Shift(goal, shift, 0);
+            for (int shiftedRows = 4; shiftedRows <= goal.Height; shiftedRows += 2)
+            {
+                byte[] pixels = goal.Pixels.ToArray();
+                int byteCount = checked(shiftedRows * goal.Width * 3);
+                Buffer.BlockCopy(shifted.Pixels, 0, pixels, 0, byteCount);
+                ImageFrame candidate = new(goal.Width, goal.Height, goal.Format, pixels, takeOwnership: true);
+                double score = VisionScorer.ScoreFrame(reference, candidate);
+                if (score is >= 0.75 and <= 0.80) return (candidate, score);
+            }
+        }
+        throw new InvalidOperationException("Could not construct the provisional 78% camera test frame.");
+    }
 
     private static ImageFrame Shift(ImageFrame source, int dx, int dy)
     {

@@ -4,9 +4,19 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.0.9] - 2026-07-19
+
 ### Added
 
 - Added automatic Components V2 release announcements to the public Discord release channel, including the Release Ping role and direct release downloads.
+- Added a repository-wide `AGENTS.md` development guide covering architecture boundaries, Roblox input invariants, detector fixtures, testing, privacy, and releases.
+
+### Fixed
+
+- Recognized the Play screen from the stable Expedition title and footer structure across changing map names, artwork, reward icons, avatars, and UI scale, then mapped the click through the detected layout.
+- Prevented the adaptive Play detector from stealing scaled or translated lobby frames.
+- Allowed camera setup to verify and fine-sweep a provisional full-turn peak as low as roughly 75% when the following yaw view confirms the wraparound, while preserving the strong refined acceptance threshold.
+- Retained the best continuation-verified camera candidate for one final refinement attempt instead of discarding it when the coarse scan reaches its sample limit.
 
 ## [1.0.8] - 2026-07-18
 
@@ -90,7 +100,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.0.8...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.0.9...HEAD
+[1.0.9]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.9
 [1.0.8]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.8
 [1.0.7]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.7
 [1.0.4]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.4

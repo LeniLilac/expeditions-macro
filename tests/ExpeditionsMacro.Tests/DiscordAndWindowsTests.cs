@@ -55,7 +55,7 @@ public sealed class DiscordAndWindowsTests
     public void ReleaseAnnouncementScript_UsesComponentsV2RolePingAndNoAccentColor()
     {
         string script = Path.Combine(TestPaths.RepositoryRoot, "scripts", "Send-DiscordReleaseAnnouncement.ps1");
-        string notes = Path.Combine(TestPaths.RepositoryRoot, "docs", "release-notes", "1.0.8.md");
+        string notes = Path.Combine(TestPaths.RepositoryRoot, "docs", "release-notes", "1.0.9.md");
         ProcessStartInfo start = new(OperatingSystem.IsWindows() ? "powershell.exe" : "pwsh")
         {
             UseShellExecute = false,
