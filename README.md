@@ -127,7 +127,7 @@ Build release artifacts:
 
 ```powershell
 .\scripts\Generate-Icon.ps1
-.\scripts\Build-Release.ps1 -Version 1.0.11
+.\scripts\Build-Release.ps1 -Version 1.0.12
 ```
 
 The release script publishes the self-contained app, creates the portable ZIP, creates the detector-pack ZIP, optionally invokes Inno Setup, and writes SHA-256 checksums plus a dependency inventory.

@@ -4,6 +4,18 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.0.12] - 2026-07-19
+
+### Fixed
+
+- Made checkpoint extraction a single guarded transaction so lag cannot return the macro to generic checkpoint handling and issue another Extract click.
+- Waited for the extraction confirmation to appear and then disappear before resuming gameplay monitoring, without repeatedly clicking Confirm while the dialog remains visible.
+- Extended both extraction transition windows to 30 seconds and stopped safely with an actionable error instead of sending a delayed duplicate action when the UI never acknowledges a click.
+
+### Tests
+
+- Added extraction-transaction state regressions proving repeated observations cannot authorize duplicate Extract or Confirm clicks.
+
 ## [1.0.11] - 2026-07-19
 
 ### Added
@@ -131,7 +143,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.0.11...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.0.12...HEAD
+[1.0.12]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.12
 [1.0.11]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.11
 [1.0.10]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.10
 [1.0.9]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.9
