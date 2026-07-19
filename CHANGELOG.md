@@ -4,6 +4,24 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.0.11] - 2026-07-19
+
+### Added
+
+- Added an unlimited diagnostic screenshot capture under Settings that temporarily uses the standard Roblox client size, restores the original window, and writes same-name ZIPs containing PNG frames and a local manifest.
+
+### Fixed
+
+- Prevented Play, map selector, and map preview lookalikes from initiating recovery during an active match unless a stable AFK, disconnect, or lobby root state is present.
+- Prioritized active Start, reward, checkpoint, continue, confirmation, victory, and defeat states over navigation-only visual collisions.
+- Replaced opaque `VisionScorer` type-initializer failures with actionable computer-vision startup errors.
+- Bundled the Microsoft Visual C++ 2015-2022 x64 runtime required by OpenCvSharp in portable and installer releases.
+
+### Tests
+
+- Added compact Map 2 and Map 3 gameplay regressions selected from two complete manual runs and scanned both full timelines for recovery-state collisions.
+- Extended release verification to require OpenCV and Visual C++ native dependencies in the portable archive.
+
 ## [1.0.10] - 2026-07-19
 
 ### Fixed
@@ -113,7 +131,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.0.10...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.0.11...HEAD
+[1.0.11]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.11
 [1.0.10]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.10
 [1.0.9]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.9
 [1.0.8]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.8
