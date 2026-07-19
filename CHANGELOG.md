@@ -2,6 +2,12 @@
 
 All notable changes to Expeditions Macro are documented here.
 
+## [Unreleased]
+
+### Added
+
+- Added automatic Components V2 release announcements to the public Discord release channel, including the Release Ping role and direct release downloads.
+
 ## [1.0.8] - 2026-07-18
 
 ### Added
@@ -84,6 +90,7 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.0.8...HEAD
 [1.0.8]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.8
 [1.0.7]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.7
 [1.0.4]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.4

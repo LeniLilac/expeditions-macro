@@ -125,6 +125,8 @@ Build release artifacts:
 
 The release script publishes the self-contained app, creates the portable ZIP, creates the detector-pack ZIP, optionally invokes Inno Setup, and writes SHA-256 checksums plus a dependency inventory.
 
+Pushing a version tag runs the release workflow. After GitHub publishes the verified assets, the workflow sends a Components V2 announcement to the public Discord `#releases` channel using the encrypted `DISCORD_RELEASE_WEBHOOK_URL` repository secret.
+
 ## Project layout
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the layer boundaries and [docs/DETECTOR-PACKS.md](docs/DETECTOR-PACKS.md) for the update format.
