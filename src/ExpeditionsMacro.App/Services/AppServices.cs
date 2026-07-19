@@ -26,6 +26,7 @@ public sealed class AppServices : IDisposable
         SettingsStore = new AppSettingsStore(Paths);
         PlacementModels = new PlacementModelRepository(Paths);
         Presets = new PresetRepository(Paths);
+        ChallengePresets = new ChallengePresetRepository(Paths);
         CameraModels = new CameraModelRepository(Paths);
         DetectorPacks = new DetectorPackRepository(Paths);
         Automation = new WindowsRobloxAutomation();
@@ -46,6 +47,7 @@ public sealed class AppServices : IDisposable
     public AppSettingsStore SettingsStore { get; }
     public PlacementModelRepository PlacementModels { get; }
     public PresetRepository Presets { get; }
+    public ChallengePresetRepository ChallengePresets { get; }
     public CameraModelRepository CameraModels { get; }
     public DetectorPackRepository DetectorPacks { get; }
     public IRobloxAutomation Automation { get; }

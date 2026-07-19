@@ -8,6 +8,8 @@ internal static class ActionButtonDetector
     private enum ButtonColor
     {
         Green,
+        ChallengeGreen,
+        Purple,
         Red,
         Yellow,
         Neutral,
@@ -45,6 +47,11 @@ internal static class ActionButtonDetector
         ["victory"] = new(new ScreenRegion(80, 360, 320, 150), ButtonColor.Yellow, 225, 438, 85, 60, 110, 200, 18, 48, 0.42),
         ["defeat"] = new(new ScreenRegion(80, 360, 320, 150), ButtonColor.Yellow, 225, 438, 85, 60, 110, 200, 18, 48, 0.42),
         ["disconnect"] = new(new ScreenRegion(320, 320, 330, 145), ButtonColor.Neutral, 496, 394, 95, 60, 120, 230, 22, 58, 0.55),
+        ["challenge_select_stage"] = new(new ScreenRegion(300, 395, 250, 80), ButtonColor.ChallengeGreen, 426, 437, 90, 35, 75, 190, 16, 42, 0.28),
+        ["challenge_enter_matchmaking"] = new(new ScreenRegion(480, 395, 230, 80), ButtonColor.Purple, 589, 437, 100, 35, 70, 190, 16, 42, 0.25),
+        ["challenge_preview_start"] = new(new ScreenRegion(390, 335, 230, 85), ButtonColor.Green, 506, 376, 65, 35, 130, 190, 20, 42, 0.42),
+        ["challenge_change_mode"] = new(new ScreenRegion(550, 335, 230, 85), ButtonColor.Yellow, 668, 376, 65, 35, 130, 190, 20, 42, 0.42),
+        ["challenge_victory_close"] = new(new ScreenRegion(625, 130, 75, 70), ButtonColor.Red, 657, 163, 32, 30, 14, 34, 14, 34, 0.35),
     };
 
     public static double Score(ImageFrame image, string state)
@@ -172,6 +179,8 @@ internal static class ActionButtonDetector
     private static bool MatchesColor(byte red, byte green, byte blue, ButtonColor color) => color switch
     {
         ButtonColor.Green => green >= 110 && green - red >= 35 && green - blue >= 25 && green * 4 >= red * 5,
+        ButtonColor.ChallengeGreen => green >= 65 && green - red >= 22 && green - blue >= 15 && green * 5 >= red * 6,
+        ButtonColor.Purple => blue >= 100 && red >= 65 && blue - green >= 35 && red - green >= 25,
         ButtonColor.Red => red >= 105 && red - green >= 30 && red - blue >= 20 && red * 4 >= green * 5,
         ButtonColor.Yellow => red >= 130 && green >= 85 && red - blue >= 60 && green - blue >= 45,
         ButtonColor.Neutral => Math.Min(red, Math.Min(green, blue)) >= 160 && Math.Max(red, Math.Max(green, blue)) - Math.Min(red, Math.Min(green, blue)) <= 35,

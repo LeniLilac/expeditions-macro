@@ -15,6 +15,8 @@ public sealed record AppSettings
 
     public string SelectedPresetId { get; init; } = string.Empty;
 
+    public string SelectedChallengePresetId { get; init; } = string.Empty;
+
     public string EncryptedWebhook { get; init; } = string.Empty;
 
     public bool CheckDetectorUpdates { get; init; } = true;
