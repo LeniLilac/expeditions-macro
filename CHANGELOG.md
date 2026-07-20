@@ -4,6 +4,22 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.0.14] - 2026-07-19
+
+### Changed
+
+- Updated the in-app and README community link to the current Expeditions Macro Discord invite.
+
+### Fixed
+
+- Continued automatic lobby recovery through the initial in-map checkpoint that can appear after the teleport preview, instead of retaining a stale preview state and waiting indefinitely.
+- Restricted that standalone Continue transition to the post-teleport recovery step so ordinary node pauses and the map-preview action cannot be mistaken for it.
+
+### Tests
+
+- Reproduced the reported 808 by 611 diagnostic frame locally at 100% Continue confidence and verified its Roblox-relative action at `(404, 490)`.
+- Added recovery-policy regressions for the post-preview Continue transition, its normal disabled state, and map-preview priority when both signals are present.
+
 ## [1.0.13] - 2026-07-19
 
 ### Added
@@ -161,7 +177,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.0.13...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.0.14...HEAD
+[1.0.14]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.14
 [1.0.13]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.13
 [1.0.12]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.12
 [1.0.11]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.11

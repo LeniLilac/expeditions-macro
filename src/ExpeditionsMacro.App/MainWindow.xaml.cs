@@ -12,7 +12,7 @@ namespace ExpeditionsMacro.App;
 
 public partial class MainWindow : Window
 {
-    private const string DiscordInviteUrl = "https://discord.gg/7NZhJZgHN3";
+    private const string DiscordInviteUrl = "https://discord.gg/wE6XSVyXsN";
     private readonly AppServices _services;
     private readonly Dictionary<string, IAppPage> _pages;
     private bool _autoMinimized;

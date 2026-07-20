@@ -122,6 +122,33 @@ public sealed class ExpeditionRunPolicyTests
     }
 
     [Fact]
+    public void RecoveryTransitionAcceptsStandaloneContinueOnlyAfterTeleportPreview()
+    {
+        DetectorPackManifest manifest = Manifest("continue");
+        Dictionary<string, double> scores = new() { ["continue"] = 0.99 };
+
+        Assert.Null(ExpeditionRunPolicy.RecoveryTransition(manifest, scores, recoveryState: null));
+        Assert.Equal(
+            "continue",
+            ExpeditionRunPolicy.RecoveryTransition(manifest, scores, recoveryState: null, allowStandaloneContinue: true));
+    }
+
+    [Fact]
+    public void RecoveryTransitionKeepsMapPreviewAheadOfItsGreenActionButton()
+    {
+        DetectorPackManifest manifest = Manifest("map_preview", "continue");
+        Dictionary<string, double> scores = new()
+        {
+            ["map_preview"] = 0.94,
+            ["continue"] = 0.99,
+        };
+
+        Assert.Equal(
+            "map_preview",
+            ExpeditionRunPolicy.RecoveryTransition(manifest, scores, "map_preview", allowStandaloneContinue: true));
+    }
+
+    [Fact]
     public void DisabledExtraction_NeverExtractsOrReportsEarlyDefeat()
     {
         ExpeditionPreset preset = Preset(extract: false, target: 1);

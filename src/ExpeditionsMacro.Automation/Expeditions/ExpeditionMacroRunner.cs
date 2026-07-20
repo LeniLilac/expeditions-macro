@@ -484,6 +484,11 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                     if (!await TryClickRecoveryAsync(window, detector, "map_preview", log, cancellationToken).ConfigureAwait(false)) break;
                     state = await WaitForRecoveryChangeAsync(window, detector, "map_preview", TimeSpan.FromSeconds(20), preset, report, log, cancellationToken).ConfigureAwait(false) ?? state;
                     break;
+                case "continue":
+                    report("Recovery", 0, "Initial Expedition checkpoint recognized. Continuing to the prestart screen.", state, null);
+                    if (!await TryClickRecoveryAsync(window, detector, "continue", log, cancellationToken).ConfigureAwait(false)) break;
+                    state = await WaitForRecoveryChangeAsync(window, detector, "continue", TimeSpan.FromSeconds(20), preset, report, log, cancellationToken).ConfigureAwait(false) ?? state;
+                    break;
                 case "start":
                     report("Recovery", 100, "Returned to the configured Expedition prestart screen.", state, null);
                     log("Automatic recovery completed.", MacroEventLevel.Success, state, null);
@@ -589,6 +594,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
     {
         DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
         StableStateTracker<string> tracker = new(ExpeditionRunPolicy.RecoveryStableDetections(preset));
+        bool allowStandaloneContinue = excluded.Equals("map_preview", StringComparison.OrdinalIgnoreCase);
         bool captureErrorReported = false;
         while (DateTimeOffset.UtcNow < deadline)
         {
@@ -597,9 +603,16 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
             {
                 ImageFrame frame = CaptureClient(window, detector);
                 IReadOnlyDictionary<string, double> scores = detector.ScoreStates(frame);
-                string? state = ExpeditionRunPolicy.RecoveryTransition(detector.Manifest, scores, detector.RecoveryState(frame));
+                string? state = ExpeditionRunPolicy.RecoveryTransition(
+                    detector.Manifest,
+                    scores,
+                    detector.RecoveryState(frame),
+                    allowStandaloneContinue);
                 if (state is not null && scores.TryGetValue(state, out double score)) report("Recovery", 0, $"Detected {Label(state)}.", state, score);
-                if ((!RecoveryStates.Contains(state ?? string.Empty) && state != "start")) tracker.Reset();
+                bool acceptedTransition = RecoveryStates.Contains(state ?? string.Empty) ||
+                    state == "start" ||
+                    (allowStandaloneContinue && state == "continue");
+                if (!acceptedTransition) tracker.Reset();
                 else
                 {
                     string? stable = tracker.Update(state);

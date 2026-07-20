@@ -75,8 +75,15 @@ public static class ExpeditionRunPolicy
     public static string? RecoveryTransition(
         DetectorPackManifest manifest,
         IReadOnlyDictionary<string, double> scores,
-        string? recoveryState) =>
-        IsStateDetected(manifest, scores, "start") ? "start" : recoveryState;
+        string? recoveryState,
+        bool allowStandaloneContinue = false)
+    {
+        if (IsStateDetected(manifest, scores, "start")) return "start";
+        if (recoveryState is not null) return recoveryState;
+        return allowStandaloneContinue && IsStateDetected(manifest, scores, "continue")
+            ? "continue"
+            : null;
+    }
 
     public static bool IsStateDetected(
         DetectorPackManifest manifest,
