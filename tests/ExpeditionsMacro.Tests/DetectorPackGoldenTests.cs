@@ -354,6 +354,22 @@ public sealed class DetectorPackGoldenTests
     }
 
     [Theory]
+    [InlineData("Expedition_Victory_UI")]
+    [InlineData("Expedition_Defeat_UI")]
+    [Trait("Category", "Golden")]
+    public void ExpeditionTerminalClose_ClicksTheVisibleResultCloseButton(string dataset)
+    {
+        if (!DatasetsAvailable()) return;
+        CompiledDetectorPack pack = Pack.Value;
+        ImageFrame image = ImageCodec.Load(Pngs(dataset).First());
+
+        (int x, int y) = pack.ActionFor("expedition_terminal_close", image);
+
+        Assert.InRange(x, 640, 700);
+        Assert.InRange(y, 135, 175);
+    }
+
+    [Theory]
     [InlineData("disconnect", "Roblox_Disconnect")]
     [InlineData("lobby", "Lobby_UI")]
     [InlineData("play", "Play_UI")]

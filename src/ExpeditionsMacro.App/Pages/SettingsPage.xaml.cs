@@ -54,6 +54,7 @@ public partial class SettingsPage : UserControl, IAppPage
         MinimizeCheck.IsChecked = _services.Settings.MinimizeDuringAutomation;
         AutoUpdateCheck.IsChecked = _services.Settings.CheckDetectorUpdates;
         AutoCaptureOnErrorCheck.IsChecked = _services.Settings.AutoCaptureOnMacroError;
+        IncludeLogsCheck.IsChecked = _services.Settings.IncludeLogsInDiagnosticArchives;
         _loading = false;
         VersionText.Text = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
         RobloxText.Text = _services.Automation.FindWindow() is { } window ? $"Found: {window.Title}" : "Not found";
@@ -79,6 +80,12 @@ public partial class SettingsPage : UserControl, IAppPage
     {
         if (_loading) return;
         await _services.UpdateSettingsAsync(settings => settings with { AutoCaptureOnMacroError = AutoCaptureOnErrorCheck.IsChecked == true });
+    }
+
+    private async void IncludeLogsCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        await _services.UpdateSettingsAsync(settings => settings with { IncludeLogsInDiagnosticArchives = IncludeLogsCheck.IsChecked == true });
     }
 
     private void HotkeyButton_Click(object sender, RoutedEventArgs e)
@@ -161,7 +168,7 @@ public partial class SettingsPage : UserControl, IAppPage
         string hotkey = _services.Hotkey.DisplayName;
         if (!_capturingHotkey) HotkeyButton.Content = hotkey;
         HotkeyText.Text = _services.Hotkey.IsRegistered ? $"{hotkey} registered" : "Unavailable";
-        DebugCaptureDescription.Text = $"Record the Roblox client at the standard 808 by 611 size. {hotkey} starts and stops capture, restores Roblox, and saves a ZIP for bug reports.";
+        DebugCaptureDescription.Text = $"Record the Roblox client at the standard 808 by 611 size. {hotkey} starts and stops capture and saves a ZIP for bug reports.";
         if (updateStatus && !_capturingHotkey && !_rebindingHotkey)
         {
             HotkeyStatusText.Text = $"{hotkey} is registered globally for every macro workflow.";
@@ -191,10 +198,15 @@ public partial class SettingsPage : UserControl, IAppPage
             {
                 try
                 {
-                    DiagnosticCaptureResult result = await _services.DiagnosticCapture.CaptureAsync(name, TimeSpan.FromSeconds(seconds), progress, token);
-                    await Dispatcher.InvokeAsync(() => CaptureStatusText.Text = result.RestoreWarning is null
-                        ? $"Saved {result.Captures} screenshot(s) to {Path.GetFileName(result.ArchivePath)}."
-                        : $"Saved {result.Captures} screenshot(s). {result.RestoreWarning}");
+                    DiagnosticCaptureResult result = await _services.DiagnosticCapture.CaptureAsync(
+                        name,
+                        TimeSpan.FromSeconds(seconds),
+                        progress,
+                        token,
+                        logFilePath: _services.Settings.IncludeLogsInDiagnosticArchives ? _services.Log.CurrentFile : null);
+                    await Dispatcher.InvokeAsync(() => CaptureStatusText.Text = result.LogsIncluded
+                        ? $"Saved {result.Captures} screenshot(s) and the current log to {Path.GetFileName(result.ArchivePath)}."
+                        : $"Saved {result.Captures} screenshot(s) to {Path.GetFileName(result.ArchivePath)}.");
                 }
                 catch (OperationCanceledException) when (token.IsCancellationRequested)
                 {
@@ -231,6 +243,7 @@ public partial class SettingsPage : UserControl, IAppPage
         CaptureNameText.IsEnabled = !busy;
         CaptureIntervalText.IsEnabled = !busy;
         AutoCaptureOnErrorCheck.IsEnabled = !busy;
+        IncludeLogsCheck.IsEnabled = !busy;
         CaptureStopButton.IsEnabled = _captureOperationActive && busy;
         CaptureStopButton.Content = _services.Coordinator.State == OperationState.Armed ? "Cancel" : "Stop and save";
         HotkeyButton.IsEnabled = !busy && !_rebindingHotkey;

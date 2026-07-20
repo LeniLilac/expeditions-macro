@@ -43,6 +43,9 @@ public static class ExpeditionRunPolicy
 
     public static bool CanEnterRecoveryDuringRun(string? state) => state is "afk" or "disconnect" or "lobby";
 
+    public static bool StopDeadlineReached(DateTimeOffset nowUtc, DateTimeOffset? stopAfterCurrentRunUtc) =>
+        stopAfterCurrentRunUtc is DateTimeOffset deadline && nowUtc >= deadline;
+
     public static string? PreferActiveState(
         DetectorPackManifest manifest,
         IReadOnlyDictionary<string, double> scores,

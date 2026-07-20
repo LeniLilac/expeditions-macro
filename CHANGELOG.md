@@ -4,6 +4,27 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-07-20
+
+### Added
+
+- Added a Settings toggle to include the current macro run log in manual and automatic diagnostic ZIPs.
+
+### Changed
+
+- Resized Roblox to the standard 808 by 611 client size when the app opens if Roblox is already running.
+- Kept Roblox at the standardized client size after startup, camera setup, placement recording, debug capture, and macro runs instead of restoring earlier bounds.
+
+### Fixed
+
+- Let the Challenge cooldown Expeditions fallback finish its active Expedition run before returning to Challenges when a global reset arrives.
+- Closed the Expedition victory or defeat screen before switching back to Challenge selection, avoiding the unreachable post-match preview timeout.
+
+### Tests
+
+- Updated camera-region, alignment, placement, settings, and Expedition deadline tests for persistent standard sizing.
+- Added golden coverage for the Expedition terminal close action used during Challenge fallback handoff.
+
 ## [1.1.2] - 2026-07-20
 
 ### Added
@@ -246,7 +267,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.3...HEAD
+[1.1.3]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.1.0

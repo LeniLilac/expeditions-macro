@@ -44,6 +44,16 @@ public sealed class ExpeditionRunPolicyTests
     }
 
     [Fact]
+    public void GracefulStopDeadlineOnlyAppliesOnceReached()
+    {
+        DateTimeOffset deadline = new(2026, 7, 20, 18, 0, 0, TimeSpan.Zero);
+
+        Assert.False(ExpeditionRunPolicy.StopDeadlineReached(deadline.AddMilliseconds(-1), deadline));
+        Assert.True(ExpeditionRunPolicy.StopDeadlineReached(deadline, deadline));
+        Assert.False(ExpeditionRunPolicy.StopDeadlineReached(deadline.AddDays(1), null));
+    }
+
+    [Fact]
     public void StartOutranksNavigationAndRewardCollisions()
     {
         DetectorPackManifest manifest = Manifest("start", "reward", "play");

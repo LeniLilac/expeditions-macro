@@ -75,6 +75,14 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public void AppSettings_IncludeLogsInDiagnosticArchivesDefaultsOn()
+    {
+        AppSettings settings = new();
+
+        Assert.True(settings.IncludeLogsInDiagnosticArchives);
+    }
+
+    [Fact]
     public void ModelId_IsReadableStableAndNameSensitive()
     {
         string first = ModelId.FromName("Expedition Map 1");

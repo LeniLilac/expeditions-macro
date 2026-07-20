@@ -30,7 +30,7 @@ Read `README.md`, `CONTRIBUTING.md`, `docs/ARCHITECTURE.md`, `docs/DETECTOR-PACK
 ## Non-negotiable runtime invariants
 
 - The canonical Roblox client area is 808 by 611 pixels. Store all capture regions, click targets, camera regions, and placement coordinates relative to the client, never the desktop or outer window.
-- A standalone workflow that resizes or moves Roblox must restore the original outer bounds in a `finally` block.
+- Workflows standardize Roblox to the canonical client size and leave it there; do not restore old outer bounds after app startup, setup, capture, placement, or macro runs.
 - Always release held mouse buttons, keyboard state, and temporary shift lock on success, cancellation, and failure.
 - Keep automation cooperative and cancellation-aware. Pass cancellation tokens through delays, polling loops, input, downloads, and long image operations where supported.
 - Only one workflow may own Roblox input. Route UI actions through the coordinator rather than starting competing workers.

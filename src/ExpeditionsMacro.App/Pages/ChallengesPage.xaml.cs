@@ -88,7 +88,7 @@ public partial class ChallengesPage : UserControl, IAppPage
     {
         string hotkey = _services.Hotkey.DisplayName;
         StartButton.Content = $"Start macro  {hotkey}";
-        StopButton.Content = $"Stop and restore  {hotkey}";
+        StopButton.Content = $"Stop macro  {hotkey}";
     }
 
     private async Task StartMacroAsync()
@@ -369,7 +369,7 @@ public partial class ChallengesPage : UserControl, IAppPage
         {
             _macroOwned = false;
             _runtimeTimer.Stop();
-            StatusText.Text = "Macro stopped. Roblox window and input state were restored.";
+            StatusText.Text = "Macro stopped. Roblox remains at the standard client size.";
             AppendLog("Macro stopped.");
         }
     }
@@ -408,28 +408,19 @@ public partial class ChallengesPage : UserControl, IAppPage
         string webhookUrl,
         CancellationToken cancellationToken)
     {
-        TimeSpan remaining = untilUtc - DateTimeOffset.UtcNow;
-        if (remaining <= TimeSpan.Zero) return;
-        using CancellationTokenSource deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadline.CancelAfter(remaining);
-        try
-        {
-            AppendLog($"Running Expeditions preset '{preset.Name}' while Challenges are unavailable.");
-            await _services.Expeditions.RunAsync(
-                preset,
-                camera,
-                placement,
-                detector,
-                webhookUrl,
-                progress: new Progress<MacroProgress>(value => DispatchUi(() => StatusText.Text = $"Expeditions fallback: {value.Message}")),
-                log: entry => AppendLog($"Expeditions: {entry.Message}"),
-                summaryChanged: null,
-                cancellationToken: deadline.Token);
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested && DateTimeOffset.UtcNow >= untilUtc - TimeSpan.FromSeconds(1))
-        {
-            AppendLog("Challenge reset reached. Stopping the Expeditions fallback and returning to Challenges.");
-        }
+        if (untilUtc <= DateTimeOffset.UtcNow) return;
+        AppendLog($"Running Expeditions preset '{preset.Name}' while Challenges are unavailable.");
+        await _services.Expeditions.RunAsync(
+            preset,
+            camera,
+            placement,
+            detector,
+            webhookUrl,
+            progress: new Progress<MacroProgress>(value => DispatchUi(() => StatusText.Text = $"Expeditions fallback: {value.Message}")),
+            log: entry => AppendLog($"Expeditions: {entry.Message}"),
+            summaryChanged: null,
+            cancellationToken: cancellationToken,
+            stopAfterCurrentRunUtc: untilUtc);
     }
 
     private void ApplySummary(ChallengeRunSummary summary)
