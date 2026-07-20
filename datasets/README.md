@@ -1,6 +1,6 @@
 # Detector image dataset
 
-This repository includes 336 Roblox client-area captures used to build and regression-test the bundled Anime Expeditions detector pack and the app's specialized UI detectors: 269 Expeditions fixtures and 67 selective Challenge fixtures. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
+This repository includes 337 Roblox client-area captures used to build and regression-test the bundled Anime Expeditions detector pack and the app's specialized UI detectors: 269 Expeditions fixtures and 68 selective Challenge fixtures. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
 
 Captures are 808 by 611 PNG files organized under:
 

@@ -13,7 +13,7 @@ Challenge mode automates the three regular Anime Expeditions Challenges that res
 - Either waits during cooldown or runs a configured Expeditions preset until the next reset.
 - Treats all three entries remaining unavailable across a complete global reset as daily-limit evidence, then waits until midnight UTC.
 
-The optional Discord webhook reports monitoring start, match attempts, Victory or Defeat with a Roblox screenshot, recovery, and reset or daily-limit waiting. It uses the same DPAPI-protected storage and Components V2 payload path as Expeditions.
+The optional Discord webhook reports monitoring start, match attempts, Victory or Defeat with a Roblox screenshot, recovery, and reset or daily-limit waiting. A numeric Discord user ID can also receive five restricted mention alerts after an unexpected error. It uses the same DPAPI-protected webhook storage and Components V2 payload path as Expeditions. Manual Stop does not send error alerts or trigger automatic failure capture.
 
 ## Detection and input safety
 
@@ -23,6 +23,6 @@ Selector rows are clicked through their map artwork, away from reward icons that
 
 ## Regression dataset
 
-The checked-in dataset contains 67 selective Challenge fixtures from multiple players, PCs, Roblox UI scales, all five maps, active and cooldown entries, gameplay, terminal screens, and Expeditions handoff states. Focused diagnostics cover private-party previews, dimmed and unavailable selectors, reward tooltips, hovered controls, and bright game-mode artwork.
+The checked-in dataset contains 68 selective Challenge fixtures from multiple players, PCs, Roblox UI scales, all five maps, active and cooldown entries, gameplay, terminal screens, and Expeditions handoff states. Focused diagnostics cover private-party previews, dimmed and unavailable selectors, reward tooltips, hovered controls, bright game-mode artwork, and blue scenery behind Start Game.
 
 Fixtures must remain 808 by 611 Roblox client captures. Do not include the Roblox title bar, desktop, notifications, account names, chat, or webhook data. See `datasets/anime-expeditions/challenges/README.md` for provenance and documented redactions.

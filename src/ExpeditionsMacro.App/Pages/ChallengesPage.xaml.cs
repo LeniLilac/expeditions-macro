@@ -73,6 +73,7 @@ public partial class ChallengesPage : UserControl, IAppPage
         try { webhook = _services.SecretProtector.Unprotect(_services.Settings.EncryptedWebhook); } catch { }
         WebhookPassword.Password = webhook;
         WebhookVisible.Text = webhook;
+        DiscordErrorUserIdText.Text = _services.Settings.DiscordErrorUserId;
         _loading = false;
         CoordinatorStateChanged();
     }
@@ -97,10 +98,13 @@ public partial class ChallengesPage : UserControl, IAppPage
         IReadOnlyDictionary<ChallengeMapId, ChallengeMapRuntimeModels> mapModels;
         IDetectorPack detector;
         string webhook = CurrentWebhook();
+        string discordUserId = DiscordErrorUserIdText.Text.Trim();
         Func<DateTimeOffset, CancellationToken, Task>? idleWorkflow = null;
         try
         {
             if (!DiscordWebhookClient.ValidateWebhookUrl(webhook)) throw new InvalidOperationException("Enter a valid Discord webhook URL, or leave it blank.");
+            if (!DiscordWebhookClient.ValidateDiscordUserId(discordUserId)) throw new InvalidOperationException("Enter a valid Discord user ID, or leave it blank.");
+            if (discordUserId.Length > 0 && webhook.Length == 0) throw new InvalidOperationException("A Discord webhook is required when an error-ping user ID is entered.");
             preset = await SavePresetInternalAsync();
             preset.ValidateReady();
             detector = await _services.DetectorPacks.LoadAsync(preset.DetectorPackId) ?? throw new InvalidOperationException("The selected detector pack could not be loaded.");
@@ -135,15 +139,20 @@ public partial class ChallengesPage : UserControl, IAppPage
             MacroProgress.Value = value.Percent;
             if (value.DetectedState is not null) DetectionText.Text = $"Last detection: {Label(value.DetectedState)}{(value.Confidence is null ? string.Empty : $" ({value.Confidence:P0})")}";
         });
-        await _services.Coordinator.RunNowAsync("Challenge macro", token => _services.Challenges.RunAsync(
-            preset,
-            mapModels,
-            detector,
+        await _services.Coordinator.RunNowAsync("Challenge macro", token => RunWithFailureHandlingAsync(
+            "Challenge Macro",
             webhook,
-            idleWorkflow,
-            progress,
-            entry => Dispatcher.BeginInvoke(() => AppendLog(entry.Level == MacroEventLevel.Error ? $"ERROR: {entry.Message}" : entry.Message)),
-            summary => Dispatcher.BeginInvoke(() => ApplySummary(summary)),
+            discordUserId,
+            () => _services.Challenges.RunAsync(
+                preset,
+                mapModels,
+                detector,
+                webhook,
+                idleWorkflow,
+                progress,
+                entry => Dispatcher.BeginInvoke(() => AppendLog(entry.Level == MacroEventLevel.Error ? $"ERROR: {entry.Message}" : entry.Message)),
+                summary => Dispatcher.BeginInvoke(() => ApplySummary(summary)),
+                token),
             token));
     }
 
@@ -180,11 +189,15 @@ public partial class ChallengesPage : UserControl, IAppPage
         preset.Validate();
         string webhook = CurrentWebhook();
         if (!DiscordWebhookClient.ValidateWebhookUrl(webhook)) throw new InvalidOperationException("Enter a valid Discord webhook URL, or leave it blank.");
+        string discordUserId = DiscordErrorUserIdText.Text.Trim();
+        if (!DiscordWebhookClient.ValidateDiscordUserId(discordUserId)) throw new InvalidOperationException("Enter a valid Discord user ID, or leave it blank.");
+        if (discordUserId.Length > 0 && webhook.Length == 0) throw new InvalidOperationException("A Discord webhook is required when an error-ping user ID is entered.");
         await _services.ChallengePresets.SaveAsync(preset);
         await _services.UpdateSettingsAsync(settings => settings with
         {
             SelectedChallengePresetId = preset.Id,
             EncryptedWebhook = _services.SecretProtector.Protect(webhook),
+            DiscordErrorUserId = discordUserId,
         });
         await RefreshPresetsAsync();
         PresetCombo.SelectedItem = _presets.FirstOrDefault(value => value.Id == preset.Id);
@@ -347,6 +360,7 @@ public partial class ChallengesPage : UserControl, IAppPage
         KeyDelayText.IsEnabled = enabled;
         WebhookPassword.IsEnabled = enabled;
         WebhookVisible.IsEnabled = enabled;
+        DiscordErrorUserIdText.IsEnabled = enabled;
         ShowWebhookCheck.IsEnabled = enabled;
         MapItems.IsEnabled = enabled;
         StartButton.IsEnabled = enabled;
@@ -454,6 +468,54 @@ public partial class ChallengesPage : UserControl, IAppPage
     }
 
     private string CurrentWebhook() => ShowWebhookCheck.IsChecked == true ? WebhookVisible.Text.Trim() : WebhookPassword.Password.Trim();
+
+    private async Task RunWithFailureHandlingAsync(
+        string macroName,
+        string webhook,
+        string discordUserId,
+        Func<Task> operation,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await operation();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception error)
+        {
+            await Dispatcher.InvokeAsync(() =>
+            {
+                StatusText.Text = "Macro failed. Running configured error diagnostics.";
+                AppendLog($"ERROR: {error.Message}");
+            });
+            MacroFailureHandlingResult result = await _services.HandleMacroFailureAsync(macroName, webhook, discordUserId, error);
+            await Dispatcher.InvokeAsync(() => AppendFailureHandlingResult(result));
+            throw;
+        }
+    }
+
+    private void AppendFailureHandlingResult(MacroFailureHandlingResult result)
+    {
+        if (result.DiagnosticArchivePath is not null)
+        {
+            AppendLog($"Automatic error diagnostics saved to {System.IO.Path.GetFileName(result.DiagnosticArchivePath)}.");
+        }
+        if (result.DiagnosticError is not null)
+        {
+            AppendLog($"ERROR: Automatic error diagnostics: {result.DiagnosticError}");
+        }
+        if (result.DiscordPingsSent)
+        {
+            AppendLog($"Sent {DiscordWebhookClient.ErrorPingCount} Discord error alerts.");
+        }
+        if (result.DiscordError is not null)
+        {
+            AppendLog($"ERROR: Discord error alerts: {result.DiscordError}");
+        }
+    }
 
     private void AppendLog(string message)
     {

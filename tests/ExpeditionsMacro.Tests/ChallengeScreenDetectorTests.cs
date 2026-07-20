@@ -192,6 +192,19 @@ public sealed class ChallengeScreenDetectorTests
     }
 
     [Fact]
+    public void BlueFlowerForestScenery_DoesNotSuppressTheStartDialog()
+    {
+        string file = Path.Combine(TestPaths.ChallengeDatasets, "Prestart_FlowerForest", "Prestart_FlowerForest_02.png");
+
+        ChallengeScreenMatch match = ChallengeScreenDetector.Detect(ImageCodec.Load(file));
+
+        Assert.Equal(ChallengeScreenState.Prestart, match.State);
+        Assert.InRange(match.Confidence, 0.95, 1);
+        Assert.InRange(match.ActionX!.Value, 398, 410);
+        Assert.InRange(match.ActionY!.Value, 172, 184);
+    }
+
+    [Fact]
     public void WiderVictoryPanel_ClicksTheDetectedRightShiftedCloseButton()
     {
         string file = Path.Combine(TestPaths.ChallengeDatasets, "Victory", "Victory_05.png");

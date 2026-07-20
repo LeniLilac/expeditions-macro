@@ -15,6 +15,12 @@ using ExpeditionsMacro.Windows;
 
 namespace ExpeditionsMacro.App.Services;
 
+public sealed record MacroFailureHandlingResult(
+    string? DiagnosticArchivePath,
+    bool DiscordPingsSent,
+    string? DiagnosticError,
+    string? DiscordError);
+
 public sealed class AppServices : IDisposable
 {
     private readonly DiscordWebhookClient _discord;
@@ -95,6 +101,26 @@ public sealed class AppServices : IDisposable
         await SettingsStore.SaveAsync(Settings);
     }
 
+    public async Task<MacroFailureHandlingResult> HandleMacroFailureAsync(
+        string macroName,
+        string webhookUrl,
+        string discordUserId,
+        Exception error)
+    {
+        Task<(string? Path, string? Error)> diagnosticTask = Settings.AutoCaptureOnMacroError
+            ? CaptureFailureDiagnosticsAsync(macroName)
+            : Task.FromResult<(string?, string?)>((null, null));
+        Task<(bool Sent, string? Error)> pingTask =
+            string.IsNullOrWhiteSpace(webhookUrl) || string.IsNullOrWhiteSpace(discordUserId)
+                ? Task.FromResult<(bool, string?)>((false, null))
+                : SendFailurePingsAsync(macroName, webhookUrl, discordUserId, error.Message);
+
+        await Task.WhenAll(diagnosticTask, pingTask);
+        (string? path, string? diagnosticError) = await diagnosticTask;
+        (bool sent, string? discordError) = await pingTask;
+        return new MacroFailureHandlingResult(path, sent, diagnosticError, discordError);
+    }
+
     public void Dispose()
     {
         Coordinator.Cancel();
@@ -115,6 +141,47 @@ public sealed class AppServices : IDisposable
         if (current is not null && !string.Equals(current.Version, bundled.Version, StringComparison.OrdinalIgnoreCase)) return;
         if (current is not null && HasSameFiles(current, bundled)) return;
         await DetectorPacks.InstallDirectoryAsync(source);
+    }
+
+    private async Task<(string? Path, string? Error)> CaptureFailureDiagnosticsAsync(string macroName)
+    {
+        try
+        {
+            using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(30));
+            string captureName = $"error-{macroName.ToLowerInvariant().Replace(' ', '-')}-{DateTimeOffset.Now:yyyyMMdd-HHmmss}";
+            DiagnosticCaptureResult result = await DiagnosticCapture.CaptureAsync(
+                captureName,
+                TimeSpan.FromSeconds(1),
+                cancellationToken: timeout.Token,
+                maximumCaptures: 10);
+            Log.Info($"Automatic failure diagnostics saved to {Path.GetFileName(result.ArchivePath)}.");
+            return (result.ArchivePath, result.RestoreWarning);
+        }
+        catch (Exception captureError)
+        {
+            Log.Error("Automatic failure diagnostics could not be saved.", captureError);
+            return (null, captureError.Message);
+        }
+    }
+
+    private async Task<(bool Sent, string? Error)> SendFailurePingsAsync(
+        string macroName,
+        string webhookUrl,
+        string discordUserId,
+        string detail)
+    {
+        try
+        {
+            using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(30));
+            await _discord.SendErrorPingsAsync(webhookUrl, discordUserId, macroName, detail, timeout.Token);
+            Log.Info($"Sent {DiscordWebhookClient.ErrorPingCount} Discord error alerts.");
+            return (true, null);
+        }
+        catch (Exception discordError)
+        {
+            Log.Error("Discord error alerts could not be sent.", discordError);
+            return (false, discordError.Message);
+        }
     }
 
     private static bool HasSameFiles(DetectorPackManifest left, DetectorPackManifest right)

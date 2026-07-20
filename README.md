@@ -22,8 +22,8 @@ It uses screen capture and ordinary Windows input. It does not inject into Roblo
 - Handles an early defeat even when extraction was planned later.
 - Rejoins after a Roblox disconnect, an unexpected lobby teleport, or an inactivity teleport to the AFK Chamber. From the AFK Chamber it chooses **Return to Lobby**, then navigates back to the configured map and difficulty.
 - Confirms recovery screens across consecutive captures before rejoining, so one animation frame cannot reset an active run or its checkpoint-extraction progress.
-- Optionally sends Discord Components V2 reports with runtime, victory/defeat totals, recovery notices, and a Roblox screenshot.
-- Records an unlimited timed Roblox screenshot sequence from Settings and packages the frames plus a manifest into one diagnostic ZIP.
+- Optionally sends Discord Components V2 reports with runtime, victory/defeat totals, recovery notices, and a Roblox screenshot. A configured Discord user ID receives five restricted mentions when a macro stops unexpectedly.
+- Records an unlimited timed Roblox screenshot sequence from Settings and packages the frames plus a manifest into one diagnostic ZIP. An opt-in failure setting automatically saves 10 one-second frames after an unexpected macro error.
 - Stores webhook secrets with Windows DPAPI and emits no telemetry.
 
 ## Install
@@ -73,7 +73,7 @@ Saving the same name replaces the previous model.
    - `1`: extract at the first checkpoint after one boss node.
    - A high value, or disabling extraction: continue until defeat/victory.
 4. Leave automatic lobby/disconnect/AFK recovery enabled unless you intend to supervise navigation.
-5. Optionally paste a standard, Canary, or PTB Discord webhook.
+5. Optionally paste a standard, Canary, or PTB Discord webhook. Add a numeric Discord user ID if unexpected errors should send five mention alerts.
 6. Save the preset and press the macro hotkey.
 
 The app waits for the difficulty carousel animation to settle and verifies the active difficulty before continuing.
@@ -84,7 +84,7 @@ The app waits for the difficulty carousel animation to settle and verifies the a
 2. For each of the five maps, choose a camera model, a before-start placement model, an optional after-start placement model, and its elapsed-time delay.
 3. Set how many times a Challenge may retry after defeat. The default is zero; a failed entry becomes eligible again at the next global reset.
 4. Choose whether to wait during cooldown or run a saved Expeditions preset until the next reset.
-5. Optionally enter a Discord webhook, save the Challenge preset, and press the macro hotkey.
+5. Optionally enter a Discord webhook and numeric user ID for five error alerts, save the Challenge preset, and press the macro hotkey.
 
 The selector order is fixed by Challenge type. The macro recognizes the current map, skips entries without **Select Stage**, and resets its per-window attempts at `xx:00` and `xx:30`. If all three entries remain unavailable across a complete global reset, it treats the daily limit as reached and waits until midnight UTC.
 
@@ -107,6 +107,8 @@ Stopping is cooperative. The app releases right mouse and shift-lock state where
 ### Diagnostic screenshot capture
 
 Open **Settings**, enter a capture name and interval under **Debug capture**, then choose **Arm capture**. Focus Roblox and press the macro hotkey to start; press it again to stop. The app temporarily uses the standard 808 by 611 client size, restores the original Roblox bounds, and writes a same-name ZIP under `diagnostics/`. A completed same-name capture replaces the previous ZIP.
+
+Enable **Automatically save 10 screenshots when a macro fails** to capture the Roblox client once per second after an unexpected Expeditions or Challenge error. These captures use timestamped ZIP names and do not run after a normal completion or manual Stop.
 
 ## Local files and privacy
 

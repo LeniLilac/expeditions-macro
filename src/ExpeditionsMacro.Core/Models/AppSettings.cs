@@ -21,6 +21,10 @@ public sealed record AppSettings
 
     public string EncryptedWebhook { get; init; } = string.Empty;
 
+    public string DiscordErrorUserId { get; init; } = string.Empty;
+
+    public bool AutoCaptureOnMacroError { get; init; }
+
     public bool CheckDetectorUpdates { get; init; } = true;
 
     public DateTimeOffset? LastDetectorUpdateCheck { get; init; }

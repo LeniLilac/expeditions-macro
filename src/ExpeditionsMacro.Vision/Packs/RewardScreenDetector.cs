@@ -148,17 +148,21 @@ internal static class RewardScreenDetector
                 0.35 * Ramp(density, 0.30, 0.90),
                 0,
                 1);
+            // The real progress bar has bounded horizontal endpoints even when
+            // it is translated or scaled. Blue Flower Forest scenery tends to
+            // span the entire search width, so it must not choose the header row
+            // that suppresses a valid Start dialog.
+            if (span > 470) continue;
             if (rowScore <= bestRow) continue;
             bestRow = rowScore;
             bestY = y;
         }
 
         // The actual reward progress bar is a thin horizontal strip. A translated
-        // frame may also expose a separate card-art run, so constrain contiguous
-        // thickness instead of the total row count. Very blue maps can satisfy
-        // the same pixel test across most of this region; treating that broad
-        // field as a header can suppress a valid Start dialog.
-        if (supportingRows < 3 || longestSupportingRun > 18) return null;
+        // frame may also expose a separate card-art run, so do not bound aggregate
+        // supporting rows. Reject a thick contiguous band and require at least one
+        // bounded row from the progress bar itself.
+        if (supportingRows < 3 || longestSupportingRun > 18 || bestRow <= 0) return null;
         double quality = 0.80 * bestRow + 0.20 * Ramp(supportingRows, 3, 8);
         return new HeaderMatch(0.70 + 0.30 * quality, bestY);
     }

@@ -11,17 +11,20 @@ All notable changes to Expeditions Macro are documented here.
 - Added a complete regular-Challenge workflow for Trait, Stat, and Sprite rotations across five maps.
 - Added per-map camera selection, before-start placement, delayed after-start placement, configurable defeat retries, half-hour reset tracking, and daily-limit waiting.
 - Added an optional Expeditions handoff while Challenges are on cooldown and Components V2 reporting for Challenge attempts, results, recovery, and waiting states.
+- Added an optional Discord user ID for five mention-restricted alerts after unexpected Expeditions or Challenge errors; manual Stop does not alert.
+- Added an opt-in automatic failure capture that saves 10 one-second Roblox-client screenshots to a timestamped diagnostic ZIP.
 
 ### Fixed
 
 - Hardened Challenge navigation across both observed selector scales, unavailable and dimmed rows, animated thumbnails, private-party previews, reward tooltips, hovered controls, and bright game-mode artwork.
+- Rejected broad blue scenery as a reward header so a valid Flower Forest Start Game dialog remains actionable.
 - Clicked Challenge map artwork instead of reward icons and tied all shared-screen detections to their expected transition context.
 - Included the v1.0.14 post-teleport recovery and v1.0.15 confirmation-dismissal fixes in the Challenge-capable build.
 
 ### Tests
 
-- Added 67 selective Challenge fixtures covering multiple players, PCs, all five maps, gameplay, terminal screens, cooldowns, and Expeditions handoff states.
-- Passed 219 automated tests across 336 checked-in Roblox client captures.
+- Added 68 selective Challenge fixtures covering multiple players, PCs, all five maps, gameplay, terminal screens, cooldowns, and Expeditions handoff states.
+- Passed 231 automated tests across 337 checked-in Roblox client captures.
 
 ## [1.0.15] - 2026-07-20
 

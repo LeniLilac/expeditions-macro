@@ -149,7 +149,12 @@
                         <CheckBox x:Name="ShowWebhookCheck" Grid.Column="1" Margin="10,0,0,0" Content="Show" Checked="ShowWebhook_Changed" Unchecked="ShowWebhook_Changed" />
                     </Grid>
                 </Grid>
-                <TextBlock Margin="170,7,0,0" Style="{StaticResource Caption}" Text="Shared with Expeditions. Reports macro start, attempts, results, recovery, and waiting states; victory and defeat include a screenshot." />
+                <Grid Margin="0,12,0,0">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="170" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource FieldLabel}" Text="Error ping user ID, optional" />
+                    <TextBox x:Name="DiscordErrorUserIdText" Grid.Column="1" />
+                </Grid>
+                <TextBlock Margin="170,7,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Shared with Expeditions. Unexpected errors ping this user five times; manual Stop never alerts. Victory and defeat include a screenshot." />
 
                 <Grid x:Name="TuningPanel" Margin="0,15,0,0" Visibility="Collapsed">
                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
