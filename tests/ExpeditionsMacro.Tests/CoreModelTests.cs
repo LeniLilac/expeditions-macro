@@ -75,11 +75,12 @@ public sealed class CoreModelTests
     }
 
     [Fact]
-    public void AppSettings_IncludeLogsInDiagnosticArchivesDefaultsOn()
+    public void AppSettings_DiagnosticCaptureOptionsDefaultOff()
     {
         AppSettings settings = new();
 
-        Assert.True(settings.IncludeLogsInDiagnosticArchives);
+        Assert.False(settings.AutoCaptureOnMacroError);
+        Assert.False(settings.IncludeLogsInDiagnosticArchives);
     }
 
     [Fact]

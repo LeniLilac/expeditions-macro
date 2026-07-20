@@ -556,6 +556,23 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         report("Return", 0, "Returning from Expeditions to the Challenge selector.", null, null);
         for (int attempt = 1; attempt <= 3; attempt++)
         {
+            ImageFrame current = CaptureClient(window, detector);
+            ChallengeScreenMatch currentMatch = ChallengeScreenDetector.Detect(current);
+            if (currentMatch.State is ChallengeScreenState.PostMatchPreview
+                or ChallengeScreenState.GameModeSelector
+                or ChallengeScreenState.ChallengeList
+                or ChallengeScreenState.ChallengeListUnavailable
+                or ChallengeScreenState.ChallengeAvailable
+                or ChallengeScreenState.ChallengeCooldown)
+            {
+                log(
+                    $"Expeditions return found {Label(currentMatch.State)} already open; continuing Challenge navigation.",
+                    MacroEventLevel.Information,
+                    currentMatch.State.ToString(),
+                    currentMatch.Confidence);
+                break;
+            }
+
             (int playX, int playY) = ChallengeScreenDetector.OpenPlayAction();
             await ClickAsync(window, playX, playY, cancellationToken).ConfigureAwait(false);
             await Task.Delay(900, cancellationToken).ConfigureAwait(false);

@@ -23,9 +23,8 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <StackPanel Margin="0,0,0,28">
+                <StackPanel Margin="0,0,0,24">
                     <TextBlock Style="{StaticResource PageTitle}" Text="Camera models" />
-                    <TextBlock Margin="0,7,0,0" Style="{StaticResource PageSubtitle}" Text="Capture a stable scene region, learn a complete yaw turn, then return to that view with coarse and micro mouse drags." />
                 </StackPanel>
 
                 <Border Grid.Row="1" Style="{StaticResource SectionDivider}">
@@ -33,7 +32,11 @@
                         <TextBlock Style="{StaticResource SectionTitle}" Text="Goal view" />
                         <TextBlock Margin="0,5,0,18" MaxWidth="640" HorizontalAlignment="Left" Style="{StaticResource Caption}" Text="Choose a UI-free area with static track or map geometry. The coordinates are stored relative to Roblox." />
                         <StackPanel MaxWidth="640" HorizontalAlignment="Stretch">
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Model name" />
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource FieldLabel}" Text="Model name" />
+                                <Button x:Name="RenameButton" Grid.Column="1" Height="30" MinWidth="82" Content="Rename" IsEnabled="False" Click="Rename_Click" />
+                            </Grid>
                             <TextBox x:Name="ModelNameText" Margin="0,7,0,12" Text="Camera model" />
                             <Border Height="190" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
                                 <Grid>

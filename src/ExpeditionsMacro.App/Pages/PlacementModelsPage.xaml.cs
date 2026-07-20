@@ -201,7 +201,7 @@ public partial class PlacementModelsPage : UserControl, IAppPage
     {
         if (_steps.Count == 0) throw new InvalidOperationException("Add or record at least one placement.");
         string name = ModelNameText.Text.Trim();
-        string id = ModelId.FromName(name);
+        string id = _selectedModel?.Id ?? ModelId.FromName(name);
         int width = _selectedModel?.ClientWidth ?? 808;
         int height = _selectedModel?.ClientHeight ?? 611;
         PlacementModel model = new()

@@ -57,6 +57,7 @@ public partial class CameraModelsPage : UserControl, IAppPage
         PreviewPlaceholder.Visibility = Visibility.Collapsed;
         AlignButton.IsEnabled = !_services.Coordinator.IsBusy;
         OverlayButton.IsEnabled = true;
+        RenameButton.IsEnabled = !_services.Coordinator.IsBusy;
         StatusText.Text = $"Ready. Baseline {manifest.BaselineScore:P0}, alignment target {manifest.SuccessThreshold:P0}.";
     }
 
@@ -71,6 +72,7 @@ public partial class CameraModelsPage : UserControl, IAppPage
         PreviewPlaceholder.Visibility = Visibility.Visible;
         AlignButton.IsEnabled = false;
         OverlayButton.IsEnabled = false;
+        RenameButton.IsEnabled = false;
         StatusText.Text = "Select a comparison region to create a model.";
         CloseOverlay();
     }
@@ -181,6 +183,38 @@ public partial class CameraModelsPage : UserControl, IAppPage
 
     private void Stop_Click(object sender, RoutedEventArgs e) => _services.Coordinator.Cancel();
 
+    private async void Rename_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedModel is null)
+        {
+            StatusText.Text = "Select a camera model to rename.";
+            return;
+        }
+
+        string name = ModelNameText.Text.Trim();
+        if (name.Length == 0)
+        {
+            StatusText.Text = "Enter a camera model name.";
+            return;
+        }
+
+        try
+        {
+            CameraModel renamed = _selectedModel with
+            {
+                Manifest = _selectedModel.Manifest with { Name = name },
+            };
+            await _services.CameraModels.SaveAsync(renamed);
+            _selectedModel = renamed;
+            await RefreshModelsAsync(renamed.Manifest.Id);
+            StatusText.Text = $"Renamed camera model to '{name}'.";
+        }
+        catch (Exception error)
+        {
+            StatusText.Text = error.Message;
+        }
+    }
+
     private void Overlay_Click(object sender, RoutedEventArgs e)
     {
         if (_overlay is not null)
@@ -239,6 +273,7 @@ public partial class CameraModelsPage : UserControl, IAppPage
     {
         bool busy = _services.Coordinator.IsBusy;
         SelectRegionButton.IsEnabled = !busy;
+        RenameButton.IsEnabled = !busy && _selectedModel is not null;
         SetupButton.IsEnabled = !busy;
         AlignButton.IsEnabled = !busy && _selectedModel is not null;
         StopButton.IsEnabled = busy;

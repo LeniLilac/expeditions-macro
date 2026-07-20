@@ -67,7 +67,7 @@ Saving the same name replaces the previous model.
 ### 3. Configure Expeditions
 
 1. Open **Expeditions**.
-2. Choose map, difficulty, camera model, placement model, and detector pack.
+2. Choose map, difficulty, camera model, and placement model.
 3. Enable checkpoint extraction and set **Boss nodes before extract**:
    - `0`: extract at the first real in-run checkpoint.
    - `1`: extract at the first checkpoint after one boss node.
@@ -146,7 +146,7 @@ Build release artifacts:
 
 ```powershell
 .\scripts\Generate-Icon.ps1
-.\scripts\Build-Release.ps1 -Version 1.1.3
+.\scripts\Build-Release.ps1 -Version 1.1.4
 ```
 
 The release script publishes the self-contained app, creates the portable ZIP, creates the detector-pack ZIP, optionally invokes Inno Setup, and writes SHA-256 checksums plus a dependency inventory.
