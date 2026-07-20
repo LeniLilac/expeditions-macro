@@ -13,6 +13,7 @@ namespace ExpeditionsMacro.App;
 public partial class MainWindow : Window
 {
     private const string DiscordInviteUrl = "https://discord.gg/wE6XSVyXsN";
+    private const string SetupGuideUrl = "https://docs.google.com/document/d/10NeDNa3BNEwPEpZj0oVQiR98_7GN67dmKS-OZwaxALM/edit?usp=sharing";
     private readonly AppServices _services;
     private readonly Dictionary<string, IAppPage> _pages;
     private bool _autoMinimized;
@@ -145,16 +146,22 @@ public partial class MainWindow : Window
 
     private void Maximize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 
-    private void JoinDiscord_Click(object sender, RoutedEventArgs e)
+    private void SetupGuide_Click(object sender, RoutedEventArgs e) =>
+        OpenExternalLink(SetupGuideUrl, "the setup guide", "Setup guide");
+
+    private void JoinDiscord_Click(object sender, RoutedEventArgs e) =>
+        OpenExternalLink(DiscordInviteUrl, "the Discord invite", "Join Discord");
+
+    private void OpenExternalLink(string url, string description, string title)
     {
         try
         {
-            Process.Start(new ProcessStartInfo(DiscordInviteUrl) { UseShellExecute = true });
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         }
         catch (Exception error)
         {
-            _services.Log.Error("Could not open the Discord invite.", error);
-            MessageBox.Show(this, $"Could not open the Discord invite.\n\n{DiscordInviteUrl}", "Join Discord", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _services.Log.Error($"Could not open {description}.", error);
+            MessageBox.Show(this, $"Could not open {description}.\n\n{url}", title, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 

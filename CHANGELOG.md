@@ -4,6 +4,22 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-07-20
+
+### Added
+
+- Added a persistent **Setup guide** button in the app sidebar that opens the public visual walkthrough in the default browser.
+
+### Fixed
+
+- Marshalled Challenge cooldown-handoff logging and fallback status updates through the WPF dispatcher, preventing the app from stopping when Expeditions starts on a worker thread.
+- Kept fallback log messages durable even if the window dispatcher is already shutting down.
+
+### Tests
+
+- Replayed the reported cooldown selector diagnostics and verified that the detector correctly reaches the Expeditions handoff state.
+- Rendered the complete dark/light UI snapshot set with the new sidebar action.
+
 ## [1.1.0] - 2026-07-20
 
 ### Added
@@ -213,7 +229,9 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.0.15...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.0...v1.1.1
+[1.1.0]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.1.0
 [1.0.15]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.15
 [1.0.14]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.14
 [1.0.13]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.13
