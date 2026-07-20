@@ -61,7 +61,7 @@ public sealed class DetectorPackGoldenTests
             }
         }
 
-        Assert.Equal(202, checkedImages);
+        Assert.Equal(203, checkedImages);
         Assert.True(failures.Length == 0, $"Compiled detector regressions:{Environment.NewLine}{failures}");
     }
 
@@ -93,7 +93,7 @@ public sealed class DetectorPackGoldenTests
             }
         }
 
-        Assert.Equal(202, checkedImages);
+        Assert.Equal(203, checkedImages);
         Assert.True(failures.Length == 0, $"Cross-state detector regressions:{Environment.NewLine}{failures}");
     }
 
@@ -335,6 +335,22 @@ public sealed class DetectorPackGoldenTests
         Assert.InRange(continueX, 442, 453);
         Assert.InRange(extractX, 354, 365);
         Assert.InRange(Math.Abs(continueY - extractY), 0, 2);
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void ReportedContinueExpeditionDialog_ClicksTheModalInsteadOfTheUnderlyingPause()
+    {
+        if (!DatasetsAvailable()) return;
+        CompiledDetectorPack pack = Pack.Value;
+        ImageFrame image = ImageCodec.Load(Pngs("Expedition_Continue_Button_Confirm").Last());
+        IReadOnlyDictionary<string, double> scores = pack.ScoreStates(image);
+
+        Assert.Equal("confirm", pack.Classify(scores));
+        Assert.True(scores["confirm"] >= 0.98, $"Reported confirmation score was {scores["confirm"]:P1}.");
+        (int x, int y) = pack.ActionFor("confirm", image);
+        Assert.InRange(x, 332, 348);
+        Assert.InRange(y, 332, 348);
     }
 
     [Theory]

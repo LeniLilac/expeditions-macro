@@ -12,6 +12,7 @@ namespace ExpeditionsMacro.Automation.Expeditions;
 public sealed class ExpeditionMacroRunner : IGameModeWorkflow
 {
     private static readonly TimeSpan ExtractionTransitionTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan ConfirmationDismissalTimeout = TimeSpan.FromSeconds(5);
 
     private static readonly HashSet<string> RecoveryStates = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -295,9 +296,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
             }
             if (state == "confirm")
             {
-                report("Transition", 0, "Confirming the node transition.", state, score);
-                await ClickActionAsync(window, detector, "confirm", frame, cancellationToken).ConfigureAwait(false);
-                await Task.Delay(2200, cancellationToken).ConfigureAwait(false);
+                await DismissNodeConfirmationAsync(window, detector, preset, frame, report, log, cancellationToken).ConfigureAwait(false);
                 continue;
             }
             if (state == "extract_confirm")
@@ -730,10 +729,67 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
     {
         if (await WaitForStateWithTimeoutAsync(window, detector, "confirm", TimeSpan.FromSeconds(6), preset, report, cancellationToken).ConfigureAwait(false))
         {
-            await ClickActionAsync(window, detector, "confirm", cancellationToken).ConfigureAwait(false);
-            await Task.Delay(1800, cancellationToken).ConfigureAwait(false);
+            await DismissNodeConfirmationAsync(window, detector, preset, clientImage: null, report, log, cancellationToken).ConfigureAwait(false);
         }
         else log("Confirmation was not recognized within 6 seconds; returning to state monitoring.", MacroEventLevel.Warning, null, null);
+    }
+
+    private async Task DismissNodeConfirmationAsync(
+        RobloxWindow window,
+        IDetectorPack detector,
+        ExpeditionPreset preset,
+        ImageFrame? clientImage,
+        Action<string, int, string, string?, double?> report,
+        Action<string, MacroEventLevel, string?, double?> log,
+        CancellationToken cancellationToken)
+    {
+        ConfirmationDismissalState transaction = new();
+        while (transaction.TryBeginAttempt())
+        {
+            ImageFrame frame = clientImage ?? CaptureClient(window, detector);
+            clientImage = null;
+            IReadOnlyDictionary<string, double> scores = detector.ScoreStates(frame);
+            if (!ExpeditionRunPolicy.IsStateDetected(detector.Manifest, scores, "confirm"))
+            {
+                if (!transaction.TryComplete()) throw new InvalidOperationException("Could not complete node confirmation handling.");
+                return;
+            }
+
+            report(
+                "Transition",
+                0,
+                transaction.Attempts == 1
+                    ? "Confirming the node transition."
+                    : $"Confirmation is still visible; retrying the focused click ({transaction.Attempts}/{ConfirmationDismissalState.MaximumAttempts}).",
+                "confirm",
+                scores["confirm"]);
+            await ClickActionAsync(window, detector, "confirm", frame, cancellationToken).ConfigureAwait(false);
+            bool dismissed = await WaitForStateToClearAsync(
+                window,
+                detector,
+                "confirm",
+                ConfirmationDismissalTimeout,
+                preset,
+                report,
+                cancellationToken).ConfigureAwait(false);
+            if (dismissed)
+            {
+                if (!transaction.TryComplete()) throw new InvalidOperationException("Could not complete node confirmation handling.");
+                log($"Node confirmation closed after {transaction.Attempts} click attempt(s).", MacroEventLevel.Success, "confirm", null);
+                return;
+            }
+
+            if (!transaction.TryMarkStillVisible()) throw new InvalidOperationException("Could not continue node confirmation handling.");
+            log(
+                $"Node confirmation remained visible after click attempt {transaction.Attempts}/{ConfirmationDismissalState.MaximumAttempts}.",
+                MacroEventLevel.Warning,
+                "confirm",
+                scores["confirm"]);
+        }
+
+        throw new InvalidOperationException(
+            $"The Continue Expedition confirmation remained visible after {ConfirmationDismissalState.MaximumAttempts} focused click attempts. " +
+            "Roblox did not acknowledge the button; retry after the client is responsive.");
     }
 
     private async Task<bool> TryClickRecoveryAsync(
