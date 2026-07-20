@@ -34,7 +34,6 @@ public partial class ChallengesPage : UserControl, IAppPage
         DataContext = this;
         PresetCombo.ItemsSource = _presets;
         ExpeditionPresetCombo.ItemsSource = _expeditionPresets;
-        DetectorCombo.ItemsSource = _detectorPacks;
         _resetTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => UpdateResetCountdown(), Dispatcher);
         _resetTimer.Start();
         _runtimeTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => UpdateRuntime(), Dispatcher);
@@ -206,7 +205,7 @@ public partial class ChallengesPage : UserControl, IAppPage
 
     private ChallengePreset BuildPreset()
     {
-        if (DetectorCombo.SelectedItem is not DetectorPackManifest detector) throw new InvalidOperationException("No detector pack is installed.");
+        DetectorPackManifest detector = CurrentDetectorPack();
         string name = PresetNameText.Text.Trim();
         ChallengeIdleBehavior idleBehavior = SelectedIdleBehavior();
         return new ChallengePreset
@@ -249,7 +248,6 @@ public partial class ChallengesPage : UserControl, IAppPage
         ExpeditionPresetCombo.SelectedItem = _expeditionPresets.FirstOrDefault(value => value.Id == preset.ExpeditionPresetId);
         AutoRecoverCheck.IsChecked = preset.AutoRecover;
         DefeatRetriesText.Text = preset.DefeatRetries.ToString(CultureInfo.InvariantCulture);
-        DetectorCombo.SelectedItem = _detectorPacks.FirstOrDefault(pack => pack.PackId == preset.DetectorPackId);
         ZoomTicksText.Text = preset.ZoomTicks.ToString(CultureInfo.InvariantCulture);
         PitchPixelsText.Text = preset.PitchDragPixels.ToString(CultureInfo.InvariantCulture);
         PollText.Text = preset.PollMilliseconds.ToString(CultureInfo.InvariantCulture);
@@ -278,7 +276,6 @@ public partial class ChallengesPage : UserControl, IAppPage
         ExpeditionPresetCombo.SelectedItem = _expeditionPresets.FirstOrDefault();
         AutoRecoverCheck.IsChecked = true;
         DefeatRetriesText.Text = "0";
-        DetectorCombo.SelectedItem = _detectorPacks.FirstOrDefault();
         ZoomTicksText.Text = "30";
         PitchPixelsText.Text = "1800";
         PollText.Text = "450";
@@ -332,6 +329,10 @@ public partial class ChallengesPage : UserControl, IAppPage
             ? ChallengeIdleBehavior.RunExpeditions
             : ChallengeIdleBehavior.WaitForReset;
 
+    private DetectorPackManifest CurrentDetectorPack() =>
+        _detectorPacks.FirstOrDefault()
+        ?? throw new InvalidOperationException("No detector pack is installed.");
+
     private void TuningToggle_Click(object sender, RoutedEventArgs e)
     {
         bool show = TuningPanel.Visibility != Visibility.Visible;
@@ -351,7 +352,6 @@ public partial class ChallengesPage : UserControl, IAppPage
         IdleBehaviorCombo.IsEnabled = enabled;
         AutoRecoverCheck.IsEnabled = enabled;
         DefeatRetriesText.IsEnabled = enabled;
-        DetectorCombo.IsEnabled = enabled;
         ZoomTicksText.IsEnabled = enabled;
         PitchPixelsText.IsEnabled = enabled;
         PollText.IsEnabled = enabled;

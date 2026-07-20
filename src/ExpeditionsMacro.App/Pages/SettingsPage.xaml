@@ -15,7 +15,6 @@
             </Grid.RowDefinitions>
             <StackPanel Margin="0,0,0,28">
                 <TextBlock Style="{StaticResource PageTitle}" Text="Settings" />
-                <TextBlock Margin="0,7,0,0" Style="{StaticResource PageSubtitle}" Text="Appearance, controls, local data, detector packs, and runtime diagnostics." />
             </StackPanel>
 
             <Border Grid.Row="1" Style="{StaticResource SectionDivider}">

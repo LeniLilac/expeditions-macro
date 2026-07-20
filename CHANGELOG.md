@@ -4,6 +4,25 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-07-20
+
+### Added
+
+- Added rename support for existing camera and placement models while preserving their stable model IDs and preset links.
+
+### Changed
+
+- Removed redundant page subtitles from the main app pages for a denser, cleaner layout.
+- Removed detector-pack selectors from Expeditions and Challenges. The app now uses the installed current detector pack automatically, with detector details remaining in Settings.
+- Reworked Expeditions recovery, extraction, model, and Discord controls into clearer grouped sections.
+- Reworked Challenge rotation and reporting controls to reduce cross-page clutter.
+- Made diagnostic log inclusion opt-in by default for new installs, matching automatic error screenshot capture.
+
+### Fixed
+
+- Restored vertical scrolling on the Expeditions page when advanced tuning or smaller windows require it.
+- Let Challenge cooldown fallback return from an already-open Expedition party preview instead of repeatedly clicking the bottom-left Play button.
+
 ## [1.1.3] - 2026-07-20
 
 ### Added
@@ -267,7 +286,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.3...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.4...HEAD
+[1.1.4]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.0...v1.1.1

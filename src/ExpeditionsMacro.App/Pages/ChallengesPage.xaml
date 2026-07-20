@@ -15,7 +15,6 @@
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                 <StackPanel Margin="0,0,24,0">
                     <TextBlock Style="{StaticResource PageTitle}" Text="Challenges" />
-                    <TextBlock Margin="0,7,0,0" Style="{StaticResource PageSubtitle}" Text="Run selected regular Challenges every reset, load map-specific camera and placement models, then wait or switch to Expeditions." />
                 </StackPanel>
                 <StackPanel Grid.Column="1" HorizontalAlignment="Right" Orientation="Horizontal">
                     <Button x:Name="StartButton" Style="{StaticResource PrimaryButton}" Content="Start macro  F6" Click="Start_Click" />
@@ -36,9 +35,8 @@
             <Border Grid.Row="2" Style="{StaticResource SectionDivider}">
                 <StackPanel>
                     <TextBlock Style="{StaticResource SectionTitle}" Text="Challenge rotation" />
-                    <TextBlock Margin="0,6,0,0" Style="{StaticResource Caption}" Text="Regular Challenges keep a fixed selector order. The macro tries only the enabled entries and skips a slot when Select Stage is unavailable." />
 
-                    <Border Margin="0,16,0,0" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
+                    <Border Margin="0,12,0,0" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
                         <Grid>
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="1" /><ColumnDefinition Width="*" /><ColumnDefinition Width="1" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                             <StackPanel Margin="12">
@@ -59,23 +57,27 @@
                     </Border>
 
                     <Grid Margin="0,16,0,0">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="170" /><ColumnDefinition Width="280" /><ColumnDefinition Width="24" /><ColumnDefinition Width="170" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                        <TextBlock Style="{StaticResource FieldLabel}" Text="When all are on cooldown" />
-                        <ComboBox x:Name="IdleBehaviorCombo" Grid.Column="1" SelectedIndex="0" SelectionChanged="IdleBehaviorCombo_SelectionChanged">
-                            <ComboBoxItem Tag="wait" Content="Wait for the next reset" />
-                            <ComboBoxItem Tag="expeditions" Content="Run Expeditions" />
-                        </ComboBox>
-                        <TextBlock Grid.Column="3" Style="{StaticResource FieldLabel}" Text="Expeditions preset" />
-                        <ComboBox x:Name="ExpeditionPresetCombo" Grid.Column="4" DisplayMemberPath="Name" IsEnabled="False" />
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="18" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="When all are on cooldown" />
+                            <ComboBox x:Name="IdleBehaviorCombo" Margin="0,7,0,0" SelectedIndex="0" SelectionChanged="IdleBehaviorCombo_SelectionChanged">
+                                <ComboBoxItem Tag="wait" Content="Wait for the next reset" />
+                                <ComboBoxItem Tag="expeditions" Content="Run Expeditions" />
+                            </ComboBox>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Expeditions preset" />
+                            <ComboBox x:Name="ExpeditionPresetCombo" Margin="0,7,0,0" DisplayMemberPath="Name" IsEnabled="False" />
+                        </StackPanel>
                     </Grid>
-                    <Grid Margin="0,12,0,0">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="170" /><ColumnDefinition Width="100" /><ColumnDefinition Width="24" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="110" /><ColumnDefinition Width="24" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="Retries after defeat" />
                         <TextBox x:Name="DefeatRetriesText" Grid.Column="1" Text="0" />
                         <CheckBox x:Name="AutoRecoverCheck" Grid.Column="3" IsChecked="True" Content="Return after lobby, disconnect, or AFK recovery" />
                         <TextBlock x:Name="NextResetText" Grid.Column="4" Margin="20,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource MutedBrush}" Text="Next reset in 30m 00s" />
                     </Grid>
-                    <TextBlock Margin="0,7,0,0" Style="{StaticResource Caption}" Text="Zero retries moves to the next Challenge after a defeat. That type becomes eligible again at the next global reset." />
+                    <TextBlock Margin="0,7,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Zero retries moves to the next Challenge after a defeat. That type becomes eligible again at the next global reset." />
                 </StackPanel>
             </Border>
 
@@ -132,29 +134,24 @@
                 </Grid>
 
                 <Grid Margin="0,15,0,0">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="170" /><ColumnDefinition Width="280" /><ColumnDefinition Width="24" /><ColumnDefinition Width="170" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                    <TextBlock Style="{StaticResource FieldLabel}" Text="Detector pack" />
-                    <ComboBox x:Name="DetectorCombo" Grid.Column="1" DisplayMemberPath="Version" />
-                    <TextBlock Grid.Column="3" Style="{StaticResource FieldLabel}" Text="Preset name" />
-                    <TextBox x:Name="PresetNameText" Grid.Column="4" Text="Challenge rotation" />
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="18" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Preset name" />
+                        <TextBox x:Name="PresetNameText" Margin="0,7,0,0" Text="Challenge rotation" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Webhook, optional" />
+                        <Grid Margin="0,7,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="86" /></Grid.ColumnDefinitions>
+                            <PasswordBox x:Name="WebhookPassword" />
+                            <TextBox x:Name="WebhookVisible" Visibility="Collapsed" />
+                            <CheckBox x:Name="ShowWebhookCheck" Grid.Column="1" Margin="10,0,0,0" Content="Show" Checked="ShowWebhook_Changed" Unchecked="ShowWebhook_Changed" />
+                        </Grid>
+                    </StackPanel>
                 </Grid>
-
-                <Grid Margin="0,12,0,0">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="170" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                    <TextBlock Style="{StaticResource FieldLabel}" Text="Discord webhook, optional" />
-                    <Grid Grid.Column="1">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="86" /></Grid.ColumnDefinitions>
-                        <PasswordBox x:Name="WebhookPassword" />
-                        <TextBox x:Name="WebhookVisible" Visibility="Collapsed" />
-                        <CheckBox x:Name="ShowWebhookCheck" Grid.Column="1" Margin="10,0,0,0" Content="Show" Checked="ShowWebhook_Changed" Unchecked="ShowWebhook_Changed" />
-                    </Grid>
-                </Grid>
-                <Grid Margin="0,12,0,0">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="170" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                    <TextBlock Style="{StaticResource FieldLabel}" Text="Error ping user ID, optional" />
-                    <TextBox x:Name="DiscordErrorUserIdText" Grid.Column="1" />
-                </Grid>
-                <TextBlock Margin="170,7,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Shared with Expeditions. Unexpected errors ping this user five times; manual Stop never alerts. Victory and defeat include a screenshot." />
+                <TextBlock Margin="0,12,0,0" Style="{StaticResource FieldLabel}" Text="Error ping user ID, optional" />
+                <TextBox x:Name="DiscordErrorUserIdText" Margin="0,7,0,0" />
+                <TextBlock Margin="0,7,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Shared with Expeditions. Unexpected errors ping this user five times. Manual Stop never alerts. Victory and defeat include a screenshot." />
 
                 <Grid x:Name="TuningPanel" Margin="0,15,0,0" Visibility="Collapsed">
                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>

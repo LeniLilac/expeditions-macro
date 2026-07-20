@@ -31,7 +31,6 @@ public partial class ExpeditionsPage : UserControl, IAppPage
         PresetCombo.ItemsSource = _presets;
         CameraCombo.ItemsSource = _cameraModels;
         PlacementCombo.ItemsSource = _placementModels;
-        DetectorCombo.ItemsSource = _detectorPacks;
         _runtimeTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => UpdateRuntime(), Dispatcher);
         _runtimeTimer.Stop();
         _services.Coordinator.StateChanged += (_, _) => Dispatcher.BeginInvoke(CoordinatorStateChanged);
@@ -142,7 +141,7 @@ public partial class ExpeditionsPage : UserControl, IAppPage
     {
         if (CameraCombo.SelectedItem is not CameraModelManifest camera) throw new InvalidOperationException("Create and select a camera model.");
         if (PlacementCombo.SelectedItem is not PlacementModel placement) throw new InvalidOperationException("Create and select a placement model.");
-        if (DetectorCombo.SelectedItem is not DetectorPackManifest detector) throw new InvalidOperationException("No detector pack is installed.");
+        DetectorPackManifest detector = CurrentDetectorPack();
         string name = PresetNameText.Text.Trim();
         string id = ModelId.FromName(name);
         ExpeditionPreset preset = new()
@@ -197,7 +196,6 @@ public partial class ExpeditionsPage : UserControl, IAppPage
         DifficultyCombo.SelectedIndex = preset.Difficulty - 1;
         CameraCombo.SelectedItem = _cameraModels.FirstOrDefault(model => model.Id == preset.CameraModelId);
         PlacementCombo.SelectedItem = _placementModels.FirstOrDefault(model => model.Id == preset.PlacementModelId);
-        DetectorCombo.SelectedItem = _detectorPacks.FirstOrDefault(pack => pack.PackId == preset.DetectorPackId);
         ExtractCheck.IsChecked = preset.ExtractAtCheckpoint;
         BossTargetText.Text = preset.BossesBeforeExtract.ToString(CultureInfo.InvariantCulture);
         AutoRecoverCheck.IsChecked = preset.AutoRecover;
@@ -242,7 +240,6 @@ public partial class ExpeditionsPage : UserControl, IAppPage
     {
         CameraCombo.SelectedItem ??= _cameraModels.FirstOrDefault();
         PlacementCombo.SelectedItem ??= _placementModels.FirstOrDefault();
-        DetectorCombo.SelectedItem ??= _detectorPacks.FirstOrDefault();
     }
 
     private void ApplySummary(ExpeditionRunSummary summary)
@@ -271,7 +268,7 @@ public partial class ExpeditionsPage : UserControl, IAppPage
 
     private void SetConfigurationEnabled(bool enabled)
     {
-        foreach (Control control in new Control[] { PresetCombo, PresetNameText, MapCombo, DifficultyCombo, CameraCombo, PlacementCombo, DetectorCombo, BossTargetText, WebhookPassword, WebhookVisible, DiscordErrorUserIdText, ZoomTicksText, PitchPixelsText, PollText, StableText, KeyHoldText, KeyDelayText }) control.IsEnabled = enabled;
+        foreach (Control control in new Control[] { PresetCombo, PresetNameText, MapCombo, DifficultyCombo, CameraCombo, PlacementCombo, BossTargetText, WebhookPassword, WebhookVisible, DiscordErrorUserIdText, ZoomTicksText, PitchPixelsText, PollText, StableText, KeyHoldText, KeyDelayText }) control.IsEnabled = enabled;
         ExtractCheck.IsEnabled = enabled;
         AutoRecoverCheck.IsEnabled = enabled;
         ShowWebhookCheck.IsEnabled = enabled;
@@ -315,6 +312,10 @@ public partial class ExpeditionsPage : UserControl, IAppPage
     }
 
     private string CurrentWebhook() => ShowWebhookCheck.IsChecked == true ? WebhookVisible.Text.Trim() : WebhookPassword.Password.Trim();
+
+    private DetectorPackManifest CurrentDetectorPack() =>
+        _detectorPacks.FirstOrDefault()
+        ?? throw new InvalidOperationException("No detector pack is installed.");
 
     private async Task RunWithFailureHandlingAsync(
         string macroName,

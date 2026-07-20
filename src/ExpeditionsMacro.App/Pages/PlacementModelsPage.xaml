@@ -19,7 +19,6 @@
             <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
             <StackPanel Margin="0,0,0,24">
                 <TextBlock Style="{StaticResource PageTitle}" Text="Placement models" />
-                <TextBlock Margin="0,7,0,0" Style="{StaticResource PageSubtitle}" Text="Observe number-key selections and relative Roblox clicks, then edit and test every placement in one tool." />
             </StackPanel>
 
             <Border Grid.Row="1" Style="{StaticResource SectionDivider}" Padding="0,0,0,18" Margin="0,0,0,18">
