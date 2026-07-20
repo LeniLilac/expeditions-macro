@@ -153,7 +153,10 @@ public sealed class DiscordAndWindowsTests
     public void ReleaseAnnouncementScript_UsesComponentsV2RolePingAndNoAccentColor()
     {
         string script = Path.Combine(TestPaths.RepositoryRoot, "scripts", "Send-DiscordReleaseAnnouncement.ps1");
-        string notes = Path.Combine(TestPaths.RepositoryRoot, "docs", "release-notes", "1.0.9.md");
+        // 1.1.1 intentionally uses section names such as "Fixed" and "Setup guide"
+        // rather than the older "Changes" heading. This guards the release bot
+        // against silently dropping notes whenever release-note headings evolve.
+        string notes = Path.Combine(TestPaths.RepositoryRoot, "docs", "release-notes", "1.1.1.md");
         ProcessStartInfo start = new(OperatingSystem.IsWindows() ? "powershell.exe" : "pwsh")
         {
             UseShellExecute = false,
@@ -206,6 +209,8 @@ public sealed class DiscordAndWindowsTests
                 .Where(component => component.TryGetProperty("content", out _))
                 .Select(component => component.GetProperty("content").GetString()));
         Assert.Contains("<@&1528250880304873643>", componentText, StringComparison.Ordinal);
+        Assert.Contains("### Highlights", componentText, StringComparison.Ordinal);
+        Assert.Contains("Challenge mode can now start the configured Expeditions preset", componentText, StringComparison.Ordinal);
         Assert.Contains("releases/tag/v9.8.7", componentText, StringComparison.Ordinal);
         Assert.Contains("ExpeditionsMacro-9.8.7-win-x64-setup.exe", componentText, StringComparison.Ordinal);
     }

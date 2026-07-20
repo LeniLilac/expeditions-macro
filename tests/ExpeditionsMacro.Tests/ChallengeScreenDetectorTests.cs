@@ -76,7 +76,7 @@ public sealed class ChallengeScreenDetectorTests
         ChallengeScreenMatch match = ChallengeScreenDetector.Detect(image);
 
         Assert.Equal(ChallengeScreenState.ChallengeList, match.State);
-        Assert.Null(match.ActionX);
+        Assert.Equal((657, 163), (match.ActionX, match.ActionY));
     }
 
     [Fact]
@@ -105,8 +105,23 @@ public sealed class ChallengeScreenDetectorTests
 
         Assert.Equal(ChallengeScreenState.ChallengeListUnavailable, match.State);
         Assert.InRange(match.Confidence, ChallengeScreenDetector.Threshold(ChallengeScreenState.ChallengeListUnavailable), 1);
-        Assert.Null(match.ActionX);
-        Assert.Null(match.ActionY);
+        Assert.InRange(match.ActionX!.Value, 630, 700);
+        Assert.InRange(match.ActionY!.Value, 130, 180);
+    }
+
+    [Fact]
+    public void ReportedCooldownSelector_ProvidesTheCloseActionRequiredForExpeditionsHandoff()
+    {
+        string file = Path.Combine(TestPaths.ChallengeDatasets, "ChallengeListUnavailable", "ChallengeListUnavailable_02.png");
+
+        ImageFrame image = ImageCodec.Load(file);
+        ChallengeScreenMatch match = ChallengeScreenDetector.Detect(image);
+        (int closeX, int closeY) = ChallengeScreenDetector.PanelCloseAction(image);
+
+        Assert.Equal(ChallengeScreenState.ChallengeListUnavailable, match.State);
+        Assert.Equal((closeX, closeY), (match.ActionX, match.ActionY));
+        Assert.InRange(closeX, 630, 700);
+        Assert.InRange(closeY, 130, 180);
     }
 
     [Fact]

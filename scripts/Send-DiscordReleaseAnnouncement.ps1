@@ -32,14 +32,19 @@ function Get-ReleaseHighlights {
     if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) { return @() }
 
     $highlights = [System.Collections.Generic.List[string]]::new()
-    $insideChanges = $false
+    $excludedSections = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($section in @('Validation', 'Tests', 'Downloads')) {
+        $null = $excludedSections.Add($section)
+    }
+    $currentSection = ''
     foreach ($line in [System.IO.File]::ReadAllLines([System.IO.Path]::GetFullPath($Path))) {
-        if ($line -eq '## Changes') {
-            $insideChanges = $true
+        if ($line -match '^##\s+(.+?)\s*$') {
+            $currentSection = $Matches[1]
             continue
         }
-        if ($insideChanges -and $line.StartsWith('## ', [System.StringComparison]::Ordinal)) { break }
-        if ($insideChanges -and $line.StartsWith('- ', [System.StringComparison]::Ordinal)) {
+        if (-not [string]::IsNullOrWhiteSpace($currentSection) -and
+            -not $excludedSections.Contains($currentSection) -and
+            $line.StartsWith('- ', [System.StringComparison]::Ordinal)) {
             $highlights.Add($line)
             if ($highlights.Count -eq 5) { break }
         }

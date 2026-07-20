@@ -143,8 +143,10 @@ public static class ChallengeScreenDetector
             ? action
             : throw new ArgumentOutOfRangeException(nameof(type));
 
-    public static (int X, int Y) TerminalCloseAction(ImageFrame image) =>
+    public static (int X, int Y) PanelCloseAction(ImageFrame image) =>
         ActionButtonDetector.ActionFor(image, "challenge_victory_close") ?? (657, 163);
+
+    public static (int X, int Y) TerminalCloseAction(ImageFrame image) => PanelCloseAction(image);
 
     public static (int X, int Y) DefeatRetryAction(ImageFrame image) =>
         ActionButtonDetector.ActionFor(image, "defeat") ?? (225, 438);
@@ -154,6 +156,7 @@ public static class ChallengeScreenDetector
     public static (int X, int Y)? ActionFor(ChallengeScreenState state, ImageFrame image) => state switch
     {
         ChallengeScreenState.GameModeSelector => (480, 205),
+        ChallengeScreenState.ChallengeList or ChallengeScreenState.ChallengeListUnavailable => PanelCloseAction(image),
         ChallengeScreenState.ChallengeAvailable => ChallengeAvailableAction(image),
         ChallengeScreenState.ChallengeCooldown => (308, 437),
         ChallengeScreenState.PreviewReady => PreviewReadyAction(image),

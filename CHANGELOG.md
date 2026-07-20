@@ -4,6 +4,23 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-07-20
+
+### Added
+
+- Published the first public release of Challenge mode, covering Trait, Stat, and Sprite rotations across five maps, split placement phases, retry policy, reset tracking, Discord monitoring, and automatic diagnostics.
+
+### Fixed
+
+- Closed and verified the Challenge selector before starting the cooldown Expeditions fallback, then handed control to the existing Play-to-Expeditions recovery route.
+- Retried the selector close action up to three times when Roblox did not acknowledge the click, and stopped with an actionable error instead of waiting forever for an unreachable prestart screen.
+- Restored Discord release-announcement highlights for release-note documents that use descriptive headings such as **Fixed**, **Reliability**, or **Setup** instead of the legacy **Changes** heading.
+
+### Tests
+
+- Replayed the supplied 149-frame manual Challenge-selector-to-Expeditions route and retained privacy-safe cooldown-selector and game-mode-selector frames as regression fixtures.
+- Verified that both active and gray cooldown selectors expose their detected close action for the handoff.
+
 ## [1.1.1] - 2026-07-20
 
 ### Added
@@ -229,7 +246,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.1.0
 [1.0.15]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.15
