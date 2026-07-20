@@ -34,7 +34,7 @@ It uses screen capture and ordinary Windows input. It does not inject into Roblo
 
 Windows 10 or Windows 11 x64 is required. Release builds are self-contained; a separate .NET installation is not required.
 
-Join the public [Expeditions Macro Discord](https://discord.gg/wE6XSVyXsN) for setup help, bug reports, model sharing, and release announcements. The same invite is available from the app sidebar.
+Follow the [Expeditions Macro setup guide](https://docs.google.com/document/d/10NeDNa3BNEwPEpZj0oVQiR98_7GN67dmKS-OZwaxALM/edit?usp=sharing) for a visual walkthrough. Join the public [Expeditions Macro Discord](https://discord.gg/wE6XSVyXsN) for setup help, bug reports, model sharing, and release announcements. Both links are available from the app sidebar.
 
 ## First-time setup
 
@@ -146,7 +146,7 @@ Build release artifacts:
 
 ```powershell
 .\scripts\Generate-Icon.ps1
-.\scripts\Build-Release.ps1 -Version 1.1.0
+.\scripts\Build-Release.ps1 -Version 1.1.1
 ```
 
 The release script publishes the self-contained app, creates the portable ZIP, creates the detector-pack ZIP, optionally invokes Inno Setup, and writes SHA-256 checksums plus a dependency inventory.

@@ -67,6 +67,12 @@
                         </RadioButton>
                     </StackPanel>
                     <StackPanel Grid.Row="2">
+                        <Button Margin="12,0,12,8" Height="36" MinWidth="0" ToolTip="Open the setup guide in your browser" Click="SetupGuide_Click">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Margin="0,0,8,0" VerticalAlignment="Center" FontFamily="{StaticResource IconFont}" FontSize="15" Text="&#xE897;" />
+                                <TextBlock VerticalAlignment="Center" Text="Setup guide" />
+                            </StackPanel>
+                        </Button>
                         <Button Margin="12,0,12,8" Height="36" MinWidth="0" ToolTip="Open the Expeditions Macro community invite" Click="JoinDiscord_Click">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Margin="0,0,8,0" VerticalAlignment="Center" FontFamily="{StaticResource IconFont}" FontSize="15" Text="&#xE716;" />

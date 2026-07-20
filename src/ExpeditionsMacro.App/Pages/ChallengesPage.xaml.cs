@@ -421,8 +421,8 @@ public partial class ChallengesPage : UserControl, IAppPage
                 placement,
                 detector,
                 webhookUrl,
-                progress: new Progress<MacroProgress>(value => StatusText.Text = $"Expeditions fallback: {value.Message}"),
-                log: entry => Dispatcher.BeginInvoke(() => AppendLog($"Expeditions: {entry.Message}")),
+                progress: new Progress<MacroProgress>(value => DispatchUi(() => StatusText.Text = $"Expeditions fallback: {value.Message}")),
+                log: entry => AppendLog($"Expeditions: {entry.Message}"),
                 summaryChanged: null,
                 cancellationToken: deadline.Token);
         }
@@ -521,6 +521,12 @@ public partial class ChallengesPage : UserControl, IAppPage
     {
         if (message.StartsWith("ERROR:", StringComparison.OrdinalIgnoreCase)) _services.Log.Error(message[6..].Trim());
         else _services.Log.Info(message);
+
+        DispatchUi(() => AppendLogText(message));
+    }
+
+    private void AppendLogText(string message)
+    {
         LogText.AppendText($"{DateTime.Now:HH:mm:ss}  {message}{Environment.NewLine}");
         if (LogText.LineCount > 500)
         {
@@ -529,6 +535,20 @@ public partial class ChallengesPage : UserControl, IAppPage
             LogText.CaretIndex = LogText.Text.Length;
         }
         LogText.ScrollToEnd();
+    }
+
+    private void DispatchUi(Action action)
+    {
+        if (Dispatcher.CheckAccess())
+        {
+            action();
+            return;
+        }
+
+        if (!Dispatcher.HasShutdownStarted && !Dispatcher.HasShutdownFinished)
+        {
+            _ = Dispatcher.BeginInvoke(action);
+        }
     }
 
     private static string Label(object value) => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.ToString()!.Replace('_', ' '));
