@@ -96,6 +96,7 @@ public static class ChallengeScreenDetector
         double enterMatchmaking = ActionButtonDetector.Score(image, "challenge_enter_matchmaking");
         double previewStart = ActionButtonDetector.Score(image, "challenge_preview_start");
         double changeMode = ActionButtonDetector.Score(image, "challenge_change_mode");
+        double compactExpeditionParty = CompactExpeditionPartyScore(image);
         double partyStart = ActionButtonDetector.Score(image, "challenge_party_start");
         double partyDisband = ActionButtonDetector.Score(image, "challenge_party_disband");
         double victoryParty = ActionButtonDetector.Score(image, "challenge_victory_party");
@@ -117,7 +118,10 @@ public static class ChallengeScreenDetector
             ? 0
             : Math.Clamp(0.55 * partyStart + 0.45 * partyDisband, 0, 1);
         double preview = Math.Max(navigationPreview, privatePartyPreview);
-        double postMatchPreview = previewStart > 0 || changeMode == 0 ? 0 : Math.Clamp(0.72 * changeMode + 0.28 * DarkPartyPanelScore(image), 0, 1);
+        double postMatchAction = Math.Max(changeMode, compactExpeditionParty);
+        double postMatchPreview = previewStart > 0 || postMatchAction == 0
+            ? 0
+            : Math.Clamp(0.72 * postMatchAction + 0.28 * DarkPartyPanelScore(image), 0, 1);
         double victory = victoryClose == 0 || victoryParty == 0
             ? 0
             : Math.Clamp(0.30 * panel + 0.25 * victoryClose + 0.30 * victoryParty + 0.15 * VictoryRosterScore(image), 0, 1);
@@ -160,7 +164,7 @@ public static class ChallengeScreenDetector
         ChallengeScreenState.ChallengeAvailable => ChallengeAvailableAction(image),
         ChallengeScreenState.ChallengeCooldown => (308, 437),
         ChallengeScreenState.PreviewReady => PreviewReadyAction(image),
-        ChallengeScreenState.PostMatchPreview => ActionButtonDetector.ActionFor(image, "challenge_change_mode"),
+        ChallengeScreenState.PostMatchPreview => ChangeModeAction(image),
         ChallengeScreenState.Prestart => StartDialogDetector.ActionFor(image),
         ChallengeScreenState.Victory => ActionButtonDetector.ActionFor(image, "challenge_victory_close"),
         ChallengeScreenState.Defeat => ActionButtonDetector.ActionFor(image, "defeat"),
@@ -225,6 +229,27 @@ public static class ChallengeScreenDetector
         ActionButtonDetector.Score(image, "challenge_party_disband") > 0
             ? ActionButtonDetector.ActionFor(image, "challenge_party_start")
             : ActionButtonDetector.ActionFor(image, "challenge_preview_start");
+
+    private static double CompactExpeditionPartyScore(ImageFrame image)
+    {
+        // Idle Expeditions uses three narrow controls instead of the Challenge
+        // preview's two wide controls. Require both neighboring actions so a lone
+        // yellow gameplay element cannot redirect Challenge navigation.
+        double changeMap = ActionButtonDetector.Score(image, "expedition_party_change_map");
+        double changeMode = ActionButtonDetector.Score(image, "expedition_party_change_mode");
+        return changeMap == 0 || changeMode == 0
+            ? 0
+            : Math.Clamp(0.45 * changeMap + 0.55 * changeMode, 0, 1);
+    }
+
+    private static (int X, int Y)? ChangeModeAction(ImageFrame image)
+    {
+        (int X, int Y)? standard = ActionButtonDetector.ActionFor(image, "challenge_change_mode");
+        if (standard is not null) return standard;
+        return CompactExpeditionPartyScore(image) > 0
+            ? ActionButtonDetector.ActionFor(image, "expedition_party_change_mode")
+            : null;
+    }
 
     private static double PanelScore(ImageFrame image) => PanelScore(image, IsCyan);
 

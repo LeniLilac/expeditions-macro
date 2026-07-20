@@ -164,6 +164,30 @@ public sealed class ChallengeScreenDetectorTests
     }
 
     [Fact]
+    public void IdleExpeditionPartyPreview_ClicksTheCompactChangeGamemodeButton()
+    {
+        string file = Path.Combine(TestPaths.ChallengeDatasets, "PostMatchPreview", "PostMatchPreview_03.png");
+
+        ChallengeScreenMatch match = ChallengeScreenDetector.Detect(ImageCodec.Load(file));
+
+        Assert.Equal(ChallengeScreenState.PostMatchPreview, match.State);
+        Assert.InRange(match.Confidence, ChallengeScreenDetector.Threshold(ChallengeScreenState.PostMatchPreview), 1);
+        Assert.InRange(match.ActionX!.Value, 685, 705);
+        Assert.InRange(match.ActionY!.Value, 345, 360);
+    }
+
+    [Fact]
+    public void NarrowYellowButton_WithoutTheAdjacentChangeMapAction_IsNotAPartyPreview()
+    {
+        ImageFrame image = Frame();
+        Button(image, 643, 339, 105, 27, 190, 135, 20);
+
+        ChallengeScreenMatch match = ChallengeScreenDetector.Detect(image);
+
+        Assert.Equal(ChallengeScreenState.None, match.State);
+    }
+
+    [Fact]
     public void Detector_RejectsAClientWithUnexpectedDimensions()
     {
         ImageFrame image = new(800, 600, PixelFormat.Rgb24, new byte[800 * 600 * 3], takeOwnership: true);

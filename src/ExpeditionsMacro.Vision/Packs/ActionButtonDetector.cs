@@ -54,6 +54,8 @@ internal static class ActionButtonDetector
         ["challenge_enter_matchmaking"] = new(new ScreenRegion(480, 395, 230, 80), ButtonColor.Purple, 589, 437, 100, 35, 70, 190, 16, 42, 0.25),
         ["challenge_preview_start"] = new(new ScreenRegion(390, 335, 230, 85), ButtonColor.Green, 506, 376, 65, 35, 130, 190, 20, 42, 0.42),
         ["challenge_change_mode"] = new(new ScreenRegion(550, 335, 230, 85), ButtonColor.Yellow, 668, 376, 65, 35, 130, 190, 20, 42, 0.42),
+        ["expedition_party_change_map"] = new(new ScreenRegion(500, 315, 170, 90), ButtonColor.Purple, 587, 353, 55, 35, 90, 125, 20, 38, 0.25),
+        ["expedition_party_change_mode"] = new(new ScreenRegion(610, 315, 170, 90), ButtonColor.Yellow, 695, 353, 55, 35, 90, 125, 20, 38, 0.42),
         ["challenge_party_start"] = new(new ScreenRegion(390, 370, 230, 65), ButtonColor.Green, 506, 393, 65, 25, 130, 190, 20, 38, 0.42),
         ["challenge_party_disband"] = new(new ScreenRegion(550, 370, 230, 65), ButtonColor.Red, 668, 393, 65, 25, 130, 190, 20, 38, 0.42),
         ["challenge_victory_party"] = new(new ScreenRegion(125, 395, 365, 80), ButtonColor.Purple, 304, 437, 100, 35, 250, 350, 16, 42, 0.25),

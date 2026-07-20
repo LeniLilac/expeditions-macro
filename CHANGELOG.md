@@ -4,6 +4,16 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.1.5] - 2026-07-20
+
+### Fixed
+
+- Recognized the compact three-button Expedition party preview during the Challenge cooldown handoff, then clicked its detected **Change Gamemode** button instead of repeatedly clicking blank HUD space.
+
+### Tests
+
+- Added a privacy-redacted reproduction of the reported v1.1.4 stall and verified its 105-pixel-wide action at `(695, 352)` without accepting an unrelated narrow yellow control.
+
 ## [1.1.4] - 2026-07-20
 
 ### Added
@@ -286,7 +296,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.4...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.5...HEAD
+[1.1.5]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.1...v1.1.2

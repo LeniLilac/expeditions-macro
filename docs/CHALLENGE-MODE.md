@@ -23,6 +23,6 @@ Selector rows are clicked through their map artwork, away from reward icons that
 
 ## Regression dataset
 
-The checked-in dataset contains 68 selective Challenge fixtures from multiple players, PCs, Roblox UI scales, all five maps, active and cooldown entries, gameplay, terminal screens, and Expeditions handoff states. Focused diagnostics cover private-party previews, dimmed and unavailable selectors, reward tooltips, hovered controls, bright game-mode artwork, and blue scenery behind Start Game.
+The checked-in dataset contains 70 selective Challenge fixtures from multiple players, PCs, Roblox UI scales, all five maps, active and cooldown entries, gameplay, terminal screens, and Expeditions handoff states. Focused diagnostics cover private-party previews, dimmed and unavailable selectors, reward tooltips, hovered controls, bright game-mode artwork, and blue scenery behind Start Game.
 
 Fixtures must remain 808 by 611 Roblox client captures. Do not include the Roblox title bar, desktop, notifications, account names, chat, or webhook data. See `datasets/anime-expeditions/challenges/README.md` for provenance and documented redactions.
