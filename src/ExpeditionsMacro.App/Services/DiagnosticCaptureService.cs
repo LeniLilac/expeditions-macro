@@ -84,7 +84,7 @@ public sealed class DiagnosticCaptureService
                 string fileName = $"frame-{frames.Count + 1:D6}.png";
                 SavePng(Path.Combine(staging, fileName), frame);
                 frames.Add(new DiagnosticCaptureFrame(fileName, capturedAt));
-                progress?.Report(new DiagnosticCaptureProgress(frames.Count, $"Captured {frames.Count} screenshot(s). Press F6 to stop and save."));
+                progress?.Report(new DiagnosticCaptureProgress(frames.Count, $"Captured {frames.Count} screenshot(s). Press the macro hotkey to stop and save."));
                 await Task.Delay(interval, cancellationToken).ConfigureAwait(false);
             }
         }

@@ -31,29 +31,21 @@ public sealed class CameraAlignmentEngine
     }
 
     public async Task<CameraModel> CalibrateAsync(
-        ScreenRegion selectedScreenRegion,
+        ScreenRegion relativeRegion,
         CameraCalibrationSettings settings,
         IProgress<MacroProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         settings.Validate();
-        RobloxWindow window = RequireWindow();
-        Focus(window);
-        WindowBounds original = _automation.GetWindowBounds(window);
-        ClientBounds initialClient = _automation.GetClientBounds(window);
-        ScreenRegion relativeRegion = new(
-            selectedScreenRegion.X - initialClient.X,
-            selectedScreenRegion.Y - initialClient.Y,
-            selectedScreenRegion.Width,
-            selectedScreenRegion.Height);
-        if (!relativeRegion.FitsWithin(initialClient.Width, initialClient.Height))
-        {
-            throw new InvalidOperationException("The comparison region must be completely inside the Roblox client area.");
-        }
         if (!relativeRegion.FitsWithin(RobloxClientProfile.Width, RobloxClientProfile.Height))
         {
             throw new InvalidOperationException($"The comparison region must fit inside the standard {RobloxClientProfile.Width} × {RobloxClientProfile.Height} Roblox client area.");
         }
+
+        RobloxWindow window = RequireWindow();
+        Focus(window);
+        WindowBounds original = _automation.GetWindowBounds(window);
+        ClientBounds initialClient = _automation.GetClientBounds(window);
 
         bool shiftLockEnabled = false;
         bool resized = initialClient.Width != RobloxClientProfile.Width || initialClient.Height != RobloxClientProfile.Height;

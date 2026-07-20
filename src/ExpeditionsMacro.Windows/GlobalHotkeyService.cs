@@ -7,6 +7,7 @@ namespace ExpeditionsMacro.Windows;
 
 public sealed class GlobalHotkeyService : IGlobalHotkeyService
 {
+    public const int DefaultVirtualKey = 0x75;
     private const int HotkeyId = 0x5941;
     private readonly object _gate = new();
     private Thread? _thread;
@@ -14,17 +15,92 @@ public sealed class GlobalHotkeyService : IGlobalHotkeyService
     private uint _threadId;
     private NativeMethods.HookProc? _fallbackCallback;
     private nint _fallbackHook;
-    private bool _f6Down;
+    private bool _hotkeyDown;
+    private int _virtualKey = DefaultVirtualKey;
 
-    public event EventHandler? F6Pressed;
+    public event EventHandler? Pressed;
+
+    public event EventHandler? BindingChanged;
 
     public bool IsRegistered { get; private set; }
+
+    public int VirtualKey
+    {
+        get
+        {
+            lock (_gate) return _virtualKey;
+        }
+    }
+
+    public string DisplayName => GetDisplayName(VirtualKey);
+
+    public static bool IsSupportedVirtualKey(int virtualKey) =>
+        virtualKey is >= 0x70 and <= 0x7A or >= 0x7C and <= 0x87;
+
+    public static string GetDisplayName(int virtualKey) => IsSupportedVirtualKey(virtualKey)
+        ? $"F{virtualKey - 0x6F}"
+        : "Unsupported";
+
+    public void Configure(int virtualKey)
+    {
+        ValidateVirtualKey(virtualKey);
+        bool changed;
+        lock (_gate)
+        {
+            if (_thread is not null) throw new InvalidOperationException("Stop the global hotkey listener before configuring it.");
+            changed = _virtualKey != virtualKey;
+            _virtualKey = virtualKey;
+        }
+        if (changed) BindingChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    public void Rebind(int virtualKey)
+    {
+        ValidateVirtualKey(virtualKey);
+        int previous;
+        bool running;
+        lock (_gate)
+        {
+            previous = _virtualKey;
+            running = _thread is not null;
+        }
+        if (previous == virtualKey) return;
+        if (!running)
+        {
+            Configure(virtualKey);
+            return;
+        }
+
+        Stop();
+        try
+        {
+            SetVirtualKey(virtualKey);
+            Start();
+        }
+        catch (Exception rebindError)
+        {
+            try
+            {
+                Stop();
+                SetVirtualKey(previous);
+                Start();
+            }
+            catch (Exception rollbackError)
+            {
+                throw new AggregateException("The new hotkey failed and the previous hotkey could not be restored.", rebindError, rollbackError);
+            }
+            throw;
+        }
+        BindingChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     public void Start()
     {
         lock (_gate)
         {
             if (_thread is not null) return;
+            int virtualKey = _virtualKey;
+            string displayName = GetDisplayName(virtualKey);
             _cancellation = new CancellationTokenSource();
             ManualResetEventSlim started = new(false);
             Exception? error = null;
@@ -32,7 +108,7 @@ public sealed class GlobalHotkeyService : IGlobalHotkeyService
             {
                 try
                 {
-                    Run(started, value => error = value);
+                    Run(virtualKey, displayName, started, value => error = value);
                 }
                 catch (Exception unexpected)
                 {
@@ -43,10 +119,10 @@ public sealed class GlobalHotkeyService : IGlobalHotkeyService
             })
             {
                 IsBackground = true,
-                Name = "ExpeditionsMacro.F6",
+                Name = $"ExpeditionsMacro.{displayName}",
             };
             _thread.Start();
-            if (!started.Wait(TimeSpan.FromSeconds(3))) throw new TimeoutException("F6 listener did not start.");
+            if (!started.Wait(TimeSpan.FromSeconds(3))) throw new TimeoutException($"{displayName} listener did not start.");
             if (error is not null)
             {
                 _thread = null;
@@ -85,10 +161,10 @@ public sealed class GlobalHotkeyService : IGlobalHotkeyService
         GC.SuppressFinalize(this);
     }
 
-    private void Run(ManualResetEventSlim started, Action<Exception> fail)
+    private void Run(int virtualKey, string displayName, ManualResetEventSlim started, Action<Exception> fail)
     {
         _threadId = NativeMethods.GetCurrentThreadId();
-        bool ownsHotkey = NativeMethods.RegisterHotKey(nint.Zero, HotkeyId, 0, NativeMethods.VkF6);
+        bool ownsHotkey = NativeMethods.RegisterHotKey(nint.Zero, HotkeyId, NativeMethods.ModNoRepeat, (uint)virtualKey);
         if (!ownsHotkey)
         {
             _fallbackCallback = (code, wParam, lParam) =>
@@ -96,19 +172,19 @@ public sealed class GlobalHotkeyService : IGlobalHotkeyService
                 if (code == NativeMethods.HcAction)
                 {
                     NativeMethods.KeyboardHookData data = Marshal.PtrToStructure<NativeMethods.KeyboardHookData>(lParam);
-                    if (data.VirtualKey == NativeMethods.VkF6)
+                    if (data.VirtualKey == (uint)virtualKey)
                     {
                         if ((uint)wParam is NativeMethods.WmKeyDown or NativeMethods.WmSysKeyDown)
                         {
-                            if (!_f6Down)
+                            if (!_hotkeyDown)
                             {
-                                _f6Down = true;
-                                F6Pressed?.Invoke(this, EventArgs.Empty);
+                                _hotkeyDown = true;
+                                Pressed?.Invoke(this, EventArgs.Empty);
                             }
                         }
                         else if ((uint)wParam is NativeMethods.WmKeyUp or NativeMethods.WmSysKeyUp)
                         {
-                            _f6Down = false;
+                            _hotkeyDown = false;
                         }
                     }
                 }
@@ -122,7 +198,7 @@ public sealed class GlobalHotkeyService : IGlobalHotkeyService
                 0);
             if (_fallbackHook == nint.Zero)
             {
-                fail(new Win32Exception("Windows could not start the F6 listener."));
+                fail(new Win32Exception($"Windows could not start the {displayName} listener."));
                 started.Set();
                 return;
             }
@@ -137,7 +213,7 @@ public sealed class GlobalHotkeyService : IGlobalHotkeyService
                 while (NativeMethods.PeekMessage(out NativeMethods.Message message, nint.Zero, 0, 0, NativeMethods.PmRemove))
                 {
                     if (message.Value == NativeMethods.WmQuit) return;
-                    if (ownsHotkey && message.Value == NativeMethods.WmHotkey && (int)message.WParam == HotkeyId) F6Pressed?.Invoke(this, EventArgs.Empty);
+                    if (ownsHotkey && message.Value == NativeMethods.WmHotkey && (int)message.WParam == HotkeyId) Pressed?.Invoke(this, EventArgs.Empty);
                 }
                 Thread.Sleep(15);
             }
@@ -148,8 +224,27 @@ public sealed class GlobalHotkeyService : IGlobalHotkeyService
             if (_fallbackHook != nint.Zero) NativeMethods.UnhookWindowsHookEx(_fallbackHook);
             _fallbackHook = nint.Zero;
             _fallbackCallback = null;
-            _f6Down = false;
+            _hotkeyDown = false;
             IsRegistered = false;
+        }
+    }
+
+    private void SetVirtualKey(int virtualKey)
+    {
+        lock (_gate)
+        {
+            if (_thread is not null) throw new InvalidOperationException("Stop the global hotkey listener before configuring it.");
+            _virtualKey = virtualKey;
+        }
+    }
+
+    private static void ValidateVirtualKey(int virtualKey)
+    {
+        if (!IsSupportedVirtualKey(virtualKey))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(virtualKey),
+                "Choose F1–F11 or F13–F24. F12 is reserved by Windows debuggers.");
         }
     }
 }

@@ -23,11 +23,16 @@ public partial class PlacementModelsPage : UserControl, IAppPage
         ModelsList.ItemsSource = _models;
         StepsGrid.ItemsSource = _steps;
         _services.Coordinator.StateChanged += (_, _) => Dispatcher.BeginInvoke(UpdateBusyState);
+        _services.Hotkey.BindingChanged += (_, _) => Dispatcher.BeginInvoke(UpdateHotkeyText);
     }
 
-    public Func<Task>? IdleF6Action => null;
+    public Func<Task>? IdleHotkeyAction => null;
 
-    public async Task OnShownAsync() => await RefreshModelsAsync(_selectedModel?.Id);
+    public async Task OnShownAsync()
+    {
+        UpdateHotkeyText();
+        await RefreshModelsAsync(_selectedModel?.Id);
+    }
 
     private async Task RefreshModelsAsync(string? selectedId = null)
     {
@@ -60,7 +65,7 @@ public partial class PlacementModelsPage : UserControl, IAppPage
         ModelNameText.Text = "Placement model";
         _steps.Clear();
         StatusText.Text = "Ready to record a new model.";
-        DetailText.Text = "Click Record placements, focus Roblox, then press F6.";
+        DetailText.Text = $"Click Record placements, focus Roblox, then press {_services.Hotkey.DisplayName}.";
     }
 
     private async void Save_Click(object sender, RoutedEventArgs e)
@@ -103,7 +108,7 @@ public partial class PlacementModelsPage : UserControl, IAppPage
                 status: message => Dispatcher.BeginInvoke(() =>
                 {
                     StatusText.Text = message;
-                    DetailText.Text = message.Contains("Recording", StringComparison.OrdinalIgnoreCase) ? "Press F6 again to finish and save." : DetailText.Text;
+                    DetailText.Text = message.Contains("Recording", StringComparison.OrdinalIgnoreCase) ? $"Press {_services.Hotkey.DisplayName} again to finish and save." : DetailText.Text;
                 }),
                 cancellationToken: token);
             await Dispatcher.InvokeAsync(() =>
@@ -114,7 +119,8 @@ public partial class PlacementModelsPage : UserControl, IAppPage
             await RefreshModelsAsync(model.Id);
         });
         StatusText.Text = "Placement recording armed.";
-        DetailText.Text = "Focus Roblox and press F6 to begin. Press F6 again after the final placement.";
+        string hotkey = _services.Hotkey.DisplayName;
+        DetailText.Text = $"Focus Roblox and press {hotkey} to begin. Press {hotkey} again after the final placement.";
         UpdateBusyState();
     }
 
@@ -143,12 +149,18 @@ public partial class PlacementModelsPage : UserControl, IAppPage
                 status: message => Dispatcher.BeginInvoke(() => StatusText.Text = message),
                 cancellationToken: token);
         });
-        StatusText.Text = "Playback armed. Focus Roblox and press F6 to begin.";
+        StatusText.Text = $"Playback armed. Focus Roblox and press {_services.Hotkey.DisplayName} to begin.";
         DetailText.Text = "Roblox will temporarily match the model's recorded client size.";
         UpdateBusyState();
     }
 
     private void Stop_Click(object sender, RoutedEventArgs e) => _services.Coordinator.Cancel();
+
+    private void UpdateHotkeyText()
+    {
+        string hotkey = _services.Hotkey.DisplayName;
+        RecordingDescription.Text = $"Recording starts after {hotkey} and ends when {hotkey} is pressed again.";
+    }
 
     private void AddRow_Click(object sender, RoutedEventArgs e)
     {

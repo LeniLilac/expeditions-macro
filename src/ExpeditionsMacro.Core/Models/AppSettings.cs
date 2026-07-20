@@ -9,6 +9,8 @@ public enum AppTheme
 
 public sealed record AppSettings
 {
+    public const int DefaultMacroHotkeyVirtualKey = 0x75;
+
     public int SchemaVersion { get; init; } = 1;
 
     public AppTheme Theme { get; init; } = AppTheme.System;
@@ -22,4 +24,6 @@ public sealed record AppSettings
     public DateTimeOffset? LastDetectorUpdateCheck { get; init; }
 
     public bool MinimizeDuringAutomation { get; init; }
+
+    public int MacroHotkeyVirtualKey { get; init; } = DefaultMacroHotkeyVirtualKey;
 }

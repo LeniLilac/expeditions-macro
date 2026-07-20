@@ -103,7 +103,7 @@ public sealed class PlacementCaptureService : IPlacementCaptureService
             throw new Win32Exception("Windows could not start the mouse observer.");
         }
 
-        status?.Invoke("Recording. Press a number and click each location. Press F6 to finish.");
+        status?.Invoke("Recording. Press a number and click each location. Press the macro hotkey to finish.");
         try
         {
             while (!cancellationToken.IsCancellationRequested && failures.Count == 0)

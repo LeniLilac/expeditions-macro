@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using ExpeditionsMacro.App.Services;
 using ExpeditionsMacro.App.Windows;
+using ExpeditionsMacro.Automation.Camera;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
@@ -14,7 +15,7 @@ public partial class CameraModelsPage : UserControl, IAppPage
 {
     private readonly AppServices _services;
     private readonly ObservableCollection<CameraModelManifest> _models = [];
-    private ScreenRegion? _selectedScreenRegion;
+    private ScreenRegion? _selectedRelativeRegion;
     private CameraModel? _selectedModel;
     private GoalOverlayWindow? _overlay;
 
@@ -26,7 +27,7 @@ public partial class CameraModelsPage : UserControl, IAppPage
         _services.Coordinator.StateChanged += (_, _) => Dispatcher.BeginInvoke(UpdateBusyState);
     }
 
-    public Func<Task>? IdleF6Action => null;
+    public Func<Task>? IdleHotkeyAction => null;
 
     public async Task OnShownAsync() => await RefreshModelsAsync(_selectedModel?.Manifest.Id);
 
@@ -63,7 +64,7 @@ public partial class CameraModelsPage : UserControl, IAppPage
     {
         ModelsList.SelectedItem = null;
         _selectedModel = null;
-        _selectedScreenRegion = null;
+        _selectedRelativeRegion = null;
         ModelNameText.Text = "Camera model";
         RegionText.Text = "Region: not selected";
         PreviewImage.Source = null;
@@ -74,28 +75,73 @@ public partial class CameraModelsPage : UserControl, IAppPage
         CloseOverlay();
     }
 
-    private void SelectRegion_Click(object sender, RoutedEventArgs e)
+    private async void SelectRegion_Click(object sender, RoutedEventArgs e)
     {
+        if (_services.Coordinator.IsBusy)
+        {
+            StatusText.Text = "Stop the current operation before selecting a comparison region.";
+            return;
+        }
+
         CloseOverlay();
-        RegionSelectionWindow selection = new() { Owner = Window.GetWindow(this) };
-        if (selection.ShowDialog() != true || selection.SelectedRegion is not { } region) return;
-        _selectedScreenRegion = region;
-        RegionText.Text = $"Screen selection: ({region.X}, {region.Y}), {region.Width} × {region.Height}";
+        SelectRegionButton.IsEnabled = false;
+        StatusText.Text = $"Temporarily resizing Roblox to {RobloxClientProfile.Width} × {RobloxClientProfile.Height} for region selection.";
         try
         {
-            PreviewImage.Source = BitmapSourceFactory.Create(_services.Automation.CaptureScreen(region));
+            CameraRegionSelection? result = null;
+            Exception? selectionError = null;
+            await _services.Coordinator.RunNowAsync("Camera region selection", async token =>
+            {
+                try
+                {
+                    result = await _services.CameraRegionSelection.SelectAsync(_client =>
+                    {
+                        RegionSelectionWindow selection = new() { Owner = Window.GetWindow(this) };
+                        using CancellationTokenRegistration registration = token.Register(() =>
+                            _ = selection.Dispatcher.InvokeAsync(selection.Close));
+                        return selection.ShowDialog() == true ? selection.SelectedRegion : null;
+                    }, token);
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception error)
+                {
+                    selectionError = error;
+                }
+            });
+            if (selectionError is not null)
+            {
+                StatusText.Text = selectionError.Message;
+                return;
+            }
+            if (result is null)
+            {
+                StatusText.Text = "Region selection canceled. Roblox was restored.";
+                return;
+            }
+
+            ScreenRegion region = result.Region;
+            _selectedRelativeRegion = region;
+            RegionText.Text = $"Relative region: ({region.X}, {region.Y}), {region.Width} × {region.Height} · client {RobloxClientProfile.Width} × {RobloxClientProfile.Height}";
+            PreviewImage.Source = BitmapSourceFactory.Create(result.Preview);
             PreviewPlaceholder.Visibility = Visibility.Collapsed;
-            StatusText.Text = "Region selected. Click Setup model, then press F6 while Roblox is ready. Shift lock is automatic.";
+            StatusText.Text = $"Region selected at the standard Roblox size. Click Setup model, then press {_services.Hotkey.DisplayName} while Roblox is ready.";
         }
         catch (Exception error)
         {
             StatusText.Text = error.Message;
         }
+        finally
+        {
+            SelectRegionButton.IsEnabled = !_services.Coordinator.IsBusy;
+        }
     }
 
     private void Setup_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedScreenRegion is not { } region)
+        if (_selectedRelativeRegion is not { } region)
         {
             StatusText.Text = "Select a comparison region first.";
             return;
@@ -111,8 +157,9 @@ public partial class CameraModelsPage : UserControl, IAppPage
             await Dispatcher.InvokeAsync(() => _selectedModel = model);
             await RefreshModelsAsync(model.Manifest.Id);
         });
-        StatusText.Text = "Camera setup armed. Focus Roblox and press F6 to begin; the app will toggle shift lock automatically.";
-        AppendLog("Setup armed. Start with shift lock off, then press F6 when the goal view is ready. The app will enable it temporarily.");
+        string hotkey = _services.Hotkey.DisplayName;
+        StatusText.Text = $"Camera setup armed. Focus Roblox and press {hotkey} to begin; the app will toggle shift lock automatically.";
+        AppendLog($"Setup armed. Start with shift lock off, then press {hotkey} when the goal view is ready. The app will enable it temporarily.");
         UpdateBusyState();
     }
 
@@ -126,8 +173,9 @@ public partial class CameraModelsPage : UserControl, IAppPage
             double score = await _services.Camera.AlignAsync(_selectedModel, progress: progress, cancellationToken: token);
             await Dispatcher.InvokeAsync(() => StatusText.Text = $"Alignment finished at {score:P0} confidence.");
         });
-        StatusText.Text = "Alignment armed. Focus Roblox and press F6 to begin.";
-        AppendLog("Auto align armed. Start with shift lock off, then press F6 when zoom and pitch match the model. The app will enable it temporarily.");
+        string hotkey = _services.Hotkey.DisplayName;
+        StatusText.Text = $"Alignment armed. Focus Roblox and press {hotkey} to begin.";
+        AppendLog($"Auto align armed. Start with shift lock off, then press {hotkey} when zoom and pitch match the model. The app will enable it temporarily.");
         UpdateBusyState();
     }
 
@@ -190,6 +238,7 @@ public partial class CameraModelsPage : UserControl, IAppPage
     private void UpdateBusyState()
     {
         bool busy = _services.Coordinator.IsBusy;
+        SelectRegionButton.IsEnabled = !busy;
         SetupButton.IsEnabled = !busy;
         AlignButton.IsEnabled = !busy && _selectedModel is not null;
         StopButton.IsEnabled = busy;

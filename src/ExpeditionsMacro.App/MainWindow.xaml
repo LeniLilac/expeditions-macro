@@ -70,16 +70,17 @@
                                 <TextBlock VerticalAlignment="Center" Text="Join Discord" />
                             </StackPanel>
                         </Button>
-                        <Border Margin="12,0,12,12" Padding="10" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="5">
+                        <Border Margin="12,0,12,6" Padding="10" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="5">
                             <Grid>
                                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                                 <StackPanel Orientation="Horizontal">
                                     <Ellipse x:Name="OperationDot" Width="7" Height="7" Margin="0,0,8,0" VerticalAlignment="Center" Fill="{DynamicResource FaintBrush}" />
                                     <TextBlock x:Name="OperationLabel" MaxWidth="155" TextTrimming="CharacterEllipsis" FontSize="12" Text="Ready" />
                                 </StackPanel>
-                                <TextBlock Grid.Row="1" Margin="15,4,0,0" Foreground="{DynamicResource FaintBrush}" FontSize="11" Text="F6 start / stop" />
+                                <TextBlock x:Name="HotkeyHint" Grid.Row="1" Margin="15,4,0,0" Foreground="{DynamicResource FaintBrush}" FontSize="11" Text="F6 start / stop" />
                             </Grid>
                         </Border>
+                        <TextBlock x:Name="VersionLabel" Margin="18,0,18,10" HorizontalAlignment="Center" Foreground="{DynamicResource FaintBrush}" FontSize="10" Text="Version" />
                     </StackPanel>
                 </Grid>
             </Border>

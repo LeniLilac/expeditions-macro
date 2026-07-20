@@ -4,9 +4,11 @@ using System.IO;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using ExpeditionsMacro.App.Services;
 using ExpeditionsMacro.Automation.Updates;
 using ExpeditionsMacro.Core.Models;
+using ExpeditionsMacro.Windows;
 
 namespace ExpeditionsMacro.App.Pages;
 
@@ -15,6 +17,8 @@ public partial class SettingsPage : UserControl, IAppPage
     private readonly AppServices _services;
     private bool _loading;
     private bool _captureOperationActive;
+    private bool _capturingHotkey;
+    private bool _rebindingHotkey;
 
     public SettingsPage(AppServices services)
     {
@@ -23,9 +27,18 @@ public partial class SettingsPage : UserControl, IAppPage
         ThemeCombo.ItemsSource = Enum.GetValues<AppTheme>();
         DataPath.Text = services.Paths.Root;
         _services.Coordinator.StateChanged += (_, _) => Dispatcher.BeginInvoke(UpdateCaptureState);
+        _services.Hotkey.BindingChanged += (_, _) => Dispatcher.BeginInvoke(() => UpdateHotkeyDisplay());
+        _services.Hotkey.Pressed += (_, _) => Dispatcher.BeginInvoke(() =>
+        {
+            if (_capturingHotkey) CancelHotkeyCapture($"{_services.Hotkey.DisplayName} is already the macro hotkey.");
+        });
+        Unloaded += (_, _) =>
+        {
+            if (_capturingHotkey) CancelHotkeyCapture("Key change canceled.");
+        };
     }
 
-    public Func<Task>? IdleF6Action => null;
+    public Func<Task>? IdleHotkeyAction => null;
 
     internal void SetSnapshotScroll(bool showDebug)
     {
@@ -43,7 +56,7 @@ public partial class SettingsPage : UserControl, IAppPage
         _loading = false;
         VersionText.Text = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
         RobloxText.Text = _services.Automation.FindWindow() is { } window ? $"Found: {window.Title}" : "Not found";
-        HotkeyText.Text = _services.Hotkey.IsRegistered ? "F6 registered" : "Unavailable";
+        UpdateHotkeyDisplay();
         await RefreshDetectorAsync();
         UpdateCaptureState();
     }
@@ -59,6 +72,93 @@ public partial class SettingsPage : UserControl, IAppPage
     {
         if (_loading) return;
         await _services.UpdateSettingsAsync(settings => settings with { MinimizeDuringAutomation = MinimizeCheck.IsChecked == true });
+    }
+
+    private void HotkeyButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_services.Coordinator.IsBusy || _rebindingHotkey) return;
+        _capturingHotkey = true;
+        HotkeyButton.Content = "Press a key…";
+        HotkeyStatusText.Text = "Press F1–F11 or F13–F24. Escape cancels; F12 is reserved by Windows.";
+        Keyboard.Focus(HotkeyButton);
+    }
+
+    private async void SettingsPage_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (!_capturingHotkey) return;
+        e.Handled = true;
+        Key key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key == Key.Escape)
+        {
+            CancelHotkeyCapture("Key change canceled.");
+            return;
+        }
+
+        int virtualKey = KeyInterop.VirtualKeyFromKey(key);
+        if (!GlobalHotkeyService.IsSupportedVirtualKey(virtualKey))
+        {
+            HotkeyStatusText.Text = "That key is not supported. Press F1–F11 or F13–F24, or Escape to cancel.";
+            return;
+        }
+
+        _capturingHotkey = false;
+        await ApplyHotkeyAsync(virtualKey);
+    }
+
+    private async Task ApplyHotkeyAsync(int virtualKey)
+    {
+        int previous = _services.Hotkey.VirtualKey;
+        string displayName = GlobalHotkeyService.GetDisplayName(virtualKey);
+        _rebindingHotkey = true;
+        HotkeyButton.IsEnabled = false;
+        HotkeyButton.Content = displayName;
+        HotkeyStatusText.Text = $"Registering {displayName} globally…";
+        try
+        {
+            await Task.Run(() => _services.Hotkey.Rebind(virtualKey));
+            await _services.UpdateSettingsAsync(settings => settings with { MacroHotkeyVirtualKey = virtualKey });
+            HotkeyStatusText.Text = $"{displayName} is now the macro start and stop key.";
+        }
+        catch (Exception error)
+        {
+            if (_services.Hotkey.VirtualKey != previous)
+            {
+                try { await Task.Run(() => _services.Hotkey.Rebind(previous)); } catch { }
+            }
+            try
+            {
+                await _services.UpdateSettingsAsync(settings => settings with { MacroHotkeyVirtualKey = previous });
+            }
+            catch { }
+            HotkeyStatusText.Text = $"Could not change the hotkey: {error.Message}";
+        }
+        finally
+        {
+            _rebindingHotkey = false;
+            UpdateHotkeyDisplay(updateStatus: false);
+            UpdateCaptureState();
+        }
+    }
+
+    private void CancelHotkeyCapture(string status)
+    {
+        _capturingHotkey = false;
+        UpdateHotkeyDisplay(updateStatus: false);
+        HotkeyStatusText.Text = status;
+    }
+
+    private void UpdateHotkeyDisplay() => UpdateHotkeyDisplay(updateStatus: true);
+
+    private void UpdateHotkeyDisplay(bool updateStatus)
+    {
+        string hotkey = _services.Hotkey.DisplayName;
+        if (!_capturingHotkey) HotkeyButton.Content = hotkey;
+        HotkeyText.Text = _services.Hotkey.IsRegistered ? $"{hotkey} registered" : "Unavailable";
+        DebugCaptureDescription.Text = $"Record the Roblox client at the standard 808 by 611 size. {hotkey} starts and stops capture, restores Roblox, and saves a ZIP for bug reports.";
+        if (updateStatus && !_capturingHotkey && !_rebindingHotkey)
+        {
+            HotkeyStatusText.Text = $"{hotkey} is registered globally for every macro workflow.";
+        }
     }
 
     private void OpenData_Click(object sender, RoutedEventArgs e) => OpenFolder(_services.Paths.Root);
@@ -104,7 +204,7 @@ public partial class SettingsPage : UserControl, IAppPage
                     _captureOperationActive = false;
                 }
             });
-            CaptureStatusText.Text = "Capture armed. Focus Roblox and press F6 to begin.";
+            CaptureStatusText.Text = $"Capture armed. Focus Roblox and press {_services.Hotkey.DisplayName} to begin.";
             UpdateCaptureState();
         }
         catch (Exception error)
@@ -125,6 +225,8 @@ public partial class SettingsPage : UserControl, IAppPage
         CaptureIntervalText.IsEnabled = !busy;
         CaptureStopButton.IsEnabled = _captureOperationActive && busy;
         CaptureStopButton.Content = _services.Coordinator.State == OperationState.Armed ? "Cancel" : "Stop and save";
+        HotkeyButton.IsEnabled = !busy && !_rebindingHotkey;
+        if (busy && _capturingHotkey) CancelHotkeyCapture("Stop the current operation before changing the hotkey.");
     }
 
     private async void RefreshDetector_Click(object sender, RoutedEventArgs e) => await CheckForUpdatesAsync(automatic: false);

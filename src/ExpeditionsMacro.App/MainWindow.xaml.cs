@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.ComponentModel;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -31,6 +32,8 @@ public partial class MainWindow : Window
         };
         _services.Coordinator.StateChanged += Coordinator_StateChanged;
         _services.Coordinator.OperationFailed += Coordinator_OperationFailed;
+        _services.Hotkey.BindingChanged += Hotkey_BindingChanged;
+        UpdateProductFooter();
         if (!snapshotMode)
         {
             Loaded += async (_, _) =>
@@ -53,7 +56,7 @@ public partial class MainWindow : Window
         IAppPage page = _pages[key];
         PageHost.Content = page;
         TitleContext.Text = key;
-        _services.Coordinator.DefaultIdleF6Action = page.IdleF6Action;
+        _services.Coordinator.DefaultIdleHotkeyAction = page.IdleHotkeyAction;
         await page.OnShownAsync();
     }
 
@@ -94,6 +97,15 @@ public partial class MainWindow : Window
     {
         _services.Log.Error("Automation operation stopped.", error);
         Dispatcher.BeginInvoke(() => MessageBox.Show(this, error.Message, "Operation stopped", MessageBoxButton.OK, MessageBoxImage.Error));
+    }
+
+    private void Hotkey_BindingChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(UpdateProductFooter);
+
+    private void UpdateProductFooter()
+    {
+        HotkeyHint.Text = $"{_services.Hotkey.DisplayName} start / stop";
+        string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
+        VersionLabel.Text = $"Version {version}";
     }
 
     private void Window_Closing(object? sender, CancelEventArgs e)

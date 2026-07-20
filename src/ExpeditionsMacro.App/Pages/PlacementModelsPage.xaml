@@ -25,7 +25,7 @@
             <Border Grid.Row="1" Style="{StaticResource SectionDivider}" Padding="0,0,0,18" Margin="0,0,0,18">
                 <StackPanel>
                     <TextBlock Style="{StaticResource SectionTitle}" Text="Model" />
-                    <TextBlock Margin="0,5,0,18" MaxWidth="680" HorizontalAlignment="Left" Style="{StaticResource Caption}" Text="Recording starts after F6 and ends when F6 is pressed again." />
+                    <TextBlock x:Name="RecordingDescription" Margin="0,5,0,18" MaxWidth="680" HorizontalAlignment="Left" Style="{StaticResource Caption}" Text="Recording starts after F6 and ends when F6 is pressed again." />
                     <Grid MaxWidth="680" HorizontalAlignment="Stretch">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="14" /><ColumnDefinition Width="150" /></Grid.ColumnDefinitions>
                         <Grid.RowDefinitions><RowDefinition Height="64" /><RowDefinition Height="48" /></Grid.RowDefinitions>

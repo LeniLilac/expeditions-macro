@@ -17,6 +17,7 @@ public sealed class OperationCoordinator : INotifyPropertyChanged
     private readonly Dispatcher _dispatcher;
     private readonly object _gate = new();
     private Func<CancellationToken, Task>? _armedAction;
+    private string? _armedDescription;
     private CancellationTokenSource? _cancellation;
     private OperationState _state;
     private string _description = "Ready";
@@ -32,7 +33,9 @@ public sealed class OperationCoordinator : INotifyPropertyChanged
 
     public event EventHandler<Exception>? OperationFailed;
 
-    public Func<Task>? DefaultIdleF6Action { get; set; }
+    public Func<Task>? DefaultIdleHotkeyAction { get; set; }
+
+    public string HotkeyDisplayName { get; set; } = "F6";
 
     public OperationState State
     {
@@ -67,7 +70,8 @@ public sealed class OperationCoordinator : INotifyPropertyChanged
         {
             if (State != OperationState.Idle) throw new InvalidOperationException("Another workflow already owns Roblox input.");
             _armedAction = action;
-            Description = $"{description}: press F6 to begin";
+            _armedDescription = description;
+            Description = $"{description}: press {HotkeyDisplayName} to begin";
             State = OperationState.Armed;
         }
     }
@@ -78,6 +82,7 @@ public sealed class OperationCoordinator : INotifyPropertyChanged
         {
             if (State != OperationState.Idle) throw new InvalidOperationException("Another workflow already owns Roblox input.");
             _armedAction = action;
+            _armedDescription = description;
         }
         return BeginAsync(description);
     }
@@ -89,6 +94,7 @@ public sealed class OperationCoordinator : INotifyPropertyChanged
             if (State == OperationState.Armed)
             {
                 _armedAction = null;
+                _armedDescription = null;
                 Description = "Ready";
                 State = OperationState.Idle;
                 return;
@@ -100,24 +106,24 @@ public sealed class OperationCoordinator : INotifyPropertyChanged
         }
     }
 
-    public void HandleF6()
+    public void HandleHotkey()
     {
         if (!_dispatcher.CheckAccess())
         {
-            _dispatcher.BeginInvoke(HandleF6);
+            _dispatcher.BeginInvoke(HandleHotkey);
             return;
         }
         if (State == OperationState.Armed)
         {
-            _ = BeginAsync(Description.Replace(": press F6 to begin", string.Empty, StringComparison.Ordinal));
+            _ = BeginAsync(_armedDescription ?? Description);
         }
         else if (State is OperationState.Running)
         {
             Cancel();
         }
-        else if (State == OperationState.Idle && DefaultIdleF6Action is not null)
+        else if (State == OperationState.Idle && DefaultIdleHotkeyAction is not null)
         {
-            _ = DefaultIdleF6Action();
+            _ = DefaultIdleHotkeyAction();
         }
     }
 
@@ -128,6 +134,7 @@ public sealed class OperationCoordinator : INotifyPropertyChanged
         {
             action = _armedAction ?? throw new InvalidOperationException("No operation is armed.");
             _armedAction = null;
+            _armedDescription = null;
             _cancellation = new CancellationTokenSource();
             Description = description;
             State = OperationState.Running;
