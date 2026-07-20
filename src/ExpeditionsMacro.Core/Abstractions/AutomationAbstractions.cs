@@ -99,5 +99,11 @@ public sealed record DiscordNotification
 
     public required string Detail { get; init; }
 
+    public string MacroName { get; init; } = "Expeditions Macro";
+
+    public string Route { get; init; } = string.Empty;
+
+    public string AttachmentPrefix { get; init; } = "expeditions";
+
     public ImageFrame? Screenshot { get; init; }
 }

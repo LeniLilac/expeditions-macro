@@ -10,6 +10,7 @@ namespace ExpeditionsMacro.Automation.Discord;
 public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
 {
     private const int ComponentsV2Flag = 1 << 15;
+    public const int ErrorPingCount = 5;
     private readonly HttpClient _httpClient;
     private readonly bool _ownsClient;
 
@@ -23,9 +24,12 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
     public async Task SendAsync(DiscordNotification notification, CancellationToken cancellationToken)
     {
         if (!ValidateWebhookUrl(notification.WebhookUrl)) throw new ArgumentException("The Discord webhook URL is not valid.", nameof(notification));
+        string attachmentPrefix = notification.AttachmentPrefix.Equals("challenge", StringComparison.OrdinalIgnoreCase)
+            ? "challenge"
+            : "expeditions";
         string? filename = notification.Screenshot is null
             ? null
-            : $"expeditions_{notification.Event.ToLowerInvariant()}_{DateTimeOffset.Now:yyyyMMdd_HHmmss}.png";
+            : $"{attachmentPrefix}_{notification.Event.ToLowerInvariant()}_{DateTimeOffset.Now:yyyyMMdd_HHmmss}.png";
         Dictionary<string, object?> payload = BuildComponentsPayload(notification, filename);
         using HttpRequestMessage request = new(HttpMethod.Post, ComponentsUrl(notification.WebhookUrl));
         if (filename is null || notification.Screenshot is null)
@@ -50,6 +54,45 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
         }
     }
 
+    public async Task SendErrorPingsAsync(
+        string webhookUrl,
+        string userId,
+        string macroName,
+        string errorDetail,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(webhookUrl) || !ValidateWebhookUrl(webhookUrl))
+        {
+            throw new ArgumentException("The Discord webhook URL is not valid.", nameof(webhookUrl));
+        }
+        if (string.IsNullOrWhiteSpace(userId) || !ValidateDiscordUserId(userId))
+        {
+            throw new ArgumentException("The Discord user ID is not valid.", nameof(userId));
+        }
+
+        for (int index = 1; index <= ErrorPingCount; index++)
+        {
+            Dictionary<string, object?> payload = BuildErrorPingPayload(userId, macroName, errorDetail, index);
+            using HttpRequestMessage request = new(HttpMethod.Post, ComponentsUrl(webhookUrl))
+            {
+                Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"),
+            };
+            using HttpResponseMessage response = await _httpClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                string detail = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                throw new HttpRequestException($"Discord returned HTTP {(int)response.StatusCode}: {Redact(detail)}");
+            }
+            if (index < ErrorPingCount)
+            {
+                await Task.Delay(200, cancellationToken).ConfigureAwait(false);
+            }
+        }
+    }
+
     public static bool ValidateWebhookUrl(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return true;
@@ -68,6 +111,15 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
             && parts[3].Length > 0;
     }
 
+    public static bool ValidateDiscordUserId(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return true;
+        string trimmed = value.Trim();
+        return trimmed.Length is >= 17 and <= 20
+            && ulong.TryParse(trimmed, NumberStyles.None, CultureInfo.InvariantCulture, out ulong id)
+            && id > 0;
+    }
+
     public static string FormatRuntime(TimeSpan runtime)
     {
         int total = Math.Max(0, (int)runtime.TotalSeconds);
@@ -84,21 +136,27 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
     public static Dictionary<string, object?> BuildComponentsPayload(DiscordNotification notification, string? filename)
     {
         string eventName = notification.Event.ToLowerInvariant();
-        (string title, int color) = eventName switch
+        string title = eventName switch
         {
-            "victory" => ("Victory", 0x57F287),
-            "defeat" => ("Defeat", 0xED4245),
-            "recovery" => ("Rejoin needed", 0xFEE75C),
+            "started" => "Started",
+            "attempt" => "Challenge started",
+            "victory" => "Victory",
+            "defeat" => "Defeat",
+            "recovery" => "Rejoin needed",
+            "waiting" => "Waiting",
             _ => throw new ArgumentException($"Unsupported Discord event '{notification.Event}'."),
         };
+        string route = string.IsNullOrWhiteSpace(notification.Route)
+            ? $"Map {notification.MapNumber}, Difficulty {notification.Difficulty}"
+            : notification.Route;
         List<object> components =
         [
-            new Dictionary<string, object?> { ["type"] = 10, ["content"] = $"## Expeditions Macro: {title}\n{notification.Detail}" },
+            new Dictionary<string, object?> { ["type"] = 10, ["content"] = $"## {notification.MacroName}: {title}\n{notification.Detail}" },
             new Dictionary<string, object?> { ["type"] = 14, ["divider"] = true, ["spacing"] = 1 },
             new Dictionary<string, object?>
             {
                 ["type"] = 10,
-                ["content"] = $"**Runtime:** {FormatRuntime(notification.Runtime)}\n**Victories:** {notification.Victories}    **Defeats:** {notification.Defeats}\n**Route:** Map {notification.MapNumber}, Difficulty {notification.Difficulty}",
+                ["content"] = $"**Runtime:** {FormatRuntime(notification.Runtime)}\n**Victories:** {notification.Victories}    **Defeats:** {notification.Defeats}\n**Route:** {route}",
             },
         ];
         if (filename is not null)
@@ -124,12 +182,12 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
         Dictionary<string, object?> payload = new()
         {
             ["flags"] = ComponentsV2Flag,
+            ["allowed_mentions"] = new Dictionary<string, object?> { ["parse"] = Array.Empty<string>() },
             ["components"] = new[]
             {
                 new Dictionary<string, object?>
                 {
                     ["type"] = 17,
-                    ["accent_color"] = color,
                     ["components"] = components,
                 },
             },
@@ -147,6 +205,50 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
             };
         }
         return payload;
+    }
+
+    public static Dictionary<string, object?> BuildErrorPingPayload(
+        string userId,
+        string macroName,
+        string errorDetail,
+        int alertIndex)
+    {
+        if (string.IsNullOrWhiteSpace(userId) || !ValidateDiscordUserId(userId))
+        {
+            throw new ArgumentException("The Discord user ID is not valid.", nameof(userId));
+        }
+        if (alertIndex is < 1 or > ErrorPingCount)
+        {
+            throw new ArgumentOutOfRangeException(nameof(alertIndex));
+        }
+
+        string safeMacroName = CleanDiscordText(macroName, 80);
+        string safeDetail = CleanDiscordText(errorDetail, 600);
+        return new Dictionary<string, object?>
+        {
+            ["flags"] = ComponentsV2Flag,
+            ["allowed_mentions"] = new Dictionary<string, object?>
+            {
+                ["parse"] = Array.Empty<string>(),
+                ["users"] = new[] { userId.Trim() },
+                ["replied_user"] = false,
+            },
+            ["components"] = new[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["type"] = 17,
+                    ["components"] = new[]
+                    {
+                        new Dictionary<string, object?>
+                        {
+                            ["type"] = 10,
+                            ["content"] = $"<@{userId.Trim()}>\n## {safeMacroName}: stopped unexpectedly\n{safeDetail}\n-# Error alert {alertIndex} of {ErrorPingCount}",
+                        },
+                    },
+                },
+            },
+        };
     }
 
     public void Dispose()
@@ -168,4 +270,16 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
     }
 
     private static string Redact(string value) => value.Length <= 500 ? value : value[..500];
+
+    private static string CleanDiscordText(string value, int maximumLength)
+    {
+        string clean = string.IsNullOrWhiteSpace(value) ? "Unexpected macro error." : value.Trim();
+        clean = clean
+            .Replace('@', '＠')
+            .Replace('<', '‹')
+            .Replace('>', '›')
+            .Replace('\r', ' ')
+            .Replace('\n', ' ');
+        return clean.Length <= maximumLength ? clean : clean[..maximumLength].TrimEnd() + "…";
+    }
 }

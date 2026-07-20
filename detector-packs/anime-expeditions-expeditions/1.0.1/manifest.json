@@ -438,6 +438,31 @@
   },
   "files": [
     {
+      "path": "challenge-maps/fairy-king-forest.png",
+      "sha256": "e1cbe4a3cfb2cd8edefdab4e234b8a6beee4b61627b32cf874e9d89c0fbfee6f",
+      "bytes": 10682
+    },
+    {
+      "path": "challenge-maps/flower-forest.png",
+      "sha256": "47c94692a1d9a4102490f69717b18cda7c3156f6d4c24945305fe1e2cadab683",
+      "bytes": 11933
+    },
+    {
+      "path": "challenge-maps/kings-tomb.png",
+      "sha256": "b0cac789b6a4485e6fb441a8cf80109192aa96dc45568c286c59ea15fa950e1a",
+      "bytes": 12743
+    },
+    {
+      "path": "challenge-maps/rose-kingdom.png",
+      "sha256": "b215d87641c2873ac380f677367e42434fecc92030b2088f94672e216eac5516",
+      "bytes": 12227
+    },
+    {
+      "path": "challenge-maps/school-grounds.png",
+      "sha256": "1538d54c198bdb857a67421ebd1e22dd2417698a934d4ebde2228911ec210427",
+      "bytes": 10544
+    },
+    {
       "path": "empty-hotbar.png",
       "sha256": "8e52f1dd91b6e84542249a44d476a572ddc7944b12140f2ff6ba9210f9f45285",
       "bytes": 749115

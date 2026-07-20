@@ -12,6 +12,8 @@ internal static class UiSnapshotRenderer
     private static readonly (string Key, string File, bool ShowPageEnd)[] Pages =
     [
         ("Expeditions", "expeditions", false),
+        ("Challenges", "challenges", false),
+        ("Challenges", "challenges-status", true),
         ("Camera Models", "camera-models", false),
         ("Placement Models", "placement-models", false),
         ("Settings", "settings", false),

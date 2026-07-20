@@ -37,12 +37,17 @@ public sealed class DiagnosticCaptureService
         string captureName,
         TimeSpan interval,
         IProgress<DiagnosticCaptureProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        int? maximumCaptures = null)
     {
         string safeName = SafeName(captureName);
         if (interval < TimeSpan.FromMilliseconds(100) || interval > TimeSpan.FromMinutes(5))
         {
             throw new ArgumentOutOfRangeException(nameof(interval), "Capture interval must be between 0.1 and 300 seconds.");
+        }
+        if (maximumCaptures is < 1 or > 1000)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maximumCaptures), "Maximum captures must be 1 through 1000.");
         }
 
         RobloxWindow window = _automation.FindWindow() ?? throw new InvalidOperationException("No visible Roblox window was found.");
@@ -84,7 +89,11 @@ public sealed class DiagnosticCaptureService
                 string fileName = $"frame-{frames.Count + 1:D6}.png";
                 SavePng(Path.Combine(staging, fileName), frame);
                 frames.Add(new DiagnosticCaptureFrame(fileName, capturedAt));
-                progress?.Report(new DiagnosticCaptureProgress(frames.Count, $"Captured {frames.Count} screenshot(s). Press the macro hotkey to stop and save."));
+                string progressMessage = maximumCaptures is int maximum
+                    ? $"Captured {frames.Count} of {maximum} screenshot(s)."
+                    : $"Captured {frames.Count} screenshot(s). Press the macro hotkey to stop and save.";
+                progress?.Report(new DiagnosticCaptureProgress(frames.Count, progressMessage));
+                if (maximumCaptures is int maximumCount && frames.Count >= maximumCount) break;
                 await Task.Delay(interval, cancellationToken).ConfigureAwait(false);
             }
         }

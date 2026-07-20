@@ -73,7 +73,9 @@
                     <TextBox x:Name="WebhookVisible" Visibility="Collapsed" />
                     <CheckBox x:Name="ShowWebhookCheck" Grid.Column="1" Margin="10,0,0,0" Content="Show" Checked="ShowWebhook_Changed" Unchecked="ShowWebhook_Changed" />
                 </Grid>
-                <TextBlock Margin="0,7,0,0" Style="{StaticResource Caption}" Text="Victory, defeat, and unexpected recovery messages include runtime, totals, and a Roblox screenshot." />
+                <TextBlock Margin="0,12,0,0" Style="{StaticResource FieldLabel}" Text="Discord user ID for error pings, optional" />
+                <TextBox x:Name="DiscordErrorUserIdText" Margin="0,7,0,0" />
+                <TextBlock Margin="0,7,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Victory, defeat, and recovery reports use the webhook. Unexpected errors ping this user five times; manual Stop never alerts." />
             </StackPanel>
         </Grid>
 

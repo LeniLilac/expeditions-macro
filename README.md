@@ -1,6 +1,6 @@
 # Expeditions Macro
 
-Expeditions Macro is a Windows desktop utility for repeatable Anime Expeditions runs in Roblox. It combines camera yaw alignment, editable unit placement, UI-state detection, lobby/disconnect/AFK recovery, checkpoint extraction, and optional Discord reporting in one native app.
+Expeditions Macro is a Windows desktop utility for repeatable Anime Expeditions and regular Challenge runs in Roblox. It combines camera yaw alignment, editable unit placement, UI-state detection, lobby/disconnect/AFK recovery, scheduled Challenge rotation, checkpoint extraction, and optional Discord reporting in one native app.
 
 ![Expeditions Macro in dark mode](docs/images/app-dark.png)
 
@@ -12,6 +12,8 @@ It uses screen capture and ordinary Windows input. It does not inject into Roblo
 
 - Starts and stops with one configurable global hotkey; **F6** is the default.
 - Can begin from the Roblox lobby and navigate to the configured Expeditions map and difficulty.
+- Runs any enabled Trait, Stat, and Sprite Challenges on the global half-hour reset, recognizes five rotating maps, and loads the matching camera and placement models.
+- Supports separate prestart and delayed in-match Challenge placements, configurable defeat retries, and an optional Expeditions handoff while Challenges are on cooldown.
 - Fully zooms out, toggles shift lock, sets a top-down pitch, and aligns yaw against a learned full-turn camera model.
 - Records, edits, saves, and tests Roblox-relative unit placements in one tool.
 - Detects start, checkpoint, continue, confirmation, reward, victory, defeat, lobby, disconnect, and AFK Chamber screens.
@@ -20,8 +22,8 @@ It uses screen capture and ordinary Windows input. It does not inject into Roblo
 - Handles an early defeat even when extraction was planned later.
 - Rejoins after a Roblox disconnect, an unexpected lobby teleport, or an inactivity teleport to the AFK Chamber. From the AFK Chamber it chooses **Return to Lobby**, then navigates back to the configured map and difficulty.
 - Confirms recovery screens across consecutive captures before rejoining, so one animation frame cannot reset an active run or its checkpoint-extraction progress.
-- Optionally sends Discord Components V2 reports with runtime, victory/defeat totals, recovery notices, and a Roblox screenshot.
-- Records an unlimited timed Roblox screenshot sequence from Settings and packages the frames plus a manifest into one diagnostic ZIP.
+- Optionally sends Discord Components V2 reports with runtime, victory/defeat totals, recovery notices, and a Roblox screenshot. A configured Discord user ID receives five restricted mentions when a macro stops unexpectedly.
+- Records an unlimited timed Roblox screenshot sequence from Settings and packages the frames plus a manifest into one diagnostic ZIP. An opt-in failure setting automatically saves 10 one-second frames after an unexpected macro error.
 - Stores webhook secrets with Windows DPAPI and emits no telemetry.
 
 ## Install
@@ -71,14 +73,24 @@ Saving the same name replaces the previous model.
    - `1`: extract at the first checkpoint after one boss node.
    - A high value, or disabling extraction: continue until defeat/victory.
 4. Leave automatic lobby/disconnect/AFK recovery enabled unless you intend to supervise navigation.
-5. Optionally paste a standard, Canary, or PTB Discord webhook.
+5. Optionally paste a standard, Canary, or PTB Discord webhook. Add a numeric Discord user ID if unexpected errors should send five mention alerts.
 6. Save the preset and press the macro hotkey.
 
 The app waits for the difficulty carousel animation to settle and verifies the active difficulty before continuing.
 
+### 4. Configure Challenges
+
+1. Open **Challenges** and enable any combination of Trait, Stat, and Sprite Challenges.
+2. For each of the five maps, choose a camera model, a before-start placement model, an optional after-start placement model, and its elapsed-time delay.
+3. Set how many times a Challenge may retry after defeat. The default is zero; a failed entry becomes eligible again at the next global reset.
+4. Choose whether to wait during cooldown or run a saved Expeditions preset until the next reset.
+5. Optionally enter a Discord webhook and numeric user ID for five error alerts, save the Challenge preset, and press the macro hotkey.
+
+The selector order is fixed by Challenge type. The macro recognizes the current map, skips entries without **Select Stage**, and resets its per-window attempts at `xx:00` and `xx:30`. If all three entries remain unavailable across a complete global reset, it treats the daily limit as reached and waits until midnight UTC.
+
 ## Runtime behavior
 
-The main loop prepares the camera, places units, starts the node, and watches for:
+The Expeditions loop prepares the camera, places units, starts the node, and watches for:
 
 - the next Start button;
 - checkpoint, Continue, or confirmation actions;
@@ -88,11 +100,15 @@ The main loop prepares the camera, places units, starts the node, and watches fo
 - victory or defeat, followed by retry;
 - lobby, disconnect, or AFK Chamber recovery.
 
+The Challenges loop navigates the fixed three-entry selector, recognizes the rotating map, runs its map-specific camera and two placement phases, handles Victory or Defeat, and returns through **Change Gamemode**. During a completed 30-minute window it either waits or temporarily runs the selected Expeditions preset.
+
 Stopping is cooperative. The app releases right mouse and shift-lock state where applicable, cancels pending work, and restores the original Roblox window bounds.
 
 ### Diagnostic screenshot capture
 
 Open **Settings**, enter a capture name and interval under **Debug capture**, then choose **Arm capture**. Focus Roblox and press the macro hotkey to start; press it again to stop. The app temporarily uses the standard 808 by 611 client size, restores the original Roblox bounds, and writes a same-name ZIP under `diagnostics/`. A completed same-name capture replaces the previous ZIP.
+
+Enable **Automatically save 10 screenshots when a macro fails** to capture the Roblox client once per second after an unexpected Expeditions or Challenge error. These captures use timestamped ZIP names and do not run after a normal completion or manual Stop.
 
 ## Local files and privacy
 
@@ -101,6 +117,7 @@ Application data is stored under `%LocalAppData%\ExpeditionsMacro`:
 - `camera-models/`
 - `placement-models/`
 - `presets/`
+- `challenge-presets/`
 - `detector-packs/`
 - `diagnostics/`
 - `logs/`
@@ -129,16 +146,16 @@ Build release artifacts:
 
 ```powershell
 .\scripts\Generate-Icon.ps1
-.\scripts\Build-Release.ps1 -Version 1.0.15
+.\scripts\Build-Release.ps1 -Version 1.1.0
 ```
 
 The release script publishes the self-contained app, creates the portable ZIP, creates the detector-pack ZIP, optionally invokes Inno Setup, and writes SHA-256 checksums plus a dependency inventory.
 
-Pushing a version tag runs the release workflow. After GitHub publishes the verified assets, the workflow sends a Components V2 announcement to the public Discord `#releases` channel using the encrypted `DISCORD_RELEASE_WEBHOOK_URL` repository secret.
+Pushing a version tag runs the release workflow. After GitHub publishes the verified assets, the workflow normally sends a Components V2 announcement to the public Discord `#releases` channel using the encrypted `DISCORD_RELEASE_WEBHOOK_URL` repository secret. Maintainers can include `[skip discord]` in the tagged commit message to publish without an announcement.
 
 ## Project layout
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the layer boundaries and [docs/DETECTOR-PACKS.md](docs/DETECTOR-PACKS.md) for the update format.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the layer boundaries, [docs/CHALLENGE-MODE.md](docs/CHALLENGE-MODE.md) for Challenge behavior, and [docs/DETECTOR-PACKS.md](docs/DETECTOR-PACKS.md) for the update format.
 
 ## License
 

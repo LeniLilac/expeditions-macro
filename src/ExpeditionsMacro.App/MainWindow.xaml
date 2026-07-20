@@ -53,6 +53,9 @@
                         <RadioButton x:Name="ExpeditionsNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" IsChecked="True" Tag="Expeditions" Checked="Navigation_Checked">
                             <StackPanel Orientation="Horizontal"><TextBlock Width="25" FontFamily="{StaticResource IconFont}" FontSize="15" Text="&#xE768;" /><TextBlock Text="Expeditions" /></StackPanel>
                         </RadioButton>
+                        <RadioButton x:Name="ChallengesNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Challenges" Checked="Navigation_Checked">
+                            <StackPanel Orientation="Horizontal"><TextBlock Width="25" FontFamily="{StaticResource IconFont}" FontSize="15" Text="&#xE7FC;" /><TextBlock Text="Challenges" /></StackPanel>
+                        </RadioButton>
                         <RadioButton x:Name="CameraNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Camera Models" Checked="Navigation_Checked">
                             <StackPanel Orientation="Horizontal"><TextBlock Width="25" FontFamily="{StaticResource IconFont}" FontSize="15" Text="&#xE722;" /><TextBlock Text="Camera Models" /></StackPanel>
                         </RadioButton>

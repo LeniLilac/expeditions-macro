@@ -13,6 +13,13 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
+      - name: Read release announcement preference
+        id: discord_announcement
+        shell: pwsh
+        run: |
+          $message = git log -1 --format=%B $env:GITHUB_SHA
+          $enabled = $message.IndexOf('[skip discord]', [System.StringComparison]::OrdinalIgnoreCase) -lt 0
+          "enabled=$($enabled.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.302
@@ -34,6 +41,7 @@ jobs:
           $version = '${{ github.ref_name }}'.TrimStart('v')
           gh release create '${{ github.ref_name }}' artifacts/release/* --verify-tag --notes-file "docs/release-notes/$version.md" --title "Expeditions Macro ${{ github.ref_name }}"
       - name: Announce release on Discord
+        if: ${{ steps.discord_announcement.outputs.enabled == 'true' }}
         shell: pwsh
         env:
           DISCORD_RELEASE_WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK_URL }}

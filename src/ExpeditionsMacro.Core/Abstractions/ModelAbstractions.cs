@@ -31,6 +31,8 @@ public interface IDetectorPack
 
     IReadOnlyList<int> RemainingUnitKeys(ExpeditionsMacro.Core.Imaging.ImageFrame clientImage, IReadOnlySet<int> unitKeys);
 
+    ChallengeMapId? ChallengeMapForType(ExpeditionsMacro.Core.Imaging.ImageFrame clientImage, ChallengeType type) => null;
+
     (int X, int Y) ActionFor(string state, ExpeditionsMacro.Core.Imaging.ImageFrame? clientImage = null);
 }
 

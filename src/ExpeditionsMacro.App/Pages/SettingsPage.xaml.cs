@@ -53,6 +53,7 @@ public partial class SettingsPage : UserControl, IAppPage
         ThemeCombo.SelectedItem = _services.Settings.Theme;
         MinimizeCheck.IsChecked = _services.Settings.MinimizeDuringAutomation;
         AutoUpdateCheck.IsChecked = _services.Settings.CheckDetectorUpdates;
+        AutoCaptureOnErrorCheck.IsChecked = _services.Settings.AutoCaptureOnMacroError;
         _loading = false;
         VersionText.Text = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
         RobloxText.Text = _services.Automation.FindWindow() is { } window ? $"Found: {window.Title}" : "Not found";
@@ -72,6 +73,12 @@ public partial class SettingsPage : UserControl, IAppPage
     {
         if (_loading) return;
         await _services.UpdateSettingsAsync(settings => settings with { MinimizeDuringAutomation = MinimizeCheck.IsChecked == true });
+    }
+
+    private async void AutoCaptureOnErrorCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        await _services.UpdateSettingsAsync(settings => settings with { AutoCaptureOnMacroError = AutoCaptureOnErrorCheck.IsChecked == true });
     }
 
     private void HotkeyButton_Click(object sender, RoutedEventArgs e)
@@ -223,6 +230,7 @@ public partial class SettingsPage : UserControl, IAppPage
         CaptureArmButton.IsEnabled = !busy;
         CaptureNameText.IsEnabled = !busy;
         CaptureIntervalText.IsEnabled = !busy;
+        AutoCaptureOnErrorCheck.IsEnabled = !busy;
         CaptureStopButton.IsEnabled = _captureOperationActive && busy;
         CaptureStopButton.Content = _services.Coordinator.State == OperationState.Armed ? "Cancel" : "Stop and save";
         HotkeyButton.IsEnabled = !busy && !_rebindingHotkey;

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using System.Text.Json;
 using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Core.Abstractions;
@@ -24,6 +25,21 @@ public sealed class DiscordAndWindowsTests
     public void WebhookValidation_RejectsUnsafeOrMalformedUrls(string url) =>
         Assert.False(DiscordWebhookClient.ValidateWebhookUrl(url));
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("1528248119425368074")]
+    [InlineData("12345678901234567")]
+    public void DiscordUserIdValidation_AcceptsBlankOrNumericSnowflakes(string value) =>
+        Assert.True(DiscordWebhookClient.ValidateDiscordUserId(value));
+
+    [Theory]
+    [InlineData("123")]
+    [InlineData("not-a-user")]
+    [InlineData("<@1528248119425368074>")]
+    [InlineData("123456789012345678901")]
+    public void DiscordUserIdValidation_RejectsMalformedValues(string value) =>
+        Assert.False(DiscordWebhookClient.ValidateDiscordUserId(value));
+
     [Fact]
     public void ComponentsPayload_UsesDiscordComponentsV2AndRuntimeTotals()
     {
@@ -48,7 +64,89 @@ public sealed class DiscordAndWindowsTests
         Assert.Contains("Victories:** 7", json);
         Assert.Contains("Map 3, Difficulty 2", json);
         Assert.Contains("attachment://victory.png", json);
-        Assert.Equal(17, document.RootElement.GetProperty("components")[0].GetProperty("type").GetInt32());
+        Assert.Empty(document.RootElement.GetProperty("allowed_mentions").GetProperty("parse").EnumerateArray());
+        JsonElement container = document.RootElement.GetProperty("components")[0];
+        Assert.Equal(17, container.GetProperty("type").GetInt32());
+        Assert.False(container.TryGetProperty("accent_color", out _));
+    }
+
+    [Fact]
+    public void ChallengeComponentsPayload_UsesChallengeContextForAdditionalEvents()
+    {
+        DiscordNotification notification = new()
+        {
+            WebhookUrl = "https://discord.com/api/webhooks/123/token",
+            Event = "attempt",
+            Runtime = TimeSpan.FromMinutes(4),
+            Victories = 2,
+            Defeats = 1,
+            MapNumber = 4,
+            Difficulty = 0,
+            Detail = "Starting the selected Challenge.",
+            MacroName = "Challenge Macro",
+            Route = "Sprite · Fairy King Forest",
+            AttachmentPrefix = "challenge",
+        };
+
+        string json = JsonSerializer.Serialize(DiscordWebhookClient.BuildComponentsPayload(notification, null));
+        using JsonDocument document = JsonDocument.Parse(json);
+        string content = string.Join(
+            '\n',
+            document.RootElement.GetProperty("components")[0].GetProperty("components")
+                .EnumerateArray()
+                .Where(component => component.TryGetProperty("content", out _))
+                .Select(component => component.GetProperty("content").GetString()));
+
+        Assert.Contains("Challenge Macro: Challenge started", content);
+        Assert.Contains("Sprite · Fairy King Forest", content);
+        Assert.DoesNotContain("Difficulty 0", content);
+    }
+
+    [Fact]
+    public void ErrorPingPayload_AllowsOnlyTheConfiguredUserAndHasNoAccent()
+    {
+        const string userId = "1528248119425368074";
+        Dictionary<string, object?> payload = DiscordWebhookClient.BuildErrorPingPayload(
+            userId,
+            "Challenge Macro",
+            "Timed out waiting for Prestart. @everyone",
+            alertIndex: 3);
+        string json = JsonSerializer.Serialize(payload);
+        using JsonDocument document = JsonDocument.Parse(json);
+
+        Assert.Equal(1 << 15, document.RootElement.GetProperty("flags").GetInt32());
+        JsonElement mentions = document.RootElement.GetProperty("allowed_mentions");
+        Assert.Empty(mentions.GetProperty("parse").EnumerateArray());
+        Assert.Equal(userId, mentions.GetProperty("users")[0].GetString());
+        JsonElement container = document.RootElement.GetProperty("components")[0];
+        Assert.Equal(17, container.GetProperty("type").GetInt32());
+        Assert.False(container.TryGetProperty("accent_color", out _));
+        string content = container.GetProperty("components")[0].GetProperty("content").GetString()!;
+        Assert.Contains($"<@{userId}>", content, StringComparison.Ordinal);
+        Assert.Contains("Error alert 3 of 5", content, StringComparison.Ordinal);
+        Assert.DoesNotContain("@everyone", content, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ErrorPings_SendFiveSeparateComponentsV2Messages()
+    {
+        RecordingHandler handler = new();
+        using HttpClient http = new(handler);
+        using DiscordWebhookClient client = new(http);
+
+        await client.SendErrorPingsAsync(
+            "https://discord.com/api/webhooks/123/test-token",
+            "1528248119425368074",
+            "Expeditions Macro",
+            "Timed out waiting for Prestart.",
+            CancellationToken.None);
+
+        Assert.Equal(DiscordWebhookClient.ErrorPingCount, handler.Payloads.Count);
+        Assert.All(handler.RequestUris, uri => Assert.Contains("with_components=true", uri.Query, StringComparison.OrdinalIgnoreCase));
+        for (int index = 0; index < handler.Payloads.Count; index++)
+        {
+            Assert.Contains($"Error alert {index + 1} of {DiscordWebhookClient.ErrorPingCount}", handler.Payloads[index], StringComparison.Ordinal);
+        }
     }
 
     [Fact]
@@ -124,5 +222,22 @@ public sealed class DiscordAndWindowsTests
         Assert.DoesNotContain("a-secret-token", protectedValue, StringComparison.Ordinal);
         Assert.Equal(webhook, protector.Unprotect(protectedValue));
         Assert.Equal(string.Empty, protector.Protect(string.Empty));
+    }
+
+    private sealed class RecordingHandler : HttpMessageHandler
+    {
+        public List<string> Payloads { get; } = [];
+
+        public List<Uri> RequestUris { get; } = [];
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            RequestUris.Add(Assert.IsType<Uri>(request.RequestUri));
+            Payloads.Add(await request.Content!.ReadAsStringAsync(cancellationToken));
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{}"),
+            };
+        }
     }
 }

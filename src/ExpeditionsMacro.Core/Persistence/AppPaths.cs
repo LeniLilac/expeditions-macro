@@ -10,6 +10,7 @@ public sealed class AppPaths
         CameraModels = Path.Combine(Root, "camera-models");
         PlacementModels = Path.Combine(Root, "placement-models");
         Presets = Path.Combine(Root, "presets");
+        ChallengePresets = Path.Combine(Root, "challenge-presets");
         DetectorPacks = Path.Combine(Root, "detector-packs");
         Diagnostics = Path.Combine(Root, "diagnostics");
         Logs = Path.Combine(Root, "logs");
@@ -23,6 +24,8 @@ public sealed class AppPaths
     public string PlacementModels { get; }
 
     public string Presets { get; }
+
+    public string ChallengePresets { get; }
 
     public string DetectorPacks { get; }
 
@@ -38,6 +41,7 @@ public sealed class AppPaths
         Directory.CreateDirectory(CameraModels);
         Directory.CreateDirectory(PlacementModels);
         Directory.CreateDirectory(Presets);
+        Directory.CreateDirectory(ChallengePresets);
         Directory.CreateDirectory(DetectorPacks);
         Directory.CreateDirectory(Diagnostics);
         Directory.CreateDirectory(Logs);

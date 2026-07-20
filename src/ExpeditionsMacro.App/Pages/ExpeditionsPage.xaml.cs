@@ -54,6 +54,7 @@ public partial class ExpeditionsPage : UserControl, IAppPage
         try { webhook = _services.SecretProtector.Unprotect(_services.Settings.EncryptedWebhook); } catch { }
         WebhookPassword.Password = webhook;
         WebhookVisible.Text = webhook;
+        DiscordErrorUserIdText.Text = _services.Settings.DiscordErrorUserId;
         _loading = false;
         CoordinatorStateChanged();
     }
@@ -76,9 +77,12 @@ public partial class ExpeditionsPage : UserControl, IAppPage
         if (_services.Coordinator.IsBusy) return;
         ExpeditionPreset preset;
         string webhook = CurrentWebhook();
+        string discordUserId = DiscordErrorUserIdText.Text.Trim();
         try
         {
             if (!DiscordWebhookClient.ValidateWebhookUrl(webhook)) throw new InvalidOperationException("Enter a valid Discord webhook URL, or leave it blank.");
+            if (!DiscordWebhookClient.ValidateDiscordUserId(discordUserId)) throw new InvalidOperationException("Enter a valid Discord user ID, or leave it blank.");
+            if (discordUserId.Length > 0 && webhook.Length == 0) throw new InvalidOperationException("A Discord webhook is required when an error-ping user ID is entered.");
             preset = await SavePresetInternalAsync();
         }
         catch (Exception error)
@@ -104,15 +108,20 @@ public partial class ExpeditionsPage : UserControl, IAppPage
             MacroProgress.Value = value.Percent;
             if (value.DetectedState is not null) DetectionText.Text = $"Last detection: {Label(value.DetectedState)}{(value.Confidence is null ? string.Empty : $" ({value.Confidence:P0})")}";
         });
-        await _services.Coordinator.RunNowAsync("Expeditions macro", token => _services.Expeditions.RunAsync(
-            preset,
-            camera,
-            placement,
-            detector,
+        await _services.Coordinator.RunNowAsync("Expeditions macro", token => RunWithFailureHandlingAsync(
+            "Expeditions Macro",
             webhook,
-            progress,
-            entry => Dispatcher.BeginInvoke(() => AppendLog(entry.Level == MacroEventLevel.Error ? $"ERROR: {entry.Message}" : entry.Message)),
-            summary => Dispatcher.BeginInvoke(() => ApplySummary(summary)),
+            discordUserId,
+            () => _services.Expeditions.RunAsync(
+                preset,
+                camera,
+                placement,
+                detector,
+                webhook,
+                progress,
+                entry => Dispatcher.BeginInvoke(() => AppendLog(entry.Level == MacroEventLevel.Error ? $"ERROR: {entry.Message}" : entry.Message)),
+                summary => Dispatcher.BeginInvoke(() => ApplySummary(summary)),
+                token),
             token));
     }
 
@@ -157,12 +166,17 @@ public partial class ExpeditionsPage : UserControl, IAppPage
             UpdatedAt = DateTimeOffset.UtcNow,
         };
         preset.Validate();
-        await _services.Presets.SaveAsync(preset);
         string webhook = CurrentWebhook();
+        string discordUserId = DiscordErrorUserIdText.Text.Trim();
+        if (!DiscordWebhookClient.ValidateWebhookUrl(webhook)) throw new InvalidOperationException("Enter a valid Discord webhook URL, or leave it blank.");
+        if (!DiscordWebhookClient.ValidateDiscordUserId(discordUserId)) throw new InvalidOperationException("Enter a valid Discord user ID, or leave it blank.");
+        if (discordUserId.Length > 0 && webhook.Length == 0) throw new InvalidOperationException("A Discord webhook is required when an error-ping user ID is entered.");
+        await _services.Presets.SaveAsync(preset);
         await _services.UpdateSettingsAsync(settings => settings with
         {
             SelectedPresetId = preset.Id,
             EncryptedWebhook = _services.SecretProtector.Protect(webhook),
+            DiscordErrorUserId = discordUserId,
         });
         await RefreshPresetsAsync();
         PresetCombo.SelectedItem = _presets.FirstOrDefault(value => value.Id == preset.Id);
@@ -257,7 +271,7 @@ public partial class ExpeditionsPage : UserControl, IAppPage
 
     private void SetConfigurationEnabled(bool enabled)
     {
-        foreach (Control control in new Control[] { PresetCombo, PresetNameText, MapCombo, DifficultyCombo, CameraCombo, PlacementCombo, DetectorCombo, BossTargetText, WebhookPassword, WebhookVisible, ZoomTicksText, PitchPixelsText, PollText, StableText, KeyHoldText, KeyDelayText }) control.IsEnabled = enabled;
+        foreach (Control control in new Control[] { PresetCombo, PresetNameText, MapCombo, DifficultyCombo, CameraCombo, PlacementCombo, DetectorCombo, BossTargetText, WebhookPassword, WebhookVisible, DiscordErrorUserIdText, ZoomTicksText, PitchPixelsText, PollText, StableText, KeyHoldText, KeyDelayText }) control.IsEnabled = enabled;
         ExtractCheck.IsEnabled = enabled;
         AutoRecoverCheck.IsEnabled = enabled;
         ShowWebhookCheck.IsEnabled = enabled;
@@ -301,6 +315,54 @@ public partial class ExpeditionsPage : UserControl, IAppPage
     }
 
     private string CurrentWebhook() => ShowWebhookCheck.IsChecked == true ? WebhookVisible.Text.Trim() : WebhookPassword.Password.Trim();
+
+    private async Task RunWithFailureHandlingAsync(
+        string macroName,
+        string webhook,
+        string discordUserId,
+        Func<Task> operation,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await operation();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception error)
+        {
+            await Dispatcher.InvokeAsync(() =>
+            {
+                PhaseText.Text = "Macro failed. Running configured error diagnostics.";
+                AppendLog($"ERROR: {error.Message}");
+            });
+            MacroFailureHandlingResult result = await _services.HandleMacroFailureAsync(macroName, webhook, discordUserId, error);
+            await Dispatcher.InvokeAsync(() => AppendFailureHandlingResult(result));
+            throw;
+        }
+    }
+
+    private void AppendFailureHandlingResult(MacroFailureHandlingResult result)
+    {
+        if (result.DiagnosticArchivePath is not null)
+        {
+            AppendLog($"Automatic error diagnostics saved to {System.IO.Path.GetFileName(result.DiagnosticArchivePath)}.");
+        }
+        if (result.DiagnosticError is not null)
+        {
+            AppendLog($"ERROR: Automatic error diagnostics: {result.DiagnosticError}");
+        }
+        if (result.DiscordPingsSent)
+        {
+            AppendLog($"Sent {DiscordWebhookClient.ErrorPingCount} Discord error alerts.");
+        }
+        if (result.DiscordError is not null)
+        {
+            AppendLog($"ERROR: Discord error alerts: {result.DiscordError}");
+        }
+    }
 
     private void AppendLog(string message)
     {

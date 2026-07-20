@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, IAppPage> _pages;
     private bool _autoMinimized;
     private bool _closingAfterStop;
+    private bool _selectingSnapshotPage;
 
     public MainWindow(AppServices services, bool snapshotMode = false)
     {
@@ -26,6 +27,7 @@ public partial class MainWindow : Window
         _pages = new Dictionary<string, IAppPage>(StringComparer.OrdinalIgnoreCase)
         {
             ["Expeditions"] = expeditions,
+            ["Challenges"] = new ChallengesPage(services),
             ["Camera Models"] = new CameraModelsPage(services),
             ["Placement Models"] = new PlacementModelsPage(services),
             ["Settings"] = new SettingsPage(services),
@@ -47,7 +49,7 @@ public partial class MainWindow : Window
 
     private async void Navigation_Checked(object sender, RoutedEventArgs e)
     {
-        if (!IsLoaded || sender is not RadioButton button || button.Tag is not string key) return;
+        if (_selectingSnapshotPage || !IsLoaded || sender is not RadioButton button || button.Tag is not string key) return;
         await ShowPageAsync(key);
     }
 
@@ -62,8 +64,29 @@ public partial class MainWindow : Window
 
     internal async Task SelectPageForSnapshotAsync(string key, bool showPageEnd = false)
     {
+        RadioButton navigation = key switch
+        {
+            "Expeditions" => ExpeditionsNav,
+            "Challenges" => ChallengesNav,
+            "Camera Models" => CameraNav,
+            "Placement Models" => PlacementNav,
+            "Settings" => SettingsNav,
+            _ => throw new ArgumentOutOfRangeException(nameof(key), key, "Unknown snapshot page."),
+        };
+
+        _selectingSnapshotPage = true;
+        try
+        {
+            navigation.IsChecked = true;
+        }
+        finally
+        {
+            _selectingSnapshotPage = false;
+        }
+
         await ShowPageAsync(key);
         if (_pages[key] is SettingsPage settings) settings.SetSnapshotScroll(showPageEnd);
+        if (_pages[key] is ChallengesPage challenges) challenges.SetSnapshotScroll(showPageEnd);
     }
 
     private void Coordinator_StateChanged(object? sender, EventArgs e)

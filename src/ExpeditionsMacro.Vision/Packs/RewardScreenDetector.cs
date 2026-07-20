@@ -113,6 +113,8 @@ internal static class RewardScreenDetector
         double bestRow = 0;
         int bestY = 0;
         int supportingRows = 0;
+        int currentSupportingRun = 0;
+        int longestSupportingRun = 0;
         for (int y = HeaderRegion.Y; y < HeaderRegion.Bottom; y++)
         {
             int count = 0;
@@ -132,20 +134,35 @@ internal static class RewardScreenDetector
 
             int span = maximumX < 0 ? 0 : maximumX - minimumX + 1;
             double density = span == 0 ? 0 : (double)count / span;
-            if (count < 105 || span < 190 || density < 0.30) continue;
+            if (count < 105 || span < 190 || density < 0.30)
+            {
+                currentSupportingRun = 0;
+                continue;
+            }
             supportingRows++;
+            currentSupportingRun++;
+            longestSupportingRun = Math.Max(longestSupportingRun, currentSupportingRun);
             double rowScore = Math.Clamp(
                 0.40 * Ramp(count, 105, 300) +
                 0.25 * Ramp(span, 190, 360) +
                 0.35 * Ramp(density, 0.30, 0.90),
                 0,
                 1);
+            // The real progress bar has bounded horizontal endpoints even when
+            // it is translated or scaled. Blue Flower Forest scenery tends to
+            // span the entire search width, so it must not choose the header row
+            // that suppresses a valid Start dialog.
+            if (span > 470) continue;
             if (rowScore <= bestRow) continue;
             bestRow = rowScore;
             bestY = y;
         }
 
-        if (supportingRows < 3) return null;
+        // The actual reward progress bar is a thin horizontal strip. A translated
+        // frame may also expose a separate card-art run, so do not bound aggregate
+        // supporting rows. Reject a thick contiguous band and require at least one
+        // bounded row from the progress bar itself.
+        if (supportingRows < 3 || longestSupportingRun > 18 || bestRow <= 0) return null;
         double quality = 0.80 * bestRow + 0.20 * Ramp(supportingRows, 3, 8);
         return new HeaderMatch(0.70 + 0.30 * quality, bestY);
     }
