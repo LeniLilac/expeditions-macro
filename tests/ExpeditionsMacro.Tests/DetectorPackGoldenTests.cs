@@ -61,7 +61,7 @@ public sealed class DetectorPackGoldenTests
             }
         }
 
-        Assert.Equal(203, checkedImages);
+        Assert.Equal(204, checkedImages);
         Assert.True(failures.Length == 0, $"Compiled detector regressions:{Environment.NewLine}{failures}");
     }
 
@@ -93,7 +93,7 @@ public sealed class DetectorPackGoldenTests
             }
         }
 
-        Assert.Equal(203, checkedImages);
+        Assert.Equal(204, checkedImages);
         Assert.True(failures.Length == 0, $"Cross-state detector regressions:{Environment.NewLine}{failures}");
     }
 
