@@ -13,6 +13,7 @@ internal static class UiSnapshotRenderer
     [
         ("Expeditions", "expeditions", false),
         ("Challenges", "challenges", false),
+        ("Challenges", "challenges-status", true),
         ("Camera Models", "camera-models", false),
         ("Placement Models", "placement-models", false),
         ("Settings", "settings", false),

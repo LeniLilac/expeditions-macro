@@ -9,6 +9,8 @@ namespace ExpeditionsMacro.Windows;
 
 public sealed class WindowsRobloxAutomation : IRobloxAutomation
 {
+    private const int ClickPositionSettleMilliseconds = 75;
+    private const int ClickHoldMilliseconds = 20;
     private const int HoverRenderSettleMilliseconds = 50;
 
     public RobloxWindow? FindWindow(string titleFragment = "Roblox")
@@ -119,11 +121,14 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation
         if (x < 0 || y < 0 || x >= bounds.Width || y >= bounds.Height) throw new ArgumentOutOfRangeException(nameof(x), "Click falls outside the Roblox client.");
         int clickNudge = x < bounds.Width - 1 ? 1 : -1;
         MoveCursorWithRegisteredMotion(bounds.X + x, bounds.Y + y, clickNudge, "Windows could not move the cursor to the Roblox coordinate.");
-        await Task.Delay(20, cancellationToken).ConfigureAwait(false);
+        // Low-frame-rate clients can render the new button before their input loop
+        // acknowledges the registered cursor move. Give Roblox two typical frames
+        // before pressing so the click is hit-tested at the visible target.
+        await Task.Delay(ClickPositionSettleMilliseconds, cancellationToken).ConfigureAwait(false);
         NativeMethods.mouse_event(NativeMethods.MouseeventfLeftDown, 0, 0, 0, 0);
         try
         {
-            await Task.Delay(10, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(ClickHoldMilliseconds, cancellationToken).ConfigureAwait(false);
         }
         finally
         {

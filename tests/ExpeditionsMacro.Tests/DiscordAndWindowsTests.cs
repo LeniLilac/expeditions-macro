@@ -48,7 +48,42 @@ public sealed class DiscordAndWindowsTests
         Assert.Contains("Victories:** 7", json);
         Assert.Contains("Map 3, Difficulty 2", json);
         Assert.Contains("attachment://victory.png", json);
-        Assert.Equal(17, document.RootElement.GetProperty("components")[0].GetProperty("type").GetInt32());
+        Assert.Empty(document.RootElement.GetProperty("allowed_mentions").GetProperty("parse").EnumerateArray());
+        JsonElement container = document.RootElement.GetProperty("components")[0];
+        Assert.Equal(17, container.GetProperty("type").GetInt32());
+        Assert.False(container.TryGetProperty("accent_color", out _));
+    }
+
+    [Fact]
+    public void ChallengeComponentsPayload_UsesChallengeContextForAdditionalEvents()
+    {
+        DiscordNotification notification = new()
+        {
+            WebhookUrl = "https://discord.com/api/webhooks/123/token",
+            Event = "attempt",
+            Runtime = TimeSpan.FromMinutes(4),
+            Victories = 2,
+            Defeats = 1,
+            MapNumber = 4,
+            Difficulty = 0,
+            Detail = "Starting the selected Challenge.",
+            MacroName = "Challenge Macro",
+            Route = "Sprite · Fairy King Forest",
+            AttachmentPrefix = "challenge",
+        };
+
+        string json = JsonSerializer.Serialize(DiscordWebhookClient.BuildComponentsPayload(notification, null));
+        using JsonDocument document = JsonDocument.Parse(json);
+        string content = string.Join(
+            '\n',
+            document.RootElement.GetProperty("components")[0].GetProperty("components")
+                .EnumerateArray()
+                .Where(component => component.TryGetProperty("content", out _))
+                .Select(component => component.GetProperty("content").GetString()));
+
+        Assert.Contains("Challenge Macro: Challenge started", content);
+        Assert.Contains("Sprite · Fairy King Forest", content);
+        Assert.DoesNotContain("Difficulty 0", content);
     }
 
     [Fact]

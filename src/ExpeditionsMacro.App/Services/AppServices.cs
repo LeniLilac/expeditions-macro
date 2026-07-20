@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows.Threading;
 using ExpeditionsMacro.Automation.Camera;
+using ExpeditionsMacro.Automation.Challenges;
 using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Expeditions;
 using ExpeditionsMacro.Automation.Placement;
@@ -39,6 +40,7 @@ public sealed class AppServices : IDisposable
         CameraRegionSelection = new CameraRegionSelectionService(Automation);
         Camera = new CameraAlignmentEngine(Automation, CameraModels);
         _discord = new DiscordWebhookClient();
+        Challenges = new ChallengeMacroRunner(Automation, Camera, Placement, _discord);
         Expeditions = new ExpeditionMacroRunner(Automation, Camera, Placement, _discord);
         DetectorUpdates = new DetectorPackUpdateService(DetectorPacks);
         Hotkey.Pressed += (_, _) => Coordinator.HandleHotkey();
@@ -62,6 +64,7 @@ public sealed class AppServices : IDisposable
     public PlacementService Placement { get; }
     public CameraRegionSelectionService CameraRegionSelection { get; }
     public CameraAlignmentEngine Camera { get; }
+    public ChallengeMacroRunner Challenges { get; }
     public ExpeditionMacroRunner Expeditions { get; }
     public DetectorPackUpdateService DetectorUpdates { get; }
     public AppSettings Settings { get; private set; } = new();
@@ -104,9 +107,22 @@ public sealed class AppServices : IDisposable
     private async Task EnsureBundledDetectorPackAsync()
     {
         IReadOnlyList<DetectorPackManifest> installed = await DetectorPacks.ListAsync();
-        if (installed.Any(pack => pack.PackId == AnimeExpeditionsDetectorSpec.PackId)) return;
         string source = Path.Combine(AppContext.BaseDirectory, "Resources", "DetectorPacks", AnimeExpeditionsDetectorSpec.PackId, AnimeExpeditionsDetectorSpec.BundledPackVersion);
         if (!Directory.Exists(source)) throw new DirectoryNotFoundException("The bundled detector pack is missing from this build.");
+        DetectorPackManifest bundled = await JsonFileStore.ReadAsync<DetectorPackManifest>(Path.Combine(source, "manifest.json"))
+            ?? throw new InvalidDataException("The bundled detector pack manifest is missing.");
+        DetectorPackManifest? current = installed.FirstOrDefault(pack => pack.PackId == AnimeExpeditionsDetectorSpec.PackId);
+        if (current is not null && !string.Equals(current.Version, bundled.Version, StringComparison.OrdinalIgnoreCase)) return;
+        if (current is not null && HasSameFiles(current, bundled)) return;
         await DetectorPacks.InstallDirectoryAsync(source);
+    }
+
+    private static bool HasSameFiles(DetectorPackManifest left, DetectorPackManifest right)
+    {
+        if (left.Files.Count != right.Files.Count) return false;
+        Dictionary<string, DetectorPackFile> expected = right.Files.ToDictionary(file => file.Path, StringComparer.OrdinalIgnoreCase);
+        return left.Files.All(file => expected.TryGetValue(file.Path, out DetectorPackFile? match) &&
+            file.Bytes == match.Bytes &&
+            string.Equals(file.Sha256, match.Sha256, StringComparison.OrdinalIgnoreCase));
     }
 }

@@ -2,6 +2,7 @@ using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
+using ExpeditionsMacro.Vision.Challenges;
 using ExpeditionsMacro.Vision.Infrastructure;
 using OpenCvSharp;
 
@@ -19,6 +20,7 @@ public sealed class CompiledDetectorPack : IDetectorPack
     private readonly ImageFrame _emptyHotbar;
     private readonly ImageFrame _hotbarReference;
     private readonly ImageFrame _nodeBarReference;
+    private readonly ChallengeMapDetector? _challengeMaps;
 
     private sealed record StateRuntime(DetectorStateDefinition Definition, IReadOnlyList<ImageFrame> References);
     private sealed record SelectionRuntime(SelectionDetectorDefinition Definition, ImageFrame Reference);
@@ -73,6 +75,7 @@ public sealed class CompiledDetectorPack : IDetectorPack
         _emptyHotbar = ImageCodec.Load(Resolve(manifest.EmptyHotbarReferenceFile), PixelFormat.Rgb24);
         _hotbarReference = VisionScorer.PrepareGray(_emptyHotbar.Crop(HotbarAnchorRegion));
         _nodeBarReference = VisionScorer.PrepareGray(_emptyHotbar.Crop(NodeBarAnchorRegion));
+        _challengeMaps = LoadChallengeMapDetector();
     }
 
     public string Directory { get; }
@@ -212,6 +215,9 @@ public sealed class CompiledDetectorPack : IDetectorPack
         }
         return remaining;
     }
+
+    public ChallengeMapId? ChallengeMapForType(ImageFrame clientImage, ChallengeType type) =>
+        _challengeMaps?.Detect(clientImage, type).Map;
 
     public (int X, int Y) ActionFor(string state, ImageFrame? clientImage = null)
     {
@@ -519,6 +525,25 @@ public sealed class CompiledDetectorPack : IDetectorPack
         string root = Path.GetFullPath(Directory) + Path.DirectorySeparatorChar;
         if (!full.StartsWith(root, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("Detector pack contains an unsafe path.");
         return full;
+    }
+
+    private ChallengeMapDetector? LoadChallengeMapDetector()
+    {
+        Dictionary<ChallengeMapId, ImageFrame> references = [];
+        foreach ((ChallengeMapId map, string file) in new[]
+        {
+            (ChallengeMapId.SchoolGrounds, "school-grounds.png"),
+            (ChallengeMapId.FlowerForest, "flower-forest.png"),
+            (ChallengeMapId.RoseKingdom, "rose-kingdom.png"),
+            (ChallengeMapId.FairyKingForest, "fairy-king-forest.png"),
+            (ChallengeMapId.KingsTomb, "kings-tomb.png"),
+        })
+        {
+            string path = Path.Combine(Directory, "challenge-maps", file);
+            if (!File.Exists(path)) return null;
+            references[map] = ImageCodec.Load(path, PixelFormat.Gray8);
+        }
+        return new ChallengeMapDetector(references);
     }
 
     private static double HueDistance(double left, double right)

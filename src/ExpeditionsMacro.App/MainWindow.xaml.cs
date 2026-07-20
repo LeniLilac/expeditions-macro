@@ -12,7 +12,7 @@ namespace ExpeditionsMacro.App;
 
 public partial class MainWindow : Window
 {
-    private const string DiscordInviteUrl = "https://discord.gg/7NZhJZgHN3";
+    private const string DiscordInviteUrl = "https://discord.gg/wE6XSVyXsN";
     private readonly AppServices _services;
     private readonly Dictionary<string, IAppPage> _pages;
     private bool _autoMinimized;
@@ -86,6 +86,7 @@ public partial class MainWindow : Window
 
         await ShowPageAsync(key);
         if (_pages[key] is SettingsPage settings) settings.SetSnapshotScroll(showPageEnd);
+        if (_pages[key] is ChallengesPage challenges) challenges.SetSnapshotScroll(showPageEnd);
     }
 
     private void Coordinator_StateChanged(object? sender, EventArgs e)

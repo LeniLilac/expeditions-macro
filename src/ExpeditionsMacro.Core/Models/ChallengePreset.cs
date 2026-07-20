@@ -87,6 +87,8 @@ public sealed record ChallengePreset
 
     public bool AutoRecover { get; init; } = true;
 
+    public int DefeatRetries { get; init; }
+
     public int ZoomTicks { get; init; } = 30;
 
     public int PitchDragPixels { get; init; } = 1800;
@@ -130,6 +132,7 @@ public sealed record ChallengePreset
         if (ZoomTicks is < 5 or > 80 || PitchDragPixels is < 300 or > 5000) throw new InvalidDataException("Camera preparation settings are out of range.");
         if (PollMilliseconds is < 150 or > 5000 || StableDetections is < 1 or > 5) throw new InvalidDataException("Detection timing is out of range.");
         if (UnitKeyHoldMilliseconds is < 30 or > 1000 || UnitSelectDelayMilliseconds is < 25 or > 5000) throw new InvalidDataException("Placement timing is out of range.");
+        if (DefeatRetries is < 0 or > 20) throw new InvalidDataException("Defeat retries must be 0 through 20.");
     }
 
     public void ValidateReady()

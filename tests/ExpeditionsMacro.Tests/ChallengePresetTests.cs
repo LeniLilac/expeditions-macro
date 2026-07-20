@@ -53,6 +53,14 @@ public sealed class ChallengePresetTests
     }
 
     [Fact]
+    public void DefeatRetries_DefaultToZeroAndRejectOutOfRangeValues()
+    {
+        Assert.Equal(0, Draft().DefeatRetries);
+        Assert.Throws<InvalidDataException>(() => (Draft() with { DefeatRetries = -1 }).Validate());
+        Assert.Throws<InvalidDataException>(() => (Draft() with { DefeatRetries = 21 }).Validate());
+    }
+
+    [Fact]
     public async Task Repository_RoundTripsAChallengeDraft()
     {
         string root = TestPaths.NewTemporaryDirectory();

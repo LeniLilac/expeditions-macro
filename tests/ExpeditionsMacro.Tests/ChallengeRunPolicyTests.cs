@@ -51,6 +51,42 @@ public sealed class ChallengeRunPolicyTests
         Assert.False(ChallengeRunPolicy.IsDelayedPlacementDue(profile with { DelayedPlacementModelId = string.Empty }, TimeSpan.FromMinutes(2)));
     }
 
+    [Fact]
+    public void DefeatAttempt_IsClearedAtTheNextHalfHourEpoch()
+    {
+        ChallengeRotationState state = new();
+        DateTimeOffset first = new(2026, 7, 19, 12, 10, 0, TimeSpan.FromHours(-4));
+        state.Advance(first);
+        state.MarkAttempted(ChallengeType.Stat);
+
+        Assert.Contains(ChallengeType.Stat, state.Attempted);
+        Assert.True(state.Advance(new DateTimeOffset(2026, 7, 19, 12, 30, 1, TimeSpan.FromHours(-4))));
+        Assert.Empty(state.Attempted);
+    }
+
+    [Fact]
+    public void AllCooldownAcrossAFullReset_InfersDailyLimitUntilMidnightUtc()
+    {
+        ChallengeRotationState state = new();
+        DateTimeOffset first = new(2026, 7, 19, 20, 10, 0, TimeSpan.Zero);
+
+        Assert.False(state.ObserveAllCooldown(first));
+        Assert.True(state.ObserveAllCooldown(new DateTimeOffset(2026, 7, 19, 20, 30, 5, TimeSpan.Zero)));
+        Assert.Equal(new DateTimeOffset(2026, 7, 20, 0, 0, 0, TimeSpan.Zero), state.DailyLimitUntilUtc);
+    }
+
+    [Fact]
+    public void AnyAvailableChallenge_ClearsTheDailyLimitInferenceBaseline()
+    {
+        ChallengeRotationState state = new();
+        DateTimeOffset first = new(2026, 7, 19, 20, 10, 0, TimeSpan.Zero);
+        state.ObserveAllCooldown(first);
+        state.ObserveAvailability();
+
+        Assert.False(state.ObserveAllCooldown(new DateTimeOffset(2026, 7, 19, 20, 30, 5, TimeSpan.Zero)));
+        Assert.Null(state.DailyLimitUntilUtc);
+    }
+
     private static ChallengePreset Preset() => new()
     {
         Id = "challenge-test",

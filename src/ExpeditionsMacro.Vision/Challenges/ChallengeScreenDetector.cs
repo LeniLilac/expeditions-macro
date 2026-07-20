@@ -10,7 +10,9 @@ public enum ChallengeScreenState
     None,
     GameModeSelector,
     ChallengeList,
+    ChallengeListUnavailable,
     ChallengeAvailable,
+    ChallengeCooldown,
     PreviewReady,
     PostMatchPreview,
     Prestart,
@@ -29,24 +31,35 @@ public static class ChallengeScreenDetector
     public const int ClientWidth = 808;
     public const int ClientHeight = 611;
 
-    private static readonly ScreenRegion ChallengeTileRegion = new(360, 150, 250, 105);
     private static readonly ScreenRegion ChallengeTileTitleRegion = new(360, 150, 130, 55);
     private static readonly ScreenRegion StoryTileTitleRegion = new(360, 50, 130, 55);
     private static readonly ScreenRegion RaidTileTitleRegion = new(570, 50, 120, 55);
     private static readonly ScreenRegion ExpeditionTileTitleRegion = new(600, 150, 140, 55);
-    private static readonly ScreenRegion PanelHeaderRegion = new(90, 120, 220, 80);
-    private static readonly ScreenRegion PanelTopEdgeRegion = new(280, 146, 380, 14);
-    private static readonly ScreenRegion PanelLeftRailRegion = new(125, 180, 150, 245);
-    private static readonly ScreenRegion PanelRightEdgeRegion = new(655, 140, 35, 330);
-    private static readonly ScreenRegion PanelBottomEdgeRegion = new(115, 440, 575, 30);
+    private static readonly ScreenRegion GameModeRowDividerRegion = new(355, 143, 440, 20);
+    private static readonly ScreenRegion GameModeColumnDividerRegion = new(562, 45, 24, 215);
+    private static readonly ScreenRegion CompactPanelHeaderRegion = new(90, 120, 220, 80);
+    private static readonly ScreenRegion CompactPanelTopEdgeRegion = new(280, 146, 380, 14);
+    private static readonly ScreenRegion CompactPanelLeftRailRegion = new(125, 180, 150, 245);
+    private static readonly ScreenRegion CompactPanelRightEdgeRegion = new(655, 140, 35, 330);
+    private static readonly ScreenRegion CompactPanelBottomEdgeRegion = new(115, 440, 575, 30);
+    private static readonly ScreenRegion LargePanelHeaderRegion = new(70, 110, 250, 100);
+    private static readonly ScreenRegion LargePanelTopEdgeRegion = new(230, 120, 500, 45);
+    private static readonly ScreenRegion LargePanelLeftRailRegion = new(105, 170, 170, 275);
+    private static readonly ScreenRegion LargePanelRightEdgeRegion = new(630, 120, 105, 370);
+    private static readonly ScreenRegion LargePanelBottomEdgeRegion = new(90, 425, 645, 65);
+    private static readonly ScreenRegion ChallengeListFirstSeparatorRegion = new(265, 282, 435, 15);
+    private static readonly ScreenRegion ChallengeListSecondSeparatorRegion = new(265, 373, 435, 15);
+    private static readonly ScreenRegion RegularChallengeTabRegion = new(135, 180, 135, 75);
     private static readonly ScreenRegion VictoryRosterRegion = new(510, 180, 150, 275);
 
     private static readonly IReadOnlyDictionary<ChallengeType, (int X, int Y)> TypeActions =
         new Dictionary<ChallengeType, (int X, int Y)>
         {
-            [ChallengeType.Trait] = (470, 244),
-            [ChallengeType.Stat] = (470, 335),
-            [ChallengeType.Sprite] = (470, 425),
+            // Click the stable map thumbnail at the left of each row. Reward icons
+            // open item tooltips and are especially dense on the Sprite row.
+            [ChallengeType.Trait] = (320, 244),
+            [ChallengeType.Stat] = (320, 335),
+            [ChallengeType.Sprite] = (320, 425),
         };
 
     public static ChallengeScreenMatch Detect(ImageFrame image)
@@ -55,11 +68,13 @@ public static class ChallengeScreenDetector
         ChallengeScreenState[] priority =
         [
             ChallengeScreenState.Defeat,
+            ChallengeScreenState.ChallengeAvailable,
+            ChallengeScreenState.ChallengeCooldown,
+            ChallengeScreenState.ChallengeListUnavailable,
             ChallengeScreenState.Victory,
             ChallengeScreenState.Prestart,
             ChallengeScreenState.PreviewReady,
             ChallengeScreenState.PostMatchPreview,
-            ChallengeScreenState.ChallengeAvailable,
             ChallengeScreenState.ChallengeList,
             ChallengeScreenState.GameModeSelector,
         ];
@@ -77,25 +92,44 @@ public static class ChallengeScreenDetector
         ValidateClient(image);
         double panel = PanelScore(image);
         double selectStage = ActionButtonDetector.Score(image, "challenge_select_stage");
+        selectStage = Math.Max(selectStage, ActionButtonDetector.Score(image, "challenge_select_stage_wide"));
         double enterMatchmaking = ActionButtonDetector.Score(image, "challenge_enter_matchmaking");
         double previewStart = ActionButtonDetector.Score(image, "challenge_preview_start");
         double changeMode = ActionButtonDetector.Score(image, "challenge_change_mode");
+        double partyStart = ActionButtonDetector.Score(image, "challenge_party_start");
+        double partyDisband = ActionButtonDetector.Score(image, "challenge_party_disband");
+        double victoryParty = ActionButtonDetector.Score(image, "challenge_victory_party");
         double victoryClose = ActionButtonDetector.Score(image, "challenge_victory_close");
         double defeat = TerminalScreenDetector.Score(image, "defeat");
         double prestart = RewardScreenDetector.HasHeader(image) ? 0 : StartDialogDetector.Score(image);
         double challengeList = ChallengeListScore(image, panel);
+        double challengeListUnavailable = ChallengeListUnavailableScore(image, panel);
         double availability = Math.Max(selectStage, enterMatchmaking);
         double challengeAvailable = panel < 0.55 || availability == 0 ? 0 : Math.Clamp(0.48 * panel + 0.52 * availability, 0, 1);
-        double preview = previewStart == 0 || changeMode == 0 ? 0 : Math.Clamp(0.55 * previewStart + 0.45 * changeMode, 0, 1);
+        double cooldownFooter = CooldownFooterScore(image);
+        double challengeCooldown = panel < 0.55 || availability > 0 || cooldownFooter == 0
+            ? 0
+            : Math.Clamp(0.52 * panel + 0.48 * cooldownFooter, 0, 1);
+        double navigationPreview = previewStart == 0 || changeMode == 0
+            ? 0
+            : Math.Clamp(0.55 * previewStart + 0.45 * changeMode, 0, 1);
+        double privatePartyPreview = partyStart == 0 || partyDisband == 0
+            ? 0
+            : Math.Clamp(0.55 * partyStart + 0.45 * partyDisband, 0, 1);
+        double preview = Math.Max(navigationPreview, privatePartyPreview);
         double postMatchPreview = previewStart > 0 || changeMode == 0 ? 0 : Math.Clamp(0.72 * changeMode + 0.28 * DarkPartyPanelScore(image), 0, 1);
-        double victory = victoryClose == 0 ? 0 : Math.Clamp(0.40 * panel + 0.35 * victoryClose + 0.25 * VictoryRosterScore(image), 0, 1);
+        double victory = victoryClose == 0 || victoryParty == 0
+            ? 0
+            : Math.Clamp(0.30 * panel + 0.25 * victoryClose + 0.30 * victoryParty + 0.15 * VictoryRosterScore(image), 0, 1);
 
         return new Dictionary<ChallengeScreenState, double>
         {
             [ChallengeScreenState.None] = 0,
             [ChallengeScreenState.GameModeSelector] = GameModeSelectorScore(image),
             [ChallengeScreenState.ChallengeList] = challengeList,
+            [ChallengeScreenState.ChallengeListUnavailable] = challengeListUnavailable,
             [ChallengeScreenState.ChallengeAvailable] = challengeAvailable,
+            [ChallengeScreenState.ChallengeCooldown] = challengeCooldown,
             [ChallengeScreenState.PreviewReady] = preview,
             [ChallengeScreenState.PostMatchPreview] = postMatchPreview,
             [ChallengeScreenState.Prestart] = prestart,
@@ -109,11 +143,20 @@ public static class ChallengeScreenDetector
             ? action
             : throw new ArgumentOutOfRangeException(nameof(type));
 
+    public static (int X, int Y) TerminalCloseAction(ImageFrame image) =>
+        ActionButtonDetector.ActionFor(image, "challenge_victory_close") ?? (657, 163);
+
+    public static (int X, int Y) DefeatRetryAction(ImageFrame image) =>
+        ActionButtonDetector.ActionFor(image, "defeat") ?? (225, 438);
+
+    public static (int X, int Y) OpenPlayAction() => (147, 584);
+
     public static (int X, int Y)? ActionFor(ChallengeScreenState state, ImageFrame image) => state switch
     {
         ChallengeScreenState.GameModeSelector => (480, 205),
         ChallengeScreenState.ChallengeAvailable => ChallengeAvailableAction(image),
-        ChallengeScreenState.PreviewReady => ActionButtonDetector.ActionFor(image, "challenge_preview_start"),
+        ChallengeScreenState.ChallengeCooldown => (308, 437),
+        ChallengeScreenState.PreviewReady => PreviewReadyAction(image),
         ChallengeScreenState.PostMatchPreview => ActionButtonDetector.ActionFor(image, "challenge_change_mode"),
         ChallengeScreenState.Prestart => StartDialogDetector.ActionFor(image),
         ChallengeScreenState.Victory => ActionButtonDetector.ActionFor(image, "challenge_victory_close"),
@@ -125,7 +168,9 @@ public static class ChallengeScreenDetector
     {
         ChallengeScreenState.GameModeSelector => 0.76,
         ChallengeScreenState.ChallengeList => 0.74,
+        ChallengeScreenState.ChallengeListUnavailable => 0.80,
         ChallengeScreenState.ChallengeAvailable => 0.76,
+        ChallengeScreenState.ChallengeCooldown => 0.76,
         ChallengeScreenState.PreviewReady => 0.78,
         ChallengeScreenState.PostMatchPreview => 0.76,
         ChallengeScreenState.Prestart => 0.82,
@@ -140,15 +185,25 @@ public static class ChallengeScreenDetector
         double storyTitle = ColorFraction(image, StoryTileTitleRegion, IsCyan);
         double raidTitle = ColorFraction(image, RaidTileTitleRegion, IsRaidRed);
         double expeditionTitle = ColorFraction(image, ExpeditionTileTitleRegion, IsExpeditionGreen);
-        double dark = ColorFraction(image, ChallengeTileRegion, IsDark);
-        if (title < 0.018 || storyTitle < 0.008 || raidTitle < 0.006 || expeditionTitle < 0.006 || dark < 0.30) return 0;
+        double rowDivider = BestHorizontalLineFraction(image, GameModeRowDividerRegion, IsDark);
+        double columnDivider = BestVerticalLineFraction(image, GameModeColumnDividerRegion, IsDark);
+        if (title < 0.018 ||
+            storyTitle < 0.008 ||
+            raidTitle < 0.006 ||
+            expeditionTitle < 0.006 ||
+            rowDivider < 0.80 ||
+            columnDivider < 0.48)
+        {
+            return 0;
+        }
         return Math.Clamp(
             0.72 +
-            0.10 * Ramp(title, 0.018, 0.08) +
-            0.05 * Ramp(storyTitle, 0.008, 0.04) +
+            0.08 * Ramp(title, 0.018, 0.08) +
+            0.04 * Ramp(storyTitle, 0.008, 0.04) +
             0.04 * Ramp(raidTitle, 0.006, 0.035) +
             0.04 * Ramp(expeditionTitle, 0.006, 0.035) +
-            0.05 * Ramp(dark, 0.30, 0.75),
+            0.04 * Ramp(rowDivider, 0.80, 0.99) +
+            0.04 * Ramp(columnDivider, 0.48, 0.85),
             0,
             1);
     }
@@ -156,19 +211,52 @@ public static class ChallengeScreenDetector
     private static (int X, int Y)? ChallengeAvailableAction(ImageFrame image)
     {
         (int X, int Y)? selectStage = ActionButtonDetector.ActionFor(image, "challenge_select_stage");
+        selectStage ??= ActionButtonDetector.ActionFor(image, "challenge_select_stage_wide");
         if (selectStage is not null) return selectStage;
         (int X, int Y)? matchmaking = ActionButtonDetector.ActionFor(image, "challenge_enter_matchmaking");
         if (matchmaking is null) return null;
         return (Math.Max(320, matchmaking.Value.X - 163), matchmaking.Value.Y);
     }
 
-    private static double PanelScore(ImageFrame image)
+    private static (int X, int Y)? PreviewReadyAction(ImageFrame image) =>
+        ActionButtonDetector.Score(image, "challenge_party_disband") > 0
+            ? ActionButtonDetector.ActionFor(image, "challenge_party_start")
+            : ActionButtonDetector.ActionFor(image, "challenge_preview_start");
+
+    private static double PanelScore(ImageFrame image) => PanelScore(image, IsCyan);
+
+    private static double PanelScore(ImageFrame image, Func<byte, byte, byte, bool> predicate) => Math.Max(
+        PanelScore(
+            image,
+            CompactPanelHeaderRegion,
+            CompactPanelTopEdgeRegion,
+            CompactPanelLeftRailRegion,
+            CompactPanelRightEdgeRegion,
+            CompactPanelBottomEdgeRegion,
+            predicate),
+        PanelScore(
+            image,
+            LargePanelHeaderRegion,
+            LargePanelTopEdgeRegion,
+            LargePanelLeftRailRegion,
+            LargePanelRightEdgeRegion,
+            LargePanelBottomEdgeRegion,
+            predicate));
+
+    private static double PanelScore(
+        ImageFrame image,
+        ScreenRegion headerRegion,
+        ScreenRegion topEdgeRegion,
+        ScreenRegion leftRailRegion,
+        ScreenRegion rightEdgeRegion,
+        ScreenRegion bottomEdgeRegion,
+        Func<byte, byte, byte, bool> predicate)
     {
-        double header = ColorFraction(image, PanelHeaderRegion, IsCyan);
-        double top = BestHorizontalLineFraction(image, PanelTopEdgeRegion, IsCyan);
-        double leftRailDark = ColorFraction(image, PanelLeftRailRegion, IsDark);
-        double right = BestVerticalLineFraction(image, PanelRightEdgeRegion, IsCyan);
-        double bottom = BestHorizontalLineFraction(image, PanelBottomEdgeRegion, IsCyan);
+        double header = ColorFraction(image, headerRegion, predicate);
+        double top = BestHorizontalLineFraction(image, topEdgeRegion, predicate);
+        double leftRailDark = ColorFraction(image, leftRailRegion, IsDark);
+        double right = BestVerticalLineFraction(image, rightEdgeRegion, predicate);
+        double bottom = BestHorizontalLineFraction(image, bottomEdgeRegion, predicate);
         if (header < 0.025 || top < 0.55 || leftRailDark < 0.52 || right < 0.35 || bottom < 0.30) return 0;
         return Math.Clamp(
             0.66 +
@@ -194,10 +282,39 @@ public static class ChallengeScreenDetector
             if (supported) supportedRows++;
             if (centerY == 425) bottomRowSupported = supported;
         }
-        // A blue reward overlay can saturate these same coordinates. Real selector
-        // compass icons are sparse outlines, and the fixed third row is always present.
-        if (supportedRows < 2 || !bottomRowSupported) return 0;
-        return Math.Clamp(0.70 * panelScore + 0.30 * (supportedRows / 3d), 0, 1);
+        // Hovering one selector row can dim the other compass emblems from cyan to
+        // gray. The two long separators remain stable across both observed panel
+        // scales and distinguish the three-row selector from a Challenge detail view.
+        double separatorEvidence = ChallengeListSeparatorEvidence(image);
+
+        // A blue reward overlay can saturate the old emblem coordinates. Preserve
+        // sparse cyan emblems as independent evidence, but never require their color.
+        double emblemEvidence = supportedRows >= 2 && bottomRowSupported ? supportedRows / 3d : 0;
+        double rowEvidence = Math.Max(separatorEvidence, emblemEvidence);
+        if (rowEvidence == 0) return 0;
+        return Math.Clamp(0.70 * panelScore + 0.30 * rowEvidence, 0, 1);
+    }
+
+    private static double ChallengeListUnavailableScore(ImageFrame image, double activePanelScore)
+    {
+        if (activePanelScore > 0) return 0;
+        double neutralPanel = PanelScore(image, IsNeutralGray);
+        double separatorEvidence = ChallengeListSeparatorEvidence(image);
+        double regularNeutral = ColorFraction(image, RegularChallengeTabRegion, IsNeutralGray);
+        if (neutralPanel == 0 || separatorEvidence == 0 || regularNeutral < 0.25) return 0;
+        return Math.Clamp(
+            0.65 * neutralPanel +
+            0.25 * separatorEvidence +
+            0.10 * Ramp(regularNeutral, 0.25, 0.60),
+            0,
+            1);
+    }
+
+    private static double ChallengeListSeparatorEvidence(ImageFrame image)
+    {
+        double first = BestHorizontalLineFraction(image, ChallengeListFirstSeparatorRegion, IsNeutralGray);
+        double second = BestHorizontalLineFraction(image, ChallengeListSecondSeparatorRegion, IsNeutralGray);
+        return first >= 0.65 && second >= 0.65 ? (first + second) / 2 : 0;
     }
 
     private static double DarkPartyPanelScore(ImageFrame image)
@@ -205,6 +322,13 @@ public static class ChallengeScreenDetector
         ScreenRegion partyPanel = new(410, 160, 355, 250);
         double dark = ColorFraction(image, partyPanel, IsDark);
         return dark < 0.45 ? 0 : 0.65 + 0.35 * Ramp(dark, 0.45, 0.85);
+    }
+
+    private static double CooldownFooterScore(ImageFrame image)
+    {
+        ScreenRegion footer = new(345, 418, 325, 38);
+        double neutral = ColorFraction(image, footer, IsNeutralGray);
+        return neutral < 0.45 ? 0 : 0.72 + 0.28 * Ramp(neutral, 0.45, 0.68);
     }
 
     private static double VictoryRosterScore(ImageFrame image)
@@ -283,6 +407,13 @@ public static class ChallengeScreenDetector
 
     private static bool IsDark(byte red, byte green, byte blue) =>
         red + green + blue <= 150;
+
+    private static bool IsNeutralGray(byte red, byte green, byte blue)
+    {
+        int maximum = Math.Max(red, Math.Max(green, blue));
+        int minimum = Math.Min(red, Math.Min(green, blue));
+        return maximum - minimum <= 28 && maximum is >= 35 and <= 190;
+    }
 
     private static double Ramp(double value, double minimum, double maximum) =>
         Math.Clamp((value - minimum) / (maximum - minimum), 0, 1);

@@ -23,9 +23,12 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
     public async Task SendAsync(DiscordNotification notification, CancellationToken cancellationToken)
     {
         if (!ValidateWebhookUrl(notification.WebhookUrl)) throw new ArgumentException("The Discord webhook URL is not valid.", nameof(notification));
+        string attachmentPrefix = notification.AttachmentPrefix.Equals("challenge", StringComparison.OrdinalIgnoreCase)
+            ? "challenge"
+            : "expeditions";
         string? filename = notification.Screenshot is null
             ? null
-            : $"expeditions_{notification.Event.ToLowerInvariant()}_{DateTimeOffset.Now:yyyyMMdd_HHmmss}.png";
+            : $"{attachmentPrefix}_{notification.Event.ToLowerInvariant()}_{DateTimeOffset.Now:yyyyMMdd_HHmmss}.png";
         Dictionary<string, object?> payload = BuildComponentsPayload(notification, filename);
         using HttpRequestMessage request = new(HttpMethod.Post, ComponentsUrl(notification.WebhookUrl));
         if (filename is null || notification.Screenshot is null)
@@ -84,21 +87,27 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
     public static Dictionary<string, object?> BuildComponentsPayload(DiscordNotification notification, string? filename)
     {
         string eventName = notification.Event.ToLowerInvariant();
-        (string title, int color) = eventName switch
+        string title = eventName switch
         {
-            "victory" => ("Victory", 0x57F287),
-            "defeat" => ("Defeat", 0xED4245),
-            "recovery" => ("Rejoin needed", 0xFEE75C),
+            "started" => "Started",
+            "attempt" => "Challenge started",
+            "victory" => "Victory",
+            "defeat" => "Defeat",
+            "recovery" => "Rejoin needed",
+            "waiting" => "Waiting",
             _ => throw new ArgumentException($"Unsupported Discord event '{notification.Event}'."),
         };
+        string route = string.IsNullOrWhiteSpace(notification.Route)
+            ? $"Map {notification.MapNumber}, Difficulty {notification.Difficulty}"
+            : notification.Route;
         List<object> components =
         [
-            new Dictionary<string, object?> { ["type"] = 10, ["content"] = $"## Expeditions Macro: {title}\n{notification.Detail}" },
+            new Dictionary<string, object?> { ["type"] = 10, ["content"] = $"## {notification.MacroName}: {title}\n{notification.Detail}" },
             new Dictionary<string, object?> { ["type"] = 14, ["divider"] = true, ["spacing"] = 1 },
             new Dictionary<string, object?>
             {
                 ["type"] = 10,
-                ["content"] = $"**Runtime:** {FormatRuntime(notification.Runtime)}\n**Victories:** {notification.Victories}    **Defeats:** {notification.Defeats}\n**Route:** Map {notification.MapNumber}, Difficulty {notification.Difficulty}",
+                ["content"] = $"**Runtime:** {FormatRuntime(notification.Runtime)}\n**Victories:** {notification.Victories}    **Defeats:** {notification.Defeats}\n**Route:** {route}",
             },
         ];
         if (filename is not null)
@@ -124,12 +133,12 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
         Dictionary<string, object?> payload = new()
         {
             ["flags"] = ComponentsV2Flag,
+            ["allowed_mentions"] = new Dictionary<string, object?> { ["parse"] = Array.Empty<string>() },
             ["components"] = new[]
             {
                 new Dictionary<string, object?>
                 {
                     ["type"] = 17,
-                    ["accent_color"] = color,
                     ["components"] = components,
                 },
             },

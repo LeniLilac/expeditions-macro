@@ -10,9 +10,9 @@ public sealed class ChallengeScreenDetectorTests
     [Fact]
     public void FixedChallengeTypes_MapToStableSelectorRows()
     {
-        Assert.Equal((470, 244), ChallengeScreenDetector.ActionForType(ChallengeType.Trait));
-        Assert.Equal((470, 335), ChallengeScreenDetector.ActionForType(ChallengeType.Stat));
-        Assert.Equal((470, 425), ChallengeScreenDetector.ActionForType(ChallengeType.Sprite));
+        Assert.Equal((320, 244), ChallengeScreenDetector.ActionForType(ChallengeType.Trait));
+        Assert.Equal((320, 335), ChallengeScreenDetector.ActionForType(ChallengeType.Stat));
+        Assert.Equal((320, 425), ChallengeScreenDetector.ActionForType(ChallengeType.Sprite));
     }
 
     [Fact]
@@ -27,16 +27,44 @@ public sealed class ChallengeScreenDetectorTests
     public void GameModeSelector_UsesAllFourStableModeHeadings()
     {
         ImageFrame image = Frame();
-        Fill(image, 360, 150, 250, 105, 20, 20, 20);
         Fill(image, 370, 160, 20, 10, 200, 150, 20);
         Fill(image, 370, 60, 12, 10, 20, 160, 200);
         Fill(image, 580, 60, 12, 10, 190, 30, 25);
         Fill(image, 610, 160, 12, 10, 25, 150, 70);
+        Fill(image, 355, 150, 440, 2, 20, 20, 20);
+        Fill(image, 570, 45, 2, 215, 20, 20, 20);
 
         ChallengeScreenMatch match = ChallengeScreenDetector.Detect(image);
 
         Assert.Equal(ChallengeScreenState.GameModeSelector, match.State);
         Assert.Equal((480, 205), (match.ActionX, match.ActionY));
+    }
+
+    [Fact]
+    public void GameModeSelector_WithBrightChallengeArtwork_UsesStableDividers()
+    {
+        string file = Path.Combine(TestPaths.ChallengeDatasets, "GameModeSelector", "GameModeSelector_05.png");
+
+        ChallengeScreenMatch match = ChallengeScreenDetector.Detect(ImageCodec.Load(file));
+
+        Assert.Equal(ChallengeScreenState.GameModeSelector, match.State);
+        Assert.InRange(match.Confidence, ChallengeScreenDetector.Threshold(ChallengeScreenState.GameModeSelector), 1);
+        Assert.Equal((480, 205), (match.ActionX, match.ActionY));
+    }
+
+    [Fact]
+    public void NonSelectorChallengeFixtures_DoNotScoreAsTheGameModeSelector()
+    {
+        string selectorDirectory = Path.Combine(TestPaths.ChallengeDatasets, "GameModeSelector");
+        foreach (string file in Directory.EnumerateFiles(TestPaths.ChallengeDatasets, "*.png", SearchOption.AllDirectories))
+        {
+            if (Path.GetDirectoryName(file)!.Equals(selectorDirectory, StringComparison.OrdinalIgnoreCase)) continue;
+
+            double score = ChallengeScreenDetector.ScoreStates(ImageCodec.Load(file))[ChallengeScreenState.GameModeSelector];
+            Assert.True(
+                score < ChallengeScreenDetector.Threshold(ChallengeScreenState.GameModeSelector),
+                $"{Path.GetFileName(file)} scored {score:P1} as the game-mode selector.");
+        }
     }
 
     [Fact]
@@ -49,6 +77,36 @@ public sealed class ChallengeScreenDetectorTests
 
         Assert.Equal(ChallengeScreenState.ChallengeList, match.State);
         Assert.Null(match.ActionX);
+    }
+
+    [Fact]
+    public void ChallengeList_WithDimmedUnhoveredRows_UsesTheRepeatedRowStructure()
+    {
+        string file = Path.Combine(TestPaths.ChallengeDatasets, "ChallengeList", "ChallengeList_11.png");
+
+        ChallengeScreenMatch match = ChallengeScreenDetector.Detect(ImageCodec.Load(file));
+
+        Assert.Equal(ChallengeScreenState.ChallengeList, match.State);
+        Assert.InRange(match.Confidence, ChallengeScreenDetector.Threshold(ChallengeScreenState.ChallengeList), 1);
+        foreach (ChallengeType type in Enum.GetValues<ChallengeType>())
+        {
+            (int x, int y) = ChallengeScreenDetector.ActionForType(type);
+            Assert.InRange(x, 280, 380);
+            Assert.InRange(y, 210, 455);
+        }
+    }
+
+    [Fact]
+    public void UnavailableRegularChallengeList_IsAThirtyMinuteCooldownState()
+    {
+        string file = Path.Combine(TestPaths.ChallengeDatasets, "ChallengeListUnavailable", "ChallengeListUnavailable_01.png");
+
+        ChallengeScreenMatch match = ChallengeScreenDetector.Detect(ImageCodec.Load(file));
+
+        Assert.Equal(ChallengeScreenState.ChallengeListUnavailable, match.State);
+        Assert.InRange(match.Confidence, ChallengeScreenDetector.Threshold(ChallengeScreenState.ChallengeListUnavailable), 1);
+        Assert.Null(match.ActionX);
+        Assert.Null(match.ActionY);
     }
 
     [Fact]
@@ -75,6 +133,19 @@ public sealed class ChallengeScreenDetectorTests
 
         Assert.Equal(ChallengeScreenState.PreviewReady, match.State);
         Assert.InRange(match.ActionX!.Value, 470, 540);
+        Assert.InRange(match.ActionY!.Value, 365, 385);
+    }
+
+    [Fact]
+    public void PrivatePartyPreview_UsesTheGreenStartAndRedDisbandPair()
+    {
+        string file = Path.Combine(TestPaths.ChallengeDatasets, "PreviewReady", "PreviewReady_03.png");
+
+        ChallengeScreenMatch match = ChallengeScreenDetector.Detect(ImageCodec.Load(file));
+
+        Assert.Equal(ChallengeScreenState.PreviewReady, match.State);
+        Assert.InRange(match.ActionX!.Value, 495, 515);
+        Assert.InRange(match.ActionY!.Value, 385, 400);
     }
 
     [Fact]
@@ -83,6 +154,89 @@ public sealed class ChallengeScreenDetectorTests
         ImageFrame image = new(800, 600, PixelFormat.Rgb24, new byte[800 * 600 * 3], takeOwnership: true);
 
         Assert.Throws<InvalidDataException>(() => ChallengeScreenDetector.Detect(image));
+    }
+
+    [Theory]
+    [InlineData("GameModeSelector", ChallengeScreenState.GameModeSelector)]
+    [InlineData("ChallengeList", ChallengeScreenState.ChallengeList)]
+    [InlineData("ChallengeListUnavailable", ChallengeScreenState.ChallengeListUnavailable)]
+    [InlineData("ChallengeAvailable", ChallengeScreenState.ChallengeAvailable)]
+    [InlineData("ChallengeCooldown", ChallengeScreenState.ChallengeCooldown)]
+    [InlineData("PreviewReady", ChallengeScreenState.PreviewReady)]
+    [InlineData("PostMatchPreview", ChallengeScreenState.PostMatchPreview)]
+    [InlineData("Victory", ChallengeScreenState.Victory)]
+    [InlineData("Defeat", ChallengeScreenState.Defeat)]
+    public void ReviewedChallengeFixtures_MatchTheirExpectedState(string dataset, ChallengeScreenState expected)
+    {
+        string directory = Path.Combine(TestPaths.ChallengeDatasets, dataset);
+        foreach (string file in Directory.EnumerateFiles(directory, "*.png"))
+        {
+            ChallengeScreenMatch match = ChallengeScreenDetector.Detect(ImageCodec.Load(file));
+            Assert.Equal(expected, match.State);
+        }
+    }
+
+    [Theory]
+    [InlineData("Prestart_RoseKingdom")]
+    [InlineData("Prestart_SchoolGrounds")]
+    [InlineData("Prestart_FairyKingForest")]
+    [InlineData("Prestart_KingsTomb")]
+    [InlineData("Prestart_FlowerForest")]
+    public void ReviewedMapPrestarts_MatchTheStartDialog(string dataset)
+    {
+        string directory = Path.Combine(TestPaths.ChallengeDatasets, dataset);
+        foreach (string file in Directory.EnumerateFiles(directory, "*.png"))
+        {
+            Assert.Equal(ChallengeScreenState.Prestart, ChallengeScreenDetector.Detect(ImageCodec.Load(file)).State);
+        }
+    }
+
+    [Fact]
+    public void WiderVictoryPanel_ClicksTheDetectedRightShiftedCloseButton()
+    {
+        string file = Path.Combine(TestPaths.ChallengeDatasets, "Victory", "Victory_05.png");
+
+        ChallengeScreenMatch match = ChallengeScreenDetector.Detect(ImageCodec.Load(file));
+
+        Assert.Equal(ChallengeScreenState.Victory, match.State);
+        Assert.InRange(match.ActionX!.Value, 675, 690);
+        Assert.InRange(match.ActionY!.Value, 145, 160);
+    }
+
+    [Fact]
+    public void HoveredVictoryCloseButton_RemainsActionable()
+    {
+        string file = Path.Combine(TestPaths.ChallengeDatasets, "Victory", "Victory_07.png");
+
+        ChallengeScreenMatch match = ChallengeScreenDetector.Detect(ImageCodec.Load(file));
+
+        Assert.Equal(ChallengeScreenState.Victory, match.State);
+        Assert.InRange(match.ActionX!.Value, 675, 690);
+        Assert.InRange(match.ActionY!.Value, 140, 155);
+    }
+
+    [Fact]
+    public void ChallengeDetailTooltip_DoesNotMatchATerminalScreen()
+    {
+        string directory = Path.Combine(TestPaths.ChallengeDatasets, "ChallengeDetailTooltipNegative");
+        foreach (string file in Directory.EnumerateFiles(directory, "*.png"))
+        {
+            ChallengeScreenState state = ChallengeScreenDetector.Detect(ImageCodec.Load(file)).State;
+            Assert.True(state is not ChallengeScreenState.Victory and not ChallengeScreenState.Defeat);
+        }
+    }
+
+    [Theory]
+    [InlineData("GameplayNegative")]
+    [InlineData("ExpeditionHandoffNegative")]
+    public void ChallengeNegativeFixtures_DoNotMatchActionableChallengeScreens(string dataset)
+    {
+        string directory = Path.Combine(TestPaths.ChallengeDatasets, dataset);
+        foreach (string file in Directory.EnumerateFiles(directory, "*.png"))
+        {
+            ChallengeScreenState state = ChallengeScreenDetector.Detect(ImageCodec.Load(file)).State;
+            Assert.True(state is ChallengeScreenState.None or ChallengeScreenState.Prestart);
+        }
     }
 
     [Theory]
@@ -100,6 +254,26 @@ public sealed class ChallengeScreenDetectorTests
         {
             ChallengeScreenMatch match = ChallengeScreenDetector.Detect(ImageCodec.Load(file));
             Assert.Equal(ChallengeScreenState.None, match.State);
+        }
+    }
+
+    [Fact]
+    public void ExpeditionsFixtures_DoNotMatchChallengeOnlyStates()
+    {
+        ChallengeScreenState[] challengeOnlyStates =
+        [
+            ChallengeScreenState.ChallengeList,
+            ChallengeScreenState.ChallengeListUnavailable,
+            ChallengeScreenState.ChallengeAvailable,
+            ChallengeScreenState.ChallengeCooldown,
+            ChallengeScreenState.PreviewReady,
+            ChallengeScreenState.PostMatchPreview,
+            ChallengeScreenState.Victory,
+        ];
+        foreach (string file in Directory.EnumerateFiles(TestPaths.Datasets, "*.png", SearchOption.AllDirectories))
+        {
+            ChallengeScreenState state = ChallengeScreenDetector.Detect(ImageCodec.Load(file)).State;
+            Assert.DoesNotContain(state, challengeOnlyStates);
         }
     }
 

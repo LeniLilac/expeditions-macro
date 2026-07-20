@@ -113,7 +113,13 @@ internal static class StartDialogDetector
         double centerScore = Math.Clamp(1 - normalizedDistance, 0, 1);
         if (centerScore == 0) return 0;
 
-        int panelHeight = (int)Math.Round(component.Height * 3.35);
+        // Roblox can render the same Start button border a couple of pixels
+        // thicker on another PC. Width remains stable, while deriving the
+        // dialog height from border thickness can move the header sample into
+        // the world background and reject an otherwise identical dialog.
+        int panelHeight = Math.Min(
+            (int)Math.Round(component.Height * 3.35),
+            (int)Math.Round(component.Width * 0.41));
         int headerHeight = Math.Max(1, (int)Math.Round(panelHeight * 0.58));
         int headerTop = component.Top - panelHeight;
         int headerLeft = Math.Max(0, component.Left - 5);
