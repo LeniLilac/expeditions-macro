@@ -4,6 +4,55 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-07-20
+
+### Added
+
+- Added a complete regular-Challenge workflow for Trait, Stat, and Sprite rotations across five maps.
+- Added per-map camera selection, before-start placement, delayed after-start placement, configurable defeat retries, half-hour reset tracking, and daily-limit waiting.
+- Added an optional Expeditions handoff while Challenges are on cooldown and Components V2 reporting for Challenge attempts, results, recovery, and waiting states.
+
+### Fixed
+
+- Hardened Challenge navigation across both observed selector scales, unavailable and dimmed rows, animated thumbnails, private-party previews, reward tooltips, hovered controls, and bright game-mode artwork.
+- Clicked Challenge map artwork instead of reward icons and tied all shared-screen detections to their expected transition context.
+- Included the v1.0.14 post-teleport recovery and v1.0.15 confirmation-dismissal fixes in the Challenge-capable build.
+
+### Tests
+
+- Added 67 selective Challenge fixtures covering multiple players, PCs, all five maps, gameplay, terminal screens, cooldowns, and Expeditions handoff states.
+- Passed 219 automated tests across 336 checked-in Roblox client captures.
+
+## [1.0.15] - 2026-07-20
+
+### Fixed
+
+- Waited for Roblox to acknowledge a registered cursor move before pressing a UI button, improving clicks on slower or low-frame-rate clients.
+- Verified that the Continue Expedition confirmation actually closes and retried its detected button up to three times when Roblox ignores an input event, instead of remaining on the modal indefinitely.
+- Stopped with an actionable error after the bounded retries if the confirmation never clears, avoiding an unobservable infinite stall.
+
+### Tests
+
+- Replayed all 21 frames from the reported v1.0.14 diagnostic capture at 98.6% confirmation confidence with an action at `(340, 340)`.
+- Added a privacy-redacted 808 by 611 fixture proving the modal action cannot fall through to the underlying checkpoint Continue button.
+- Added confirmation-transaction regressions proving dismissal ends the transaction and a persistent dialog permits exactly three verified attempts.
+
+## [1.0.14] - 2026-07-19
+
+### Changed
+
+- Updated the in-app and README community link to the current Expeditions Macro Discord invite.
+
+### Fixed
+
+- Continued automatic lobby recovery through the initial in-map checkpoint that can appear after the teleport preview, instead of retaining a stale preview state and waiting indefinitely.
+- Restricted that standalone Continue transition to the post-teleport recovery step so ordinary node pauses and the map-preview action cannot be mistaken for it.
+
+### Tests
+
+- Reproduced the reported 808 by 611 diagnostic frame locally at 100% Continue confidence and verified its Roblox-relative action at `(404, 490)`.
+- Added recovery-policy regressions for the post-preview Continue transition, its normal disabled state, and map-preview priority when both signals are present.
+
 ## [1.0.13] - 2026-07-19
 
 ### Added
@@ -161,7 +210,9 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.0.13...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.0.15...HEAD
+[1.0.15]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.15
+[1.0.14]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.14
 [1.0.13]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.13
 [1.0.12]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.12
 [1.0.11]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.11
