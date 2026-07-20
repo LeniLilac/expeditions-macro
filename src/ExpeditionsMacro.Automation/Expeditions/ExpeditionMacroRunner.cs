@@ -51,14 +51,14 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         IProgress<MacroProgress>? progress = null,
         Action<MacroEvent>? log = null,
         Action<ExpeditionRunSummary>? summaryChanged = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        DateTimeOffset? stopAfterCurrentRunUtc = null)
     {
         preset.Validate();
         cameraModel.Manifest.Validate();
         placementModel.Validate();
         ValidateCompatibility(preset, cameraModel, placementModel, detector.Manifest);
         RobloxWindow window = _automation.FindWindow() ?? throw new InvalidOperationException("No visible Roblox window was found.");
-        WindowBounds original = _automation.GetWindowBounds(window);
         DateTimeOffset startedAt = DateTimeOffset.UtcNow;
         Stopwatch runtime = Stopwatch.StartNew();
         int repeats = 0;
@@ -97,21 +97,49 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                if (ExpeditionRunPolicy.StopDeadlineReached(DateTimeOffset.UtcNow, stopAfterCurrentRunUtc))
+                {
+                    Write("Challenge reset reached before the next Expedition run. Returning to Challenges.", MacroEventLevel.Success);
+                    return;
+                }
                 bossesSeen = 0;
                 PublishSummary();
                 try
                 {
                     Report("Waiting", 0, "Waiting for the Expedition prestart screen.");
-                    await WaitForStateAsync(window, detector, "start", preset, Report, Write, cancellationToken).ConfigureAwait(false);
+                    bool prestartReady = await WaitForStateAsync(
+                        window,
+                        detector,
+                        "start",
+                        preset,
+                        Report,
+                        Write,
+                        stopAfterCurrentRunUtc,
+                        cancellationToken).ConfigureAwait(false);
+                    if (!prestartReady)
+                    {
+                        Write("Challenge reset reached while waiting for the next Expedition run. Returning to Challenges.", MacroEventLevel.Success);
+                        return;
+                    }
                     Write("Prestart screen recognized. Preparing camera.", MacroEventLevel.Success);
                     await PrepareCameraAsync(window, preset, cameraModel, value => shiftLockEnabled = value, progress, Write, cancellationToken).ConfigureAwait(false);
                     shiftLockEnabled = false;
                     await ThrowIfRecoveryAsync(window, detector, preset, cancellationToken).ConfigureAwait(false);
+                    if (ExpeditionRunPolicy.StopDeadlineReached(DateTimeOffset.UtcNow, stopAfterCurrentRunUtc))
+                    {
+                        Write("Challenge reset reached during Expedition preparation. Returning before starting the node.", MacroEventLevel.Success);
+                        return;
+                    }
 
                     Report("Placement", 0, "Placing the recorded prestart units.");
                     await PlaceStepsAsync(window, placementModel, placementModel.Steps, preset, Write, cancellationToken).ConfigureAwait(false);
                     Write($"Preplace pass sent {placementModel.Steps.Count} placement(s).");
                     await ThrowIfRecoveryAsync(window, detector, preset, cancellationToken).ConfigureAwait(false);
+                    if (ExpeditionRunPolicy.StopDeadlineReached(DateTimeOffset.UtcNow, stopAfterCurrentRunUtc))
+                    {
+                        Write("Challenge reset reached during Expedition preparation. Returning before starting the node.", MacroEventLevel.Success);
+                        return;
+                    }
 
                     Report("Starting node", 0, "Starting the Expedition node.");
                     await ClickActionAsync(window, detector, "start", cancellationToken).ConfigureAwait(false);
@@ -132,6 +160,14 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                     PublishSummary();
                     string detail = terminal.State == "victory" ? "The run reached the Victory screen." : "The run reached the Defeat screen.";
                     QueueNotification(webhookUrl, terminal.State, detail, terminal.Frame, runtime.Elapsed, victories, defeats, preset, Write);
+                    if (ExpeditionRunPolicy.StopDeadlineReached(DateTimeOffset.UtcNow, stopAfterCurrentRunUtc))
+                    {
+                        Report("Completed", 100, "Current Expedition run finished. Returning to Challenges.", terminal.State, null);
+                        Write("Challenge reset occurred during an Expedition run. Closing its results before switching modes.", MacroEventLevel.Information);
+                        await CloseTerminalForModeSwitchAsync(window, detector, terminal, preset, Report, Write, cancellationToken).ConfigureAwait(false);
+                        Write("Current Expedition run finished cleanly. Returning to Challenges.", MacroEventLevel.Success);
+                        return;
+                    }
                     if (terminal.State == "victory") Report("Completed", 100, "Extraction victory recognized. Repeating the stage.");
                     else if (ExpeditionRunPolicy.IsEarlyDefeat(preset, bossesSeen))
                     {
@@ -178,15 +214,6 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                     // Window restoration still proceeds.
                 }
             }
-            try
-            {
-                _automation.RestoreWindowBounds(window, original);
-                Write("Restored the original Roblox window bounds.");
-            }
-            catch (Exception error)
-            {
-                Write($"Could not restore the original Roblox window bounds: {error.Message}", MacroEventLevel.Warning);
-            }
             await FlushNotificationsAsync(Write).ConfigureAwait(false);
         }
     }
@@ -216,7 +243,6 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
             double score = await _camera.AlignAsync(
                 model,
                 window,
-                restoreWindow: false,
                 manageShiftLock: false,
                 progress: progress,
                 cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -356,6 +382,50 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         log("Extraction confirmed. Waiting for Victory or an early Defeat screen.", MacroEventLevel.Success, "extract_confirm", null);
     }
 
+    private async Task CloseTerminalForModeSwitchAsync(
+        RobloxWindow window,
+        IDetectorPack detector,
+        RunTerminal terminal,
+        ExpeditionPreset preset,
+        Action<string, int, string, string?, double?> report,
+        Action<string, MacroEventLevel, string?, double?> log,
+        CancellationToken cancellationToken)
+    {
+        const int maximumAttempts = 3;
+        for (int attempt = 1; attempt <= maximumAttempts; attempt++)
+        {
+            ImageFrame frame = CaptureClient(window, detector);
+            IReadOnlyDictionary<string, double> scores = detector.ScoreStates(frame);
+            if (!ExpeditionRunPolicy.IsStateDetected(detector.Manifest, scores, terminal.State)) return;
+
+            report(
+                "Transition",
+                100,
+                $"Closing the Expedition results before returning to Challenges ({attempt}/{maximumAttempts}).",
+                terminal.State,
+                scores[terminal.State]);
+            await ClickActionAsync(window, detector, "expedition_terminal_close", frame, cancellationToken).ConfigureAwait(false);
+            bool dismissed = await WaitForStateToClearAsync(
+                window,
+                detector,
+                terminal.State,
+                TimeSpan.FromSeconds(5),
+                preset,
+                report,
+                cancellationToken).ConfigureAwait(false);
+            if (dismissed) return;
+
+            log(
+                $"Expedition results remained visible after close attempt {attempt}/{maximumAttempts}.",
+                MacroEventLevel.Warning,
+                terminal.State,
+                scores[terminal.State]);
+        }
+
+        throw new InvalidOperationException(
+            $"The Expedition {terminal.State} screen remained visible after {maximumAttempts} focused close attempts.");
+    }
+
     private async Task ConfirmExtractionAsync(
         RobloxWindow window,
         IDetectorPack detector,
@@ -423,7 +493,6 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
             preset.UnitSelectDelayMilliseconds,
             stepSent: null,
             status: message => log(message, MacroEventLevel.Information, null, null),
-            restoreWindow: false,
             cancellationToken);
 
     private async Task RecoverToPrestartAsync(
@@ -631,13 +700,14 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         return null;
     }
 
-    private async Task WaitForStateAsync(
+    private async Task<bool> WaitForStateAsync(
         RobloxWindow window,
         IDetectorPack detector,
         string desired,
         ExpeditionPreset preset,
         Action<string, int, string, string?, double?> report,
         Action<string, MacroEventLevel, string?, double?> log,
+        DateTimeOffset? stopAfterCurrentRunUtc,
         CancellationToken cancellationToken)
     {
         StableStateTracker<string> tracker = new(preset.StableDetections);
@@ -645,6 +715,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (ExpeditionRunPolicy.StopDeadlineReached(DateTimeOffset.UtcNow, stopAfterCurrentRunUtc)) return false;
             ImageFrame frame = CaptureClient(window, detector);
             IReadOnlyDictionary<string, double> scores = detector.ScoreStates(frame);
             string? state = ExpeditionRunPolicy.PreferDesiredState(detector.Manifest, scores, desired, detector.Classify(scores));
@@ -653,7 +724,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
             if (tracker.Update(state) == desired)
             {
                 log($"Recognized {desired} at {scores[desired]:P0} confidence.", MacroEventLevel.Success, desired, scores[desired]);
-                return;
+                return true;
             }
             await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
         }

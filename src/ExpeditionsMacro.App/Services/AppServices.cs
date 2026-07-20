@@ -9,6 +9,7 @@ using ExpeditionsMacro.Automation.Updates;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
+using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Camera;
 using ExpeditionsMacro.Vision.Packs;
 using ExpeditionsMacro.Windows;
@@ -90,6 +91,7 @@ public sealed class AppServices : IDisposable
         services.Hotkey.Configure(configuredHotkey);
         services.Coordinator.HotkeyDisplayName = services.Hotkey.DisplayName;
         await services.EnsureBundledDetectorPackAsync();
+        await services.NormalizeRobloxWindowOnStartupAsync();
         services.Hotkey.Start();
         services.Log.Info($"Startup complete. {services.Hotkey.DisplayName} listener: {(services.Hotkey.IsRegistered ? "ready" : "unavailable")}.");
         return services;
@@ -153,14 +155,39 @@ public sealed class AppServices : IDisposable
                 captureName,
                 TimeSpan.FromSeconds(1),
                 cancellationToken: timeout.Token,
-                maximumCaptures: 10);
+                maximumCaptures: 10,
+                logFilePath: Settings.IncludeLogsInDiagnosticArchives ? Log.CurrentFile : null);
             Log.Info($"Automatic failure diagnostics saved to {Path.GetFileName(result.ArchivePath)}.");
-            return (result.ArchivePath, result.RestoreWarning);
+            return (result.ArchivePath, null);
         }
         catch (Exception captureError)
         {
             Log.Error("Automatic failure diagnostics could not be saved.", captureError);
             return (null, captureError.Message);
+        }
+    }
+
+    private async Task NormalizeRobloxWindowOnStartupAsync()
+    {
+        RobloxWindow? window = Automation.FindWindow();
+        if (window is null)
+        {
+            Log.Info("Roblox was not open during startup. Standard sizing will be applied when a workflow starts.");
+            return;
+        }
+
+        try
+        {
+            await Automation.ResizeClientAsync(
+                window.Value,
+                RobloxClientProfile.Width,
+                RobloxClientProfile.Height,
+                CancellationToken.None);
+            Log.Info($"Roblox client resized to {RobloxClientProfile.Width} by {RobloxClientProfile.Height} during startup.");
+        }
+        catch (Exception error)
+        {
+            Log.Warning($"Roblox could not be resized during startup: {error.Message}");
         }
     }
 

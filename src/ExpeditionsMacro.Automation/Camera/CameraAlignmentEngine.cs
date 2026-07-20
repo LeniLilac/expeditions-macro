@@ -44,7 +44,6 @@ public sealed class CameraAlignmentEngine
 
         RobloxWindow window = RequireWindow();
         Focus(window);
-        WindowBounds original = _automation.GetWindowBounds(window);
         ClientBounds initialClient = _automation.GetClientBounds(window);
 
         bool shiftLockEnabled = false;
@@ -53,7 +52,7 @@ public sealed class CameraAlignmentEngine
         {
             if (resized)
             {
-                progress?.Report(new MacroProgress("Camera setup", 1, $"Temporarily resizing Roblox to {RobloxClientProfile.Width} × {RobloxClientProfile.Height}."));
+                progress?.Report(new MacroProgress("Camera setup", 1, $"Resizing Roblox to {RobloxClientProfile.Width} × {RobloxClientProfile.Height}."));
                 await _automation.ResizeClientAsync(window, RobloxClientProfile.Width, RobloxClientProfile.Height, cancellationToken).ConfigureAwait(false);
                 await Task.Delay(250, cancellationToken).ConfigureAwait(false);
             }
@@ -115,21 +114,13 @@ public sealed class CameraAlignmentEngine
         }
         finally
         {
-            try
-            {
-                if (shiftLockEnabled) await DisableShiftLockAsync(window).ConfigureAwait(false);
-            }
-            finally
-            {
-                if (resized) _automation.RestoreWindowBounds(window, original);
-            }
+            if (shiftLockEnabled) await DisableShiftLockAsync(window).ConfigureAwait(false);
         }
     }
 
     public async Task<double> AlignAsync(
         CameraModel model,
         RobloxWindow? existingWindow = null,
-        bool restoreWindow = true,
         bool manageShiftLock = true,
         IProgress<MacroProgress>? progress = null,
         CancellationToken cancellationToken = default)
@@ -137,7 +128,6 @@ public sealed class CameraAlignmentEngine
         model.Manifest.Validate();
         RobloxWindow window = existingWindow ?? RequireWindow();
         Focus(window);
-        WindowBounds original = _automation.GetWindowBounds(window);
         ClientBounds currentClient = _automation.GetClientBounds(window);
         bool resized = currentClient.Width != model.Manifest.ClientWidth || currentClient.Height != model.Manifest.ClientHeight;
         bool shiftLockEnabled = false;
@@ -146,7 +136,7 @@ public sealed class CameraAlignmentEngine
             progress?.Report(new MacroProgress("Camera alignment", 2, "Starting camera alignment."));
             if (resized)
             {
-                progress?.Report(new MacroProgress("Camera alignment", 4, $"Temporarily resizing Roblox to {model.Manifest.ClientWidth} × {model.Manifest.ClientHeight}."));
+                progress?.Report(new MacroProgress("Camera alignment", 4, $"Resizing Roblox to {model.Manifest.ClientWidth} × {model.Manifest.ClientHeight}."));
                 await _automation.ResizeClientAsync(window, model.Manifest.ClientWidth, model.Manifest.ClientHeight, cancellationToken).ConfigureAwait(false);
                 await Task.Delay(250, cancellationToken).ConfigureAwait(false);
             }
@@ -207,14 +197,7 @@ public sealed class CameraAlignmentEngine
         }
         finally
         {
-            try
-            {
-                if (shiftLockEnabled) await DisableShiftLockAsync(window).ConfigureAwait(false);
-            }
-            finally
-            {
-                if (resized && restoreWindow) _automation.RestoreWindowBounds(window, original);
-            }
+            if (shiftLockEnabled) await DisableShiftLockAsync(window).ConfigureAwait(false);
         }
     }
 

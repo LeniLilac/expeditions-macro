@@ -12,7 +12,7 @@ namespace ExpeditionsMacro.App.Services;
 
 public sealed record DiagnosticCaptureProgress(int Captures, string Message);
 
-public sealed record DiagnosticCaptureResult(string ArchivePath, int Captures, string? RestoreWarning = null);
+public sealed record DiagnosticCaptureResult(string ArchivePath, int Captures, bool LogsIncluded);
 
 public sealed class DiagnosticCaptureService
 {
@@ -38,7 +38,8 @@ public sealed class DiagnosticCaptureService
         TimeSpan interval,
         IProgress<DiagnosticCaptureProgress>? progress = null,
         CancellationToken cancellationToken = default,
-        int? maximumCaptures = null)
+        int? maximumCaptures = null,
+        string? logFilePath = null)
     {
         string safeName = SafeName(captureName);
         if (interval < TimeSpan.FromMilliseconds(100) || interval > TimeSpan.FromMinutes(5))
@@ -51,7 +52,6 @@ public sealed class DiagnosticCaptureService
         }
 
         RobloxWindow window = _automation.FindWindow() ?? throw new InvalidOperationException("No visible Roblox window was found.");
-        WindowBounds originalBounds = _automation.GetWindowBounds(window);
         string diagnosticsRoot = Path.GetFullPath(_paths.Diagnostics);
         Directory.CreateDirectory(diagnosticsRoot);
         string staging = Path.Combine(diagnosticsRoot, $".capture-{Guid.NewGuid():N}");
@@ -66,7 +66,6 @@ public sealed class DiagnosticCaptureService
         DateTimeOffset startedAt = DateTimeOffset.UtcNow;
         bool stopped = false;
         bool completed = false;
-        Exception? restoreError = null;
         try
         {
             if (!_automation.Focus(window)) throw new InvalidOperationException("Windows could not focus Roblox.");
@@ -107,19 +106,6 @@ public sealed class DiagnosticCaptureService
             if (File.Exists(temporaryArchive)) File.Delete(temporaryArchive);
             throw;
         }
-        finally
-        {
-            try
-            {
-                _automation.RestoreWindowBounds(window, originalBounds);
-            }
-            catch (Exception error)
-            {
-                // Preserve the captures even if Roblox closed before its bounds could be restored.
-                restoreError = error;
-            }
-        }
-
         try
         {
             if (frames.Count == 0)
@@ -128,6 +114,8 @@ public sealed class DiagnosticCaptureService
                 throw new InvalidOperationException("No screenshots were captured.");
             }
 
+            bool logsIncluded = TryCopyLog(logFilePath, staging);
+            string[] includedFiles = logsIncluded ? ["macro-run.log"] : [];
             DiagnosticCaptureManifest manifest = new(
                 safeName,
                 Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "unknown",
@@ -136,6 +124,7 @@ public sealed class DiagnosticCaptureService
                 ClientWidth,
                 ClientHeight,
                 (int)Math.Round(interval.TotalMilliseconds),
+                includedFiles,
                 frames);
             await File.WriteAllTextAsync(
                 Path.Combine(staging, "manifest.json"),
@@ -146,11 +135,10 @@ public sealed class DiagnosticCaptureService
             ZipFile.CreateFromDirectory(staging, temporaryArchive, CompressionLevel.Optimal, includeBaseDirectory: false);
             File.Move(temporaryArchive, archivePath, overwrite: true);
             completed = true;
-            string? warning = restoreError is null ? null : $"Roblox bounds could not be restored: {restoreError.Message}";
             string message = $"Saved {frames.Count} screenshot(s) to {Path.GetFileName(archivePath)}.";
-            if (warning is not null) message += $" {warning}";
+            if (logsIncluded) message += " Included the current macro run log.";
             progress?.Report(new DiagnosticCaptureProgress(frames.Count, message));
-            return new DiagnosticCaptureResult(archivePath, frames.Count, warning);
+            return new DiagnosticCaptureResult(archivePath, frames.Count, logsIncluded);
         }
         finally
         {
@@ -179,6 +167,13 @@ public sealed class DiagnosticCaptureService
         encoder.Save(output);
     }
 
+    private static bool TryCopyLog(string? logFilePath, string staging)
+    {
+        if (string.IsNullOrWhiteSpace(logFilePath) || !File.Exists(logFilePath)) return false;
+        File.Copy(logFilePath, Path.Combine(staging, "macro-run.log"), overwrite: true);
+        return true;
+    }
+
     private static void EnsureChildPath(string root, string path)
     {
         string prefix = root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
@@ -198,5 +193,6 @@ public sealed class DiagnosticCaptureService
         int ClientWidth,
         int ClientHeight,
         int IntervalMilliseconds,
+        IReadOnlyList<string> IncludedFiles,
         IReadOnlyList<DiagnosticCaptureFrame> Frames);
 }

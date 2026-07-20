@@ -11,7 +11,7 @@ namespace ExpeditionsMacro.Tests;
 public sealed class CameraAlignmentTests
 {
     [Fact]
-    public async Task SelectRegion_ResizesBeforeSelectionStoresRelativeCoordinatesAndRestores()
+    public async Task SelectRegion_ResizesBeforeSelectionStoresRelativeCoordinatesAndKeepsStandardSize()
     {
         ImageFrame capture = VisionScorerTests.Pattern(96, 72);
         FakeAutomation automation = new(capture);
@@ -29,11 +29,11 @@ public sealed class CameraAlignmentTests
         Assert.Equal(new ScreenRegion(15, 20, 96, 72), selection.Region);
         Assert.Equal((808, 611), automation.ResizeRequest);
         Assert.Equal(new ScreenRegion(315, 220, 96, 72), Assert.Single(automation.CapturedRegions));
-        Assert.Equal(new WindowBounds(40, 50, 1100, 800), automation.RestoredBounds);
+        Assert.Null(automation.RestoredBounds);
     }
 
     [Fact]
-    public async Task SelectRegion_WhenCanceled_RestoresOriginalWindow()
+    public async Task SelectRegion_WhenCanceled_KeepsStandardSize()
     {
         FakeAutomation automation = new(VisionScorerTests.Pattern(96, 72));
         CameraRegionSelectionService service = new(automation);
@@ -42,11 +42,11 @@ public sealed class CameraAlignmentTests
 
         Assert.Null(selection);
         Assert.Empty(automation.CapturedRegions);
-        Assert.Equal(new WindowBounds(40, 50, 1100, 800), automation.RestoredBounds);
+        Assert.Null(automation.RestoredBounds);
     }
 
     [Fact]
-    public async Task SelectRegion_WhenHotkeyCancellationArrivesDuringOverlay_RestoresOriginalWindow()
+    public async Task SelectRegion_WhenHotkeyCancellationArrivesDuringOverlay_KeepsStandardSize()
     {
         FakeAutomation automation = new(VisionScorerTests.Pattern(96, 72));
         CameraRegionSelectionService service = new(automation);
@@ -59,11 +59,11 @@ public sealed class CameraAlignmentTests
         }, cancellation.Token));
 
         Assert.Empty(automation.CapturedRegions);
-        Assert.Equal(new WindowBounds(40, 50, 1100, 800), automation.RestoredBounds);
+        Assert.Null(automation.RestoredBounds);
     }
 
     [Fact]
-    public async Task SelectRegion_WhenSelectionLeavesClient_RejectsAndRestoresOriginalWindow()
+    public async Task SelectRegion_WhenSelectionLeavesClient_RejectsAndKeepsStandardSize()
     {
         FakeAutomation automation = new(VisionScorerTests.Pattern(96, 72));
         CameraRegionSelectionService service = new(automation);
@@ -73,11 +73,11 @@ public sealed class CameraAlignmentTests
 
         Assert.Equal("The comparison region must be completely inside the Roblox client area.", error.Message);
         Assert.Empty(automation.CapturedRegions);
-        Assert.Equal(new WindowBounds(40, 50, 1100, 800), automation.RestoredBounds);
+        Assert.Null(automation.RestoredBounds);
     }
 
     [Fact]
-    public async Task Align_ResizesUsesRelativeRegionAndRestoresOriginalWindow()
+    public async Task Align_ResizesUsesRelativeRegionAndKeepsModelSize()
     {
         ImageFrame capture = VisionScorerTests.Pattern(96, 72);
         CameraModel model = CreateModel(capture);
@@ -88,7 +88,7 @@ public sealed class CameraAlignmentTests
 
         Assert.True(score > 0.95, $"Alignment score was {score:P1}.");
         Assert.Equal((808, 611), automation.ResizeRequest);
-        Assert.Equal(new WindowBounds(40, 50, 1100, 800), automation.RestoredBounds);
+        Assert.Null(automation.RestoredBounds);
         Assert.All(automation.CapturedRegions, region => Assert.Equal(new ScreenRegion(315, 220, 96, 72), region));
         Assert.NotEmpty(automation.Drags);
         Assert.Equal(1, automation.MoveToCenterCount);
@@ -133,7 +133,7 @@ public sealed class CameraAlignmentTests
 
         Assert.Equal("Synthetic capture failure.", error.Message);
         Assert.Equal((808, 611), automation.ResizeRequest);
-        Assert.Equal(new WindowBounds(40, 50, 1100, 800), automation.RestoredBounds);
+        Assert.Null(automation.RestoredBounds);
         Assert.Equal(new ScreenRegion(315, 220, 96, 72), Assert.Single(automation.CapturedRegions));
         Assert.Equal(1, automation.MoveToCenterCount);
         Assert.Equal(2, automation.LeftControlTapCount);

@@ -50,7 +50,6 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         preset.ValidateReady();
         ValidateRuntimeModels(preset, mapModels, detector.Manifest);
         RobloxWindow window = _automation.FindWindow() ?? throw new InvalidOperationException("No visible Roblox window was found.");
-        WindowBounds original = _automation.GetWindowBounds(window);
         DateTimeOffset startedAt = DateTimeOffset.UtcNow;
         Stopwatch runtime = Stopwatch.StartNew();
         ChallengeRotationState rotation = new();
@@ -257,15 +256,6 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         }
         finally
         {
-            try
-            {
-                _automation.RestoreWindowBounds(window, original);
-                Write("Restored the original Roblox window bounds.");
-            }
-            catch (Exception error)
-            {
-                Write($"Could not restore the original Roblox window bounds: {error.Message}", MacroEventLevel.Warning);
-            }
             await FlushNotificationsAsync(Write).ConfigureAwait(false);
         }
     }
@@ -478,7 +468,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
             report("Waiting", 0, dailyLimit ? "Daily Challenge limits reached. Running Expeditions until midnight UTC." : "Challenges complete. Running Expeditions until the next reset.", null, null);
             await PrepareExpeditionsIdleHandoffAsync(window, preset, detector, log, report, cancellationToken).ConfigureAwait(false);
             await idleWorkflow(untilUtc, cancellationToken).ConfigureAwait(false);
-            await ReturnFromIdleModeAsync(window, preset, detector, report, cancellationToken).ConfigureAwait(false);
+            await ReturnFromIdleModeAsync(window, preset, detector, log, report, cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -559,16 +549,53 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         RobloxWindow window,
         ChallengePreset preset,
         IDetectorPack detector,
+        Action<string, MacroEventLevel, string?, double?> log,
         Action<string, int, string, string?, double?> report,
         CancellationToken cancellationToken)
     {
         report("Return", 0, "Returning from Expeditions to the Challenge selector.", null, null);
-        (int playX, int playY) = ChallengeScreenDetector.OpenPlayAction();
-        await ClickAsync(window, playX, playY, cancellationToken).ConfigureAwait(false);
-        ImageFrame party = await WaitForScreenAsync(window, preset, detector, ChallengeScreenState.PostMatchPreview, TimeSpan.FromSeconds(12), report, cancellationToken).ConfigureAwait(false);
-        (int X, int Y)? change = ChallengeScreenDetector.ActionFor(ChallengeScreenState.PostMatchPreview, party);
-        if (change is null) throw new InvalidOperationException("Change Gamemode could not be located after the idle Expeditions run.");
-        await ClickAsync(window, change.Value.X, change.Value.Y, cancellationToken).ConfigureAwait(false);
+        for (int attempt = 1; attempt <= 3; attempt++)
+        {
+            (int playX, int playY) = ChallengeScreenDetector.OpenPlayAction();
+            await ClickAsync(window, playX, playY, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(900, cancellationToken).ConfigureAwait(false);
+            ImageFrame? party = await TryWaitForScreenAsync(
+                window,
+                preset,
+                detector,
+                ChallengeScreenState.PostMatchPreview,
+                TimeSpan.FromSeconds(5),
+                report,
+                cancellationToken).ConfigureAwait(false);
+            if (party is not null)
+            {
+                (int X, int Y)? change = ChallengeScreenDetector.ActionFor(ChallengeScreenState.PostMatchPreview, party);
+                if (change is null) throw new InvalidOperationException("Change Gamemode could not be located after the idle Expeditions run.");
+                await ClickAsync(window, change.Value.X, change.Value.Y, cancellationToken).ConfigureAwait(false);
+                await Task.Delay(900, cancellationToken).ConfigureAwait(false);
+                break;
+            }
+
+            ImageFrame? modes = await TryWaitForScreenAsync(
+                window,
+                preset,
+                detector,
+                ChallengeScreenState.GameModeSelector,
+                TimeSpan.FromSeconds(1),
+                report,
+                cancellationToken).ConfigureAwait(false);
+            if (modes is not null) break;
+            log($"Expeditions return Play click did not open navigation (attempt {attempt}/3).", MacroEventLevel.Warning, null, null);
+        }
+
+        await EnsureChallengeListAsync(
+            window,
+            preset,
+            detector,
+            log,
+            report,
+            static () => { },
+            cancellationToken).ConfigureAwait(false);
     }
 
     private async Task EnsureChallengeListAsync(
@@ -800,7 +827,6 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
             double score = await _camera.AlignAsync(
                 model,
                 window,
-                restoreWindow: false,
                 manageShiftLock: false,
                 progress: new Progress<MacroProgress>(value => report(value.Phase, value.Percent, value.Message, value.DetectedState, value.Confidence)),
                 cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -836,7 +862,6 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
             preset.UnitSelectDelayMilliseconds,
             stepSent: null,
             status: message => log(message, MacroEventLevel.Information, null, null),
-            restoreWindow: false,
             cancellationToken);
 
     private async Task EnsureClientSizeAsync(RobloxWindow window, int width, int height, CancellationToken cancellationToken)

@@ -47,6 +47,7 @@ internal static class ActionButtonDetector
         ["extract_confirm"] = new(new ScreenRegion(220, 315, 360, 140), ButtonColor.Red, 345, 378, 75, 55, 75, 155, 15, 42, 0.42),
         ["victory"] = new(new ScreenRegion(80, 360, 320, 150), ButtonColor.Yellow, 225, 438, 85, 60, 110, 200, 18, 48, 0.42),
         ["defeat"] = new(new ScreenRegion(80, 360, 320, 150), ButtonColor.Yellow, 225, 438, 85, 60, 110, 200, 18, 48, 0.42),
+        ["expedition_terminal_close"] = new(new ScreenRegion(625, 125, 90, 80), ButtonColor.Red, 670, 155, 48, 35, 14, 34, 14, 34, 0.35, 0.40),
         ["disconnect"] = new(new ScreenRegion(320, 320, 330, 145), ButtonColor.Neutral, 496, 394, 95, 60, 120, 230, 22, 58, 0.55),
         ["challenge_select_stage"] = new(new ScreenRegion(300, 395, 250, 80), ButtonColor.ChallengeGreen, 426, 437, 90, 35, 75, 190, 16, 42, 0.28),
         ["challenge_select_stage_wide"] = new(new ScreenRegion(300, 395, 390, 80), ButtonColor.ChallengeGreen, 507, 437, 170, 35, 190, 350, 16, 42, 0.28),

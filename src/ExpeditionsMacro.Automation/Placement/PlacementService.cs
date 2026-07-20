@@ -32,30 +32,22 @@ public sealed class PlacementService
     {
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Enter a placement model name.", nameof(name));
         RobloxWindow window = _automation.FindWindow() ?? throw new InvalidOperationException("No visible Roblox window was found.");
-        WindowBounds original = _automation.GetWindowBounds(window);
         ClientBounds initial = _automation.GetClientBounds(window);
         bool resized = initial.Width != RobloxClientProfile.Width || initial.Height != RobloxClientProfile.Height;
         (int width, int height, IReadOnlyList<PlacementCapture> captures) recording;
-        try
+        EnsureFocus(window);
+        if (resized)
         {
-            EnsureFocus(window);
-            if (resized)
-            {
-                status?.Invoke($"Temporarily resizing Roblox to {RobloxClientProfile.Width} × {RobloxClientProfile.Height}.");
-                await _automation.ResizeClientAsync(window, RobloxClientProfile.Width, RobloxClientProfile.Height, cancellationToken).ConfigureAwait(false);
-                await Task.Delay(250, cancellationToken).ConfigureAwait(false);
-            }
-            ClientBounds client = _automation.GetClientBounds(window);
-            if (client.Width != RobloxClientProfile.Width || client.Height != RobloxClientProfile.Height)
-            {
-                throw new InvalidOperationException($"Roblox did not accept the standard {RobloxClientProfile.Width} × {RobloxClientProfile.Height} client size.");
-            }
-            recording = await _capture.RecordAsync(window, captured, status, cancellationToken).ConfigureAwait(false);
+            status?.Invoke($"Resizing Roblox to {RobloxClientProfile.Width} × {RobloxClientProfile.Height}.");
+            await _automation.ResizeClientAsync(window, RobloxClientProfile.Width, RobloxClientProfile.Height, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(250, cancellationToken).ConfigureAwait(false);
         }
-        finally
+        ClientBounds client = _automation.GetClientBounds(window);
+        if (client.Width != RobloxClientProfile.Width || client.Height != RobloxClientProfile.Height)
         {
-            if (resized) _automation.RestoreWindowBounds(window, original);
+            throw new InvalidOperationException($"Roblox did not accept the standard {RobloxClientProfile.Width} × {RobloxClientProfile.Height} client size.");
         }
+        recording = await _capture.RecordAsync(window, captured, status, cancellationToken).ConfigureAwait(false);
         (int width, int height, IReadOnlyList<PlacementCapture> captures) = recording;
         if (captures.Count == 0) throw new InvalidOperationException("Record at least one unit placement before saving.");
         string id = ModelId.FromName(name);
@@ -87,7 +79,7 @@ public sealed class PlacementService
     {
         model.Validate();
         RobloxWindow window = _automation.FindWindow() ?? throw new InvalidOperationException("No visible Roblox window was found.");
-        await PlayStepsAsync(window, model, model.Steps, useDefaultInterval, defaultIntervalMilliseconds, keyHoldMilliseconds, afterKeyMilliseconds, stepSent, status, restoreWindow: true, cancellationToken).ConfigureAwait(false);
+        await PlayStepsAsync(window, model, model.Steps, useDefaultInterval, defaultIntervalMilliseconds, keyHoldMilliseconds, afterKeyMilliseconds, stepSent, status, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task PlayStepsAsync(
@@ -100,35 +92,26 @@ public sealed class PlacementService
         int afterKeyMilliseconds,
         Action<int, int, PlacementStep>? stepSent,
         Action<string>? status,
-        bool restoreWindow,
         CancellationToken cancellationToken)
     {
         if (defaultIntervalMilliseconds < 0) throw new ArgumentOutOfRangeException(nameof(defaultIntervalMilliseconds));
-        WindowBounds original = _automation.GetWindowBounds(window);
-        try
+        EnsureFocus(window);
+        await EnsureSizeAsync(window, model.ClientWidth, model.ClientHeight, cancellationToken).ConfigureAwait(false);
+        for (int index = 0; index < steps.Count; index++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            PlacementStep step = steps[index];
             EnsureFocus(window);
+            status?.Invoke($"Step {index + 1}/{steps.Count}: pressing top-row {step.UnitKey} for {keyHoldMilliseconds} ms.");
+            await _automation.TapUnitKeyAsync(window, step.UnitKey, keyHoldMilliseconds, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(afterKeyMilliseconds, cancellationToken).ConfigureAwait(false);
             await EnsureSizeAsync(window, model.ClientWidth, model.ClientHeight, cancellationToken).ConfigureAwait(false);
-            for (int index = 0; index < steps.Count; index++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                PlacementStep step = steps[index];
-                EnsureFocus(window);
-                status?.Invoke($"Step {index + 1}/{steps.Count}: pressing top-row {step.UnitKey} for {keyHoldMilliseconds} ms.");
-                await _automation.TapUnitKeyAsync(window, step.UnitKey, keyHoldMilliseconds, cancellationToken).ConfigureAwait(false);
-                await Task.Delay(afterKeyMilliseconds, cancellationToken).ConfigureAwait(false);
-                await EnsureSizeAsync(window, model.ClientWidth, model.ClientHeight, cancellationToken).ConfigureAwait(false);
-                status?.Invoke($"Step {index + 1}/{steps.Count}: clicking relative ({step.X}, {step.Y}).");
-                await _automation.ClickClientAsync(window, step.X, step.Y, cancellationToken).ConfigureAwait(false);
-                stepSent?.Invoke(index + 1, steps.Count, step);
-                int delay = useDefaultInterval ? defaultIntervalMilliseconds : step.DelayAfterMilliseconds;
-                status?.Invoke($"Step {index + 1}/{steps.Count}: waiting {delay} ms after click.");
-                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-            }
-        }
-        finally
-        {
-            if (restoreWindow) _automation.RestoreWindowBounds(window, original);
+            status?.Invoke($"Step {index + 1}/{steps.Count}: clicking relative ({step.X}, {step.Y}).");
+            await _automation.ClickClientAsync(window, step.X, step.Y, cancellationToken).ConfigureAwait(false);
+            stepSent?.Invoke(index + 1, steps.Count, step);
+            int delay = useDefaultInterval ? defaultIntervalMilliseconds : step.DelayAfterMilliseconds;
+            status?.Invoke($"Step {index + 1}/{steps.Count}: waiting {delay} ms after click.");
+            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
         }
     }
 

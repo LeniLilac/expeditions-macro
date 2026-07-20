@@ -69,7 +69,7 @@ public partial class ExpeditionsPage : UserControl, IAppPage
     {
         string hotkey = _services.Hotkey.DisplayName;
         StartButton.Content = $"Start macro  {hotkey}";
-        StopButton.Content = $"Stop and restore  {hotkey}";
+        StopButton.Content = $"Stop macro  {hotkey}";
     }
 
     private async Task StartMacroAsync()
@@ -264,7 +264,7 @@ public partial class ExpeditionsPage : UserControl, IAppPage
         {
             _macroOwned = false;
             _runtimeTimer.Stop();
-            PhaseText.Text = "Macro stopped. Roblox window and input state were restored.";
+            PhaseText.Text = "Macro stopped. Roblox remains at the standard client size.";
             AppendLog("Macro stopped.");
         }
     }

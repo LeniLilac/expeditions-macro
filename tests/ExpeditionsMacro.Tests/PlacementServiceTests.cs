@@ -10,7 +10,7 @@ namespace ExpeditionsMacro.Tests;
 public sealed class PlacementServiceTests
 {
     [Fact]
-    public async Task Record_UsesStandardClientSizeAndRestoresOriginalWindow()
+    public async Task Record_UsesStandardClientSizeAndKeepsIt()
     {
         string root = Path.Combine(Path.GetTempPath(), $"expeditions-placement-{Guid.NewGuid():N}");
         try
@@ -25,7 +25,7 @@ public sealed class PlacementServiceTests
             Assert.Equal((808, 611), capture.ClientSizeAtCapture);
             Assert.Equal(808, model.ClientWidth);
             Assert.Equal(611, model.ClientHeight);
-            Assert.Equal(new WindowBounds(40, 50, 920, 720), automation.RestoredBounds);
+            Assert.Null(automation.RestoredBounds);
         }
         finally
         {

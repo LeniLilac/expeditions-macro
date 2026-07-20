@@ -85,7 +85,7 @@ public partial class CameraModelsPage : UserControl, IAppPage
 
         CloseOverlay();
         SelectRegionButton.IsEnabled = false;
-        StatusText.Text = $"Temporarily resizing Roblox to {RobloxClientProfile.Width} × {RobloxClientProfile.Height} for region selection.";
+        StatusText.Text = $"Resizing Roblox to {RobloxClientProfile.Width} × {RobloxClientProfile.Height} for region selection.";
         try
         {
             CameraRegionSelection? result = null;
@@ -118,7 +118,7 @@ public partial class CameraModelsPage : UserControl, IAppPage
             }
             if (result is null)
             {
-                StatusText.Text = "Region selection canceled. Roblox was restored.";
+                StatusText.Text = "Region selection canceled. Roblox remains at the standard client size.";
                 return;
             }
 

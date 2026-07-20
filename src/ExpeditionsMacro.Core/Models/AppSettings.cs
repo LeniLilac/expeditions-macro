@@ -25,6 +25,8 @@ public sealed record AppSettings
 
     public bool AutoCaptureOnMacroError { get; init; }
 
+    public bool IncludeLogsInDiagnosticArchives { get; init; } = true;
+
     public bool CheckDetectorUpdates { get; init; } = true;
 
     public DateTimeOffset? LastDetectorUpdateCheck { get; init; }

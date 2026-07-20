@@ -48,9 +48,9 @@ The instructions below refer to the **macro hotkey**. It defaults to **F6** and 
 4. Choose **Setup model**. The app arms the workflow without stealing focus.
 5. Focus Roblox and press the macro hotkey.
 
-**Select region** temporarily resizes Roblox before the overlay appears, records the selection relative to the standard 808 by 611 client, and restores the original window even when selection is canceled. Leave shift lock off before pressing the macro hotkey. Setup returns to the standard capture size, enables shift lock for stable right-mouse drags, and restores both when setup finishes, is stopped, or fails. Setup then takes several goal captures over time and learns one full yaw turn. If the coarse scan only finds a degraded wraparound view, setup verifies the following yaw view, fine-sweeps the provisional peak, and still requires a strong refined match before accepting it. The resulting atlas supports large shortest-path corrections when far from the goal and one-pixel refinement near it. Lighting normalization, temporal median capture, edge/gradient comparison, and tile trimming reduce sensitivity to lighting changes and moving units.
+**Select region** resizes Roblox before the overlay appears and records the selection relative to the standard 808 by 611 client. Leave shift lock off before pressing the macro hotkey. Setup uses the standard capture size, enables shift lock for stable right-mouse drags, and releases shift lock when setup finishes, is stopped, or fails. Setup then takes several goal captures over time and learns one full yaw turn. If the coarse scan only finds a degraded wraparound view, setup verifies the following yaw view, fine-sweeps the provisional peak, and still requires a strong refined match before accepting it. The resulting atlas supports large shortest-path corrections when far from the goal and one-pixel refinement near it. Lighting normalization, temporal median capture, edge/gradient comparison, and tile trimming reduce sensitivity to lighting changes and moving units.
 
-Camera regions are saved relative to the Roblox client. When using **Auto align** by itself, the app also manages shift lock automatically. It temporarily restores the recorded client size and returns the window to its original bounds afterward. If the fast yaw estimate misses its confidence target, alignment scans one complete turn and refines the strongest match. The Expeditions workflow does not place units unless the final result meets the model target. Use **Show 30% overlay** to visually confirm the result.
+Camera regions are saved relative to the Roblox client. When using **Auto align** by itself, the app also manages shift lock automatically and applies the recorded client size. If the fast yaw estimate misses its confidence target, alignment scans one complete turn and refines the strongest match. The Expeditions workflow does not place units unless the final result meets the model target. Use **Show 30% overlay** to visually confirm the result.
 
 ### 2. Create a placement model
 
@@ -60,7 +60,7 @@ Camera regions are saved relative to the Roblox client. When using **Auto align*
 4. For each unit, press its top-row number and click the placement location.
 5. Press the macro hotkey again to finish and save.
 
-Recording temporarily uses the same 808 by 611 Roblox client size as the detector pack and restores the original window afterward. Every row can be edited afterward: unit key, client-relative X/Y, and delay. **Test playback** replays the model through the same input path used during an Expedition run.
+Recording uses the same 808 by 611 Roblox client size as the detector pack. Every row can be edited afterward: unit key, client-relative X/Y, and delay. **Test playback** replays the model through the same input path used during an Expedition run.
 
 Saving the same name replaces the previous model.
 
@@ -100,13 +100,13 @@ The Expeditions loop prepares the camera, places units, starts the node, and wat
 - victory or defeat, followed by retry;
 - lobby, disconnect, or AFK Chamber recovery.
 
-The Challenges loop navigates the fixed three-entry selector, recognizes the rotating map, runs its map-specific camera and two placement phases, handles Victory or Defeat, and returns through **Change Gamemode**. During a completed 30-minute window it either waits or temporarily runs the selected Expeditions preset.
+The Challenges loop navigates the fixed three-entry selector, recognizes the rotating map, runs its map-specific camera and two placement phases, handles Victory or Defeat, and returns through **Change Gamemode**. During a completed 30-minute window it either waits or runs the selected Expeditions preset until the current Expedition run finishes cleanly.
 
-Stopping is cooperative. The app releases right mouse and shift-lock state where applicable, cancels pending work, and restores the original Roblox window bounds.
+Stopping is cooperative. The app releases right mouse and shift-lock state where applicable, cancels pending work, and leaves Roblox at the standardized client size used for detection.
 
 ### Diagnostic screenshot capture
 
-Open **Settings**, enter a capture name and interval under **Debug capture**, then choose **Arm capture**. Focus Roblox and press the macro hotkey to start; press it again to stop. The app temporarily uses the standard 808 by 611 client size, restores the original Roblox bounds, and writes a same-name ZIP under `diagnostics/`. A completed same-name capture replaces the previous ZIP.
+Open **Settings**, enter a capture name and interval under **Debug capture**, then choose **Arm capture**. Focus Roblox and press the macro hotkey to start; press it again to stop. The app uses the standard 808 by 611 client size and writes a same-name ZIP under `diagnostics/`. A completed same-name capture replaces the previous ZIP. Enable the log option when a bug report needs both screenshots and the current run log.
 
 Enable **Automatically save 10 screenshots when a macro fails** to capture the Roblox client once per second after an unexpected Expeditions or Challenge error. These captures use timestamped ZIP names and do not run after a normal completion or manual Stop.
 
@@ -146,7 +146,7 @@ Build release artifacts:
 
 ```powershell
 .\scripts\Generate-Icon.ps1
-.\scripts\Build-Release.ps1 -Version 1.1.2
+.\scripts\Build-Release.ps1 -Version 1.1.3
 ```
 
 The release script publishes the self-contained app, creates the portable ZIP, creates the detector-pack ZIP, optionally invokes Inno Setup, and writes SHA-256 checksums plus a dependency inventory.

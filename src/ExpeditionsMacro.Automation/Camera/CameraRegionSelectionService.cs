@@ -29,9 +29,6 @@ public sealed class CameraRegionSelectionService
             throw new InvalidOperationException($"Found '{window.Title}', but Windows could not focus it. Restore Roblox and try again.");
         }
 
-        WindowBounds original = _automation.GetWindowBounds(window);
-        try
-        {
             await _automation.ResizeClientAsync(
                 window,
                 RobloxClientProfile.Width,
@@ -62,10 +59,5 @@ public sealed class CameraRegionSelectionService
 
             ImageFrame preview = _automation.CaptureScreen(client.ToScreen(relativeRegion));
             return new CameraRegionSelection(relativeRegion, preview);
-        }
-        finally
-        {
-            _automation.RestoreWindowBounds(window, original);
-        }
     }
 }
