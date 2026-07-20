@@ -17,8 +17,8 @@ jobs:
         id: discord_announcement
         shell: pwsh
         run: |
-          $message = git log -1 --format=%B $env:GITHUB_SHA
-          $enabled = $message.IndexOf('[skip discord]', [System.StringComparison]::OrdinalIgnoreCase) -lt 0
+          $skipDiscord = git log -1 --format=%B $env:GITHUB_SHA | Select-String -SimpleMatch '[skip discord]' -Quiet
+          $enabled = -not $skipDiscord
           "enabled=$($enabled.ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - uses: actions/setup-dotnet@v6
         with:
