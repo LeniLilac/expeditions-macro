@@ -69,7 +69,7 @@ public sealed class PlacementService
             CreatedAt = DateTimeOffset.UtcNow,
             UpdatedAt = DateTimeOffset.UtcNow,
         };
-        // F6 ends a recording by cancelling the observation token. Saving the
+        // The global macro hotkey ends a recording by cancelling the observation token. Saving the
         // completed captures must therefore use an independent token.
         await _models.SaveAsync(model, CancellationToken.None).ConfigureAwait(false);
         return model;

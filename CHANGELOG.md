@@ -4,6 +4,36 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.0.13] - 2026-07-19
+
+### Added
+
+- Added a persistent global macro-hotkey setting under Settings > Controls. F6 remains the default, and users can record F1-F11 or F13-F24 directly from the interface.
+- Added the running app version to the bottom of the left navigation footer.
+
+### Fixed
+
+- Standardized Roblox to the canonical 808 by 611 client size before the camera-region selector appears, so users cannot choose an area that later falls outside the calibration size.
+- Stored a camera selection as client-relative coordinates immediately and restored the original Roblox window after selection, cancellation, or failure, so moving Roblox before setup no longer shifts the comparison region.
+- Updated workflow prompts, buttons, diagnostics, recording instructions, and the sidebar footer whenever the macro hotkey changes.
+
+### Tests
+
+- Added camera-region regressions for standard-size selection, relative conversion, cancellation, invalid bounds, preview capture, and window restoration.
+- Added global-hotkey regressions for the F6 default, supported rebinding, display names, and the Windows-reserved F12 rejection.
+
+## [1.0.12] - 2026-07-19
+
+### Fixed
+
+- Made checkpoint extraction a single guarded transaction so lag cannot return the macro to generic checkpoint handling and issue another Extract click.
+- Waited for the extraction confirmation to appear and then disappear before resuming gameplay monitoring, without repeatedly clicking Confirm while the dialog remains visible.
+- Extended both extraction transition windows to 30 seconds and stopped safely with an actionable error instead of sending a delayed duplicate action when the UI never acknowledges a click.
+
+### Tests
+
+- Added extraction-transaction state regressions proving repeated observations cannot authorize duplicate Extract or Confirm clicks.
+
 ## [1.0.11] - 2026-07-19
 
 ### Added
@@ -131,7 +161,9 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.0.11...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.0.13...HEAD
+[1.0.13]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.13
+[1.0.12]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.12
 [1.0.11]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.11
 [1.0.10]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.10
 [1.0.9]: https://github.com/LeniLilac/expeditions-macro/releases/tag/v1.0.9

@@ -35,12 +35,14 @@ public partial class ExpeditionsPage : UserControl, IAppPage
         _runtimeTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => UpdateRuntime(), Dispatcher);
         _runtimeTimer.Stop();
         _services.Coordinator.StateChanged += (_, _) => Dispatcher.BeginInvoke(CoordinatorStateChanged);
+        _services.Hotkey.BindingChanged += (_, _) => Dispatcher.BeginInvoke(UpdateHotkeyText);
     }
 
-    public Func<Task>? IdleF6Action => StartFromHotkeyAsync;
+    public Func<Task>? IdleHotkeyAction => StartFromHotkeyAsync;
 
     public async Task OnShownAsync()
     {
+        UpdateHotkeyText();
         _loading = true;
         await RefreshCatalogsAsync();
         await RefreshPresetsAsync();
@@ -61,6 +63,13 @@ public partial class ExpeditionsPage : UserControl, IAppPage
     private async void Start_Click(object sender, RoutedEventArgs e) => await StartMacroAsync();
 
     private void Stop_Click(object sender, RoutedEventArgs e) => _services.Coordinator.Cancel();
+
+    private void UpdateHotkeyText()
+    {
+        string hotkey = _services.Hotkey.DisplayName;
+        StartButton.Content = $"Start macro  {hotkey}";
+        StopButton.Content = $"Stop and restore  {hotkey}";
+    }
 
     private async Task StartMacroAsync()
     {

@@ -41,9 +41,19 @@ public interface IRobloxAutomation
 
 public interface IGlobalHotkeyService : IDisposable
 {
-    event EventHandler? F6Pressed;
+    event EventHandler? Pressed;
+
+    event EventHandler? BindingChanged;
 
     bool IsRegistered { get; }
+
+    int VirtualKey { get; }
+
+    string DisplayName { get; }
+
+    void Configure(int virtualKey);
+
+    void Rebind(int virtualKey);
 
     void Start();
 

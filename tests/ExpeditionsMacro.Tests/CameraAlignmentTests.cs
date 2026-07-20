@@ -11,6 +11,72 @@ namespace ExpeditionsMacro.Tests;
 public sealed class CameraAlignmentTests
 {
     [Fact]
+    public async Task SelectRegion_ResizesBeforeSelectionStoresRelativeCoordinatesAndRestores()
+    {
+        ImageFrame capture = VisionScorerTests.Pattern(96, 72);
+        FakeAutomation automation = new(capture);
+        CameraRegionSelectionService service = new(automation);
+        ClientBounds clientDuringSelection = default;
+
+        CameraRegionSelection? selection = await service.SelectAsync(client =>
+        {
+            clientDuringSelection = client;
+            return new ScreenRegion(client.X + 15, client.Y + 20, 96, 72);
+        });
+
+        Assert.NotNull(selection);
+        Assert.Equal(new ClientBounds(300, 200, 808, 611), clientDuringSelection);
+        Assert.Equal(new ScreenRegion(15, 20, 96, 72), selection.Region);
+        Assert.Equal((808, 611), automation.ResizeRequest);
+        Assert.Equal(new ScreenRegion(315, 220, 96, 72), Assert.Single(automation.CapturedRegions));
+        Assert.Equal(new WindowBounds(40, 50, 1100, 800), automation.RestoredBounds);
+    }
+
+    [Fact]
+    public async Task SelectRegion_WhenCanceled_RestoresOriginalWindow()
+    {
+        FakeAutomation automation = new(VisionScorerTests.Pattern(96, 72));
+        CameraRegionSelectionService service = new(automation);
+
+        CameraRegionSelection? selection = await service.SelectAsync(_ => null);
+
+        Assert.Null(selection);
+        Assert.Empty(automation.CapturedRegions);
+        Assert.Equal(new WindowBounds(40, 50, 1100, 800), automation.RestoredBounds);
+    }
+
+    [Fact]
+    public async Task SelectRegion_WhenHotkeyCancellationArrivesDuringOverlay_RestoresOriginalWindow()
+    {
+        FakeAutomation automation = new(VisionScorerTests.Pattern(96, 72));
+        CameraRegionSelectionService service = new(automation);
+        using CancellationTokenSource cancellation = new();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.SelectAsync(client =>
+        {
+            cancellation.Cancel();
+            return new ScreenRegion(client.X + 15, client.Y + 20, 96, 72);
+        }, cancellation.Token));
+
+        Assert.Empty(automation.CapturedRegions);
+        Assert.Equal(new WindowBounds(40, 50, 1100, 800), automation.RestoredBounds);
+    }
+
+    [Fact]
+    public async Task SelectRegion_WhenSelectionLeavesClient_RejectsAndRestoresOriginalWindow()
+    {
+        FakeAutomation automation = new(VisionScorerTests.Pattern(96, 72));
+        CameraRegionSelectionService service = new(automation);
+
+        InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.SelectAsync(client => new ScreenRegion(client.X + 800, client.Y + 20, 96, 72)));
+
+        Assert.Equal("The comparison region must be completely inside the Roblox client area.", error.Message);
+        Assert.Empty(automation.CapturedRegions);
+        Assert.Equal(new WindowBounds(40, 50, 1100, 800), automation.RestoredBounds);
+    }
+
+    [Fact]
     public async Task Align_ResizesUsesRelativeRegionAndRestoresOriginalWindow()
     {
         ImageFrame capture = VisionScorerTests.Pattern(96, 72);
@@ -63,11 +129,12 @@ public sealed class CameraAlignmentTests
         };
 
         InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            engine.CalibrateAsync(new ScreenRegion(315, 220, 96, 72), settings));
+            engine.CalibrateAsync(new ScreenRegion(15, 20, 96, 72), settings));
 
         Assert.Equal("Synthetic capture failure.", error.Message);
         Assert.Equal((808, 611), automation.ResizeRequest);
         Assert.Equal(new WindowBounds(40, 50, 1100, 800), automation.RestoredBounds);
+        Assert.Equal(new ScreenRegion(315, 220, 96, 72), Assert.Single(automation.CapturedRegions));
         Assert.Equal(1, automation.MoveToCenterCount);
         Assert.Equal(2, automation.LeftControlTapCount);
     }
@@ -101,7 +168,7 @@ public sealed class CameraAlignmentTests
         CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
 
         CameraModel model = await engine.CalibrateAsync(
-            new ScreenRegion(315, 220, 96, 72),
+            new ScreenRegion(15, 20, 96, 72),
             CalibrationSettings("Degraded return", maximumSamples: 15),
             new InlineProgress<MacroProgress>(updates.Add));
 
@@ -139,7 +206,7 @@ public sealed class CameraAlignmentTests
         CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
 
         CameraModel model = await engine.CalibrateAsync(
-            new ScreenRegion(315, 220, 96, 72),
+            new ScreenRegion(15, 20, 96, 72),
             CalibrationSettings("Provisional return", maximumSamples: 15),
             new InlineProgress<MacroProgress>(updates.Add));
 
@@ -175,7 +242,7 @@ public sealed class CameraAlignmentTests
         CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
 
         CameraModel model = await engine.CalibrateAsync(
-            new ScreenRegion(315, 220, 96, 72),
+            new ScreenRegion(15, 20, 96, 72),
             CalibrationSettings("Repeated landmark", maximumSamples: 30));
 
         Assert.Equal(389, model.Manifest.FullYawPixels);

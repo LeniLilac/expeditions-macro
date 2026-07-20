@@ -11,6 +11,8 @@ namespace ExpeditionsMacro.Automation.Expeditions;
 
 public sealed class ExpeditionMacroRunner : IGameModeWorkflow
 {
+    private static readonly TimeSpan ExtractionTransitionTimeout = TimeSpan.FromSeconds(30);
+
     private static readonly HashSet<string> RecoveryStates = new(StringComparer.OrdinalIgnoreCase)
     {
         "afk", "disconnect", "lobby", "play", "map_select", "map_preview",
@@ -302,8 +304,9 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
             {
                 if (ExpeditionRunPolicy.ShouldExtract(preset, bosses))
                 {
-                    await ClickActionAsync(window, detector, "extract_confirm", frame, cancellationToken).ConfigureAwait(false);
-                    await Task.Delay(2200, cancellationToken).ConfigureAwait(false);
+                    ExtractionTransactionState transaction = new();
+                    if (!transaction.TryBegin()) throw new InvalidOperationException("Could not begin extraction confirmation handling.");
+                    await ConfirmExtractionAsync(window, detector, preset, transaction, frame, report, cancellationToken).ConfigureAwait(false);
                 }
                 else
                 {
@@ -317,8 +320,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                 if (state == "checkpoint" && ExpeditionRunPolicy.ShouldExtract(preset, bosses))
                 {
                     report("Extraction", 0, $"Extraction target met after {bosses} boss node(s).", state, score);
-                    bool requested = await ExtractAtCheckpointAsync(window, detector, preset, frame, report, log, cancellationToken).ConfigureAwait(false);
-                    await Task.Delay(requested ? 1200 : 500, cancellationToken).ConfigureAwait(false);
+                    await ExtractAtCheckpointAsync(window, detector, preset, frame, report, log, cancellationToken).ConfigureAwait(false);
                     continue;
                 }
                 await RetryRemainingUnitsAsync(window, placement, preset, detector, frame, log, cancellationToken).ConfigureAwait(false);
@@ -332,7 +334,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         }
     }
 
-    private async Task<bool> ExtractAtCheckpointAsync(
+    private async Task ExtractAtCheckpointAsync(
         RobloxWindow window,
         IDetectorPack detector,
         ExpeditionPreset preset,
@@ -341,17 +343,47 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         Action<string, MacroEventLevel, string?, double?> log,
         CancellationToken cancellationToken)
     {
+        ExtractionTransactionState transaction = new();
+        if (!transaction.TryBegin()) throw new InvalidOperationException("Could not begin checkpoint extraction.");
         log("Checkpoint has an Extract button; opening extraction confirmation.", MacroEventLevel.Information, "checkpoint", null);
         await ClickActionAsync(window, detector, "extract", checkpointFrame, cancellationToken).ConfigureAwait(false);
-        bool found = await WaitForStateWithTimeoutAsync(window, detector, "extract_confirm", TimeSpan.FromSeconds(6), preset, report, cancellationToken).ConfigureAwait(false);
+        bool found = await WaitForStateWithTimeoutAsync(window, detector, "extract_confirm", ExtractionTransitionTimeout, preset, report, cancellationToken).ConfigureAwait(false);
         if (!found)
         {
-            log("Extraction confirmation was not recognized; the checkpoint will be retried.", MacroEventLevel.Warning, "checkpoint", null);
-            return false;
+            throw new InvalidOperationException(
+                "Extraction confirmation did not appear within 30 seconds. The macro stopped without clicking Extract again to avoid a delayed duplicate action.");
         }
-        await ClickActionAsync(window, detector, "extract_confirm", cancellationToken).ConfigureAwait(false);
+        await ConfirmExtractionAsync(window, detector, preset, transaction, clientImage: null, report, cancellationToken).ConfigureAwait(false);
         log("Extraction confirmed. Waiting for Victory or an early Defeat screen.", MacroEventLevel.Success, "extract_confirm", null);
-        return true;
+    }
+
+    private async Task ConfirmExtractionAsync(
+        RobloxWindow window,
+        IDetectorPack detector,
+        ExpeditionPreset preset,
+        ExtractionTransactionState transaction,
+        ImageFrame? clientImage,
+        Action<string, int, string, string?, double?> report,
+        CancellationToken cancellationToken)
+    {
+        if (!transaction.TryConfirm()) throw new InvalidOperationException("Extraction confirmation was already clicked.");
+        report("Extraction", 0, "Confirming extraction once and waiting for the dialog to close.", "extract_confirm", null);
+        await ClickActionAsync(window, detector, "extract_confirm", clientImage, cancellationToken).ConfigureAwait(false);
+        bool dismissed = await WaitForStateToClearAsync(
+            window,
+            detector,
+            "extract_confirm",
+            ExtractionTransitionTimeout,
+            preset,
+            report,
+            cancellationToken).ConfigureAwait(false);
+        if (!dismissed)
+        {
+            throw new InvalidOperationException(
+                "Extraction confirmation remained visible for 30 seconds. The macro stopped without clicking Confirm again to avoid a delayed duplicate action.");
+        }
+        if (!transaction.TryComplete()) throw new InvalidOperationException("Could not complete extraction confirmation handling.");
+        await Task.Delay(700, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task RetryRemainingUnitsAsync(
@@ -635,6 +667,41 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
             ThrowForStableRecovery(recoveryTracker, state, activeRunOnly: true);
             if (state is not null) report("Waiting", 0, $"Detected {Label(state)}.", state, scores[state]);
             if (tracker.Update(state) == desired) return true;
+            await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
+        }
+        return false;
+    }
+
+    private async Task<bool> WaitForStateToClearAsync(
+        RobloxWindow window,
+        IDetectorPack detector,
+        string stateToClear,
+        TimeSpan timeout,
+        ExpeditionPreset preset,
+        Action<string, int, string, string?, double?> report,
+        CancellationToken cancellationToken)
+    {
+        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
+        // Require at least three consecutive clear frames so a short detector
+        // flicker cannot reopen the generic loop and authorize another click.
+        StableStateTracker<string> clearTracker = new(Math.Max(3, preset.StableDetections));
+        StableStateTracker<string> recoveryTracker = new(ExpeditionRunPolicy.RecoveryStableDetections(preset));
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            ImageFrame frame = CaptureClient(window, detector);
+            IReadOnlyDictionary<string, double> scores = detector.ScoreStates(frame);
+            string? classified = ExpeditionRunPolicy.PreferActiveState(detector.Manifest, scores, detector.Classify(scores));
+            ThrowForStableRecovery(recoveryTracker, classified, activeRunOnly: true);
+            bool visible = ExpeditionRunPolicy.IsStateDetected(detector.Manifest, scores, stateToClear);
+            if (visible)
+            {
+                clearTracker.Reset();
+                report("Waiting", 0, $"Waiting for {Label(stateToClear)} to close.", stateToClear, scores[stateToClear]);
+            }
+            else if (clearTracker.Update("cleared") == "cleared")
+            {
+                return true;
+            }
             await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
         }
         return false;

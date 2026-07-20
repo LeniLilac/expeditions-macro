@@ -36,11 +36,13 @@ public sealed class AppServices : IDisposable
         DiagnosticCapture = new DiagnosticCaptureService(Automation, Paths);
         PlacementCapture = new PlacementCaptureService(Automation);
         Placement = new PlacementService(Automation, PlacementCapture, PlacementModels);
+        CameraRegionSelection = new CameraRegionSelectionService(Automation);
         Camera = new CameraAlignmentEngine(Automation, CameraModels);
         _discord = new DiscordWebhookClient();
         Expeditions = new ExpeditionMacroRunner(Automation, Camera, Placement, _discord);
         DetectorUpdates = new DetectorPackUpdateService(DetectorPacks);
-        Hotkey.F6Pressed += (_, _) => Coordinator.HandleF6();
+        Hotkey.Pressed += (_, _) => Coordinator.HandleHotkey();
+        Hotkey.BindingChanged += (_, _) => Coordinator.HotkeyDisplayName = Hotkey.DisplayName;
     }
 
     public AppPaths Paths { get; }
@@ -58,6 +60,7 @@ public sealed class AppServices : IDisposable
     public DiagnosticCaptureService DiagnosticCapture { get; }
     public IPlacementCaptureService PlacementCapture { get; }
     public PlacementService Placement { get; }
+    public CameraRegionSelectionService CameraRegionSelection { get; }
     public CameraAlignmentEngine Camera { get; }
     public ExpeditionMacroRunner Expeditions { get; }
     public DetectorPackUpdateService DetectorUpdates { get; }
@@ -68,9 +71,18 @@ public sealed class AppServices : IDisposable
         AppServices services = new(dispatcher);
         services.Log.Info("Starting Expeditions Macro.");
         services.Settings = await services.SettingsStore.LoadAsync();
+        int configuredHotkey = services.Settings.MacroHotkeyVirtualKey;
+        if (!GlobalHotkeyService.IsSupportedVirtualKey(configuredHotkey))
+        {
+            configuredHotkey = GlobalHotkeyService.DefaultVirtualKey;
+            services.Settings = services.Settings with { MacroHotkeyVirtualKey = configuredHotkey };
+            await services.SettingsStore.SaveAsync(services.Settings);
+        }
+        services.Hotkey.Configure(configuredHotkey);
+        services.Coordinator.HotkeyDisplayName = services.Hotkey.DisplayName;
         await services.EnsureBundledDetectorPackAsync();
         services.Hotkey.Start();
-        services.Log.Info($"Startup complete. F6 listener: {(services.Hotkey.IsRegistered ? "ready" : "unavailable")}.");
+        services.Log.Info($"Startup complete. {services.Hotkey.DisplayName} listener: {(services.Hotkey.IsRegistered ? "ready" : "unavailable")}.");
         return services;
     }
 

@@ -9,6 +9,7 @@ internal static partial class NativeMethods
     internal const int SwpFrameChanged = 0x0020;
     internal const uint MonitorDefaultToNearest = 0x00000002;
     internal const uint WmHotkey = 0x0312;
+    internal const uint ModNoRepeat = 0x4000;
     internal const uint WmQuit = 0x0012;
     internal const uint PmRemove = 0x0001;
     internal const int WhKeyboardLl = 13;
@@ -19,7 +20,6 @@ internal static partial class NativeMethods
     internal const uint WmSysKeyDown = 0x0104;
     internal const uint WmSysKeyUp = 0x0105;
     internal const uint WmLButtonDown = 0x0201;
-    internal const int VkF6 = 0x75;
     internal const int VkLeftControl = 0xA2;
     internal const uint KeyeventfKeyUp = 0x0002;
     internal const uint MouseeventfMove = 0x0001;

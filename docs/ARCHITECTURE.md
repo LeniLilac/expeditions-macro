@@ -3,7 +3,7 @@
 The application separates reusable automation behavior from the WPF shell:
 
 - `ExpeditionsMacro.Core` contains immutable geometry, image, model, preset, persistence, and workflow contracts.
-- `ExpeditionsMacro.Windows` owns Win32 window discovery, exact client sizing, GDI capture, DPAPI, F6, keyboard input, Roblox-compatible mouse nudging, and relative right-drag camera input.
+- `ExpeditionsMacro.Windows` owns Win32 window discovery, exact client sizing, GDI capture, DPAPI, the configurable global macro hotkey, keyboard input, Roblox-compatible mouse nudging, and relative right-drag camera input.
 - `ExpeditionsMacro.Vision` owns lighting-normalized scoring, temporal medians, detector-pack compilation, validation, classification, map and difficulty selection, node hues, and hotbar checks.
 - `ExpeditionsMacro.Automation` owns camera calibration/alignment, placement recording/playback, the Expeditions state machine, recovery, Discord Components V2, and detector updates.
 - `ExpeditionsMacro.App` is the single WPF interface and exclusive input-owner coordinator.

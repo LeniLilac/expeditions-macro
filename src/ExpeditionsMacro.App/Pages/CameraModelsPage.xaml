@@ -44,7 +44,7 @@
                             <StackPanel Margin="0,10,0,0">
                                 <TextBlock x:Name="RegionText" Style="{StaticResource Caption}" Text="Region: not selected" />
                                 <StackPanel Margin="0,8,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
-                                    <Button Content="Select region" Click="SelectRegion_Click" />
+                                    <Button x:Name="SelectRegionButton" Content="Select region" Click="SelectRegion_Click" />
                                     <Button x:Name="OverlayButton" Margin="8,0,0,0" Content="Show 30% overlay" IsEnabled="False" Click="Overlay_Click" />
                                 </StackPanel>
                             </StackPanel>
