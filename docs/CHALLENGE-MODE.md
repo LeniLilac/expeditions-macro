@@ -8,7 +8,7 @@ Challenge mode automates the three regular Anime Expeditions Challenges that res
 - Tries only the enabled Challenge types and skips an entry when **Select Stage** is unavailable.
 - Recognizes the selected map and loads that map's camera model and placement configuration.
 - Runs a before-start placement model, starts the match, then optionally runs a second placement model after the configured elapsed time.
-- Closes Victory and returns through **Change Gamemode**. Defeat retries are configurable and default to zero.
+- Closes Victory, detects the live post-match Play control, verifies that navigation opened, and returns through **Change Gamemode**. An ignored Play click is re-detected and retried up to three times. Defeat retries are configurable and default to zero.
 - Clears per-entry attempts at every global half-hour reset. A no-retry defeat can therefore be attempted again when a new Challenge appears.
 - Either waits during cooldown or runs a configured Expeditions preset until the next reset.
 - Treats all three entries remaining unavailable across a complete global reset as daily-limit evidence, then waits until midnight UTC.
@@ -23,6 +23,6 @@ Selector rows are clicked through their map artwork, away from reward icons that
 
 ## Regression dataset
 
-The checked-in dataset contains 71 selective Challenge fixtures from multiple players, PCs, Roblox UI scales, all five maps, active and cooldown entries, gameplay, terminal screens, and Expeditions handoff states. Focused diagnostics cover private-party previews, dimmed and unavailable selectors, reward tooltips, hovered controls, bright game-mode artwork, and blue scenery behind Start Game.
+The checked-in dataset contains 72 selective Challenge fixtures from multiple players, PCs, Roblox UI scales, all five maps, active and cooldown entries, gameplay, terminal screens, the post-match HUD, and Expeditions handoff states. Focused diagnostics cover private-party previews, dimmed and unavailable selectors, reward tooltips, hovered controls, bright game-mode artwork, and blue scenery behind Start Game.
 
 Fixtures must remain 808 by 611 Roblox client captures. Do not include the Roblox title bar, desktop, notifications, account names, chat, or webhook data. See `datasets/anime-expeditions/challenges/README.md` for provenance and documented redactions.

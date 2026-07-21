@@ -444,10 +444,13 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         (int closeX, int closeY) = ChallengeScreenDetector.TerminalCloseAction(terminal);
         await ClickAsync(window, closeX, closeY, cancellationToken).ConfigureAwait(false);
         await Task.Delay(900, cancellationToken).ConfigureAwait(false);
-        (int playX, int playY) = ChallengeScreenDetector.OpenPlayAction();
-        report("Return", 85, "Opening Play from the match HUD.", null, null);
-        await ClickAsync(window, playX, playY, cancellationToken).ConfigureAwait(false);
-        ImageFrame party = await WaitForScreenAsync(window, preset, detector, ChallengeScreenState.PostMatchPreview, TimeSpan.FromSeconds(12), report, cancellationToken).ConfigureAwait(false);
+        ImageFrame party = await OpenPostMatchPreviewAsync(
+            window,
+            preset,
+            detector,
+            log: null,
+            report,
+            cancellationToken).ConfigureAwait(false);
         (int X, int Y)? changeMode = ChallengeScreenDetector.ActionFor(ChallengeScreenState.PostMatchPreview, party);
         if (changeMode is null) throw new InvalidOperationException("Change Gamemode could not be located after the match.");
         await ClickAsync(window, changeMode.Value.X, changeMode.Value.Y, cancellationToken).ConfigureAwait(false);
@@ -559,55 +562,42 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         CancellationToken cancellationToken)
     {
         report("Return", 0, "Returning from Expeditions to the Challenge selector.", null, null);
-        for (int attempt = 1; attempt <= 3; attempt++)
+        ImageFrame current = CaptureClient(window, detector);
+        ChallengeScreenMatch currentMatch = ChallengeScreenDetector.Detect(current);
+        ImageFrame? party = null;
+        if (currentMatch.State == ChallengeScreenState.PostMatchPreview)
         {
-            ImageFrame current = CaptureClient(window, detector);
-            ChallengeScreenMatch currentMatch = ChallengeScreenDetector.Detect(current);
-            if (currentMatch.State is ChallengeScreenState.PostMatchPreview
-                or ChallengeScreenState.GameModeSelector
-                or ChallengeScreenState.ChallengeList
-                or ChallengeScreenState.ChallengeListUnavailable
-                or ChallengeScreenState.ChallengeAvailable
-                or ChallengeScreenState.ChallengeCooldown)
-            {
-                log(
-                    $"Expeditions return found {Label(currentMatch.State)} already open; continuing Challenge navigation.",
-                    MacroEventLevel.Information,
-                    currentMatch.State.ToString(),
-                    currentMatch.Confidence);
-                break;
-            }
+            party = current;
+        }
+        else if (currentMatch.State is ChallengeScreenState.GameModeSelector
+                 or ChallengeScreenState.ChallengeList
+                 or ChallengeScreenState.ChallengeListUnavailable
+                 or ChallengeScreenState.ChallengeAvailable
+                 or ChallengeScreenState.ChallengeCooldown)
+        {
+            log(
+                $"Expeditions return found {Label(currentMatch.State)} already open; continuing Challenge navigation.",
+                MacroEventLevel.Information,
+                currentMatch.State.ToString(),
+                currentMatch.Confidence);
+        }
+        else
+        {
+            party = await OpenPostMatchPreviewAsync(
+                window,
+                preset,
+                detector,
+                log,
+                report,
+                cancellationToken).ConfigureAwait(false);
+        }
 
-            (int playX, int playY) = ChallengeScreenDetector.OpenPlayAction();
-            await ClickAsync(window, playX, playY, cancellationToken).ConfigureAwait(false);
+        if (party is not null)
+        {
+            (int X, int Y)? change = ChallengeScreenDetector.ActionFor(ChallengeScreenState.PostMatchPreview, party);
+            if (change is null) throw new InvalidOperationException("Change Gamemode could not be located after the idle Expeditions run.");
+            await ClickAsync(window, change.Value.X, change.Value.Y, cancellationToken).ConfigureAwait(false);
             await Task.Delay(900, cancellationToken).ConfigureAwait(false);
-            ImageFrame? party = await TryWaitForScreenAsync(
-                window,
-                preset,
-                detector,
-                ChallengeScreenState.PostMatchPreview,
-                TimeSpan.FromSeconds(5),
-                report,
-                cancellationToken).ConfigureAwait(false);
-            if (party is not null)
-            {
-                (int X, int Y)? change = ChallengeScreenDetector.ActionFor(ChallengeScreenState.PostMatchPreview, party);
-                if (change is null) throw new InvalidOperationException("Change Gamemode could not be located after the idle Expeditions run.");
-                await ClickAsync(window, change.Value.X, change.Value.Y, cancellationToken).ConfigureAwait(false);
-                await Task.Delay(900, cancellationToken).ConfigureAwait(false);
-                break;
-            }
-
-            ImageFrame? modes = await TryWaitForScreenAsync(
-                window,
-                preset,
-                detector,
-                ChallengeScreenState.GameModeSelector,
-                TimeSpan.FromSeconds(1),
-                report,
-                cancellationToken).ConfigureAwait(false);
-            if (modes is not null) break;
-            log($"Expeditions return Play click did not open navigation (attempt {attempt}/3).", MacroEventLevel.Warning, null, null);
         }
 
         await EnsureChallengeListAsync(
@@ -618,6 +608,74 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
             report,
             static () => { },
             cancellationToken).ConfigureAwait(false);
+    }
+
+    private Task<ImageFrame> OpenPostMatchPreviewAsync(
+        RobloxWindow window,
+        ChallengePreset preset,
+        IDetectorPack detector,
+        Action<string, MacroEventLevel, string?, double?>? log,
+        Action<string, int, string, string?, double?> report,
+        CancellationToken cancellationToken) =>
+        OpenPostMatchPreviewWithRetriesAsync(
+            () => CaptureClient(window, detector),
+            (x, y, token) => ClickAsync(window, x, y, token),
+            (timeout, token) => TryWaitForScreenAsync(
+                window,
+                preset,
+                detector,
+                ChallengeScreenState.PostMatchPreview,
+                timeout,
+                report,
+                token),
+            (attempt, match) => report(
+                "Return",
+                85,
+                attempt == 1
+                    ? "Opening Play from the detected post-match HUD."
+                    : $"Retrying the detected Play control ({attempt}/3).",
+                match.State.ToString(),
+                match.Confidence),
+            (attempt, match) => log?.Invoke(
+                $"Post-match Play click did not open navigation (attempt {attempt}/3).",
+                MacroEventLevel.Warning,
+                match.State.ToString(),
+                match.Confidence),
+            cancellationToken);
+
+    internal static async Task<ImageFrame> OpenPostMatchPreviewWithRetriesAsync(
+        Func<ImageFrame> capture,
+        Func<int, int, CancellationToken, Task> click,
+        Func<TimeSpan, CancellationToken, Task<ImageFrame?>> waitForPreview,
+        Action<int, ChallengeScreenMatch>? attemptStarted,
+        Action<int, ChallengeScreenMatch>? attemptMissed,
+        CancellationToken cancellationToken)
+    {
+        const int maximumAttempts = 3;
+        TimeSpan transitionTimeout = TimeSpan.FromSeconds(4);
+        for (int attempt = 1; attempt <= maximumAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ImageFrame hud = capture();
+            ChallengeScreenMatch match = ChallengeScreenDetector.Detect(hud);
+            if (match.State == ChallengeScreenState.PostMatchPreview) return hud;
+            if (match.State != ChallengeScreenState.PostMatchHud ||
+                match.ActionX is not int playX ||
+                match.ActionY is not int playY)
+            {
+                throw new InvalidOperationException(
+                    "The post-match HUD and its Play control could not be located from the current Roblox frame.");
+            }
+
+            attemptStarted?.Invoke(attempt, match);
+            await click(playX, playY, cancellationToken).ConfigureAwait(false);
+            ImageFrame? preview = await waitForPreview(transitionTimeout, cancellationToken).ConfigureAwait(false);
+            if (preview is not null) return preview;
+            attemptMissed?.Invoke(attempt, match);
+        }
+
+        throw new InvalidOperationException(
+            "The detected post-match Play control remained open after three focused click attempts.");
     }
 
     private async Task EnsureChallengeListAsync(

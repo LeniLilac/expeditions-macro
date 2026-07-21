@@ -177,6 +177,20 @@ public sealed class ChallengeScreenDetectorTests
     }
 
     [Fact]
+    public void ReportedPostMatchHud_ClicksTheLiveCyanPlayControl()
+    {
+        string file = Path.Combine(TestPaths.ChallengeDatasets, "PostMatchHud", "PostMatchHud_01.png");
+
+        ChallengeScreenMatch match = ChallengeScreenDetector.Detect(ImageCodec.Load(file));
+
+        Assert.Equal(ChallengeScreenState.PostMatchHud, match.State);
+        Assert.InRange(match.Confidence, ChallengeScreenDetector.Threshold(ChallengeScreenState.PostMatchHud), 1);
+        Assert.InRange(match.ActionX!.Value, 158, 170);
+        Assert.InRange(match.ActionY!.Value, 570, 592);
+        Assert.NotEqual((147, 584), (match.ActionX, match.ActionY));
+    }
+
+    [Fact]
     public void NarrowYellowButton_WithoutTheAdjacentChangeMapAction_IsNotAPartyPreview()
     {
         ImageFrame image = Frame();
@@ -203,6 +217,7 @@ public sealed class ChallengeScreenDetectorTests
     [InlineData("ChallengeCooldown", ChallengeScreenState.ChallengeCooldown)]
     [InlineData("PreviewReady", ChallengeScreenState.PreviewReady)]
     [InlineData("PostMatchPreview", ChallengeScreenState.PostMatchPreview)]
+    [InlineData("PostMatchHud", ChallengeScreenState.PostMatchHud)]
     [InlineData("Victory", ChallengeScreenState.Victory)]
     [InlineData("Defeat", ChallengeScreenState.Defeat)]
     public void ReviewedChallengeFixtures_MatchTheirExpectedState(string dataset, ChallengeScreenState expected)
@@ -280,6 +295,27 @@ public sealed class ChallengeScreenDetectorTests
 
     [Theory]
     [InlineData("GameplayNegative")]
+    [InlineData("Victory")]
+    [InlineData("Defeat")]
+    [InlineData("Prestart_RoseKingdom")]
+    [InlineData("Prestart_SchoolGrounds")]
+    [InlineData("Prestart_FairyKingForest")]
+    [InlineData("Prestart_KingsTomb")]
+    [InlineData("Prestart_FlowerForest")]
+    public void PostMatchHud_RejectsOrdinaryHudAndTerminalScreens(string dataset)
+    {
+        string directory = Path.Combine(TestPaths.ChallengeDatasets, dataset);
+        foreach (string file in Directory.EnumerateFiles(directory, "*.png"))
+        {
+            double score = ChallengeScreenDetector.ScoreStates(ImageCodec.Load(file))[ChallengeScreenState.PostMatchHud];
+            Assert.True(
+                score < ChallengeScreenDetector.Threshold(ChallengeScreenState.PostMatchHud),
+                $"{Path.GetFileName(file)} scored {score:P1} as the post-match HUD.");
+        }
+    }
+
+    [Theory]
+    [InlineData("GameplayNegative")]
     [InlineData("ExpeditionHandoffNegative")]
     public void ChallengeNegativeFixtures_DoNotMatchActionableChallengeScreens(string dataset)
     {
@@ -320,6 +356,7 @@ public sealed class ChallengeScreenDetectorTests
             ChallengeScreenState.ChallengeCooldown,
             ChallengeScreenState.PreviewReady,
             ChallengeScreenState.PostMatchPreview,
+            ChallengeScreenState.PostMatchHud,
             ChallengeScreenState.Victory,
         ];
         foreach (string file in Directory.EnumerateFiles(TestPaths.Datasets, "*.png", SearchOption.AllDirectories))

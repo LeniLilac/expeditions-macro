@@ -15,6 +15,7 @@ public enum ChallengeScreenState
     ChallengeCooldown,
     PreviewReady,
     PostMatchPreview,
+    PostMatchHud,
     Prestart,
     Victory,
     Defeat,
@@ -72,6 +73,7 @@ public static class ChallengeScreenDetector
             ChallengeScreenState.ChallengeCooldown,
             ChallengeScreenState.ChallengeListUnavailable,
             ChallengeScreenState.Victory,
+            ChallengeScreenState.PostMatchHud,
             ChallengeScreenState.Prestart,
             ChallengeScreenState.PreviewReady,
             ChallengeScreenState.PostMatchPreview,
@@ -102,6 +104,7 @@ public static class ChallengeScreenDetector
         double victoryParty = ActionButtonDetector.Score(image, "challenge_victory_party");
         double victoryClose = ActionButtonDetector.Score(image, "challenge_victory_close");
         double defeat = TerminalScreenDetector.Score(image, "defeat");
+        double postMatchHud = PostMatchHudScore(image);
         double prestart = RewardScreenDetector.HasHeader(image) ? 0 : StartDialogDetector.Score(image);
         double challengeList = ChallengeListScore(image, panel);
         double challengeListUnavailable = ChallengeListUnavailableScore(image, panel);
@@ -136,6 +139,7 @@ public static class ChallengeScreenDetector
             [ChallengeScreenState.ChallengeCooldown] = challengeCooldown,
             [ChallengeScreenState.PreviewReady] = preview,
             [ChallengeScreenState.PostMatchPreview] = postMatchPreview,
+            [ChallengeScreenState.PostMatchHud] = postMatchHud,
             [ChallengeScreenState.Prestart] = prestart,
             [ChallengeScreenState.Victory] = victory,
             [ChallengeScreenState.Defeat] = defeat,
@@ -155,8 +159,6 @@ public static class ChallengeScreenDetector
     public static (int X, int Y) DefeatRetryAction(ImageFrame image) =>
         ActionButtonDetector.ActionFor(image, "defeat") ?? (225, 438);
 
-    public static (int X, int Y) OpenPlayAction() => (147, 584);
-
     public static (int X, int Y)? ActionFor(ChallengeScreenState state, ImageFrame image) => state switch
     {
         ChallengeScreenState.GameModeSelector => (480, 205),
@@ -165,6 +167,7 @@ public static class ChallengeScreenDetector
         ChallengeScreenState.ChallengeCooldown => (308, 437),
         ChallengeScreenState.PreviewReady => PreviewReadyAction(image),
         ChallengeScreenState.PostMatchPreview => ChangeModeAction(image),
+        ChallengeScreenState.PostMatchHud => PostMatchPlayAction(image),
         ChallengeScreenState.Prestart => StartDialogDetector.ActionFor(image),
         ChallengeScreenState.Victory => ActionButtonDetector.ActionFor(image, "challenge_victory_close"),
         ChallengeScreenState.Defeat => ActionButtonDetector.ActionFor(image, "defeat"),
@@ -180,6 +183,7 @@ public static class ChallengeScreenDetector
         ChallengeScreenState.ChallengeCooldown => 0.76,
         ChallengeScreenState.PreviewReady => 0.78,
         ChallengeScreenState.PostMatchPreview => 0.76,
+        ChallengeScreenState.PostMatchHud => 0.76,
         ChallengeScreenState.Prestart => 0.82,
         ChallengeScreenState.Victory => 0.74,
         ChallengeScreenState.Defeat => 0.75,
@@ -229,6 +233,20 @@ public static class ChallengeScreenDetector
         ActionButtonDetector.Score(image, "challenge_party_disband") > 0
             ? ActionButtonDetector.ActionFor(image, "challenge_party_start")
             : ActionButtonDetector.ActionFor(image, "challenge_preview_start");
+
+    private static double PostMatchHudScore(ImageFrame image)
+    {
+        double play = ActionButtonDetector.Score(image, "challenge_post_match_play");
+        double gameResults = ActionButtonDetector.Score(image, "challenge_game_results");
+        return play == 0 || gameResults == 0
+            ? 0
+            : Math.Clamp(0.60 * play + 0.40 * gameResults, 0, 1);
+    }
+
+    private static (int X, int Y)? PostMatchPlayAction(ImageFrame image) =>
+        PostMatchHudScore(image) >= Threshold(ChallengeScreenState.PostMatchHud)
+            ? ActionButtonDetector.ActionFor(image, "challenge_post_match_play")
+            : null;
 
     private static double CompactExpeditionPartyScore(ImageFrame image)
     {
