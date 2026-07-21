@@ -4,6 +4,24 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.1.6] - 2026-07-21
+
+### Changed
+
+- Upgraded the bundled detector pack to 1.0.2 with the five Challenge map references required by Challenge automation.
+- Replaced older bundled detector packs automatically at startup, repaired corrupted same-version installations, and preserved genuinely newer user-installed packs.
+- Included detector-pack identity, manifest hash, and Challenge-map capability in diagnostic capture manifests.
+
+### Fixed
+
+- Replaced the fixed post-match Play click with live detection of the bottom-left Play control, a safe detected-center click, and verified retries when Roblox does not transition.
+- Stopped Challenge runs early with an actionable detector-pack update message when the active pack cannot recognize Challenge maps.
+
+### Tests
+
+- Added the reported post-match HUD and Challenge selector frames as privacy-reviewed regression fixtures.
+- Added navigation retry, detector-pack migration, payload-integrity, capability, and reported-map recognition coverage.
+
 ## [1.1.5] - 2026-07-20
 
 ### Fixed
@@ -297,6 +315,7 @@ All notable changes to Expeditions Macro are documented here.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
 [Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.5...HEAD
+[1.1.6]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.5...v1.1.6
 [1.1.5]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.2...v1.1.3
