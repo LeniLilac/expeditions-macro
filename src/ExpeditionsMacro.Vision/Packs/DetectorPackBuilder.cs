@@ -88,6 +88,18 @@ public sealed class DetectorPackBuilder
             const string emptyFile = "empty-hotbar.png";
             ImageCodec.SavePng(Path.Combine(staging, emptyFile), emptyReference);
 
+            string? animeExpeditionsRoot = Directory.GetParent(Path.GetFullPath(datasetsRoot))?.FullName;
+            if (animeExpeditionsRoot is null) throw new DirectoryNotFoundException("The Anime Expeditions dataset root could not be located.");
+            string challengeRoot = Path.Combine(animeExpeditionsRoot, "challenges");
+            foreach (ChallengeMapReferenceSpec spec in AnimeExpeditionsDetectorSpec.ChallengeMapReferences)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                string source = Path.Combine(challengeRoot, spec.SourceFile.Replace('/', Path.DirectorySeparatorChar));
+                ImageFrame image = LoadImage(source);
+                string relative = DetectorPackCapabilities.ChallengeMapReferences[spec.Map];
+                ImageCodec.SavePng(Path.Combine(staging, relative.Replace('/', Path.DirectorySeparatorChar)), image.Crop(spec.Region));
+            }
+
             List<DetectorPackFile> files = [];
             foreach (string file in Directory.EnumerateFiles(staging, "*", SearchOption.AllDirectories).Order(StringComparer.OrdinalIgnoreCase))
             {
@@ -161,6 +173,17 @@ public sealed class DetectorPackBuilder
         }
         if (images.Count == 0) throw new FileNotFoundException($"No PNG examples were found for {string.Join(", ", names)}.");
         return images;
+    }
+
+    private static ImageFrame LoadImage(string path)
+    {
+        if (!File.Exists(path)) throw new FileNotFoundException("A detector source image is missing.", path);
+        ImageFrame image = ImageCodec.Load(path, PixelFormat.Rgb24);
+        if (image.Width != AnimeExpeditionsDetectorSpec.ClientWidth || image.Height != AnimeExpeditionsDetectorSpec.ClientHeight)
+        {
+            throw new InvalidDataException($"{path} is {image.Width} by {image.Height}, expected {AnimeExpeditionsDetectorSpec.ClientWidth} by {AnimeExpeditionsDetectorSpec.ClientHeight}.");
+        }
+        return image;
     }
 
     private static double? NodeHue(ImageFrame image)

@@ -19,20 +19,115 @@ public sealed class DetectorPackRepositoryTests
             CopyDirectory(TestPaths.DetectorPack, modified);
             string manifestPath = Path.Combine(modified, "manifest.json");
             DetectorPackManifest manifest = (await JsonFileStore.ReadAsync<DetectorPackManifest>(manifestPath))!;
-            await JsonFileStore.WriteAtomicAsync(manifestPath, manifest with { Version = "1.0.2" });
+            await JsonFileStore.WriteAtomicAsync(manifestPath, manifest with { Version = "1.0.3" });
 
             await repository.InstallDirectoryAsync(modified);
-            Assert.Equal("1.0.2", Assert.Single(await repository.ListAsync()).Version);
+            Assert.Equal("1.0.3", Assert.Single(await repository.ListAsync()).Version);
 
             await repository.RollbackAsync(AnimeExpeditionsDetectorSpec.PackId);
 
-            Assert.Equal("1.0.1", Assert.Single(await repository.ListAsync()).Version);
+            Assert.Equal("1.0.2", Assert.Single(await repository.ListAsync()).Version);
             Assert.NotNull(await repository.LoadAsync(AnimeExpeditionsDetectorSpec.PackId));
         }
         finally
         {
             TestPaths.DeleteTemporaryDirectory(root);
             TestPaths.DeleteTemporaryDirectory(modified);
+        }
+    }
+
+    [Fact]
+    public async Task EnsureBundled_ReplacesAnOlderInstalledPack()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            DetectorPackRepository repository = new(new AppPaths(root));
+            await repository.InstallDirectoryAsync(TestPaths.LegacyDetectorPack);
+
+            Assert.True(await repository.EnsureBundledAsync(TestPaths.DetectorPack));
+
+            Assert.Equal("1.0.2", Assert.Single(await repository.ListAsync()).Version);
+            Assert.True((await repository.LoadAsync(AnimeExpeditionsDetectorSpec.PackId))!.SupportsChallengeMaps);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task EnsureBundled_ReplacesAStaleSameVersionPayload()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        string stale = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            await CopyWithVersionAsync(TestPaths.LegacyDetectorPack, stale, "1.0.2");
+            DetectorPackRepository repository = new(new AppPaths(root));
+            await repository.InstallDirectoryAsync(stale);
+
+            Assert.True(await repository.EnsureBundledAsync(TestPaths.DetectorPack));
+
+            DetectorPackManifest installed = Assert.Single(await repository.ListAsync());
+            Assert.Equal("1.0.2", installed.Version);
+            Assert.Equal(34, installed.Files.Count);
+            Assert.True((await repository.LoadAsync(AnimeExpeditionsDetectorSpec.PackId))!.SupportsChallengeMaps);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+            TestPaths.DeleteTemporaryDirectory(stale);
+        }
+    }
+
+    [Fact]
+    public async Task EnsureBundled_ReplacesASameVersionManifestMismatch()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        string stale = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            CopyDirectory(TestPaths.DetectorPack, stale);
+            string manifestPath = Path.Combine(stale, "manifest.json");
+            DetectorPackManifest manifest = (await JsonFileStore.ReadAsync<DetectorPackManifest>(manifestPath))!;
+            await JsonFileStore.WriteAtomicAsync(manifestPath, manifest with { MinimumAppVersion = "99.0.0" });
+            DetectorPackRepository repository = new(new AppPaths(root));
+            await repository.InstallDirectoryAsync(stale);
+
+            Assert.True(await repository.EnsureBundledAsync(TestPaths.DetectorPack));
+
+            DetectorPackManifest installed = Assert.Single(await repository.ListAsync());
+            Assert.Equal("0.1.0", installed.MinimumAppVersion);
+            Assert.True((await repository.LoadAsync(AnimeExpeditionsDetectorSpec.PackId))!.SupportsChallengeMaps);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+            TestPaths.DeleteTemporaryDirectory(stale);
+        }
+    }
+
+    [Fact]
+    public async Task EnsureBundled_PreservesANewerInstalledPack()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        string newer = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            await CopyWithVersionAsync(TestPaths.LegacyDetectorPack, newer, "1.0.3");
+            DetectorPackRepository repository = new(new AppPaths(root));
+            await repository.InstallDirectoryAsync(newer);
+
+            Assert.False(await repository.EnsureBundledAsync(TestPaths.DetectorPack));
+
+            Assert.Equal("1.0.3", Assert.Single(await repository.ListAsync()).Version);
+            Assert.False((await repository.LoadAsync(AnimeExpeditionsDetectorSpec.PackId))!.SupportsChallengeMaps);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+            TestPaths.DeleteTemporaryDirectory(newer);
         }
     }
 
@@ -95,5 +190,13 @@ public sealed class DetectorPackRepositoryTests
             Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             File.Copy(file, target, overwrite: true);
         }
+    }
+
+    private static async Task CopyWithVersionAsync(string source, string destination, string version)
+    {
+        CopyDirectory(source, destination);
+        string manifestPath = Path.Combine(destination, "manifest.json");
+        DetectorPackManifest manifest = (await JsonFileStore.ReadAsync<DetectorPackManifest>(manifestPath))!;
+        await JsonFileStore.WriteAtomicAsync(manifestPath, manifest with { Version = version });
     }
 }

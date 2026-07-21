@@ -11,7 +11,7 @@ Run `ExpeditionsMacro.DatasetBuilder`, choose the local dataset root, choose an 
 ## Build from the command line
 
 ```powershell
-dotnet run --project tools/ExpeditionsMacro.DatasetBuilder -- --build datasets/anime-expeditions/expeditions detector-packs 1.0.1
+dotnet run --project tools/ExpeditionsMacro.DatasetBuilder -- --build datasets/anime-expeditions/expeditions detector-packs 1.0.2
 ```
 
 For release updates, ZIP the contents of the version directory so `manifest.json` is at the archive root. Name the GitHub Release asset:
@@ -19,3 +19,5 @@ For release updates, ZIP the contents of the version directory so `manifest.json
 `anime-expeditions-expeditions-<version>.zip`
 
 The app checks stable releases at `LeniLilac/expeditions-macro`, prompts before installation, and never updates a pack while automation owns Roblox input.
+
+At startup, an older bundled pack is installed automatically. A same-version installation is replaced when its manifest or on-disk hashes differ, while a newer installed pack is preserved.

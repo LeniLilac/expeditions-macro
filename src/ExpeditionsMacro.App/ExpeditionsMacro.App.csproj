@@ -22,8 +22,8 @@
   <ItemGroup>
     <Resource Include="..\..\assets\app.ico"><Link>Resources\app.ico</Link></Resource>
     <Resource Include="..\..\assets\app-preview.png"><Link>Resources\app-preview.png</Link></Resource>
-    <Content Include="..\..\detector-packs\anime-expeditions-expeditions\1.0.1\**\*">
-      <Link>Resources\DetectorPacks\anime-expeditions-expeditions\1.0.1\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    <Content Include="..\..\detector-packs\anime-expeditions-expeditions\1.0.2\**\*">
+      <Link>Resources\DetectorPacks\anime-expeditions-expeditions\1.0.2\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>

@@ -1,4 +1,5 @@
 using ExpeditionsMacro.Core.Geometry;
+using ExpeditionsMacro.Core.Models;
 
 namespace ExpeditionsMacro.Vision.Packs;
 
@@ -10,10 +11,15 @@ public sealed record DatasetStateSpec(
     int ActionY,
     double Threshold);
 
+public sealed record ChallengeMapReferenceSpec(
+    ChallengeMapId Map,
+    string SourceFile,
+    ScreenRegion Region);
+
 public static class AnimeExpeditionsDetectorSpec
 {
     public const string PackId = "anime-expeditions-expeditions";
-    public const string BundledPackVersion = "1.0.1";
+    public const string BundledPackVersion = "1.0.2";
     public const int ClientWidth = 808;
     public const int ClientHeight = 611;
 
@@ -70,6 +76,15 @@ public static class AnimeExpeditionsDetectorSpec
         ["boss"] = "Expedition_Boss_Node",
         ["checkpoint"] = "Expedition_Checkpoint_Node",
     };
+
+    public static IReadOnlyList<ChallengeMapReferenceSpec> ChallengeMapReferences { get; } =
+    [
+        new(ChallengeMapId.SchoolGrounds, "ChallengeList/ChallengeList_01.png", new(276, 292, 78, 75)),
+        new(ChallengeMapId.FlowerForest, "ChallengeList/ChallengeList_03.png", new(276, 203, 78, 75)),
+        new(ChallengeMapId.RoseKingdom, "ChallengeList/ChallengeList_01.png", new(276, 203, 78, 75)),
+        new(ChallengeMapId.FairyKingForest, "ChallengeList/ChallengeList_01.png", new(276, 381, 78, 75)),
+        new(ChallengeMapId.KingsTomb, "ChallengeList/ChallengeList_03.png", new(276, 292, 78, 75)),
+    ];
 
     public static IReadOnlyDictionary<string, int[]> ExtraActions { get; } = new Dictionary<string, int[]>
     {

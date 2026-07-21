@@ -8,6 +8,7 @@ using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Challenges;
+using ExpeditionsMacro.Vision.Packs;
 
 namespace ExpeditionsMacro.Automation.Challenges;
 
@@ -48,6 +49,10 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         CancellationToken cancellationToken = default)
     {
         preset.ValidateReady();
+        if (!detector.SupportsChallengeMaps)
+        {
+            throw new InvalidDataException(DetectorPackCapabilities.ChallengeMapsUnavailableMessage(detector.Manifest));
+        }
         ValidateRuntimeModels(preset, mapModels, detector.Manifest);
         RobloxWindow window = _automation.FindWindow() ?? throw new InvalidOperationException("No visible Roblox window was found.");
         DateTimeOffset startedAt = DateTimeOffset.UtcNow;

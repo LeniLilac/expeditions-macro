@@ -17,6 +17,8 @@ public interface IDetectorPack
 {
     DetectorPackManifest Manifest { get; }
 
+    bool SupportsChallengeMaps => false;
+
     IReadOnlyDictionary<string, double> ScoreStates(ExpeditionsMacro.Core.Imaging.ImageFrame clientImage);
 
     string? Classify(IReadOnlyDictionary<string, double> scores);

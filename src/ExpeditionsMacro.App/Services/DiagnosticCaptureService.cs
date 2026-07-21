@@ -1,12 +1,15 @@
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows.Media.Imaging;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
+using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
+using ExpeditionsMacro.Vision.Packs;
 
 namespace ExpeditionsMacro.App.Services;
 
@@ -116,6 +119,7 @@ public sealed class DiagnosticCaptureService
 
             bool logsIncluded = TryCopyLog(logFilePath, staging);
             string[] includedFiles = logsIncluded ? ["macro-run.log"] : [];
+            DiagnosticDetectorPack? detectorPack = await TryReadDetectorPackAsync().ConfigureAwait(false);
             DiagnosticCaptureManifest manifest = new(
                 safeName,
                 Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "unknown",
@@ -124,6 +128,7 @@ public sealed class DiagnosticCaptureService
                 ClientWidth,
                 ClientHeight,
                 (int)Math.Round(interval.TotalMilliseconds),
+                detectorPack,
                 includedFiles,
                 frames);
             await File.WriteAllTextAsync(
@@ -174,6 +179,30 @@ public sealed class DiagnosticCaptureService
         return true;
     }
 
+    private async Task<DiagnosticDetectorPack?> TryReadDetectorPackAsync()
+    {
+        string directory = Path.Combine(_paths.DetectorPacks, AnimeExpeditionsDetectorSpec.PackId, "current");
+        string manifestPath = Path.Combine(directory, "manifest.json");
+        if (!File.Exists(manifestPath)) return null;
+        try
+        {
+            DetectorPackManifest manifest = await JsonFileStore.ReadAsync<DetectorPackManifest>(manifestPath, CancellationToken.None).ConfigureAwait(false)
+                ?? throw new InvalidDataException("The active detector pack manifest is empty.");
+            manifest.Validate();
+            await using FileStream stream = File.OpenRead(manifestPath);
+            string manifestHash = Convert.ToHexStringLower(await SHA256.HashDataAsync(stream, CancellationToken.None).ConfigureAwait(false));
+            return new DiagnosticDetectorPack(
+                manifest.PackId,
+                manifest.Version,
+                manifestHash,
+                DetectorPackCapabilities.SupportsChallengeMaps(directory, manifest));
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException or JsonException)
+        {
+            return null;
+        }
+    }
+
     private static void EnsureChildPath(string root, string path)
     {
         string prefix = root.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
@@ -185,6 +214,12 @@ public sealed class DiagnosticCaptureService
 
     private sealed record DiagnosticCaptureFrame(string File, DateTimeOffset CapturedAtUtc);
 
+    private sealed record DiagnosticDetectorPack(
+        string PackId,
+        string Version,
+        string ManifestSha256,
+        bool SupportsChallengeMaps);
+
     private sealed record DiagnosticCaptureManifest(
         string Name,
         string AppVersion,
@@ -193,6 +228,7 @@ public sealed class DiagnosticCaptureService
         int ClientWidth,
         int ClientHeight,
         int IntervalMilliseconds,
+        DiagnosticDetectorPack? DetectorPack,
         IReadOnlyList<string> IncludedFiles,
         IReadOnlyList<DiagnosticCaptureFrame> Frames);
 }

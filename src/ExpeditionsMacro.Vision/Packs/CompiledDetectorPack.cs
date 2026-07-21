@@ -82,6 +82,8 @@ public sealed class CompiledDetectorPack : IDetectorPack
 
     public DetectorPackManifest Manifest { get; }
 
+    public bool SupportsChallengeMaps => _challengeMaps?.IsComplete == true;
+
     public IReadOnlyDictionary<string, double> ScoreStates(ImageFrame clientImage)
     {
         ValidateClient(clientImage);
@@ -216,8 +218,11 @@ public sealed class CompiledDetectorPack : IDetectorPack
         return remaining;
     }
 
-    public ChallengeMapId? ChallengeMapForType(ImageFrame clientImage, ChallengeType type) =>
-        _challengeMaps?.Detect(clientImage, type).Map;
+    public ChallengeMapId? ChallengeMapForType(ImageFrame clientImage, ChallengeType type)
+    {
+        if (_challengeMaps is null) throw new InvalidOperationException(DetectorPackCapabilities.ChallengeMapsUnavailableMessage(Manifest));
+        return _challengeMaps.Detect(clientImage, type).Map;
+    }
 
     public (int X, int Y) ActionFor(string state, ImageFrame? clientImage = null)
     {
@@ -530,16 +535,9 @@ public sealed class CompiledDetectorPack : IDetectorPack
     private ChallengeMapDetector? LoadChallengeMapDetector()
     {
         Dictionary<ChallengeMapId, ImageFrame> references = [];
-        foreach ((ChallengeMapId map, string file) in new[]
+        foreach ((ChallengeMapId map, string relative) in DetectorPackCapabilities.ChallengeMapReferences)
         {
-            (ChallengeMapId.SchoolGrounds, "school-grounds.png"),
-            (ChallengeMapId.FlowerForest, "flower-forest.png"),
-            (ChallengeMapId.RoseKingdom, "rose-kingdom.png"),
-            (ChallengeMapId.FairyKingForest, "fairy-king-forest.png"),
-            (ChallengeMapId.KingsTomb, "kings-tomb.png"),
-        })
-        {
-            string path = Path.Combine(Directory, "challenge-maps", file);
+            string path = Resolve(relative);
             if (!File.Exists(path)) return null;
             references[map] = ImageCodec.Load(path, PixelFormat.Gray8);
         }

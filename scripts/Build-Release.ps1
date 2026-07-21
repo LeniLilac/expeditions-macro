@@ -86,7 +86,7 @@ Copy-Item -LiteralPath (Join-Path $repository 'THIRD-PARTY-NOTICES.md') -Destina
 $portable = Join-Path $release "ExpeditionsMacro-$Version-win-x64.zip"
 Compress-Archive -Path $publish -DestinationPath $portable -CompressionLevel Optimal
 
-$packVersion = '1.0.1'
+$packVersion = '1.0.2'
 $packId = 'anime-expeditions-expeditions'
 $packRoot = Join-Path $repository "detector-packs\$packId\$packVersion"
 $packArchive = Join-Path $release "$packId-$packVersion.zip"

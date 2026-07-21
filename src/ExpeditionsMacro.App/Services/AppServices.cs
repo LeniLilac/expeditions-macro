@@ -134,15 +134,9 @@ public sealed class AppServices : IDisposable
 
     private async Task EnsureBundledDetectorPackAsync()
     {
-        IReadOnlyList<DetectorPackManifest> installed = await DetectorPacks.ListAsync();
         string source = Path.Combine(AppContext.BaseDirectory, "Resources", "DetectorPacks", AnimeExpeditionsDetectorSpec.PackId, AnimeExpeditionsDetectorSpec.BundledPackVersion);
         if (!Directory.Exists(source)) throw new DirectoryNotFoundException("The bundled detector pack is missing from this build.");
-        DetectorPackManifest bundled = await JsonFileStore.ReadAsync<DetectorPackManifest>(Path.Combine(source, "manifest.json"))
-            ?? throw new InvalidDataException("The bundled detector pack manifest is missing.");
-        DetectorPackManifest? current = installed.FirstOrDefault(pack => pack.PackId == AnimeExpeditionsDetectorSpec.PackId);
-        if (current is not null && !string.Equals(current.Version, bundled.Version, StringComparison.OrdinalIgnoreCase)) return;
-        if (current is not null && HasSameFiles(current, bundled)) return;
-        await DetectorPacks.InstallDirectoryAsync(source);
+        await DetectorPacks.EnsureBundledAsync(source);
     }
 
     private async Task<(string? Path, string? Error)> CaptureFailureDiagnosticsAsync(string macroName)
@@ -211,12 +205,4 @@ public sealed class AppServices : IDisposable
         }
     }
 
-    private static bool HasSameFiles(DetectorPackManifest left, DetectorPackManifest right)
-    {
-        if (left.Files.Count != right.Files.Count) return false;
-        Dictionary<string, DetectorPackFile> expected = right.Files.ToDictionary(file => file.Path, StringComparer.OrdinalIgnoreCase);
-        return left.Files.All(file => expected.TryGetValue(file.Path, out DetectorPackFile? match) &&
-            file.Bytes == match.Bytes &&
-            string.Equals(file.Sha256, match.Sha256, StringComparison.OrdinalIgnoreCase));
-    }
 }

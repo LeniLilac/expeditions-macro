@@ -99,6 +99,43 @@ public sealed class DetectorPackRepository : IDetectorPackRepository
         }
     }
 
+    public async Task<bool> EnsureBundledAsync(string sourceDirectory, CancellationToken cancellationToken = default)
+    {
+        DetectorPackManifest bundled = await JsonFileStore.ReadAsync<DetectorPackManifest>(Path.Combine(sourceDirectory, "manifest.json"), cancellationToken).ConfigureAwait(false)
+            ?? throw new InvalidDataException("Bundled detector pack has no manifest.");
+        bundled.Validate();
+        Version bundledVersion = ParseVersion(bundled);
+        DetectorPackManifest? current = (await ListAsync(cancellationToken).ConfigureAwait(false))
+            .FirstOrDefault(pack => pack.PackId.Equals(bundled.PackId, StringComparison.OrdinalIgnoreCase));
+
+        if (current is not null)
+        {
+            Version currentVersion = ParseVersion(current);
+            int comparison = currentVersion.CompareTo(bundledVersion);
+            if (comparison > 0) return false;
+            if (comparison == 0)
+            {
+                string currentDirectory = Path.Combine(_paths.DetectorPacks, ValidateId(current.PackId), "current");
+                string currentManifestPath = Path.Combine(currentDirectory, "manifest.json");
+                if (await HasSameManifestAsync(currentManifestPath, Path.Combine(sourceDirectory, "manifest.json"), cancellationToken).ConfigureAwait(false))
+                {
+                    try
+                    {
+                        await ValidateFilesAsync(currentDirectory, current, cancellationToken).ConfigureAwait(false);
+                        return false;
+                    }
+                    catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException)
+                    {
+                        // Replace a same-version pack whose declared payload is no longer healthy.
+                    }
+                }
+            }
+        }
+
+        await InstallDirectoryAsync(sourceDirectory, cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
     public Task RollbackAsync(string packId, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -150,6 +187,20 @@ public sealed class DetectorPackRepository : IDetectorPackRepository
             if (!string.Equals(hash, expected.Sha256, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException($"Detector pack file '{expected.Path}' failed its SHA-256 check.");
         }
     }
+
+    private static async Task<bool> HasSameManifestAsync(string leftPath, string rightPath, CancellationToken cancellationToken)
+    {
+        await using FileStream left = File.OpenRead(leftPath);
+        await using FileStream right = File.OpenRead(rightPath);
+        byte[] leftHash = await SHA256.HashDataAsync(left, cancellationToken).ConfigureAwait(false);
+        byte[] rightHash = await SHA256.HashDataAsync(right, cancellationToken).ConfigureAwait(false);
+        return CryptographicOperations.FixedTimeEquals(leftHash, rightHash);
+    }
+
+    private static Version ParseVersion(DetectorPackManifest manifest) =>
+        Version.TryParse(manifest.Version, out Version? version)
+            ? version
+            : throw new InvalidDataException($"Detector pack '{manifest.PackId}' has an invalid version.");
 
     private static string SafeArchivePath(string root, string relative)
     {

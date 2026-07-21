@@ -1,0 +1,612 @@
+{
+  "schema_version": 1,
+  "pack_id": "anime-expeditions-expeditions",
+  "version": "1.0.2",
+  "game_id": "anime-expeditions",
+  "mode_id": "expeditions",
+  "minimum_app_version": "0.1.0",
+  "client_width": 808,
+  "client_height": 611,
+  "states": [
+    {
+      "name": "disconnect",
+      "regions": [
+        {
+          "region": {
+            "x": 204,
+            "y": 181,
+            "width": 400,
+            "height": 251
+          },
+          "file": "states/disconnect/00.png"
+        },
+        {
+          "region": {
+            "x": 224,
+            "y": 374,
+            "width": 360,
+            "height": 38
+          },
+          "file": "states/disconnect/01.png"
+        }
+      ],
+      "action_x": 496,
+      "action_y": 394,
+      "threshold": 0.86
+    },
+    {
+      "name": "lobby",
+      "regions": [
+        {
+          "region": {
+            "x": 10,
+            "y": 236,
+            "width": 80,
+            "height": 31
+          },
+          "file": "states/lobby/00.png"
+        },
+        {
+          "region": {
+            "x": 10,
+            "y": 269,
+            "width": 80,
+            "height": 40
+          },
+          "file": "states/lobby/01.png"
+        },
+        {
+          "region": {
+            "x": 10,
+            "y": 310,
+            "width": 80,
+            "height": 40
+          },
+          "file": "states/lobby/02.png"
+        },
+        {
+          "region": {
+            "x": 10,
+            "y": 352,
+            "width": 80,
+            "height": 40
+          },
+          "file": "states/lobby/03.png"
+        },
+        {
+          "region": {
+            "x": 10,
+            "y": 396,
+            "width": 80,
+            "height": 30
+          },
+          "file": "states/lobby/04.png"
+        }
+      ],
+      "action_x": 70,
+      "action_y": 389,
+      "threshold": 0.8
+    },
+    {
+      "name": "play",
+      "regions": [
+        {
+          "region": {
+            "x": 608,
+            "y": 158,
+            "width": 176,
+            "height": 90
+          },
+          "file": "states/play/00.png"
+        },
+        {
+          "region": {
+            "x": 617,
+            "y": 162,
+            "width": 92,
+            "height": 23
+          },
+          "file": "states/play/01.png"
+        }
+      ],
+      "action_x": 690,
+      "action_y": 205,
+      "threshold": 0.82
+    },
+    {
+      "name": "map_select",
+      "regions": [
+        {
+          "region": {
+            "x": 669,
+            "y": 518,
+            "width": 119,
+            "height": 33
+          },
+          "file": "states/map_select/00.png"
+        },
+        {
+          "region": {
+            "x": 723,
+            "y": 18,
+            "width": 72,
+            "height": 16
+          },
+          "file": "states/map_select/01.png"
+        }
+      ],
+      "action_x": 728,
+      "action_y": 535,
+      "threshold": 0.82
+    },
+    {
+      "name": "map_preview",
+      "regions": [
+        {
+          "region": {
+            "x": 425,
+            "y": 354,
+            "width": 324,
+            "height": 33
+          },
+          "file": "states/map_preview/00.png"
+        }
+      ],
+      "action_x": 479,
+      "action_y": 370,
+      "threshold": 0.82
+    },
+    {
+      "name": "victory",
+      "regions": [
+        {
+          "region": {
+            "x": 125,
+            "y": 150,
+            "width": 95,
+            "height": 27
+          },
+          "file": "states/victory/00.png"
+        }
+      ],
+      "action_x": 225,
+      "action_y": 438,
+      "threshold": 0.9
+    },
+    {
+      "name": "defeat",
+      "regions": [
+        {
+          "region": {
+            "x": 125,
+            "y": 150,
+            "width": 95,
+            "height": 27
+          },
+          "file": "states/defeat/00.png"
+        }
+      ],
+      "action_x": 225,
+      "action_y": 438,
+      "threshold": 0.9
+    },
+    {
+      "name": "extract_confirm",
+      "regions": [
+        {
+          "region": {
+            "x": 283,
+            "y": 217,
+            "width": 241,
+            "height": 176
+          },
+          "file": "states/extract_confirm/00.png"
+        }
+      ],
+      "action_x": 345,
+      "action_y": 378,
+      "threshold": 0.82
+    },
+    {
+      "name": "reward",
+      "regions": [
+        {
+          "region": {
+            "x": 136,
+            "y": 383,
+            "width": 116,
+            "height": 19
+          },
+          "file": "states/reward/00.png"
+        },
+        {
+          "region": {
+            "x": 345,
+            "y": 383,
+            "width": 117,
+            "height": 19
+          },
+          "file": "states/reward/01.png"
+        },
+        {
+          "region": {
+            "x": 554,
+            "y": 383,
+            "width": 118,
+            "height": 19
+          },
+          "file": "states/reward/02.png"
+        }
+      ],
+      "action_x": 194,
+      "action_y": 391,
+      "threshold": 0.76
+    },
+    {
+      "name": "confirm",
+      "regions": [
+        {
+          "region": {
+            "x": 280,
+            "y": 255,
+            "width": 248,
+            "height": 93
+          },
+          "file": "states/confirm/00.png"
+        }
+      ],
+      "action_x": 345,
+      "action_y": 331,
+      "threshold": 0.8
+    },
+    {
+      "name": "checkpoint",
+      "regions": [
+        {
+          "region": {
+            "x": 310,
+            "y": 482,
+            "width": 185,
+            "height": 36
+          },
+          "file": "states/checkpoint/00.png"
+        }
+      ],
+      "action_x": 448,
+      "action_y": 500,
+      "threshold": 0.78
+    },
+    {
+      "name": "start",
+      "regions": [
+        {
+          "region": {
+            "x": 315,
+            "y": 100,
+            "width": 180,
+            "height": 92
+          },
+          "file": "states/start/00.png"
+        }
+      ],
+      "action_x": 404,
+      "action_y": 177,
+      "threshold": 0.82
+    },
+    {
+      "name": "continue",
+      "regions": [
+        {
+          "region": {
+            "x": 355,
+            "y": 482,
+            "width": 97,
+            "height": 36
+          },
+          "file": "states/continue/00.png"
+        }
+      ],
+      "action_x": 404,
+      "action_y": 500,
+      "threshold": 0.88
+    }
+  ],
+  "map_selections": [
+    {
+      "value": 1,
+      "region": {
+        "x": 654,
+        "y": 28,
+        "width": 145,
+        "height": 31
+      },
+      "file": "selections/map-1.png",
+      "minimum_score": 0.9
+    },
+    {
+      "value": 2,
+      "region": {
+        "x": 654,
+        "y": 28,
+        "width": 145,
+        "height": 31
+      },
+      "file": "selections/map-2.png",
+      "minimum_score": 0.9
+    },
+    {
+      "value": 3,
+      "region": {
+        "x": 654,
+        "y": 28,
+        "width": 145,
+        "height": 31
+      },
+      "file": "selections/map-3.png",
+      "minimum_score": 0.9
+    }
+  ],
+  "difficulty_selections": [
+    {
+      "value": 1,
+      "region": {
+        "x": 636,
+        "y": 386,
+        "width": 151,
+        "height": 41
+      },
+      "file": "selections/difficulty-1.png",
+      "minimum_score": 0.97
+    },
+    {
+      "value": 2,
+      "region": {
+        "x": 636,
+        "y": 386,
+        "width": 151,
+        "height": 41
+      },
+      "file": "selections/difficulty-2.png",
+      "minimum_score": 0.97
+    },
+    {
+      "value": 3,
+      "region": {
+        "x": 636,
+        "y": 386,
+        "width": 151,
+        "height": 41
+      },
+      "file": "selections/difficulty-3.png",
+      "minimum_score": 0.97
+    }
+  ],
+  "difficulty_hue_prototypes": {
+    "1": 45,
+    "2": 0,
+    "3": 140
+  },
+  "difficulty_hue_region": {
+    "x": 672,
+    "y": 376,
+    "width": 80,
+    "height": 59
+  },
+  "node_hue_prototypes": {
+    "defense": 50,
+    "assault": 14,
+    "elite": 135,
+    "boss": 0,
+    "checkpoint": 19
+  },
+  "node_hue_region": {
+    "x": 236,
+    "y": 63,
+    "width": 62,
+    "height": 9
+  },
+  "empty_hotbar_reference_file": "empty-hotbar.png",
+  "extra_actions": {
+    "extract": [
+      360,
+      500
+    ],
+    "map_1": [
+      98,
+      230
+    ],
+    "map_2": [
+      98,
+      282
+    ],
+    "map_3": [
+      98,
+      333
+    ],
+    "difficulty_minus": [
+      657,
+      406
+    ],
+    "difficulty_plus": [
+      768,
+      406
+    ],
+    "select_stage": [
+      728,
+      535
+    ]
+  },
+  "files": [
+    {
+      "path": "challenge-maps/fairy-king-forest.png",
+      "sha256": "e1cbe4a3cfb2cd8edefdab4e234b8a6beee4b61627b32cf874e9d89c0fbfee6f",
+      "bytes": 10682
+    },
+    {
+      "path": "challenge-maps/flower-forest.png",
+      "sha256": "47c94692a1d9a4102490f69717b18cda7c3156f6d4c24945305fe1e2cadab683",
+      "bytes": 11933
+    },
+    {
+      "path": "challenge-maps/kings-tomb.png",
+      "sha256": "b0cac789b6a4485e6fb441a8cf80109192aa96dc45568c286c59ea15fa950e1a",
+      "bytes": 12743
+    },
+    {
+      "path": "challenge-maps/rose-kingdom.png",
+      "sha256": "b215d87641c2873ac380f677367e42434fecc92030b2088f94672e216eac5516",
+      "bytes": 12227
+    },
+    {
+      "path": "challenge-maps/school-grounds.png",
+      "sha256": "1538d54c198bdb857a67421ebd1e22dd2417698a934d4ebde2228911ec210427",
+      "bytes": 10544
+    },
+    {
+      "path": "empty-hotbar.png",
+      "sha256": "8e52f1dd91b6e84542249a44d476a572ddc7944b12140f2ff6ba9210f9f45285",
+      "bytes": 749115
+    },
+    {
+      "path": "selections/difficulty-1.png",
+      "sha256": "78141182ef030f068bf45298fb77b396d74485e431af94bc5b6aeef0d507d12f",
+      "bytes": 3107
+    },
+    {
+      "path": "selections/difficulty-2.png",
+      "sha256": "df4b97fb7f8c740d93d6745854c22a4b0432a56bd76a04205415e7a185edba3d",
+      "bytes": 3011
+    },
+    {
+      "path": "selections/difficulty-3.png",
+      "sha256": "83221481b83ddf2acacc10cc90d1cee9da80ba1435b450f8abfaca69edfc3759",
+      "bytes": 2963
+    },
+    {
+      "path": "selections/map-1.png",
+      "sha256": "d8ce4a2d51387c38d53b95c4a9ca68bebcf39f7d5a0cd38d97de4c2f5f519bb6",
+      "bytes": 3191
+    },
+    {
+      "path": "selections/map-2.png",
+      "sha256": "a838bfcf547cd1a82e5d4ee75563240e8910279edfa4b9f757e00e1a586418e1",
+      "bytes": 3064
+    },
+    {
+      "path": "selections/map-3.png",
+      "sha256": "ae24ebb28e81b62cfc954911a5ef8bfe46f6f9ea9e3cd847320e5a4f9e0bd25b",
+      "bytes": 3132
+    },
+    {
+      "path": "states/checkpoint/00.png",
+      "sha256": "acd6fa63b1fe53a2301cbea4dbc328f1be38e0d78fea9ed518904db217bb4206",
+      "bytes": 3629
+    },
+    {
+      "path": "states/confirm/00.png",
+      "sha256": "9d2dead3f2080befb9fcc346fc7a232b890ab7a8ffa7e6d6abde35fbb16b40f3",
+      "bytes": 9509
+    },
+    {
+      "path": "states/continue/00.png",
+      "sha256": "73fe07d7d976e57a91848230f8f0ebcb22bfa63dd52a95cf6aefef3eef86d75a",
+      "bytes": 2108
+    },
+    {
+      "path": "states/defeat/00.png",
+      "sha256": "f113af3422843364d405c5dd5d6f960eb86c179de0757903307a91783cbdfc6f",
+      "bytes": 1778
+    },
+    {
+      "path": "states/disconnect/00.png",
+      "sha256": "6b08cc53c4122db54bb9f4c8079eb4fcc6621be8d4a0084143d00ed24bc0cf1b",
+      "bytes": 12336
+    },
+    {
+      "path": "states/disconnect/01.png",
+      "sha256": "21ec93f3d9eb927bccd778ec9b1b91ef08db8c646759a2d589ba319d83c0c298",
+      "bytes": 2138
+    },
+    {
+      "path": "states/extract_confirm/00.png",
+      "sha256": "e6558992e37e7b51e200da1e4a3537c55a7415897a6b5466dcd59ec3b40722ae",
+      "bytes": 18994
+    },
+    {
+      "path": "states/lobby/00.png",
+      "sha256": "7a19216e61234bf724a4f358b4f13181d6e2f51e51ffd3f443bced978d52d73c",
+      "bytes": 1970
+    },
+    {
+      "path": "states/lobby/01.png",
+      "sha256": "c0b3ddc78363e35740f0355723f671643c157877867f78fdab88bb995181996d",
+      "bytes": 2542
+    },
+    {
+      "path": "states/lobby/02.png",
+      "sha256": "855a9e9fd65c172e2f7b7879a5d078dc85973d41d5966a640866d57db39f1df3",
+      "bytes": 2461
+    },
+    {
+      "path": "states/lobby/03.png",
+      "sha256": "399d6915a0edeec75afbe5db4b6fd0c52e9a582da0ef90f7481fa979038a3c8c",
+      "bytes": 2621
+    },
+    {
+      "path": "states/lobby/04.png",
+      "sha256": "bab105b4e31d1964acc20d1e119b2b5d137639d9292a594d88a6cd2454b2f697",
+      "bytes": 1943
+    },
+    {
+      "path": "states/map_preview/00.png",
+      "sha256": "9f8dd269019ea0110001848402fbb527be454615603d32d14e3459264f57a1bf",
+      "bytes": 3399
+    },
+    {
+      "path": "states/map_select/00.png",
+      "sha256": "df3542a299ceee724f3553b99a70ee743dfc2a68a7e85b9a4b9b31696132b416",
+      "bytes": 1577
+    },
+    {
+      "path": "states/map_select/01.png",
+      "sha256": "dc5fdd5a62b9c6ea05f9bbe8a5be23a7a6401621c4c81fc55a488d4a91e5a519",
+      "bytes": 1057
+    },
+    {
+      "path": "states/play/00.png",
+      "sha256": "e10206bf45fcc789ec8ec6ab5d5d17fb8ec8ae932a52895ab819159a50471626",
+      "bytes": 9784
+    },
+    {
+      "path": "states/play/01.png",
+      "sha256": "39558efe058b5695572bf1e3c1a576d56844eb03a38279fc1dc6ddf6355232c2",
+      "bytes": 1868
+    },
+    {
+      "path": "states/reward/00.png",
+      "sha256": "ce51faaf313d1ff3bb65152f595dce420db519a911b8ddc283ccb70f3ea367b0",
+      "bytes": 1164
+    },
+    {
+      "path": "states/reward/01.png",
+      "sha256": "7797567568f968e1cfc546b53fa4332a788a6729020ef483a02cf8ce8a32c711",
+      "bytes": 1200
+    },
+    {
+      "path": "states/reward/02.png",
+      "sha256": "d3b2f42fc8252b24dbe24cd30c17a28f3426828a90753ae3dfcea7907a2b1948",
+      "bytes": 1195
+    },
+    {
+      "path": "states/start/00.png",
+      "sha256": "e85da76c33ce5022a4d83f06decbdb6d41f6c889b34eeddc9e9cf862746ec60b",
+      "bytes": 6348
+    },
+    {
+      "path": "states/victory/00.png",
+      "sha256": "2f39f1ee1b9ff40f22929fed86cfbb114a7bb035e370cdfc0301538f1bd456e4",
+      "bytes": 1912
+    }
+  ],
+  "built_at": "2026-07-21T05:17:52.0620441+00:00"
+}
