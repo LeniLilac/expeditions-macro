@@ -24,13 +24,7 @@ public partial class GoalOverlayWindow : Window
         InitializeComponent();
         RobloxWindow window = automation.FindWindow() ?? throw new InvalidOperationException("No visible Roblox window was found.");
         ClientBounds client = automation.GetClientBounds(window);
-        double scaleX = (double)client.Width / model.Manifest.ClientWidth;
-        double scaleY = (double)client.Height / model.Manifest.ClientHeight;
-        _bounds = new ScreenRegion(
-            client.X + (int)Math.Round(model.Manifest.Region.X * scaleX),
-            client.Y + (int)Math.Round(model.Manifest.Region.Y * scaleY),
-            Math.Max(1, (int)Math.Round(model.Manifest.Region.Width * scaleX)),
-            Math.Max(1, (int)Math.Round(model.Manifest.Region.Height * scaleY)));
+        _bounds = client.AsRegion();
         GoalImage.Source = BitmapSourceFactory.Create(model.GoalOverlay);
         SourceInitialized += OnSourceInitialized;
     }

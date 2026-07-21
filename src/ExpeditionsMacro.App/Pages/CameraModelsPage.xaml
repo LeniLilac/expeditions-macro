@@ -30,7 +30,7 @@
                 <Border Grid.Row="1" Style="{StaticResource SectionDivider}">
                     <StackPanel>
                         <TextBlock Style="{StaticResource SectionTitle}" Text="Goal view" />
-                        <TextBlock Margin="0,5,0,18" MaxWidth="640" HorizontalAlignment="Left" Style="{StaticResource Caption}" Text="Choose a UI-free area with static track or map geometry. The coordinates are stored relative to Roblox." />
+                        <TextBlock Margin="0,5,0,18" MaxWidth="640" HorizontalAlignment="Left" Style="{StaticResource Caption}" Text="Setup finds several stable, detailed map areas automatically and ignores the usual HUD zones. The colored outlines show what the model compares." />
                         <StackPanel MaxWidth="640" HorizontalAlignment="Stretch">
                             <Grid>
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
@@ -41,14 +41,13 @@
                             <Border Height="190" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
                                 <Grid>
                                     <Image x:Name="PreviewImage" Margin="1" Stretch="Uniform" />
-                                    <TextBlock x:Name="PreviewPlaceholder" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource FaintBrush}" Text="No comparison region selected" />
+                                    <TextBlock x:Name="PreviewPlaceholder" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource FaintBrush}" Text="Automatic regions appear after setup" />
                                 </Grid>
                             </Border>
                             <StackPanel Margin="0,10,0,0">
-                                <TextBlock x:Name="RegionText" Style="{StaticResource Caption}" Text="Region: not selected" />
+                                <TextBlock x:Name="RegionText" Style="{StaticResource Caption}" Text="Automatic regions: chosen during setup" />
                                 <StackPanel Margin="0,8,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
-                                    <Button x:Name="SelectRegionButton" Content="Select region" Click="SelectRegion_Click" />
-                                    <Button x:Name="OverlayButton" Margin="8,0,0,0" Content="Show 30% overlay" IsEnabled="False" Click="Overlay_Click" />
+                                    <Button x:Name="OverlayButton" Content="Show 30% overlay" IsEnabled="False" Click="Overlay_Click" />
                                 </StackPanel>
                             </StackPanel>
                         </StackPanel>
@@ -57,17 +56,23 @@
 
                 <Border Grid.Row="2" Style="{StaticResource SectionDivider}">
                     <StackPanel>
-                        <TextBlock Style="{StaticResource SectionTitle}" Text="Calibration" />
-                        <TextBlock Margin="0,5,0,18" MaxWidth="640" HorizontalAlignment="Left" Style="{StaticResource Caption}" Text="Setup temporarily enables shift lock. More settle time helps Roblox finish rendering after each drag; fine drag controls final precision." />
-                        <Grid MaxWidth="640" HorizontalAlignment="Stretch">
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel Margin="0,0,20,0">
+                                <TextBlock Style="{StaticResource SectionTitle}" Text="Calibration" />
+                                <TextBlock Margin="0,5,0,0" MaxWidth="640" HorizontalAlignment="Left" Style="{StaticResource Caption}" Text="Setup zooms fully out, sets a top-down pitch, learns a fine goal neighborhood, then learns one complete turn with Right-arrow pulses." TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button x:Name="CalibrationToggle" Grid.Column="1" Height="34" Content="Show tuning" Click="CalibrationToggle_Click" />
+                        </Grid>
+                        <Grid x:Name="CalibrationPanel" Margin="0,18,0,0" MaxWidth="640" HorizontalAlignment="Stretch" Visibility="Collapsed">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                             <Grid.RowDefinitions><RowDefinition Height="66" /><RowDefinition Height="66" /><RowDefinition Height="66" /></Grid.RowDefinitions>
                             <StackPanel><TextBlock Style="{StaticResource FieldLabel}" Text="Goal captures" /><TextBox x:Name="CaptureCountText" Margin="0,7,0,0" Text="12" /></StackPanel>
                             <StackPanel Grid.Column="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Capture time, seconds" /><TextBox x:Name="CaptureSecondsText" Margin="0,7,0,0" Text="3.0" /></StackPanel>
-                            <StackPanel Grid.Row="1"><TextBlock Style="{StaticResource FieldLabel}" Text="Coarse drag, pixels" /><TextBox x:Name="CoarsePixelsText" Margin="0,7,0,0" Text="16" /></StackPanel>
+                            <StackPanel Grid.Row="1"><TextBlock Style="{StaticResource FieldLabel}" Text="Arrow hold, ms" /><TextBox x:Name="ArrowHoldText" Margin="0,7,0,0" Text="30" /></StackPanel>
                             <StackPanel Grid.Row="1" Grid.Column="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Fine drag, pixels" /><TextBox x:Name="FinePixelsText" Margin="0,7,0,0" Text="1" /></StackPanel>
-                            <StackPanel Grid.Row="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Settle time, ms" /><TextBox x:Name="SettleText" Margin="0,7,0,0" Text="350" /></StackPanel>
-                            <StackPanel Grid.Row="2" Grid.Column="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Maximum yaw samples" /><TextBox x:Name="MaxSamplesText" Margin="0,7,0,0" Text="300" /></StackPanel>
+                            <StackPanel Grid.Row="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Settle time, ms" /><TextBox x:Name="SettleText" Margin="0,7,0,0" Text="100" /></StackPanel>
+                            <StackPanel Grid.Row="2" Grid.Column="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Maximum arrow samples" /><TextBox x:Name="MaxSamplesText" Margin="0,7,0,0" Text="300" /></StackPanel>
                         </Grid>
                     </StackPanel>
                 </Border>
@@ -78,7 +83,7 @@
                         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                         <StackPanel>
                             <TextBlock Style="{StaticResource SectionTitle}" Text="Operation" />
-                            <TextBlock x:Name="StatusText" Margin="0,5,0,0" Style="{StaticResource Caption}" Text="Select a comparison region to create a model." />
+                            <TextBlock x:Name="StatusText" Margin="0,5,0,0" Style="{StaticResource Caption}" Text="Ready to create an automatic multi-region model." />
                         </StackPanel>
                         <StackPanel Grid.Row="1" Margin="0,12,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
                             <Button x:Name="SetupButton" Style="{StaticResource PrimaryButton}" Content="Setup model" Click="Setup_Click" />

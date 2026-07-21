@@ -6,6 +6,7 @@ using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
+using ExpeditionsMacro.Vision.Challenges;
 
 namespace ExpeditionsMacro.Automation.Expeditions;
 
@@ -52,7 +53,8 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         Action<MacroEvent>? log = null,
         Action<ExpeditionRunSummary>? summaryChanged = null,
         CancellationToken cancellationToken = default,
-        DateTimeOffset? stopAfterCurrentRunUtc = null)
+        DateTimeOffset? stopAfterCurrentRunUtc = null,
+        Func<Exception, CancellationToken, Task>? recoverableFailure = null)
     {
         preset.Validate();
         cameraModel.Manifest.Validate();
@@ -178,6 +180,36 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                     await ClickActionAsync(window, detector, terminal.State, cancellationToken).ConfigureAwait(false);
                     await Task.Delay(4500, cancellationToken).ConfigureAwait(false);
                 }
+                catch (CameraAlignmentException alignment)
+                {
+                    string detail = $"Skipping this Expedition run because camera alignment exhausted {alignment.Attempts} attempts (best {alignment.BestConfidence:P0}). No units were placed and the node was not started.";
+                    Write(detail, MacroEventLevel.Warning, "camera_alignment_skipped", alignment.BestConfidence);
+                    Report("Task skipped", 100, detail, "camera_alignment_skipped", alignment.BestConfidence);
+                    if (recoverableFailure is not null)
+                    {
+                        try
+                        {
+                            await recoverableFailure(alignment, cancellationToken).ConfigureAwait(false);
+                        }
+                        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                        {
+                            throw;
+                        }
+                        catch (Exception diagnosticsError)
+                        {
+                            Write($"Recoverable-failure diagnostics could not finish: {diagnosticsError.Message}", MacroEventLevel.Warning, "camera_alignment_skipped", alignment.BestConfidence);
+                        }
+                    }
+                    QueueNotification(webhookUrl, "skipped", detail, TryCaptureClient(window, detector), runtime.Elapsed, victories, defeats, preset, Write);
+                    await OpenPartyPreviewAfterAlignmentFailureAsync(window, detector, preset, Report, cancellationToken).ConfigureAwait(false);
+                    Write(stopAfterCurrentRunUtc is null
+                        ? "Expeditions stopped safely at the party preview after the alignment circuit breaker opened."
+                        : "Expeditions returned to the party preview so the Challenge scheduler can continue.",
+                        MacroEventLevel.Warning,
+                        "camera_alignment_skipped",
+                        alignment.BestConfidence);
+                    return;
+                }
                 catch (RecoveryNeededException recovery)
                 {
                     if (!preset.AutoRecover) throw new InvalidOperationException($"{Label(recovery.State)} was recognized, but automatic recovery is disabled.", recovery);
@@ -216,6 +248,46 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
             }
             await FlushNotificationsAsync(Write).ConfigureAwait(false);
         }
+    }
+
+    private async Task<ImageFrame> OpenPartyPreviewAfterAlignmentFailureAsync(
+        RobloxWindow window,
+        IDetectorPack detector,
+        ExpeditionPreset preset,
+        Action<string, int, string, string?, double?> report,
+        CancellationToken cancellationToken)
+    {
+        for (int attempt = 1; attempt <= 3; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await _automation.ParkCursorAsync(window, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(150, cancellationToken).ConfigureAwait(false);
+            ImageFrame frame = CaptureClient(window, detector);
+            if (ChallengeScreenDetector.Detect(frame).State == ChallengeScreenState.PostMatchPreview) return frame;
+            (int X, int Y)? play = ChallengeScreenDetector.PlayAction(frame);
+            if (play is null)
+            {
+                report("Task skipped", 100, $"Waiting for the Play control before leaving the unstarted Expedition ({attempt}/3).", "camera_alignment_skipped", null);
+                await Task.Delay(350, cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+            report("Task skipped", 100, $"Opening Play to leave the unstarted Expedition ({attempt}/3).", "camera_alignment_skipped", null);
+            Focus(window);
+            await _automation.ClickClientAsync(window, play.Value.X, play.Value.Y, cancellationToken).ConfigureAwait(false);
+            DateTimeOffset deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(4);
+            StableStateTracker<ChallengeScreenState> tracker = new(Math.Max(1, preset.StableDetections));
+            while (DateTimeOffset.UtcNow < deadline)
+            {
+                ImageFrame current = CaptureClient(window, detector);
+                ChallengeScreenMatch match = ChallengeScreenDetector.Detect(current);
+                ChallengeScreenState? stable = tracker.Update(match.State == ChallengeScreenState.PostMatchPreview
+                    ? ChallengeScreenState.PostMatchPreview
+                    : ChallengeScreenState.None);
+                if (stable == ChallengeScreenState.PostMatchPreview) return current;
+                await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        throw new InvalidOperationException("Camera alignment was skipped, but the unstarted Expedition could not be exited after three Play attempts.");
     }
 
     private async Task PrepareCameraAsync(

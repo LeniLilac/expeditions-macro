@@ -77,6 +77,11 @@
                             <TextBox x:Name="WebhookVisible" Visibility="Collapsed" />
                             <CheckBox x:Name="ShowWebhookCheck" Grid.Column="1" Margin="10,0,0,0" Content="Show" Checked="ShowWebhook_Changed" Unchecked="ShowWebhook_Changed" />
                         </Grid>
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Button x:Name="TestWebhookButton" Height="34" MinWidth="108" Content="Test webhook" Click="TestWebhook_Click" />
+                            <TextBlock x:Name="WebhookTestStatusText" Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+                        </Grid>
                         <TextBlock Margin="0,12,0,0" Style="{StaticResource FieldLabel}" Text="Error ping user ID, optional" />
                         <TextBox x:Name="DiscordErrorUserIdText" Margin="0,7,0,0" />
                         <TextBlock Margin="0,7,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Victory, defeat, and recovery use the webhook. Unexpected errors ping this user five times. Manual Stop never alerts." />

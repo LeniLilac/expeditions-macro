@@ -1,5 +1,6 @@
 using ExpeditionsMacro.Automation.Challenges;
 using ExpeditionsMacro.Core.Imaging;
+using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Vision.Challenges;
 using ExpeditionsMacro.Vision.Infrastructure;
 
@@ -7,6 +8,82 @@ namespace ExpeditionsMacro.Tests;
 
 public sealed class ChallengeMacroRunnerTests
 {
+    [Fact]
+    public void PrestartPlayAction_IsAvailableForSafeCameraFailureExit()
+    {
+        string[] captures = Directory.GetFiles(
+            TestPaths.ChallengeDatasets,
+            "Prestart_*.png",
+            SearchOption.AllDirectories);
+
+        Assert.NotEmpty(captures);
+        foreach (string path in captures)
+        {
+            ImageFrame frame = ImageCodec.Load(path);
+            (int X, int Y)? play = ChallengeScreenDetector.PlayAction(frame);
+            Assert.True(play is not null, $"Play was not located in {path}.");
+            Assert.InRange(play.Value.X, 152, 180);
+            Assert.InRange(play.Value.Y, 570, 598);
+        }
+    }
+
+    [Fact]
+    public async Task MapRecognition_ParksCursorBeforeDiscardingHighlightedSelectorFrame()
+    {
+        bool parked = false;
+        int captures = 0;
+        ImageFrame frame = new(1, 1, PixelFormat.Rgb24, new byte[3], takeOwnership: true);
+
+        ChallengeMapId? map = await ChallengeMacroRunner.RecognizeMapAfterParkingAsync(
+            _ =>
+            {
+                parked = true;
+                return Task.CompletedTask;
+            },
+            () =>
+            {
+                Assert.True(parked);
+                captures++;
+                return frame;
+            },
+            _ => parked ? ChallengeMapId.FairyKingForest : null,
+            retryMilliseconds: 0,
+            maximumAttempts: 2,
+            CancellationToken.None);
+
+        Assert.Equal(ChallengeMapId.FairyKingForest, map);
+        Assert.Equal(1, captures);
+    }
+
+    [Fact]
+    public async Task PrestartAction_ReparksAndRecapturesWhenUnitHoverCoversButton()
+    {
+        int parks = 0;
+        int captures = 0;
+        ImageFrame frame = new(1, 1, PixelFormat.Rgb24, new byte[3], takeOwnership: true);
+
+        (int X, int Y)? action = await ChallengeMacroRunner.LocateActionAfterParkingAsync(
+            _ =>
+            {
+                parks++;
+                return Task.CompletedTask;
+            },
+            () =>
+            {
+                captures++;
+                return frame;
+            },
+            _ => captures >= 2 ? (404, 177) : null,
+            retryMilliseconds: 0,
+            maximumAttempts: 3,
+            CancellationToken.None);
+
+        Assert.NotNull(action);
+        Assert.Equal((404, 177), action.Value);
+        Assert.Equal(2, parks);
+        Assert.Equal(2, captures);
+    }
+
     [Fact]
     public async Task PostMatchPlay_FirstIgnoredClick_IsRedetectedAndRetried()
     {

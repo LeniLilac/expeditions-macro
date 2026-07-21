@@ -21,7 +21,9 @@ internal static partial class NativeMethods
     internal const uint WmSysKeyUp = 0x0105;
     internal const uint WmLButtonDown = 0x0201;
     internal const int VkLeftControl = 0xA2;
+    internal const uint KeyeventfExtendedKey = 0x0001;
     internal const uint KeyeventfKeyUp = 0x0002;
+    internal const uint KeyeventfScanCode = 0x0008;
     internal const uint MouseeventfMove = 0x0001;
     internal const uint MouseeventfLeftDown = 0x0002;
     internal const uint MouseeventfLeftUp = 0x0004;
@@ -30,6 +32,7 @@ internal static partial class NativeMethods
     internal const uint MouseeventfWheel = 0x0800;
     internal const int WheelDelta = 120;
     internal const uint InputMouse = 0;
+    internal const uint InputKeyboard = 1;
     internal const uint Srccopy = 0x00CC0020;
     internal const uint CaptureBlt = 0x40000000;
     internal const uint DibRgbColors = 0;
@@ -86,10 +89,21 @@ internal static partial class NativeMethods
         internal nuint ExtraInfo;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct KeyboardInput
+    {
+        internal ushort VirtualKey;
+        internal ushort ScanCode;
+        internal uint Flags;
+        internal uint Time;
+        internal nuint ExtraInfo;
+    }
+
     [StructLayout(LayoutKind.Explicit)]
     internal struct InputUnion
     {
         [FieldOffset(0)] internal MouseInput Mouse;
+        [FieldOffset(0)] internal KeyboardInput Keyboard;
     }
 
     [StructLayout(LayoutKind.Sequential)]

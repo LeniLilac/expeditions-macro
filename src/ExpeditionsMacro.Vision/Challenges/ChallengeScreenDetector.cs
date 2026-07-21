@@ -159,6 +159,9 @@ public static class ChallengeScreenDetector
     public static (int X, int Y) DefeatRetryAction(ImageFrame image) =>
         ActionButtonDetector.ActionFor(image, "defeat") ?? (225, 438);
 
+    public static (int X, int Y)? PlayAction(ImageFrame image) =>
+        ActionButtonDetector.ActionFor(image, "challenge_post_match_play");
+
     public static (int X, int Y)? ActionFor(ChallengeScreenState state, ImageFrame image) => state switch
     {
         ChallengeScreenState.GameModeSelector => (480, 205),
@@ -245,7 +248,7 @@ public static class ChallengeScreenDetector
 
     private static (int X, int Y)? PostMatchPlayAction(ImageFrame image) =>
         PostMatchHudScore(image) >= Threshold(ChallengeScreenState.PostMatchHud)
-            ? ActionButtonDetector.ActionFor(image, "challenge_post_match_play")
+            ? PlayAction(image)
             : null;
 
     private static double CompactExpeditionPartyScore(ImageFrame image)

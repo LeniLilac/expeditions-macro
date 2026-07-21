@@ -1,12 +1,14 @@
 # Detector image dataset
 
-This repository includes 342 Roblox client-area captures used to build and regression-test the bundled Anime Expeditions detector pack and the app's specialized UI detectors: 270 Expeditions fixtures and 72 selective Challenge fixtures. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
+This repository includes 356 Roblox client-area captures used to build and regression-test the bundled Anime Expeditions detector pack, specialized UI detectors, and automatic camera-region selection: 270 Expeditions fixtures, 72 selective Challenge fixtures, and 14 camera-yaw fixtures. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
 
 Captures are 808 by 611 PNG files organized under:
 
 `datasets/anime-expeditions/expeditions/<dataset-name>/`
 
 Challenge-mode fixtures are organized under `datasets/anime-expeditions/challenges/`; see that directory's README for provenance and privacy filtering.
+
+Camera-alignment fixtures are organized under `datasets/anime-expeditions/camera-rotations/`. Each of the three Expedition and four Story/Challenge maps contributes a goal frame plus a clearly incorrect yaw from a continuous right-arrow rotation. These fixtures verify that automatic setup selects four textured regions spanning the left, center, and right of the client and keeps an incorrect yaw well below the alignment threshold.
 
 The current builder recognizes these dataset names:
 

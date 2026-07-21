@@ -103,6 +103,30 @@ public sealed class DiscordAndWindowsTests
     }
 
     [Fact]
+    public void SkippedComponentsPayload_ReportsRecoverableTaskSkip()
+    {
+        DiscordNotification notification = new()
+        {
+            WebhookUrl = "https://discord.com/api/webhooks/123/token",
+            Event = "skipped",
+            Runtime = TimeSpan.FromMinutes(3),
+            Victories = 0,
+            Defeats = 0,
+            MapNumber = 2,
+            Difficulty = 3,
+            Detail = "Camera alignment stayed below its required confidence after three attempts.",
+            MacroName = "Challenge Macro",
+            Route = "Trait · Flower Forest",
+        };
+
+        string json = JsonSerializer.Serialize(DiscordWebhookClient.BuildComponentsPayload(notification, null));
+
+        Assert.Contains("Challenge Macro: Task skipped", json, StringComparison.Ordinal);
+        Assert.Contains("after three attempts", json, StringComparison.Ordinal);
+        Assert.Contains("Flower Forest", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ErrorPingPayload_AllowsOnlyTheConfiguredUserAndHasNoAccent()
     {
         const string userId = "1528248119425368074";
@@ -147,6 +171,29 @@ public sealed class DiscordAndWindowsTests
         {
             Assert.Contains($"Error alert {index + 1} of {DiscordWebhookClient.ErrorPingCount}", handler.Payloads[index], StringComparison.Ordinal);
         }
+    }
+
+    [Fact]
+    public async Task WebhookTest_SendsOneRestrictedComponentsV2Message()
+    {
+        RecordingHandler handler = new();
+        using HttpClient http = new(handler);
+        using DiscordWebhookClient client = new(http);
+
+        await client.SendTestAsync(
+            "https://canary.discord.com/api/webhooks/123/test-token",
+            CancellationToken.None);
+
+        string payload = Assert.Single(handler.Payloads);
+        Uri uri = Assert.Single(handler.RequestUris);
+        Assert.Contains("with_components=true", uri.Query, StringComparison.OrdinalIgnoreCase);
+        using JsonDocument document = JsonDocument.Parse(payload);
+        Assert.Equal(1 << 15, document.RootElement.GetProperty("flags").GetInt32());
+        Assert.Empty(document.RootElement.GetProperty("allowed_mentions").GetProperty("parse").EnumerateArray());
+        JsonElement container = document.RootElement.GetProperty("components")[0];
+        Assert.Equal(17, container.GetProperty("type").GetInt32());
+        Assert.False(container.TryGetProperty("accent_color", out _));
+        Assert.Contains("Webhook test", payload, StringComparison.Ordinal);
     }
 
     [Fact]

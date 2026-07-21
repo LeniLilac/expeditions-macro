@@ -6,8 +6,12 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using ExpeditionsMacro.App.Services;
+using ExpeditionsMacro.App.Windows;
 using ExpeditionsMacro.Automation.Updates;
+using ExpeditionsMacro.Core.Abstractions;
+using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Models;
+using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Windows;
 
 namespace ExpeditionsMacro.App.Pages;
@@ -19,6 +23,8 @@ public partial class SettingsPage : UserControl, IAppPage
     private bool _captureOperationActive;
     private bool _capturingHotkey;
     private bool _rebindingHotkey;
+    private bool _uiScaleOverlayChanging;
+    private UiScaleOverlayWindow? _uiScaleOverlay;
 
     public SettingsPage(AppServices services)
     {
@@ -35,6 +41,7 @@ public partial class SettingsPage : UserControl, IAppPage
         Unloaded += (_, _) =>
         {
             if (_capturingHotkey) CancelHotkeyCapture("Key change canceled.");
+            CloseUiScaleOverlay();
         };
     }
 
@@ -181,6 +188,73 @@ public partial class SettingsPage : UserControl, IAppPage
 
     private void OpenCaptures_Click(object sender, RoutedEventArgs e) => OpenFolder(_services.Paths.Diagnostics);
 
+    private async void UiScaleOverlayButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_uiScaleOverlay is not null)
+        {
+            CloseUiScaleOverlay();
+            UiScaleOverlayStatusText.Text = "Calibration overlay hidden.";
+            return;
+        }
+        if (_services.Coordinator.IsBusy || _uiScaleOverlayChanging) return;
+
+        _uiScaleOverlayChanging = true;
+        UiScaleOverlayButton.IsEnabled = false;
+        UiScaleOverlayStatusText.Text = "Preparing the standard Roblox client size…";
+        try
+        {
+            RobloxWindow window = _services.Automation.FindWindow()
+                ?? throw new InvalidOperationException("Open Roblox before showing the calibration overlay.");
+            await _services.Automation.ResizeClientAsync(
+                window,
+                RobloxClientProfile.Width,
+                RobloxClientProfile.Height,
+                CancellationToken.None);
+            await Task.Delay(250);
+            ClientBounds bounds = _services.Automation.GetClientBounds(window);
+            if (bounds.Width != RobloxClientProfile.Width || bounds.Height != RobloxClientProfile.Height)
+            {
+                throw new InvalidOperationException($"Roblox did not accept the standard {RobloxClientProfile.Width} by {RobloxClientProfile.Height} client size.");
+            }
+
+            UiScaleOverlayWindow overlay = new(window, _services.Automation);
+            overlay.Closed += (_, _) => Dispatcher.BeginInvoke(() =>
+            {
+                if (ReferenceEquals(_uiScaleOverlay, overlay))
+                {
+                    _uiScaleOverlay = null;
+                    UiScaleOverlayStatusText.Text = "Calibration overlay closed because Roblox closed or changed size.";
+                }
+                UiScaleOverlayButton.Content = "Show calibration overlay";
+                UpdateCaptureState();
+            });
+            _uiScaleOverlay = overlay;
+            overlay.Show();
+            _services.Automation.Focus(window);
+            overlay.RefreshPosition();
+            UiScaleOverlayButton.Content = "Hide calibration overlay";
+            UiScaleOverlayStatusText.Text = "Adjust Roblox UI Scale until the level bar matches the green reference.";
+        }
+        catch (Exception error)
+        {
+            CloseUiScaleOverlay();
+            UiScaleOverlayStatusText.Text = error.Message;
+        }
+        finally
+        {
+            _uiScaleOverlayChanging = false;
+            UpdateCaptureState();
+        }
+    }
+
+    private void CloseUiScaleOverlay()
+    {
+        UiScaleOverlayWindow? overlay = _uiScaleOverlay;
+        _uiScaleOverlay = null;
+        overlay?.Close();
+        UiScaleOverlayButton.Content = "Show calibration overlay";
+    }
+
     private void CaptureArm_Click(object sender, RoutedEventArgs e)
     {
         string name = CaptureNameText.Text.Trim();
@@ -239,6 +313,11 @@ public partial class SettingsPage : UserControl, IAppPage
     private void UpdateCaptureState()
     {
         bool busy = _services.Coordinator.IsBusy;
+        if (busy && _uiScaleOverlay is not null)
+        {
+            CloseUiScaleOverlay();
+            UiScaleOverlayStatusText.Text = "Calibration overlay closed because automation started.";
+        }
         CaptureArmButton.IsEnabled = !busy;
         CaptureNameText.IsEnabled = !busy;
         CaptureIntervalText.IsEnabled = !busy;
@@ -247,6 +326,7 @@ public partial class SettingsPage : UserControl, IAppPage
         CaptureStopButton.IsEnabled = _captureOperationActive && busy;
         CaptureStopButton.Content = _services.Coordinator.State == OperationState.Armed ? "Cancel" : "Stop and save";
         HotkeyButton.IsEnabled = !busy && !_rebindingHotkey;
+        UiScaleOverlayButton.IsEnabled = !busy && !_uiScaleOverlayChanging;
         if (busy && _capturingHotkey) CancelHotkeyCapture("Stop the current operation before changing the hotkey.");
     }
 

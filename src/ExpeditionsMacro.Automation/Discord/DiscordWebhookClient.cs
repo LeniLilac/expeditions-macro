@@ -93,6 +93,29 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
         }
     }
 
+    public async Task SendTestAsync(string webhookUrl, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(webhookUrl) || !ValidateWebhookUrl(webhookUrl))
+        {
+            throw new ArgumentException("The Discord webhook URL is not valid.", nameof(webhookUrl));
+        }
+
+        Dictionary<string, object?> payload = BuildTestPayload();
+        using HttpRequestMessage request = new(HttpMethod.Post, ComponentsUrl(webhookUrl))
+        {
+            Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"),
+        };
+        using HttpResponseMessage response = await _httpClient.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken).ConfigureAwait(false);
+        if (!response.IsSuccessStatusCode)
+        {
+            string detail = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            throw new HttpRequestException($"Discord returned HTTP {(int)response.StatusCode}: {Redact(detail)}");
+        }
+    }
+
     public static bool ValidateWebhookUrl(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return true;
@@ -144,6 +167,7 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
             "defeat" => "Defeat",
             "recovery" => "Rejoin needed",
             "waiting" => "Waiting",
+            "skipped" => "Task skipped",
             _ => throw new ArgumentException($"Unsupported Discord event '{notification.Event}'."),
         };
         string route = string.IsNullOrWhiteSpace(notification.Route)
@@ -250,6 +274,27 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
             },
         };
     }
+
+    public static Dictionary<string, object?> BuildTestPayload() => new()
+    {
+        ["flags"] = ComponentsV2Flag,
+        ["allowed_mentions"] = new Dictionary<string, object?> { ["parse"] = Array.Empty<string>() },
+        ["components"] = new[]
+        {
+            new Dictionary<string, object?>
+            {
+                ["type"] = 17,
+                ["components"] = new[]
+                {
+                    new Dictionary<string, object?>
+                    {
+                        ["type"] = 10,
+                        ["content"] = "## Expeditions Macro: Webhook test\nTest message received. Discord reporting is configured correctly.",
+                    },
+                },
+            },
+        },
+    };
 
     public void Dispose()
     {

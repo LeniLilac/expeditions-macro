@@ -11,7 +11,10 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation
 {
     private const int ClickPositionSettleMilliseconds = 75;
     private const int ClickHoldMilliseconds = 20;
-    private const int HoverRenderSettleMilliseconds = 50;
+    private const int CursorParkingInsetPixels = 24;
+    private const int HoverClearPulseCount = 4;
+    private const int HoverClearPulseIntervalMilliseconds = 100;
+    private const int HoverRenderSettleMilliseconds = 100;
 
     public RobloxWindow? FindWindow(string titleFragment = "Roblox")
     {
@@ -114,6 +117,13 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation
         return Task.CompletedTask;
     }
 
+    public async Task ParkCursorAsync(RobloxWindow window, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!Focus(window)) throw new InvalidOperationException("Windows could not focus Roblox.");
+        await ParkCursorWithAcknowledgedMotionAsync(GetClientBounds(window), cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task ClickClientAsync(RobloxWindow window, int x, int y, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -133,14 +143,11 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation
         finally
         {
             NativeMethods.mouse_event(NativeMethods.MouseeventfLeftUp, 0, 0, 0, 0);
-            // SetCursorPos alone can move the Windows pointer without making Roblox
-            // process a mouse-motion event. Follow the absolute park with a relative
-            // pulse so Roblox clears the control's hover state before the next capture.
-            int parkingX = bounds.X + Math.Max(0, bounds.Width - 3);
-            int parkingY = bounds.Y + Math.Max(0, bounds.Height - 3);
-            int parkingNudge = bounds.Width > 1 ? -1 : 1;
-            MoveCursorWithRegisteredMotion(parkingX, parkingY, parkingNudge, "Windows could not park the cursor away from the Roblox control.");
         }
+        // SetCursorPos alone can move the Windows pointer without making Roblox
+        // process a mouse-motion event. Keep the pointer safely inside the client and
+        // send spaced motion pulses so Roblox cannot coalesce the entire hover clear.
+        await ParkCursorWithAcknowledgedMotionAsync(bounds, cancellationToken).ConfigureAwait(false);
         await Task.Delay(HoverRenderSettleMilliseconds, cancellationToken).ConfigureAwait(false);
     }
 
@@ -174,6 +181,34 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation
         {
             SendMouse(NativeMethods.MouseeventfRightUp);
             if (restoreCursor) MoveCursorWithRegisteredMotion(original.X, original.Y, 1, "Windows could not restore the cursor after camera movement.");
+        }
+    }
+
+    public async Task PulseCameraYawAsync(
+        RobloxWindow window,
+        CameraYawDirection direction,
+        int holdMilliseconds,
+        CancellationToken cancellationToken)
+    {
+        if (!Focus(window)) throw new InvalidOperationException("Windows could not focus Roblox.");
+        if (holdMilliseconds is < 1 or > 5000) throw new ArgumentOutOfRangeException(nameof(holdMilliseconds));
+        ushort scanCode = direction switch
+        {
+            CameraYawDirection.Left => 0x4B,
+            CameraYawDirection.Right => 0x4D,
+            _ => throw new ArgumentOutOfRangeException(nameof(direction)),
+        };
+
+        SendKeyboard(scanCode, keyUp: false);
+        try
+        {
+            await Task.Delay(holdMilliseconds, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            // Arrow keys are extended scan-code inputs. Releasing through the same
+            // SendInput path prevents a canceled setup from leaving Roblox rotating.
+            SendKeyboard(scanCode, keyUp: true);
         }
     }
 
@@ -227,12 +262,56 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation
         if (NativeMethods.SendInput(1, inputs, Marshal.SizeOf<NativeMethods.Input>()) != 1) throw new Win32Exception("Windows rejected a simulated mouse input event.");
     }
 
+    private static void SendKeyboard(ushort scanCode, bool keyUp)
+    {
+        uint flags = NativeMethods.KeyeventfScanCode | NativeMethods.KeyeventfExtendedKey;
+        if (keyUp) flags |= NativeMethods.KeyeventfKeyUp;
+        NativeMethods.Input[] inputs =
+        [
+            new NativeMethods.Input
+            {
+                Type = NativeMethods.InputKeyboard,
+                Value = new NativeMethods.InputUnion
+                {
+                    Keyboard = new NativeMethods.KeyboardInput { ScanCode = scanCode, Flags = flags },
+                },
+            },
+        ];
+        if (NativeMethods.SendInput(1, inputs, Marshal.SizeOf<NativeMethods.Input>()) != 1)
+        {
+            throw new Win32Exception("Windows rejected a simulated camera key event.");
+        }
+    }
+
     private static void MoveCursorWithRegisteredMotion(int x, int y, int nudgeX, string failureMessage)
     {
         if (!NativeMethods.SetCursorPos(x, y)) throw new Win32Exception(failureMessage);
         int delta = nudgeX < 0 ? -1 : 1;
         NativeMethods.mouse_event(NativeMethods.MouseeventfMove, delta, 0, 0, 0);
         NativeMethods.mouse_event(NativeMethods.MouseeventfMove, -delta, 0, 0, 0);
+    }
+
+    private static async Task ParkCursorWithAcknowledgedMotionAsync(ClientBounds bounds, CancellationToken cancellationToken)
+    {
+        int horizontalInset = Math.Min(CursorParkingInsetPixels, Math.Max(0, bounds.Width - 2));
+        int verticalInset = Math.Min(CursorParkingInsetPixels, Math.Max(0, bounds.Height - 2));
+        int parkingX = bounds.X + Math.Max(0, bounds.Width - 1 - horizontalInset);
+        int parkingY = bounds.Y + Math.Max(0, bounds.Height - 1 - verticalInset);
+        if (!NativeMethods.SetCursorPos(parkingX, parkingY))
+        {
+            throw new Win32Exception("Windows could not park the cursor away from the Roblox control.");
+        }
+
+        for (int pulse = 0; pulse < HoverClearPulseCount; pulse++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            int delta = pulse % 2 == 0 ? -1 : 1;
+            NativeMethods.mouse_event(NativeMethods.MouseeventfMove, delta, 0, 0, 0);
+            if (pulse + 1 < HoverClearPulseCount)
+            {
+                await Task.Delay(HoverClearPulseIntervalMilliseconds, cancellationToken).ConfigureAwait(false);
+            }
+        }
     }
 
     private static (int X, int Y) FitOnMonitor(RobloxWindow window, int x, int y, int width, int height)

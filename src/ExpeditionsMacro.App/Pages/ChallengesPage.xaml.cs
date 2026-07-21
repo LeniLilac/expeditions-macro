@@ -25,6 +25,7 @@ public partial class ChallengesPage : UserControl, IAppPage
     private DateTimeOffset? _runStarted;
     private bool _macroOwned;
     private bool _loading;
+    private bool _testingWebhook;
 
     public ChallengesPage(AppServices services)
     {
@@ -114,7 +115,7 @@ public partial class ChallengesPage : UserControl, IAppPage
                 CameraModel camera = await _services.CameraModels.LoadAsync(expedition.CameraModelId) ?? throw new InvalidOperationException("The fallback Expeditions camera model could not be loaded.");
                 PlacementModel placement = await _services.PlacementModels.LoadAsync(expedition.PlacementModelId) ?? throw new InvalidOperationException("The fallback Expeditions placement model could not be loaded.");
                 IDetectorPack expeditionDetector = await _services.DetectorPacks.LoadAsync(expedition.DetectorPackId) ?? throw new InvalidOperationException("The fallback Expeditions detector pack could not be loaded.");
-                idleWorkflow = (untilUtc, token) => RunExpeditionsUntilAsync(untilUtc, expedition, camera, placement, expeditionDetector, webhook, token);
+                idleWorkflow = (untilUtc, token) => RunExpeditionsUntilAsync(untilUtc, expedition, camera, placement, expeditionDetector, webhook, discordUserId, token);
             }
         }
         catch (Exception error)
@@ -151,7 +152,8 @@ public partial class ChallengesPage : UserControl, IAppPage
                 progress,
                 entry => Dispatcher.BeginInvoke(() => AppendLog(entry.Level == MacroEventLevel.Error ? $"ERROR: {entry.Message}" : entry.Message)),
                 summary => Dispatcher.BeginInvoke(() => ApplySummary(summary)),
-                token),
+                cancellationToken: token,
+                recoverableFailure: (error, failureToken) => HandleRecoverableFailureAsync("Challenge Macro", webhook, discordUserId, error, failureToken)),
             token));
     }
 
@@ -362,6 +364,7 @@ public partial class ChallengesPage : UserControl, IAppPage
         WebhookVisible.IsEnabled = enabled;
         DiscordErrorUserIdText.IsEnabled = enabled;
         ShowWebhookCheck.IsEnabled = enabled;
+        TestWebhookButton.IsEnabled = enabled && !_testingWebhook;
         MapItems.IsEnabled = enabled;
         StartButton.IsEnabled = enabled;
         UpdateIdleBehaviorAvailability();
@@ -406,6 +409,7 @@ public partial class ChallengesPage : UserControl, IAppPage
         PlacementModel placement,
         IDetectorPack detector,
         string webhookUrl,
+        string discordUserId,
         CancellationToken cancellationToken)
     {
         if (untilUtc <= DateTimeOffset.UtcNow) return;
@@ -420,7 +424,8 @@ public partial class ChallengesPage : UserControl, IAppPage
             log: entry => AppendLog($"Expeditions: {entry.Message}"),
             summaryChanged: null,
             cancellationToken: cancellationToken,
-            stopAfterCurrentRunUtc: untilUtc);
+            stopAfterCurrentRunUtc: untilUtc,
+            recoverableFailure: (error, failureToken) => HandleRecoverableFailureAsync("Challenge Macro", webhookUrl, discordUserId, error, failureToken));
     }
 
     private void ApplySummary(ChallengeRunSummary summary)
@@ -458,6 +463,46 @@ public partial class ChallengesPage : UserControl, IAppPage
         }
     }
 
+    private async void TestWebhook_Click(object sender, RoutedEventArgs e)
+    {
+        string webhook = CurrentWebhook();
+        WebhookTestStatusText.Text = string.Empty;
+        if (string.IsNullOrWhiteSpace(webhook))
+        {
+            WebhookTestStatusText.Text = "Enter a webhook first.";
+            return;
+        }
+        if (!DiscordWebhookClient.ValidateWebhookUrl(webhook))
+        {
+            WebhookTestStatusText.Text = "Enter a valid Discord webhook URL.";
+            return;
+        }
+
+        _testingWebhook = true;
+        TestWebhookButton.IsEnabled = false;
+        TestWebhookButton.Content = "Sending…";
+        try
+        {
+            using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(15));
+            await _services.TestDiscordWebhookAsync(webhook, timeout.Token);
+            WebhookTestStatusText.Text = "Test message sent.";
+        }
+        catch (OperationCanceledException)
+        {
+            WebhookTestStatusText.Text = "Test timed out.";
+        }
+        catch (Exception error)
+        {
+            WebhookTestStatusText.Text = $"Test failed: {error.Message}";
+        }
+        finally
+        {
+            _testingWebhook = false;
+            TestWebhookButton.Content = "Test webhook";
+            TestWebhookButton.IsEnabled = !_services.Coordinator.IsBusy;
+        }
+    }
+
     private string CurrentWebhook() => ShowWebhookCheck.IsChecked == true ? WebhookVisible.Text.Trim() : WebhookPassword.Password.Trim();
 
     private async Task RunWithFailureHandlingAsync(
@@ -486,6 +531,24 @@ public partial class ChallengesPage : UserControl, IAppPage
             await Dispatcher.InvokeAsync(() => AppendFailureHandlingResult(result));
             throw;
         }
+    }
+
+    private async Task HandleRecoverableFailureAsync(
+        string macroName,
+        string webhook,
+        string discordUserId,
+        Exception error,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await Dispatcher.InvokeAsync(() =>
+        {
+            StatusText.Text = "Camera task skipped. Capturing configured diagnostics before continuing.";
+            AppendLog($"RECOVERABLE: {error.Message}");
+        });
+        MacroFailureHandlingResult result = await _services.HandleMacroFailureAsync(macroName, webhook, discordUserId, error);
+        cancellationToken.ThrowIfCancellationRequested();
+        await Dispatcher.InvokeAsync(() => AppendFailureHandlingResult(result));
     }
 
     private void AppendFailureHandlingResult(MacroFailureHandlingResult result)

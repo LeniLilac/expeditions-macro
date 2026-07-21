@@ -44,7 +44,6 @@ public sealed class AppServices : IDisposable
         DiagnosticCapture = new DiagnosticCaptureService(Automation, Paths);
         PlacementCapture = new PlacementCaptureService(Automation);
         Placement = new PlacementService(Automation, PlacementCapture, PlacementModels);
-        CameraRegionSelection = new CameraRegionSelectionService(Automation);
         Camera = new CameraAlignmentEngine(Automation, CameraModels);
         _discord = new DiscordWebhookClient();
         Challenges = new ChallengeMacroRunner(Automation, Camera, Placement, _discord);
@@ -69,7 +68,6 @@ public sealed class AppServices : IDisposable
     public DiagnosticCaptureService DiagnosticCapture { get; }
     public IPlacementCaptureService PlacementCapture { get; }
     public PlacementService Placement { get; }
-    public CameraRegionSelectionService CameraRegionSelection { get; }
     public CameraAlignmentEngine Camera { get; }
     public ChallengeMacroRunner Challenges { get; }
     public ExpeditionMacroRunner Expeditions { get; }
@@ -121,6 +119,12 @@ public sealed class AppServices : IDisposable
         (string? path, string? diagnosticError) = await diagnosticTask;
         (bool sent, string? discordError) = await pingTask;
         return new MacroFailureHandlingResult(path, sent, diagnosticError, discordError);
+    }
+
+    public async Task TestDiscordWebhookAsync(string webhookUrl, CancellationToken cancellationToken)
+    {
+        await _discord.SendTestAsync(webhookUrl, cancellationToken);
+        Log.Info("Discord webhook test message sent.");
     }
 
     public void Dispose()

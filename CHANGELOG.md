@@ -4,6 +4,37 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-07-21
+
+### Added
+
+- Added automatic camera-region selection that chooses four stable, detailed map areas across the standard Roblox client while avoiding common HUD zones.
+- Added a persisted signed fine-yaw neighborhood atlas so runtime alignment can reuse the micro-adjustment evidence learned during setup.
+- Added a Settings calibration overlay for matching Roblox's rendered UI scale to the standard detector scale.
+- Added **Test webhook** actions for validating optional Discord reporting without sending a screenshot or user mention.
+- Added seven-map camera-rotation fixtures covering all Expedition maps and Story/Challenge map layouts.
+
+### Changed
+
+- Rebuilt camera setup around sensitivity-independent Left/Right-arrow pulses for coarse yaw and right-drag mouse movement only for fine refinement.
+- Camera setup now standardizes zoom, top-down pitch, and temporary shift lock automatically; manual comparison-region selection is no longer required.
+- Runtime alignment now makes up to three fresh attempts with alternating scan direction and sampling phase, using both the saved coarse atlas and fine neighborhood before each full-turn fallback.
+- Changed new camera defaults to a 30 ms arrow hold and 100 ms settle time, with calibration controls hidden behind **Show tuning**.
+- Camera models now use schema version 3. Existing camera models must be recorded again; placement models and presets remain reusable after selecting replacement camera models.
+
+### Fixed
+
+- Prevented low-confidence alignment from placing units or starting a match. After all three attempts fail, the macro exits the unstarted match safely, records diagnostics, and reports the skipped task; the Challenge scheduler advances to its next configured task while standalone Expeditions stops at the party preview.
+- Parked the pointer inside the Roblox client with spaced acknowledged motion pulses so unit hover cards and highlighted selector rows clear before Start Game or map detection.
+- Re-detected live Start Game and Play controls after parking instead of trusting a stale or partially covered action.
+- Made camera-model replacement transactional with bounded retries and backup restoration when another process temporarily holds model files.
+- Preserved the v1.1.6 live post-match Play detection and detector-pack 1.0.2 migration behavior while integrating the new camera workflow.
+
+### Tests
+
+- Added camera calibration, automatic-region, persisted-neighborhood, alternating-retry, safe-skip, hover-clear, and UI-scale overlay coverage.
+- Added golden rotation checks proving incorrect yaw remains below the alignment threshold across three Expedition and four Story/Challenge maps.
+
 ## [1.1.6] - 2026-07-21
 
 ### Changed
@@ -314,7 +345,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.5...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.6...v1.2.0
 [1.1.6]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.5...v1.1.6
 [1.1.5]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.3...v1.1.4

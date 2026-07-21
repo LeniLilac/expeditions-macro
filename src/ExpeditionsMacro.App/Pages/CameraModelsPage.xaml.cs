@@ -5,7 +5,6 @@ using System.Windows.Controls;
 using ExpeditionsMacro.App.Services;
 using ExpeditionsMacro.App.Windows;
 using ExpeditionsMacro.Automation.Camera;
-using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
 
@@ -15,7 +14,6 @@ public partial class CameraModelsPage : UserControl, IAppPage
 {
     private readonly AppServices _services;
     private readonly ObservableCollection<CameraModelManifest> _models = [];
-    private ScreenRegion? _selectedRelativeRegion;
     private CameraModel? _selectedModel;
     private GoalOverlayWindow? _overlay;
 
@@ -52,7 +50,7 @@ public partial class CameraModelsPage : UserControl, IAppPage
         _selectedModel = await _services.CameraModels.LoadAsync(manifest.Id);
         if (_selectedModel is null) return;
         ModelNameText.Text = manifest.Name;
-        RegionText.Text = $"Relative region: ({manifest.Region.X}, {manifest.Region.Y}), {manifest.Region.Width} × {manifest.Region.Height} · client {manifest.ClientWidth} × {manifest.ClientHeight}";
+        RegionText.Text = $"Automatic regions: {manifest.Regions.Count} · client {manifest.ClientWidth} × {manifest.ClientHeight}";
         PreviewImage.Source = BitmapSourceFactory.Create(_selectedModel.GoalOverlay);
         PreviewPlaceholder.Visibility = Visibility.Collapsed;
         AlignButton.IsEnabled = !_services.Coordinator.IsBusy;
@@ -65,89 +63,19 @@ public partial class CameraModelsPage : UserControl, IAppPage
     {
         ModelsList.SelectedItem = null;
         _selectedModel = null;
-        _selectedRelativeRegion = null;
         ModelNameText.Text = "Camera model";
-        RegionText.Text = "Region: not selected";
+        RegionText.Text = "Automatic regions: chosen during setup";
         PreviewImage.Source = null;
         PreviewPlaceholder.Visibility = Visibility.Visible;
         AlignButton.IsEnabled = false;
         OverlayButton.IsEnabled = false;
         RenameButton.IsEnabled = false;
-        StatusText.Text = "Select a comparison region to create a model.";
+        StatusText.Text = "Ready to create an automatic multi-region model.";
         CloseOverlay();
-    }
-
-    private async void SelectRegion_Click(object sender, RoutedEventArgs e)
-    {
-        if (_services.Coordinator.IsBusy)
-        {
-            StatusText.Text = "Stop the current operation before selecting a comparison region.";
-            return;
-        }
-
-        CloseOverlay();
-        SelectRegionButton.IsEnabled = false;
-        StatusText.Text = $"Resizing Roblox to {RobloxClientProfile.Width} × {RobloxClientProfile.Height} for region selection.";
-        try
-        {
-            CameraRegionSelection? result = null;
-            Exception? selectionError = null;
-            await _services.Coordinator.RunNowAsync("Camera region selection", async token =>
-            {
-                try
-                {
-                    result = await _services.CameraRegionSelection.SelectAsync(_client =>
-                    {
-                        RegionSelectionWindow selection = new() { Owner = Window.GetWindow(this) };
-                        using CancellationTokenRegistration registration = token.Register(() =>
-                            _ = selection.Dispatcher.InvokeAsync(selection.Close));
-                        return selection.ShowDialog() == true ? selection.SelectedRegion : null;
-                    }, token);
-                }
-                catch (OperationCanceledException) when (token.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception error)
-                {
-                    selectionError = error;
-                }
-            });
-            if (selectionError is not null)
-            {
-                StatusText.Text = selectionError.Message;
-                return;
-            }
-            if (result is null)
-            {
-                StatusText.Text = "Region selection canceled. Roblox remains at the standard client size.";
-                return;
-            }
-
-            ScreenRegion region = result.Region;
-            _selectedRelativeRegion = region;
-            RegionText.Text = $"Relative region: ({region.X}, {region.Y}), {region.Width} × {region.Height} · client {RobloxClientProfile.Width} × {RobloxClientProfile.Height}";
-            PreviewImage.Source = BitmapSourceFactory.Create(result.Preview);
-            PreviewPlaceholder.Visibility = Visibility.Collapsed;
-            StatusText.Text = $"Region selected at the standard Roblox size. Click Setup model, then press {_services.Hotkey.DisplayName} while Roblox is ready.";
-        }
-        catch (Exception error)
-        {
-            StatusText.Text = error.Message;
-        }
-        finally
-        {
-            SelectRegionButton.IsEnabled = !_services.Coordinator.IsBusy;
-        }
     }
 
     private void Setup_Click(object sender, RoutedEventArgs e)
     {
-        if (_selectedRelativeRegion is not { } region)
-        {
-            StatusText.Text = "Select a comparison region first.";
-            return;
-        }
         CameraCalibrationSettings settings;
         try { settings = ReadSettings(); }
         catch (Exception error) { StatusText.Text = error.Message; return; }
@@ -155,13 +83,13 @@ public partial class CameraModelsPage : UserControl, IAppPage
         Progress<MacroProgress> progress = new(UpdateProgress);
         _services.Coordinator.Arm("Camera setup", async token =>
         {
-            CameraModel model = await _services.Camera.CalibrateAsync(region, settings, progress, token);
+            CameraModel model = await _services.Camera.CalibrateAsync(settings, progress, token);
             await Dispatcher.InvokeAsync(() => _selectedModel = model);
             await RefreshModelsAsync(model.Manifest.Id);
         });
         string hotkey = _services.Hotkey.DisplayName;
-        StatusText.Text = $"Camera setup armed. Focus Roblox and press {hotkey} to begin; the app will toggle shift lock automatically.";
-        AppendLog($"Setup armed. Start with shift lock off, then press {hotkey} when the goal view is ready. The app will enable it temporarily.");
+        StatusText.Text = $"Camera setup armed. Focus Roblox and press {hotkey}; zoom, pitch, and shift lock are prepared automatically.";
+        AppendLog($"Setup armed. Start with shift lock off, put the player at the repeatable position and goal yaw, then press {hotkey}. The app will zoom out, look down, and enable shift lock temporarily.");
         UpdateBusyState();
     }
 
@@ -253,10 +181,11 @@ public partial class CameraModelsPage : UserControl, IAppPage
             Name = ModelNameText.Text.Trim(),
             CaptureCount = ParseInt(CaptureCountText, "Goal captures"),
             CaptureDuration = TimeSpan.FromSeconds(ParseDouble(CaptureSecondsText, "Capture time")),
-            CoarseStepPixels = ParseInt(CoarsePixelsText, "Coarse drag"),
+            ArrowHoldMilliseconds = ParseInt(ArrowHoldText, "Arrow hold"),
             FineStepPixels = ParseInt(FinePixelsText, "Fine drag"),
+            FineSearchPixels = 16,
             SettleMilliseconds = ParseInt(SettleText, "Settle time"),
-            MaximumSamples = ParseInt(MaxSamplesText, "Maximum yaw samples"),
+            MaximumSamples = ParseInt(MaxSamplesText, "Maximum arrow samples"),
         };
         settings.Validate();
         return settings;
@@ -272,11 +201,17 @@ public partial class CameraModelsPage : UserControl, IAppPage
     private void UpdateBusyState()
     {
         bool busy = _services.Coordinator.IsBusy;
-        SelectRegionButton.IsEnabled = !busy;
         RenameButton.IsEnabled = !busy && _selectedModel is not null;
         SetupButton.IsEnabled = !busy;
         AlignButton.IsEnabled = !busy && _selectedModel is not null;
         StopButton.IsEnabled = busy;
+    }
+
+    private void CalibrationToggle_Click(object sender, RoutedEventArgs e)
+    {
+        bool show = CalibrationPanel.Visibility != Visibility.Visible;
+        CalibrationPanel.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        CalibrationToggle.Content = show ? "Hide tuning" : "Show tuning";
     }
 
     private void AppendLog(string message)

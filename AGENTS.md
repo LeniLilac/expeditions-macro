@@ -36,7 +36,7 @@ Read `README.md`, `CONTRIBUTING.md`, `docs/ARCHITECTURE.md`, `docs/DETECTOR-PACK
 - Only one workflow may own Roblox input. Route UI actions through the coordinator rather than starting competing workers.
 - Focus and revalidate the Roblox window immediately before capture or input when a delay or external transition could make the handle or bounds stale.
 - Roblox may ignore a direct cursor teleport. Use the shared click path, including the small relative motion that makes Roblox acknowledge the position, and park the cursor through the same registered-motion path after clicks.
-- Camera yaw uses relative mouse motion while right mouse is held. Do not replace it with visible absolute cursor movement.
+- Camera yaw uses extended scan-code Left/Right-arrow pulses for coarse movement and relative mouse motion while right mouse is held for fine refinement. Never use visible absolute cursor movement for camera rotation, and always release either input path on cancellation.
 
 ## Vision and detector rules
 

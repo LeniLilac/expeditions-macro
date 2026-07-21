@@ -46,7 +46,8 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         IProgress<MacroProgress>? progress = null,
         Action<MacroEvent>? log = null,
         Action<ChallengeRunSummary>? summaryChanged = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Func<Exception, CancellationToken, Task>? recoverableFailure = null)
     {
         preset.ValidateReady();
         if (!detector.SupportsChallengeMaps)
@@ -138,8 +139,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
                             selector.Match.Confidence);
                         break;
                     }
-                    ImageFrame listFrame = selector.Frame;
-                    ChallengeMapId map = await RecognizeMapAsync(window, preset, detector, type, listFrame, Write, cancellationToken).ConfigureAwait(false);
+                    ChallengeMapId map = await RecognizeMapAsync(window, preset, detector, type, Write, cancellationToken).ConfigureAwait(false);
                     currentType = type;
                     currentMap = map;
                     PublishSummary();
@@ -185,6 +185,42 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
                             Write,
                             Report,
                             cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (CameraAlignmentException alignment)
+                    {
+                        string skipDetail = $"Skipping {Label(type)} on {Label(map)} for this reset because camera alignment exhausted {alignment.Attempts} attempts (best {alignment.BestConfidence:P0}). No units were placed and the match was not started.";
+                        Write(skipDetail, MacroEventLevel.Warning, "camera_alignment_skipped", alignment.BestConfidence);
+                        Report("Task skipped", 100, skipDetail, "camera_alignment_skipped", alignment.BestConfidence);
+                        if (recoverableFailure is not null)
+                        {
+                            try
+                            {
+                                await recoverableFailure(alignment, cancellationToken).ConfigureAwait(false);
+                            }
+                            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                            {
+                                throw;
+                            }
+                            catch (Exception diagnosticsError)
+                            {
+                                Write($"Recoverable-failure diagnostics could not finish: {diagnosticsError.Message}", MacroEventLevel.Warning, "camera_alignment_skipped", alignment.BestConfidence);
+                            }
+                        }
+                        QueueNotification(
+                            webhookUrl,
+                            "skipped",
+                            skipDetail,
+                            TryCaptureClient(window, detector),
+                            runtime.Elapsed,
+                            victories,
+                            defeats,
+                            (int)map,
+                            ChallengeRoute(type, map),
+                            Write);
+                        await ReturnFromPrestartAfterAlignmentFailureAsync(window, preset, detector, Report, cancellationToken).ConfigureAwait(false);
+                        rotation.MarkAttempted(type);
+                        PublishSummary();
+                        continue;
                     }
                     catch (ChallengeRecoveryException recovery)
                     {
@@ -293,21 +329,10 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         (int X, int Y)? startPreview = ChallengeScreenDetector.ActionFor(ChallengeScreenState.PreviewReady, preview);
         if (startPreview is null) throw new InvalidOperationException("The Challenge preview Start button could not be located.");
         await ClickAsync(window, startPreview.Value.X, startPreview.Value.Y, cancellationToken).ConfigureAwait(false);
-        QueueNotification(
-            webhookUrl,
-            "attempt",
-            $"Starting the {Label(type)} Challenge on {Label(map)}.",
-            screenshot: null,
-            runtime.Elapsed,
-            priorVictories,
-            priorDefeats,
-            (int)map,
-            ChallengeRoute(type, map),
-            log);
-
+        bool attemptNotified = false;
         while (true)
         {
-            ImageFrame prestart = await WaitForScreenAsync(window, preset, detector, ChallengeScreenState.Prestart, TimeSpan.FromSeconds(35), report, cancellationToken).ConfigureAwait(false);
+            await WaitForScreenAsync(window, preset, detector, ChallengeScreenState.Prestart, TimeSpan.FromSeconds(35), report, cancellationToken).ConfigureAwait(false);
             report("Camera preparation", 20, $"Preparing {Label(map)} for {Label(type)}.", "prestart", null);
             await PrepareCameraAsync(window, preset, models.Camera, report, log, cancellationToken).ConfigureAwait(false);
             if (models.PrestartPlacement is not null)
@@ -316,10 +341,30 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
                 await PlaceAsync(window, preset, models.PrestartPlacement, log, cancellationToken).ConfigureAwait(false);
             }
 
-            prestart = CaptureClient(window, detector);
-            (int X, int Y)? start = ChallengeScreenDetector.ActionFor(ChallengeScreenState.Prestart, prestart);
+            (int X, int Y)? start = await LocateActionAfterParkingAsync(
+                token => _automation.ParkCursorAsync(window, token),
+                () => CaptureClient(window, detector),
+                frame => ChallengeScreenDetector.ActionFor(ChallengeScreenState.Prestart, frame),
+                retryMilliseconds: 100,
+                maximumAttempts: 3,
+                cancellationToken).ConfigureAwait(false);
             if (start is null) throw new InvalidOperationException("The Challenge Start Game button disappeared before it could be clicked.");
             await ClickAsync(window, start.Value.X, start.Value.Y, cancellationToken).ConfigureAwait(false);
+            if (!attemptNotified)
+            {
+                QueueNotification(
+                    webhookUrl,
+                    "attempt",
+                    $"Starting the {Label(type)} Challenge on {Label(map)}.",
+                    screenshot: null,
+                    runtime.Elapsed,
+                    priorVictories,
+                    priorDefeats,
+                    (int)map,
+                    ChallengeRoute(type, map),
+                    log);
+                attemptNotified = true;
+            }
             await Task.Delay(2200, cancellationToken).ConfigureAwait(false);
             MatchTerminal terminal = await MonitorMatchAsync(window, preset, profile, models, detector, log, report, cancellationToken).ConfigureAwait(false);
             if (terminal.State == ChallengeScreenState.Victory)
@@ -610,6 +655,61 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
             cancellationToken).ConfigureAwait(false);
     }
 
+    private async Task ReturnFromPrestartAfterAlignmentFailureAsync(
+        RobloxWindow window,
+        ChallengePreset preset,
+        IDetectorPack detector,
+        Action<string, int, string, string?, double?> report,
+        CancellationToken cancellationToken)
+    {
+        report("Task skipped", 100, "Leaving the unstarted match and returning to the Challenge selector.", "camera_alignment_skipped", null);
+        ImageFrame party = await OpenPartyPreviewFromPrestartAsync(window, preset, detector, report, cancellationToken).ConfigureAwait(false);
+        (int X, int Y)? changeMode = ChallengeScreenDetector.ActionFor(ChallengeScreenState.PostMatchPreview, party);
+        if (changeMode is null) throw new InvalidOperationException("Camera alignment was skipped, but Change Gamemode could not be located in the party preview.");
+        await ClickAsync(window, changeMode.Value.X, changeMode.Value.Y, cancellationToken).ConfigureAwait(false);
+        ImageFrame modes = await WaitForScreenAsync(window, preset, detector, ChallengeScreenState.GameModeSelector, TimeSpan.FromSeconds(12), report, cancellationToken).ConfigureAwait(false);
+        (int X, int Y)? challenge = ChallengeScreenDetector.ActionFor(ChallengeScreenState.GameModeSelector, modes);
+        if (challenge is null) throw new InvalidOperationException("Camera alignment was skipped, but Challenges could not be located in the game-mode selector.");
+        await ClickAsync(window, challenge.Value.X, challenge.Value.Y, cancellationToken).ConfigureAwait(false);
+        await WaitForChallengeSelectorAsync(window, preset, detector, TimeSpan.FromSeconds(12), report, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<ImageFrame> OpenPartyPreviewFromPrestartAsync(
+        RobloxWindow window,
+        ChallengePreset preset,
+        IDetectorPack detector,
+        Action<string, int, string, string?, double?> report,
+        CancellationToken cancellationToken)
+    {
+        for (int attempt = 1; attempt <= 3; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await _automation.ParkCursorAsync(window, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(150, cancellationToken).ConfigureAwait(false);
+            ImageFrame frame = CaptureClient(window, detector);
+            if (ChallengeScreenDetector.Detect(frame).State == ChallengeScreenState.PostMatchPreview) return frame;
+            (int X, int Y)? play = ChallengeScreenDetector.PlayAction(frame);
+            if (play is null)
+            {
+                report("Task skipped", 100, $"Waiting for the Play control before leaving the unstarted match ({attempt}/3).", "camera_alignment_skipped", null);
+                await Task.Delay(350, cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+            report("Task skipped", 100, $"Opening Play to leave the unstarted match ({attempt}/3).", "camera_alignment_skipped", null);
+            await ClickAsync(window, play.Value.X, play.Value.Y, cancellationToken).ConfigureAwait(false);
+            ImageFrame? preview = await TryWaitForScreenAsync(
+                window,
+                preset,
+                detector,
+                ChallengeScreenState.PostMatchPreview,
+                TimeSpan.FromSeconds(4),
+                report,
+                cancellationToken).ConfigureAwait(false);
+            if (preview is not null) return preview;
+        }
+        throw new InvalidOperationException("Camera alignment was skipped, but the unstarted match could not be exited after three Play attempts.");
+    }
+
     private Task<ImageFrame> OpenPostMatchPreviewAsync(
         RobloxWindow window,
         ChallengePreset preset,
@@ -792,26 +892,81 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         ChallengePreset preset,
         IDetectorPack detector,
         ChallengeType type,
-        ImageFrame initial,
         Action<string, MacroEventLevel, string?, double?> log,
         CancellationToken cancellationToken)
     {
-        ImageFrame frame = initial;
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(6);
         int retryMilliseconds = Math.Clamp(preset.PollMilliseconds / 2, 180, 350);
-        while (true)
+        int maximumAttempts = Math.Max(2, (int)Math.Ceiling(6000d / retryMilliseconds));
+        ChallengeMapId? map = await RecognizeMapAfterParkingAsync(
+            token => _automation.ParkCursorAsync(window, token),
+            () => CaptureClient(window, detector),
+            frame => detector.ChallengeMapForType(frame, type),
+            retryMilliseconds,
+            maximumAttempts,
+            cancellationToken).ConfigureAwait(false);
+        if (map is not null)
         {
-            ChallengeMapId? map = detector.ChallengeMapForType(frame, type);
-            if (map is not null)
-            {
-                log($"{Label(type)} map recognized as {Label(map.Value)}.", MacroEventLevel.Success, "challenge_map", null);
-                return map.Value;
-            }
-            if (DateTimeOffset.UtcNow >= deadline) break;
-            await Task.Delay(retryMilliseconds, cancellationToken).ConfigureAwait(false);
-            frame = CaptureClient(window, detector);
+            log($"{Label(type)} map recognized as {Label(map.Value)}.", MacroEventLevel.Success, "challenge_map", null);
+            return map.Value;
         }
         throw new InvalidOperationException($"The map thumbnail for {Label(type)} could not be recognized. Add this selector capture to the Challenge detector dataset before running automation.");
+    }
+
+    internal static async Task<ChallengeMapId?> RecognizeMapAfterParkingAsync(
+        Func<CancellationToken, Task> parkCursor,
+        Func<ImageFrame> capture,
+        Func<ImageFrame, ChallengeMapId?> recognize,
+        int retryMilliseconds,
+        int maximumAttempts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(parkCursor);
+        ArgumentNullException.ThrowIfNull(capture);
+        ArgumentNullException.ThrowIfNull(recognize);
+        if (retryMilliseconds < 0) throw new ArgumentOutOfRangeException(nameof(retryMilliseconds));
+        if (maximumAttempts < 1) throw new ArgumentOutOfRangeException(nameof(maximumAttempts));
+
+        await parkCursor(cancellationToken).ConfigureAwait(false);
+        await Task.Delay(retryMilliseconds, cancellationToken).ConfigureAwait(false);
+        for (int attempt = 0; attempt < maximumAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ChallengeMapId? map = recognize(capture());
+            if (map is not null) return map;
+            if (attempt + 1 < maximumAttempts)
+            {
+                await Task.Delay(retryMilliseconds, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        return null;
+    }
+
+    internal static async Task<(int X, int Y)?> LocateActionAfterParkingAsync(
+        Func<CancellationToken, Task> parkCursor,
+        Func<ImageFrame> capture,
+        Func<ImageFrame, (int X, int Y)?> locate,
+        int retryMilliseconds,
+        int maximumAttempts,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(parkCursor);
+        ArgumentNullException.ThrowIfNull(capture);
+        ArgumentNullException.ThrowIfNull(locate);
+        if (retryMilliseconds < 0) throw new ArgumentOutOfRangeException(nameof(retryMilliseconds));
+        if (maximumAttempts < 1) throw new ArgumentOutOfRangeException(nameof(maximumAttempts));
+
+        for (int attempt = 0; attempt < maximumAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await parkCursor(cancellationToken).ConfigureAwait(false);
+            (int X, int Y)? action = locate(capture());
+            if (action is not null) return action;
+            if (attempt + 1 < maximumAttempts)
+            {
+                await Task.Delay(retryMilliseconds, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        return null;
     }
 
     private async Task<ImageFrame> WaitForScreenAsync(

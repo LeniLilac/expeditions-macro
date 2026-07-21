@@ -12,6 +12,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <StackPanel Margin="0,0,0,28">
                 <TextBlock Style="{StaticResource PageTitle}" Text="Settings" />
@@ -48,6 +49,17 @@
             </Border>
 
             <Border Grid.Row="3" Style="{StaticResource SectionDivider}">
+                <StackPanel Width="640" HorizontalAlignment="Left">
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="UI scale calibration" />
+                    <TextBlock Margin="0,5,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Compare Roblox's rendered interface with the standard detector scale. The overlay stays click-through while you adjust UI Scale in Roblox settings." />
+                    <Grid Margin="0,16,0,0">
+                        <TextBlock x:Name="UiScaleOverlayStatusText" MaxWidth="390" HorizontalAlignment="Left" VerticalAlignment="Center" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Roblox will be resized to the standard 808 by 611 client size." />
+                        <Button x:Name="UiScaleOverlayButton" Width="180" HorizontalAlignment="Right" Content="Show calibration overlay" Click="UiScaleOverlayButton_Click" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="4" Style="{StaticResource SectionDivider}">
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
                     <StackPanel>
@@ -64,7 +76,7 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Row="4" Style="{StaticResource SectionDivider}">
+            <Border Grid.Row="5" Style="{StaticResource SectionDivider}">
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
                     <StackPanel>
@@ -86,7 +98,7 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Row="5" Style="{StaticResource SectionDivider}">
+            <Border Grid.Row="6" Style="{StaticResource SectionDivider}">
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
                     <StackPanel>
@@ -107,7 +119,7 @@
                 </Grid>
             </Border>
 
-            <StackPanel Grid.Row="6" Width="640" HorizontalAlignment="Left">
+            <StackPanel Grid.Row="7" Width="640" HorizontalAlignment="Left">
                 <TextBlock Style="{StaticResource SectionTitle}" Text="Debug capture" />
                 <TextBlock x:Name="DebugCaptureDescription" Margin="0,5,0,0" Style="{StaticResource Caption}" Text="Record the Roblox client at the standard 808 by 611 size. F6 starts and stops capture and saves a ZIP for bug reports." />
                 <CheckBox x:Name="AutoCaptureOnErrorCheck" Margin="0,14,0,0" Content="Automatically save 10 screenshots when a macro fails" Checked="AutoCaptureOnErrorCheck_Changed" Unchecked="AutoCaptureOnErrorCheck_Changed" />

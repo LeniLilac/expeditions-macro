@@ -43,14 +43,13 @@ The instructions below refer to the **macro hotkey**. It defaults to **F6** and 
 ### 1. Create a camera model
 
 1. Open **Camera Models** and choose **New model**.
-2. Put Roblox at the repeatable world position, zoom, and pitch you want.
-3. Choose **Select region** and drag over a stable, UI-free part of the Roblox client, such as the tower-defense track and nearby architecture.
-4. Choose **Setup model**. The app arms the workflow without stealing focus.
-5. Focus Roblox and press the macro hotkey.
+2. Put Roblox at the repeatable world position and goal yaw. Leave shift lock off.
+3. Choose **Setup model**. The app arms the workflow without stealing focus.
+4. Focus Roblox and press the macro hotkey.
 
-**Select region** resizes Roblox before the overlay appears and records the selection relative to the standard 808 by 611 client. Leave shift lock off before pressing the macro hotkey. Setup uses the standard capture size, enables shift lock for stable right-mouse drags, and releases shift lock when setup finishes, is stopped, or fails. Setup then takes several goal captures over time and learns one full yaw turn. If the coarse scan only finds a degraded wraparound view, setup verifies the following yaw view, fine-sweeps the provisional peak, and still requires a strong refined match before accepting it. The resulting atlas supports large shortest-path corrections when far from the goal and one-pixel refinement near it. Lighting normalization, temporal median capture, edge/gradient comparison, and tile trimming reduce sensitivity to lighting changes and moving units.
+Leave shift lock off before pressing the macro hotkey. Setup uses the standard 808 by 611 client size, zooms fully out, enables shift lock, sets a top-down pitch, takes several full-client goal captures, and automatically chooses four stable, detailed map regions outside the usual HUD zones. The regions span the left, center, and right of the map so one animated structure or lighting effect cannot dominate the comparison. Setup first sweeps a small mouse-controlled neighborhood around the goal, then learns one full yaw turn with Right-arrow pulses. The neighborhood lets setup recognize a wrap that lands slightly beside the exact starting angle; a final fine sweep returns to the strongest goal view. The signed neighborhood atlas is saved with the model and applied before the live micro-search during later alignments. If the coarse scan only finds a degraded wraparound view, setup verifies the following yaw view and still requires a strong refined match before accepting it. The resulting atlases support large sensitivity-independent arrow corrections when far from the goal and learned one-pixel mouse correction near it. Lighting normalization, temporal median capture, edge/gradient comparison, and multiple independent regions reduce sensitivity to lighting changes and moving units.
 
-Camera regions are saved relative to the Roblox client. When using **Auto align** by itself, the app also manages shift lock automatically and applies the recorded client size. If the fast yaw estimate misses its confidence target, alignment scans one complete turn and refines the strongest match. The Expeditions workflow does not place units unless the final result meets the model target. Use **Show 30% overlay** to visually confirm the result.
+Camera regions are saved relative to the Roblox client and shown as colored outlines in the goal preview. When using **Auto align** by itself, the app also manages shift lock automatically and applies the recorded client size. If the fast yaw estimate misses its confidence target, alignment scans one complete arrow-based turn and refines the strongest match. The Expeditions workflow does not place units unless the final result meets the model target. Use **Show 30% overlay** to visually confirm the result.
 
 ### 2. Create a placement model
 
@@ -73,7 +72,7 @@ Saving the same name replaces the previous model.
    - `1`: extract at the first checkpoint after one boss node.
    - A high value, or disabling extraction: continue until defeat/victory.
 4. Leave automatic lobby/disconnect/AFK recovery enabled unless you intend to supervise navigation.
-5. Optionally paste a standard, Canary, or PTB Discord webhook. Add a numeric Discord user ID if unexpected errors should send five mention alerts.
+5. Optionally paste a standard, Canary, or PTB Discord webhook and use **Test webhook** to verify it. Add a numeric Discord user ID if unexpected errors should send five mention alerts.
 6. Save the preset and press the macro hotkey.
 
 The app waits for the difficulty carousel animation to settle and verifies the active difficulty before continuing.
@@ -146,7 +145,7 @@ Build release artifacts:
 
 ```powershell
 .\scripts\Generate-Icon.ps1
-.\scripts\Build-Release.ps1 -Version 1.1.6
+.\scripts\Build-Release.ps1 -Version 1.2.0
 ```
 
 The release script publishes the self-contained app, creates the portable ZIP, creates the detector-pack ZIP, optionally invokes Inno Setup, and writes SHA-256 checksums plus a dependency inventory.

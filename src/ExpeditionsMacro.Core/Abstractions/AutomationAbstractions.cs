@@ -6,6 +6,12 @@ namespace ExpeditionsMacro.Core.Abstractions;
 
 public readonly record struct RobloxWindow(nint Handle, string Title);
 
+public enum CameraYawDirection
+{
+    Left = -1,
+    Right = 1,
+}
+
 public interface IRobloxAutomation
 {
     RobloxWindow? FindWindow(string titleFragment = "Roblox");
@@ -28,9 +34,13 @@ public interface IRobloxAutomation
 
     Task MoveCursorToClientCenterAsync(RobloxWindow window, CancellationToken cancellationToken);
 
+    Task ParkCursorAsync(RobloxWindow window, CancellationToken cancellationToken);
+
     Task ClickClientAsync(RobloxWindow window, int x, int y, CancellationToken cancellationToken);
 
     Task DragCameraAsync(RobloxWindow window, int deltaX, int deltaY, int chunkPixels, CancellationToken cancellationToken);
+
+    Task PulseCameraYawAsync(RobloxWindow window, CameraYawDirection direction, int holdMilliseconds, CancellationToken cancellationToken);
 
     Task ZoomOutFullyAsync(RobloxWindow window, int ticks, CancellationToken cancellationToken);
 
