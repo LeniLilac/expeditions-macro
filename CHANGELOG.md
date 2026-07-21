@@ -13,6 +13,8 @@ All notable changes to Expeditions Macro are documented here.
 - Added a Settings calibration overlay for matching Roblox's rendered UI scale to the standard detector scale.
 - Added **Test webhook** actions for validating optional Discord reporting without sending a screenshot or user mention.
 - Added seven-map camera-rotation fixtures covering all Expedition maps and Story/Challenge map layouts.
+- Added a required, separately configured Anime Expeditions **Toggle Play Menu** letter under Settings. It starts empty, is captured by clicking its button and pressing a letter, and shows a five-step popup if either macro is started before setup is complete.
+- Expanded the global macro start/stop hotkey to letters, digits, punctuation, numpad keys, and the existing supported function-key range.
 
 ### Changed
 
@@ -21,19 +23,23 @@ All notable changes to Expeditions Macro are documented here.
 - Runtime alignment now makes up to three fresh attempts with alternating scan direction and sampling phase, using both the saved coarse atlas and fine neighborhood before each full-turn fallback.
 - Changed new camera defaults to a 30 ms arrow hold and 100 ms settle time, with calibration controls hidden behind **Show tuning**.
 - Camera models now use schema version 3. Existing camera models must be recorded again; placement models and presets remain reusable after selecting replacement camera models.
+- Challenge and Expedition handoffs now open Play directly with the configured game key while terminal UI is still visible, then verify the party preview with up to three bounded attempts.
 
 ### Fixed
 
 - Prevented low-confidence alignment from placing units or starting a match. After all three attempts fail, the macro exits the unstarted match safely, records diagnostics, and reports the skipped task; the Challenge scheduler advances to its next configured task while standalone Expeditions stops at the party preview.
 - Parked the pointer inside the Roblox client with spaced acknowledged motion pulses so unit hover cards and highlighted selector rows clear before Start Game or map detection.
-- Re-detected live Start Game and Play controls after parking instead of trusting a stale or partially covered action.
+- Re-detected live Start Game controls after parking instead of trusting a stale or partially covered action.
 - Made camera-model replacement transactional with bounded retries and backup restoration when another process temporarily holds model files.
-- Preserved the v1.1.6 live post-match Play detection and detector-pack 1.0.2 migration behavior while integrating the new camera workflow.
+- Removed fragile Play clicks from lobby recovery, post-match, fallback, and alignment-skip navigation, so hotbar overlap, UI scale, and shifted Play icons cannot block mode changes.
+- Prevented assigning the same letter to the macro hotkey and Play-menu key, which would otherwise let the macro's own navigation input stop the run.
+- Preserved detector-pack 1.0.2 migration behavior while integrating the new camera workflow.
 
 ### Tests
 
 - Added camera calibration, automatic-region, persisted-neighborhood, alternating-retry, safe-skip, hover-clear, and UI-scale overlay coverage.
 - Added golden rotation checks proving incorrect yaw remains below the alignment threshold across three Expedition and four Story/Challenge maps.
+- Added key-driven Play navigation retries, required-key validation, hotkey-conflict validation, and global letter/number/punctuation hotkey coverage.
 
 ## [1.1.6] - 2026-07-21
 

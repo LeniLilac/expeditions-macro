@@ -236,6 +236,9 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll")]
     internal static partial void keybd_event(byte virtualKey, byte scanCode, uint flags, nuint extraInfo);
 
+    [LibraryImport("user32.dll", EntryPoint = "MapVirtualKeyW")]
+    internal static partial uint MapVirtualKey(uint code, uint mapType);
+
     [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool RegisterHotKey(nint window, int id, uint modifiers, uint virtualKey);

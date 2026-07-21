@@ -84,6 +84,38 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public void AppSettings_PlayMenuKeyDefaultsEmptyAndNormalizesLetters()
+    {
+        AppSettings settings = new();
+
+        Assert.Equal(string.Empty, settings.PlayMenuKey);
+        Assert.Equal('P', AppSettings.ParsePlayMenuKey(" p "));
+    }
+
+    [Fact]
+    public void AppSettings_PlayMenuKeyIsRequiredBeforeMacroStart()
+    {
+        InvalidDataException error = Assert.Throws<InvalidDataException>(() => AppSettings.ParsePlayMenuKey(string.Empty));
+
+        Assert.Equal(
+            "1. Go to the Settings menu in game\n" +
+            "2. Go to the Keybinds section in settings\n" +
+            "3. Find the Toggle Play Menu keybind\n" +
+            "4. Set the keybind to a letter in game\n" +
+            "5. Set fill in the keybind letter in the macro settings",
+            error.Message);
+    }
+
+    [Fact]
+    public void AppSettings_PlayMenuKeyMustDifferFromMacroHotkey()
+    {
+        InvalidDataException error = Assert.Throws<InvalidDataException>(() => AppSettings.ParsePlayMenuKey("p", 0x50));
+
+        Assert.Contains("cannot both be P", error.Message, StringComparison.Ordinal);
+        Assert.Equal('P', AppSettings.ParsePlayMenuKey("p", AppSettings.DefaultMacroHotkeyVirtualKey));
+    }
+
+    [Fact]
     public void ModelId_IsReadableStableAndNameSensitive()
     {
         string first = ModelId.FromName("Expedition Map 1");

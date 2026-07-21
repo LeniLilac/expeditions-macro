@@ -10,7 +10,7 @@ Windows players configuring and supervising repeatable Anime Expeditions runs in
 
 ## Product Purpose
 
-Provide one dependable desktop tool for camera alignment, unit placement, Expeditions progression, recovery, and optional run reporting. Success means a user can configure a run once, start it with F6, and trust the app to make its state and any required intervention obvious.
+Provide one dependable desktop tool for camera alignment, unit placement, Expeditions progression, recovery, and optional run reporting. Success means a user can configure a run once, start it with the chosen global hotkey, and trust the app to make its state and any required intervention obvious.
 
 ## Brand Personality
 

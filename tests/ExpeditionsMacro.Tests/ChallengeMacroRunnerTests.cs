@@ -1,4 +1,5 @@
 using ExpeditionsMacro.Automation.Challenges;
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Vision.Challenges;
@@ -85,7 +86,7 @@ public sealed class ChallengeMacroRunnerTests
     }
 
     [Fact]
-    public async Task PostMatchPlay_FirstIgnoredClick_IsRedetectedAndRetried()
+    public async Task PlayMenuKey_FirstIgnoredPress_IsRetried()
     {
         ImageFrame hud = ImageCodec.Load(Path.Combine(
             TestPaths.ChallengeDatasets,
@@ -95,19 +96,20 @@ public sealed class ChallengeMacroRunnerTests
             TestPaths.ChallengeDatasets,
             "PostMatchPreview",
             "PostMatchPreview_03.png"));
-        List<(int X, int Y)> clicks = [];
+        List<char> presses = [];
         int captures = 0;
         int waits = 0;
 
-        ImageFrame result = await ChallengeMacroRunner.OpenPostMatchPreviewWithRetriesAsync(
+        ImageFrame result = await PlayMenuNavigator.OpenWithRetriesAsync(
+            playMenuKey: 'p',
             capture: () =>
             {
                 captures++;
                 return hud.Clone();
             },
-            click: (x, y, _) =>
+            pressKey: (key, _) =>
             {
-                clicks.Add((x, y));
+                presses.Add(key);
                 return Task.CompletedTask;
             },
             waitForPreview: (_, _) => Task.FromResult<ImageFrame?>(++waits == 1 ? null : preview),
@@ -118,16 +120,11 @@ public sealed class ChallengeMacroRunnerTests
         Assert.Same(preview, result);
         Assert.Equal(2, captures);
         Assert.Equal(2, waits);
-        Assert.Equal(2, clicks.Count);
-        Assert.All(clicks, click =>
-        {
-            Assert.InRange(click.X, 158, 170);
-            Assert.InRange(click.Y, 570, 592);
-        });
+        Assert.Equal(['P', 'P'], presses);
     }
 
     [Fact]
-    public async Task PostMatchPlay_LateTransitionBeforeRetry_IsAcceptedWithoutAnotherClick()
+    public async Task PlayMenuKey_LateTransitionBeforeRetry_IsAcceptedWithoutAnotherPress()
     {
         ImageFrame hud = ImageCodec.Load(Path.Combine(
             TestPaths.ChallengeDatasets,
@@ -138,14 +135,15 @@ public sealed class ChallengeMacroRunnerTests
             "PostMatchPreview",
             "PostMatchPreview_03.png"));
         Queue<ImageFrame> captures = new([hud, preview]);
-        int clicks = 0;
+        int presses = 0;
         int waits = 0;
 
-        ImageFrame result = await ChallengeMacroRunner.OpenPostMatchPreviewWithRetriesAsync(
+        ImageFrame result = await PlayMenuNavigator.OpenWithRetriesAsync(
+            playMenuKey: 'P',
             capture: () => captures.Dequeue().Clone(),
-            click: (_, _, _) =>
+            pressKey: (_, _) =>
             {
-                clicks++;
+                presses++;
                 return Task.CompletedTask;
             },
             waitForPreview: (_, _) =>
@@ -158,7 +156,7 @@ public sealed class ChallengeMacroRunnerTests
             CancellationToken.None);
 
         Assert.Equal(ChallengeScreenState.PostMatchPreview, ChallengeScreenDetector.Detect(result).State);
-        Assert.Equal(1, clicks);
+        Assert.Equal(1, presses);
         Assert.Equal(1, waits);
         Assert.Empty(captures);
     }

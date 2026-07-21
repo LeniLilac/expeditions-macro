@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using ExpeditionsMacro.Automation.Camera;
 using ExpeditionsMacro.Automation.Expeditions;
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
@@ -42,6 +43,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         IReadOnlyDictionary<ChallengeMapId, ChallengeMapRuntimeModels> mapModels,
         IDetectorPack detector,
         string webhookUrl,
+        char playMenuKey,
         Func<DateTimeOffset, CancellationToken, Task>? idleWorkflow = null,
         IProgress<MacroProgress>? progress = null,
         Action<MacroEvent>? log = null,
@@ -50,6 +52,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         Func<Exception, CancellationToken, Task>? recoverableFailure = null)
     {
         preset.ValidateReady();
+        playMenuKey = ValidatePlayMenuKey(playMenuKey);
         if (!detector.SupportsChallengeMaps)
         {
             throw new InvalidDataException(DetectorPackCapabilities.ChallengeMapsUnavailableMessage(detector.Manifest));
@@ -91,7 +94,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         {
             Focus(window);
             await EnsureClientSizeAsync(window, detector.Manifest.ClientWidth, detector.Manifest.ClientHeight, cancellationToken).ConfigureAwait(false);
-            await EnsureChallengeListAsync(window, preset, detector, Write, Report, () => { recoveries++; PublishSummary(); }, cancellationToken).ConfigureAwait(false);
+            await EnsureChallengeListAsync(window, preset, detector, playMenuKey, Write, Report, () => { recoveries++; PublishSummary(); }, cancellationToken).ConfigureAwait(false);
             string enabledTypes = string.Join(", ", preset.EnabledTypes.Select(Label));
             QueueNotification(
                 webhookUrl,
@@ -115,7 +118,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
                 {
                     waitingUntil = dailyUntil;
                     PublishSummary();
-                    await WaitUntilAsync(window, preset, detector, dailyUntil, dailyLimit: true, idleWorkflow, Write, Report, cancellationToken).ConfigureAwait(false);
+                    await WaitUntilAsync(window, preset, detector, playMenuKey, dailyUntil, dailyLimit: true, idleWorkflow, Write, Report, cancellationToken).ConfigureAwait(false);
                     waitingUntil = null;
                     PublishSummary();
                     continue;
@@ -127,7 +130,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
                 foreach (ChallengeType type in Enum.GetValues<ChallengeType>())
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    await EnsureChallengeListAsync(window, preset, detector, Write, Report, () => { recoveries++; PublishSummary(); }, cancellationToken).ConfigureAwait(false);
+                    await EnsureChallengeListAsync(window, preset, detector, playMenuKey, Write, Report, () => { recoveries++; PublishSummary(); }, cancellationToken).ConfigureAwait(false);
                     ChallengeSelectorObservation selector = await WaitForChallengeSelectorAsync(window, preset, detector, TimeSpan.FromSeconds(12), Report, cancellationToken).ConfigureAwait(false);
                     if (selector.Match.State == ChallengeScreenState.ChallengeListUnavailable)
                     {
@@ -178,6 +181,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
                             models,
                             detector,
                             webhookUrl,
+                            playMenuKey,
                             runtime,
                             victories,
                             defeats,
@@ -217,7 +221,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
                             (int)map,
                             ChallengeRoute(type, map),
                             Write);
-                        await ReturnFromPrestartAfterAlignmentFailureAsync(window, preset, detector, Report, cancellationToken).ConfigureAwait(false);
+                        await ReturnFromPrestartAfterAlignmentFailureAsync(window, preset, detector, playMenuKey, Report, cancellationToken).ConfigureAwait(false);
                         rotation.MarkAttempted(type);
                         PublishSummary();
                         continue;
@@ -240,7 +244,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
                             (int)map,
                             ChallengeRoute(type, map),
                             Write);
-                        await EnsureChallengeListAsync(window, preset, detector, Write, Report, () => { }, cancellationToken).ConfigureAwait(false);
+                        await EnsureChallengeListAsync(window, preset, detector, playMenuKey, Write, Report, () => { }, cancellationToken).ConfigureAwait(false);
                         ranChallenge = true;
                         break;
                     }
@@ -290,7 +294,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
                     mapNumber: 0,
                     route: "Regular Challenge rotation",
                     Write);
-                await WaitUntilAsync(window, preset, detector, waitUntil, dailyLimit, idleWorkflow, Write, Report, cancellationToken).ConfigureAwait(false);
+                await WaitUntilAsync(window, preset, detector, playMenuKey, waitUntil, dailyLimit, idleWorkflow, Write, Report, cancellationToken).ConfigureAwait(false);
                 waitingUntil = null;
                 PublishSummary();
             }
@@ -309,6 +313,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         ChallengeMapRuntimeModels models,
         IDetectorPack detector,
         string webhookUrl,
+        char playMenuKey,
         Stopwatch runtime,
         int priorVictories,
         int priorDefeats,
@@ -383,7 +388,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
                     (int)map,
                     ChallengeRoute(type, map),
                     log);
-                await CloseTerminalAndReturnAsync(window, preset, detector, terminal.Frame, report, cancellationToken).ConfigureAwait(false);
+                await ReturnFromTerminalAsync(window, preset, detector, playMenuKey, report, cancellationToken).ConfigureAwait(false);
                 return new ChallengeTerminal(victories, defeats);
             }
 
@@ -416,7 +421,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
             }
 
             log("Defeat retry limit reached. This Challenge will not be attempted again until the next global reset.", MacroEventLevel.Information, null, null);
-            await CloseTerminalAndReturnAsync(window, preset, detector, terminal.Frame, report, cancellationToken).ConfigureAwait(false);
+            await ReturnFromTerminalAsync(window, preset, detector, playMenuKey, report, cancellationToken).ConfigureAwait(false);
             return new ChallengeTerminal(victories, defeats);
         }
     }
@@ -478,21 +483,19 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         }
     }
 
-    private async Task CloseTerminalAndReturnAsync(
+    private async Task ReturnFromTerminalAsync(
         RobloxWindow window,
         ChallengePreset preset,
         IDetectorPack detector,
-        ImageFrame terminal,
+        char playMenuKey,
         Action<string, int, string, string?, double?> report,
         CancellationToken cancellationToken)
     {
-        (int closeX, int closeY) = ChallengeScreenDetector.TerminalCloseAction(terminal);
-        await ClickAsync(window, closeX, closeY, cancellationToken).ConfigureAwait(false);
-        await Task.Delay(900, cancellationToken).ConfigureAwait(false);
-        ImageFrame party = await OpenPostMatchPreviewAsync(
+        ImageFrame party = await OpenPlayMenuAsync(
             window,
             preset,
             detector,
+            playMenuKey,
             log: null,
             report,
             cancellationToken).ConfigureAwait(false);
@@ -509,6 +512,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         RobloxWindow window,
         ChallengePreset preset,
         IDetectorPack detector,
+        char playMenuKey,
         DateTimeOffset untilUtc,
         bool dailyLimit,
         Func<DateTimeOffset, CancellationToken, Task>? idleWorkflow,
@@ -521,7 +525,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
             report("Waiting", 0, dailyLimit ? "Daily Challenge limits reached. Running Expeditions until midnight UTC." : "Challenges complete. Running Expeditions until the next reset.", null, null);
             await PrepareExpeditionsIdleHandoffAsync(window, preset, detector, log, report, cancellationToken).ConfigureAwait(false);
             await idleWorkflow(untilUtc, cancellationToken).ConfigureAwait(false);
-            await ReturnFromIdleModeAsync(window, preset, detector, log, report, cancellationToken).ConfigureAwait(false);
+            await ReturnFromIdleModeAsync(window, preset, detector, playMenuKey, log, report, cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -602,6 +606,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         RobloxWindow window,
         ChallengePreset preset,
         IDetectorPack detector,
+        char playMenuKey,
         Action<string, MacroEventLevel, string?, double?> log,
         Action<string, int, string, string?, double?> report,
         CancellationToken cancellationToken)
@@ -628,10 +633,11 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         }
         else
         {
-            party = await OpenPostMatchPreviewAsync(
+            party = await OpenPlayMenuAsync(
                 window,
                 preset,
                 detector,
+                playMenuKey,
                 log,
                 report,
                 cancellationToken).ConfigureAwait(false);
@@ -649,6 +655,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
             window,
             preset,
             detector,
+            playMenuKey,
             log,
             report,
             static () => { },
@@ -659,11 +666,12 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         RobloxWindow window,
         ChallengePreset preset,
         IDetectorPack detector,
+        char playMenuKey,
         Action<string, int, string, string?, double?> report,
         CancellationToken cancellationToken)
     {
         report("Task skipped", 100, "Leaving the unstarted match and returning to the Challenge selector.", "camera_alignment_skipped", null);
-        ImageFrame party = await OpenPartyPreviewFromPrestartAsync(window, preset, detector, report, cancellationToken).ConfigureAwait(false);
+        ImageFrame party = await OpenPlayMenuAsync(window, preset, detector, playMenuKey, log: null, report, cancellationToken).ConfigureAwait(false);
         (int X, int Y)? changeMode = ChallengeScreenDetector.ActionFor(ChallengeScreenState.PostMatchPreview, party);
         if (changeMode is null) throw new InvalidOperationException("Camera alignment was skipped, but Change Gamemode could not be located in the party preview.");
         await ClickAsync(window, changeMode.Value.X, changeMode.Value.Y, cancellationToken).ConfigureAwait(false);
@@ -674,52 +682,18 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         await WaitForChallengeSelectorAsync(window, preset, detector, TimeSpan.FromSeconds(12), report, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<ImageFrame> OpenPartyPreviewFromPrestartAsync(
+    private Task<ImageFrame> OpenPlayMenuAsync(
         RobloxWindow window,
         ChallengePreset preset,
         IDetectorPack detector,
-        Action<string, int, string, string?, double?> report,
-        CancellationToken cancellationToken)
-    {
-        for (int attempt = 1; attempt <= 3; attempt++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await _automation.ParkCursorAsync(window, cancellationToken).ConfigureAwait(false);
-            await Task.Delay(150, cancellationToken).ConfigureAwait(false);
-            ImageFrame frame = CaptureClient(window, detector);
-            if (ChallengeScreenDetector.Detect(frame).State == ChallengeScreenState.PostMatchPreview) return frame;
-            (int X, int Y)? play = ChallengeScreenDetector.PlayAction(frame);
-            if (play is null)
-            {
-                report("Task skipped", 100, $"Waiting for the Play control before leaving the unstarted match ({attempt}/3).", "camera_alignment_skipped", null);
-                await Task.Delay(350, cancellationToken).ConfigureAwait(false);
-                continue;
-            }
-            report("Task skipped", 100, $"Opening Play to leave the unstarted match ({attempt}/3).", "camera_alignment_skipped", null);
-            await ClickAsync(window, play.Value.X, play.Value.Y, cancellationToken).ConfigureAwait(false);
-            ImageFrame? preview = await TryWaitForScreenAsync(
-                window,
-                preset,
-                detector,
-                ChallengeScreenState.PostMatchPreview,
-                TimeSpan.FromSeconds(4),
-                report,
-                cancellationToken).ConfigureAwait(false);
-            if (preview is not null) return preview;
-        }
-        throw new InvalidOperationException("Camera alignment was skipped, but the unstarted match could not be exited after three Play attempts.");
-    }
-
-    private Task<ImageFrame> OpenPostMatchPreviewAsync(
-        RobloxWindow window,
-        ChallengePreset preset,
-        IDetectorPack detector,
+        char playMenuKey,
         Action<string, MacroEventLevel, string?, double?>? log,
         Action<string, int, string, string?, double?> report,
         CancellationToken cancellationToken) =>
-        OpenPostMatchPreviewWithRetriesAsync(
+        PlayMenuNavigator.OpenWithRetriesAsync(
+            playMenuKey,
             () => CaptureClient(window, detector),
-            (x, y, token) => ClickAsync(window, x, y, token),
+            (key, token) => _automation.TapLetterKeyAsync(window, key, token),
             (timeout, token) => TryWaitForScreenAsync(
                 window,
                 preset,
@@ -728,60 +702,26 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
                 timeout,
                 report,
                 token),
-            (attempt, match) => report(
+            attempt => report(
                 "Return",
                 85,
                 attempt == 1
-                    ? "Opening Play from the detected post-match HUD."
-                    : $"Retrying the detected Play control ({attempt}/3).",
-                match.State.ToString(),
-                match.Confidence),
-            (attempt, match) => log?.Invoke(
-                $"Post-match Play click did not open navigation (attempt {attempt}/3).",
+                    ? $"Opening the Play menu with {playMenuKey}."
+                    : $"Retrying the {playMenuKey} Play-menu key ({attempt}/{PlayMenuNavigator.MaximumAttempts}).",
+                "play_menu_key",
+                null),
+            attempt => log?.Invoke(
+                $"The {playMenuKey} Play-menu key did not open navigation (attempt {attempt}/{PlayMenuNavigator.MaximumAttempts}).",
                 MacroEventLevel.Warning,
-                match.State.ToString(),
-                match.Confidence),
+                "play_menu_key",
+                null),
             cancellationToken);
-
-    internal static async Task<ImageFrame> OpenPostMatchPreviewWithRetriesAsync(
-        Func<ImageFrame> capture,
-        Func<int, int, CancellationToken, Task> click,
-        Func<TimeSpan, CancellationToken, Task<ImageFrame?>> waitForPreview,
-        Action<int, ChallengeScreenMatch>? attemptStarted,
-        Action<int, ChallengeScreenMatch>? attemptMissed,
-        CancellationToken cancellationToken)
-    {
-        const int maximumAttempts = 3;
-        TimeSpan transitionTimeout = TimeSpan.FromSeconds(4);
-        for (int attempt = 1; attempt <= maximumAttempts; attempt++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            ImageFrame hud = capture();
-            ChallengeScreenMatch match = ChallengeScreenDetector.Detect(hud);
-            if (match.State == ChallengeScreenState.PostMatchPreview) return hud;
-            if (match.State != ChallengeScreenState.PostMatchHud ||
-                match.ActionX is not int playX ||
-                match.ActionY is not int playY)
-            {
-                throw new InvalidOperationException(
-                    "The post-match HUD and its Play control could not be located from the current Roblox frame.");
-            }
-
-            attemptStarted?.Invoke(attempt, match);
-            await click(playX, playY, cancellationToken).ConfigureAwait(false);
-            ImageFrame? preview = await waitForPreview(transitionTimeout, cancellationToken).ConfigureAwait(false);
-            if (preview is not null) return preview;
-            attemptMissed?.Invoke(attempt, match);
-        }
-
-        throw new InvalidOperationException(
-            "The detected post-match Play control remained open after three focused click attempts.");
-    }
 
     private async Task EnsureChallengeListAsync(
         RobloxWindow window,
         ChallengePreset preset,
         IDetectorPack detector,
+        char playMenuKey,
         Action<string, MacroEventLevel, string?, double?> log,
         Action<string, int, string, string?, double?> report,
         Action recovered,
@@ -816,9 +756,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
             }
             if (match.State is ChallengeScreenState.Victory or ChallengeScreenState.Defeat)
             {
-                (int x, int y) = ChallengeScreenDetector.TerminalCloseAction(frame);
-                await ClickAsync(window, x, y, cancellationToken).ConfigureAwait(false);
-                await Task.Delay(700, cancellationToken).ConfigureAwait(false);
+                await OpenPlayMenuAsync(window, preset, detector, playMenuKey, log, report, cancellationToken).ConfigureAwait(false);
                 continue;
             }
 
@@ -832,9 +770,18 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
                     lastRecovery = recovery;
                     log($"Automatic Challenge recovery started from {Label(recovery)}.", MacroEventLevel.Warning, recovery, null);
                 }
-                (int x, int y) = detector.ActionFor(recovery, frame);
-                await ClickAsync(window, x, y, cancellationToken).ConfigureAwait(false);
-                await Task.Delay(recovery == "disconnect" ? 5000 : 2200, cancellationToken).ConfigureAwait(false);
+                if (recovery == "lobby")
+                {
+                    report("Navigation", 0, $"Lobby recognized. Opening Play with {playMenuKey}.", recovery, null);
+                    await _automation.TapLetterKeyAsync(window, playMenuKey, cancellationToken).ConfigureAwait(false);
+                    await Task.Delay(1200, cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    (int x, int y) = detector.ActionFor(recovery, frame);
+                    await ClickAsync(window, x, y, cancellationToken).ConfigureAwait(false);
+                    await Task.Delay(recovery == "disconnect" ? 5000 : 2200, cancellationToken).ConfigureAwait(false);
+                }
                 continue;
             }
             if (recovery == "play")
@@ -1238,6 +1185,18 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         : $"{Math.Max(0, (int)remaining.TotalMinutes)}m {Math.Max(0, remaining.Seconds):00}s";
 
     private static string ChallengeRoute(ChallengeType type, ChallengeMapId map) => $"{Label(type)} · {Label(map)}";
+
+    private static char ValidatePlayMenuKey(char value)
+    {
+        char normalized = char.ToUpperInvariant(value);
+        if (!char.IsAsciiLetter(normalized))
+        {
+            throw new InvalidDataException(
+                "Set the Play menu key under Settings > Controls so it matches Anime Expeditions' Toggle Play Menu binding.");
+        }
+
+        return normalized;
+    }
 
     private static string Label(ChallengeMapId map) => map switch
     {

@@ -97,6 +97,8 @@ public sealed class PlacementServiceTests
 
         public Task TapLeftControlAsync(RobloxWindow window, CancellationToken cancellationToken) => Task.CompletedTask;
 
+        public Task TapLetterKeyAsync(RobloxWindow window, char key, CancellationToken cancellationToken) => Task.CompletedTask;
+
         public Task TapUnitKeyAsync(RobloxWindow window, int unitKey, int holdMilliseconds, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

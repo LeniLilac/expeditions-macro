@@ -225,6 +225,15 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation
 
     public Task TapLeftControlAsync(RobloxWindow window, CancellationToken cancellationToken) => PulseKeyAsync(window, NativeMethods.VkLeftControl, 0x1D, 70, cancellationToken);
 
+    public Task TapLetterKeyAsync(RobloxWindow window, char key, CancellationToken cancellationToken)
+    {
+        char normalized = char.ToUpperInvariant(key);
+        if (!char.IsAsciiLetter(normalized)) throw new ArgumentOutOfRangeException(nameof(key), "The Roblox key must be A through Z.");
+        int virtualKey = normalized;
+        int scanCode = checked((int)NativeMethods.MapVirtualKey((uint)virtualKey, 0));
+        return PulseKeyAsync(window, virtualKey, scanCode, 70, cancellationToken);
+    }
+
     public Task TapUnitKeyAsync(RobloxWindow window, int unitKey, int holdMilliseconds, CancellationToken cancellationToken)
     {
         if (unitKey is < 0 or > 9) throw new ArgumentOutOfRangeException(nameof(unitKey));

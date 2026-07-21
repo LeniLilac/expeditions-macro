@@ -34,12 +34,52 @@ public sealed class GlobalHotkeyService : IGlobalHotkeyService
 
     public string DisplayName => GetDisplayName(VirtualKey);
 
-    public static bool IsSupportedVirtualKey(int virtualKey) =>
-        virtualKey is >= 0x70 and <= 0x7A or >= 0x7C and <= 0x87;
+    public static bool IsSupportedVirtualKey(int virtualKey) => virtualKey switch
+    {
+        >= 0x30 and <= 0x39 => true, // Top-row digits.
+        >= 0x41 and <= 0x5A => true, // Letters.
+        >= 0x60 and <= 0x6B => true, // Numpad digits, multiply, and add.
+        >= 0x6D and <= 0x6F => true, // Numpad subtract, decimal, and divide.
+        >= 0x70 and <= 0x7A => true, // F1-F11.
+        >= 0x7C and <= 0x87 => true, // F13-F24; F12 stays reserved.
+        >= 0xBA and <= 0xC0 => true, // Common OEM punctuation keys.
+        >= 0xDB and <= 0xDE => true,
+        0xE2 => true, // OEM 102-key punctuation key.
+        _ => false,
+    };
 
-    public static string GetDisplayName(int virtualKey) => IsSupportedVirtualKey(virtualKey)
-        ? $"F{virtualKey - 0x6F}"
-        : "Unsupported";
+    public static string GetDisplayName(int virtualKey)
+    {
+        if (virtualKey is >= 0x30 and <= 0x39 or >= 0x41 and <= 0x5A)
+        {
+            return ((char)virtualKey).ToString();
+        }
+
+        if (virtualKey is >= 0x60 and <= 0x69) return $"Num {virtualKey - 0x60}";
+        if (virtualKey is >= 0x70 and <= 0x87 && virtualKey != 0x7B) return $"F{virtualKey - 0x6F}";
+
+        return virtualKey switch
+        {
+            0x6A => "Num *",
+            0x6B => "Num +",
+            0x6D => "Num -",
+            0x6E => "Num .",
+            0x6F => "Num /",
+            0xBA => ";",
+            0xBB => "=",
+            0xBC => ",",
+            0xBD => "-",
+            0xBE => ".",
+            0xBF => "/",
+            0xC0 => "`",
+            0xDB => "[",
+            0xDC => "\\",
+            0xDD => "]",
+            0xDE => "'",
+            0xE2 => "\\",
+            _ => "Unsupported",
+        };
+    }
 
     public void Configure(int virtualKey)
     {
@@ -244,7 +284,7 @@ public sealed class GlobalHotkeyService : IGlobalHotkeyService
         {
             throw new ArgumentOutOfRangeException(
                 nameof(virtualKey),
-                "Choose F1–F11 or F13–F24. F12 is reserved by Windows debuggers.");
+                "Choose a letter, number, punctuation key, numpad key, F1-F11, or F13-F24. F12 is reserved by Windows debuggers.");
         }
     }
 }

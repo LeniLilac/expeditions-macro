@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -76,10 +77,14 @@ public partial class ExpeditionsPage : UserControl, IAppPage
     {
         if (_services.Coordinator.IsBusy) return;
         ExpeditionPreset preset;
+        char playMenuKey;
         string webhook = CurrentWebhook();
         string discordUserId = DiscordErrorUserIdText.Text.Trim();
         try
         {
+            playMenuKey = AppSettings.ParsePlayMenuKey(
+                _services.Settings.PlayMenuKey,
+                _services.Settings.MacroHotkeyVirtualKey);
             if (!DiscordWebhookClient.ValidateWebhookUrl(webhook)) throw new InvalidOperationException("Enter a valid Discord webhook URL, or leave it blank.");
             if (!DiscordWebhookClient.ValidateDiscordUserId(discordUserId)) throw new InvalidOperationException("Enter a valid Discord user ID, or leave it blank.");
             if (discordUserId.Length > 0 && webhook.Length == 0) throw new InvalidOperationException("A Discord webhook is required when an error-ping user ID is entered.");
@@ -89,6 +94,17 @@ public partial class ExpeditionsPage : UserControl, IAppPage
         {
             PhaseText.Text = error.Message;
             AppendLog($"ERROR: {error.Message}");
+            if (error is InvalidDataException &&
+                (error.Message == AppSettings.PlayMenuKeySetupInstructions ||
+                 error.Message.StartsWith("The Play menu key", StringComparison.Ordinal)))
+            {
+                MessageBox.Show(
+                    Window.GetWindow(this),
+                    error.Message,
+                    "Operation stopped",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
             return;
         }
 
@@ -118,6 +134,7 @@ public partial class ExpeditionsPage : UserControl, IAppPage
                 placement,
                 detector,
                 webhook,
+                playMenuKey,
                 progress,
                 entry => Dispatcher.BeginInvoke(() => AppendLog(entry.Level == MacroEventLevel.Error ? $"ERROR: {entry.Message}" : entry.Message)),
                 summary => Dispatcher.BeginInvoke(() => ApplySummary(summary)),

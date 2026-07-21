@@ -43,7 +43,22 @@ internal static class TestPaths
 
     public static void DeleteTemporaryDirectory(string path)
     {
-        if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
+        const int maximumAttempts = 5;
+        for (int attempt = 1; attempt <= maximumAttempts; attempt++)
+        {
+            if (!Directory.Exists(path)) return;
+            try
+            {
+                Directory.Delete(path, recursive: true);
+                return;
+            }
+            catch (Exception error) when (
+                error is IOException or UnauthorizedAccessException &&
+                attempt < maximumAttempts)
+            {
+                Thread.Sleep(50 * attempt);
+            }
+        }
     }
 
     private static string FindRepositoryRoot()

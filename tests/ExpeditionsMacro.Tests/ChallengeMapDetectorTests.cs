@@ -132,7 +132,8 @@ public sealed class ChallengeMapDetectorTests
             preset,
             new Dictionary<ChallengeMapId, ChallengeMapRuntimeModels>(),
             detector,
-            string.Empty));
+            string.Empty,
+            'P'));
 
         Assert.Contains("does not include the Challenge map references", error.Message, StringComparison.Ordinal);
         Assert.Contains("Update the detector pack in Settings or reinstall Expeditions Macro", error.Message, StringComparison.Ordinal);

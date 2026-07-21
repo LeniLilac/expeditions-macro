@@ -8,7 +8,7 @@ Challenge mode automates the three regular Anime Expeditions Challenges that res
 - Tries only the enabled Challenge types and skips an entry when **Select Stage** is unavailable.
 - Recognizes the selected map and loads that map's camera model and placement configuration.
 - Runs a before-start placement model, starts the match, then optionally runs a second placement model after the configured elapsed time.
-- Closes Victory, detects the live post-match Play control, verifies that navigation opened, and returns through **Change Gamemode**. An ignored Play click is re-detected and retried up to three times. Defeat retries are configurable and default to zero.
+- While Victory or Defeat is still visible, presses the configured Anime Expeditions **Toggle Play Menu** key, verifies that navigation opened, and returns through **Change Gamemode**. An ignored key press is retried up to three times. This avoids the small Play control and any hotbar overlap. Defeat retries are configurable and default to zero.
 - Clears per-entry attempts at every global half-hour reset. A no-retry defeat can therefore be attempted again when a new Challenge appears.
 - Either waits during cooldown or runs a configured Expeditions preset until the next reset.
 - Treats all three entries remaining unavailable across a complete global reset as daily-limit evidence, then waits until midnight UTC.
@@ -20,6 +20,8 @@ The optional Discord webhook reports monitoring start, match attempts, Victory o
 The workflow recognizes the game-mode selector, active and unavailable Challenge lists, available and cooldown details, both preview layouts, Start Game, Victory, and Defeat. It uses stable panel geometry, headings, dividers, button shapes, and map thumbnails instead of player names, reward rarity colors, or changing background artwork.
 
 Selector rows are clicked through their map artwork, away from reward icons that open item tooltips. Every transition is consumed only from its expected runner state; shared Start Game and Defeat visuals are not sufficient by themselves to begin Challenge automation.
+
+The Play-menu key is required under **Settings > Controls**. Click its button and press one A-Z letter that matches the in-game **Toggle Play Menu** binding. It must differ from the global macro start/stop hotkey. Challenge recovery also uses this key to open Play from the lobby instead of clicking the left navigation.
 
 ## Regression dataset
 

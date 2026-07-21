@@ -46,6 +46,8 @@ public interface IRobloxAutomation
 
     Task TapLeftControlAsync(RobloxWindow window, CancellationToken cancellationToken);
 
+    Task TapLetterKeyAsync(RobloxWindow window, char key, CancellationToken cancellationToken);
+
     Task TapUnitKeyAsync(RobloxWindow window, int unitKey, int holdMilliseconds, CancellationToken cancellationToken);
 }
 

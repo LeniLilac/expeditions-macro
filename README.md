@@ -10,7 +10,7 @@ It uses screen capture and ordinary Windows input. It does not inject into Roblo
 
 ## What it does
 
-- Starts and stops with one configurable global hotkey; **F6** is the default.
+- Starts and stops with one configurable global hotkey; **F6** is the default, with letters, digits, punctuation, numpad keys, and supported function keys available.
 - Can begin from the Roblox lobby and navigate to the configured Expeditions map and difficulty.
 - Runs any enabled Trait, Stat, and Sprite Challenges on the global half-hour reset, recognizes five rotating maps, and loads the matching camera and placement models.
 - Supports separate prestart and delayed in-match Challenge placements, configurable defeat retries, and an optional Expeditions handoff while Challenges are on cooldown.
@@ -38,7 +38,9 @@ Follow the [Expeditions Macro setup guide](https://docs.google.com/document/d/10
 
 ## First-time setup
 
-The instructions below refer to the **macro hotkey**. It defaults to **F6** and can be changed under **Settings > Controls** by clicking the key button and pressing a supported function key.
+The instructions below refer to the **macro hotkey**. It defaults to **F6** and can be changed under **Settings > Controls** by clicking the key button and pressing a letter, number, punctuation key, numpad key, or supported function key.
+
+Before starting either macro, assign Anime Expeditions' **Toggle Play Menu** action to one letter from A through Z. Under **Settings > Controls**, click **Play menu key** and press that same letter. This setting intentionally starts empty, so the app shows an immediate setup popup and refuses to start until it is configured. Keep it different from the macro start/stop hotkey. The same key opens Play from the lobby as well as from Victory, Defeat, or an unstarted match, avoiding the small on-screen Play button.
 
 ### 1. Create a camera model
 
@@ -99,7 +101,7 @@ The Expeditions loop prepares the camera, places units, starts the node, and wat
 - victory or defeat, followed by retry;
 - lobby, disconnect, or AFK Chamber recovery.
 
-The Challenges loop navigates the fixed three-entry selector, recognizes the rotating map, runs its map-specific camera and two placement phases, handles Victory or Defeat, and returns through **Change Gamemode**. During a completed 30-minute window it either waits or runs the selected Expeditions preset until the current Expedition run finishes cleanly.
+The Challenges loop navigates the fixed three-entry selector, recognizes the rotating map, runs its map-specific camera and two placement phases, handles Victory or Defeat, opens Play with the configured in-game key, and returns through **Change Gamemode**. The same key-driven path returns from an Expeditions fallback without depending on the small Play icon or hotbar layout. During a completed 30-minute window it either waits or runs the selected Expeditions preset until the current Expedition run finishes cleanly.
 
 Stopping is cooperative. The app releases right mouse and shift-lock state where applicable, cancels pending work, and leaves Roblox at the standardized client size used for detection.
 

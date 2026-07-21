@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
@@ -97,11 +98,15 @@ public partial class ChallengesPage : UserControl, IAppPage
         ChallengePreset preset;
         IReadOnlyDictionary<ChallengeMapId, ChallengeMapRuntimeModels> mapModels;
         IDetectorPack detector;
+        char playMenuKey;
         string webhook = CurrentWebhook();
         string discordUserId = DiscordErrorUserIdText.Text.Trim();
         Func<DateTimeOffset, CancellationToken, Task>? idleWorkflow = null;
         try
         {
+            playMenuKey = AppSettings.ParsePlayMenuKey(
+                _services.Settings.PlayMenuKey,
+                _services.Settings.MacroHotkeyVirtualKey);
             if (!DiscordWebhookClient.ValidateWebhookUrl(webhook)) throw new InvalidOperationException("Enter a valid Discord webhook URL, or leave it blank.");
             if (!DiscordWebhookClient.ValidateDiscordUserId(discordUserId)) throw new InvalidOperationException("Enter a valid Discord user ID, or leave it blank.");
             if (discordUserId.Length > 0 && webhook.Length == 0) throw new InvalidOperationException("A Discord webhook is required when an error-ping user ID is entered.");
@@ -115,13 +120,24 @@ public partial class ChallengesPage : UserControl, IAppPage
                 CameraModel camera = await _services.CameraModels.LoadAsync(expedition.CameraModelId) ?? throw new InvalidOperationException("The fallback Expeditions camera model could not be loaded.");
                 PlacementModel placement = await _services.PlacementModels.LoadAsync(expedition.PlacementModelId) ?? throw new InvalidOperationException("The fallback Expeditions placement model could not be loaded.");
                 IDetectorPack expeditionDetector = await _services.DetectorPacks.LoadAsync(expedition.DetectorPackId) ?? throw new InvalidOperationException("The fallback Expeditions detector pack could not be loaded.");
-                idleWorkflow = (untilUtc, token) => RunExpeditionsUntilAsync(untilUtc, expedition, camera, placement, expeditionDetector, webhook, discordUserId, token);
+                idleWorkflow = (untilUtc, token) => RunExpeditionsUntilAsync(untilUtc, expedition, camera, placement, expeditionDetector, webhook, discordUserId, playMenuKey, token);
             }
         }
         catch (Exception error)
         {
             StatusText.Text = error.Message;
             AppendLog($"ERROR: {error.Message}");
+            if (error is InvalidDataException &&
+                (error.Message == AppSettings.PlayMenuKeySetupInstructions ||
+                 error.Message.StartsWith("The Play menu key", StringComparison.Ordinal)))
+            {
+                MessageBox.Show(
+                    Window.GetWindow(this),
+                    error.Message,
+                    "Operation stopped",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
             return;
         }
 
@@ -148,6 +164,7 @@ public partial class ChallengesPage : UserControl, IAppPage
                 mapModels,
                 detector,
                 webhook,
+                playMenuKey,
                 idleWorkflow,
                 progress,
                 entry => Dispatcher.BeginInvoke(() => AppendLog(entry.Level == MacroEventLevel.Error ? $"ERROR: {entry.Message}" : entry.Message)),
@@ -410,6 +427,7 @@ public partial class ChallengesPage : UserControl, IAppPage
         IDetectorPack detector,
         string webhookUrl,
         string discordUserId,
+        char playMenuKey,
         CancellationToken cancellationToken)
     {
         if (untilUtc <= DateTimeOffset.UtcNow) return;
@@ -420,6 +438,7 @@ public partial class ChallengesPage : UserControl, IAppPage
             placement,
             detector,
             webhookUrl,
+            playMenuKey,
             progress: new Progress<MacroProgress>(value => DispatchUi(() => StatusText.Text = $"Expeditions fallback: {value.Message}")),
             log: entry => AppendLog($"Expeditions: {entry.Message}"),
             summaryChanged: null,

@@ -19,10 +19,12 @@ namespace ExpeditionsMacro.App.Pages;
 public partial class SettingsPage : UserControl, IAppPage
 {
     private readonly AppServices _services;
-    private bool _loading;
+    private bool _loading = true;
     private bool _captureOperationActive;
     private bool _capturingHotkey;
+    private bool _capturingPlayMenuKey;
     private bool _rebindingHotkey;
+    private bool _savingPlayMenuKey;
     private bool _uiScaleOverlayChanging;
     private UiScaleOverlayWindow? _uiScaleOverlay;
 
@@ -37,10 +39,12 @@ public partial class SettingsPage : UserControl, IAppPage
         _services.Hotkey.Pressed += (_, _) => Dispatcher.BeginInvoke(() =>
         {
             if (_capturingHotkey) CancelHotkeyCapture($"{_services.Hotkey.DisplayName} is already the macro hotkey.");
+            if (_capturingPlayMenuKey) CancelPlayMenuKeyCapture($"{_services.Hotkey.DisplayName} is already the macro hotkey. Choose a different letter for Toggle Play Menu.");
         });
         Unloaded += (_, _) =>
         {
             if (_capturingHotkey) CancelHotkeyCapture("Key change canceled.");
+            if (_capturingPlayMenuKey) CancelPlayMenuKeyCapture("Key change canceled.");
             CloseUiScaleOverlay();
         };
     }
@@ -66,6 +70,7 @@ public partial class SettingsPage : UserControl, IAppPage
         VersionText.Text = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
         RobloxText.Text = _services.Automation.FindWindow() is { } window ? $"Found: {window.Title}" : "Not found";
         UpdateHotkeyDisplay();
+        UpdatePlayMenuKeyDisplay();
         await RefreshDetectorAsync();
         UpdateCaptureState();
     }
@@ -95,30 +100,116 @@ public partial class SettingsPage : UserControl, IAppPage
         await _services.UpdateSettingsAsync(settings => settings with { IncludeLogsInDiagnosticArchives = IncludeLogsCheck.IsChecked == true });
     }
 
+    private void PlayMenuKeyButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_services.Coordinator.IsBusy || _savingPlayMenuKey || _capturingPlayMenuKey) return;
+        if (_capturingHotkey) CancelHotkeyCapture("Macro hotkey change canceled.");
+        _capturingPlayMenuKey = true;
+        PlayMenuKeyButton.Content = "Press a letter...";
+        PlayMenuKeyStatusText.Text = "Press the letter assigned to Toggle Play Menu in Anime Expeditions. Escape cancels.";
+        Keyboard.Focus(PlayMenuKeyButton);
+        UpdateCaptureState();
+    }
+
+    private async Task ApplyPlayMenuKeyAsync(char key)
+    {
+        _savingPlayMenuKey = true;
+        UpdateCaptureState();
+        try
+        {
+            _ = AppSettings.ParsePlayMenuKey(key.ToString(), _services.Hotkey.VirtualKey);
+            await _services.UpdateSettingsAsync(settings => settings with { PlayMenuKey = key.ToString() });
+            UpdatePlayMenuKeyDisplay();
+        }
+        catch (Exception error)
+        {
+            UpdatePlayMenuKeyDisplay();
+            PlayMenuKeyStatusText.Text = $"Could not save the Play menu key: {error.Message}";
+        }
+        finally
+        {
+            _savingPlayMenuKey = false;
+            UpdateCaptureState();
+        }
+    }
+
+    private void UpdatePlayMenuKeyDisplay()
+    {
+        try
+        {
+            char key = AppSettings.ParsePlayMenuKey(_services.Settings.PlayMenuKey, _services.Hotkey.VirtualKey);
+            if (!_capturingPlayMenuKey) PlayMenuKeyButton.Content = key.ToString();
+            PlayMenuKeyStatusText.Text = $"{key} must match Anime Expeditions' Toggle Play Menu binding.";
+            PlayMenuKeyDiagnosticText.Text = key.ToString();
+        }
+        catch (InvalidDataException error)
+        {
+            bool empty = string.IsNullOrWhiteSpace(_services.Settings.PlayMenuKey);
+            if (!_capturingPlayMenuKey) PlayMenuKeyButton.Content = empty ? "Set key" : _services.Settings.PlayMenuKey;
+            PlayMenuKeyStatusText.Text = empty
+                ? "Required before a macro can start. Click the button, then press a letter from A through Z."
+                : error.Message;
+            PlayMenuKeyDiagnosticText.Text = empty ? "Not set" : "Conflict";
+        }
+    }
+
     private void HotkeyButton_Click(object sender, RoutedEventArgs e)
     {
         if (_services.Coordinator.IsBusy || _rebindingHotkey) return;
+        if (_capturingPlayMenuKey) CancelPlayMenuKeyCapture("Play menu key change canceled.");
         _capturingHotkey = true;
-        HotkeyButton.Content = "Press a key…";
-        HotkeyStatusText.Text = "Press F1–F11 or F13–F24. Escape cancels; F12 is reserved by Windows.";
+        HotkeyButton.Content = "Press a key...";
+        HotkeyStatusText.Text = "Press a letter, number, punctuation key, numpad key, F1-F11, or F13-F24. Escape cancels; F12 is reserved.";
         Keyboard.Focus(HotkeyButton);
     }
 
     private async void SettingsPage_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (!_capturingHotkey) return;
+        if (!_capturingHotkey && !_capturingPlayMenuKey) return;
         e.Handled = true;
         Key key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (_capturingPlayMenuKey)
+        {
+            if (key == Key.Escape)
+            {
+                CancelPlayMenuKeyCapture("Key change canceled.");
+                return;
+            }
+
+            int playMenuVirtualKey = KeyInterop.VirtualKeyFromKey(key);
+            if (playMenuVirtualKey is < 0x41 or > 0x5A)
+            {
+                PlayMenuKeyStatusText.Text = "Toggle Play Menu must use one letter from A through Z. Press a letter, or Escape to cancel.";
+                return;
+            }
+
+            if (playMenuVirtualKey == _services.Hotkey.VirtualKey)
+            {
+                PlayMenuKeyStatusText.Text = $"{(char)playMenuVirtualKey} is already the macro hotkey. Press a different letter.";
+                return;
+            }
+
+            _capturingPlayMenuKey = false;
+            await ApplyPlayMenuKeyAsync((char)playMenuVirtualKey);
+            return;
+        }
+
         if (key == Key.Escape)
         {
             CancelHotkeyCapture("Key change canceled.");
             return;
         }
 
+        if (key is Key.LeftShift or Key.RightShift or Key.LeftCtrl or Key.RightCtrl or Key.LeftAlt or Key.RightAlt or Key.LWin or Key.RWin)
+        {
+            HotkeyStatusText.Text = "Modifier keys cannot be used alone. Press the letter, number, punctuation, numpad, or function key you want.";
+            return;
+        }
+
         int virtualKey = KeyInterop.VirtualKeyFromKey(key);
         if (!GlobalHotkeyService.IsSupportedVirtualKey(virtualKey))
         {
-            HotkeyStatusText.Text = "That key is not supported. Press F1–F11 or F13–F24, or Escape to cancel.";
+            HotkeyStatusText.Text = "That key is not supported. Choose a letter, number, punctuation key, numpad key, or supported function key.";
             return;
         }
 
@@ -130,6 +221,21 @@ public partial class SettingsPage : UserControl, IAppPage
     {
         int previous = _services.Hotkey.VirtualKey;
         string displayName = GlobalHotkeyService.GetDisplayName(virtualKey);
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(_services.Settings.PlayMenuKey))
+            {
+                _ = AppSettings.ParsePlayMenuKey(_services.Settings.PlayMenuKey, virtualKey);
+            }
+        }
+        catch (InvalidDataException error)
+        {
+            _capturingHotkey = false;
+            UpdateHotkeyDisplay(updateStatus: false);
+            HotkeyStatusText.Text = error.Message;
+            return;
+        }
+
         _rebindingHotkey = true;
         HotkeyButton.IsEnabled = false;
         HotkeyButton.Content = displayName;
@@ -157,6 +263,7 @@ public partial class SettingsPage : UserControl, IAppPage
         {
             _rebindingHotkey = false;
             UpdateHotkeyDisplay(updateStatus: false);
+            UpdatePlayMenuKeyDisplay();
             UpdateCaptureState();
         }
     }
@@ -166,6 +273,15 @@ public partial class SettingsPage : UserControl, IAppPage
         _capturingHotkey = false;
         UpdateHotkeyDisplay(updateStatus: false);
         HotkeyStatusText.Text = status;
+        UpdateCaptureState();
+    }
+
+    private void CancelPlayMenuKeyCapture(string status)
+    {
+        _capturingPlayMenuKey = false;
+        UpdatePlayMenuKeyDisplay();
+        PlayMenuKeyStatusText.Text = status;
+        UpdateCaptureState();
     }
 
     private void UpdateHotkeyDisplay() => UpdateHotkeyDisplay(updateStatus: true);
@@ -323,11 +439,13 @@ public partial class SettingsPage : UserControl, IAppPage
         CaptureIntervalText.IsEnabled = !busy;
         AutoCaptureOnErrorCheck.IsEnabled = !busy;
         IncludeLogsCheck.IsEnabled = !busy;
+        PlayMenuKeyButton.IsEnabled = !busy && !_capturingHotkey && !_savingPlayMenuKey;
         CaptureStopButton.IsEnabled = _captureOperationActive && busy;
         CaptureStopButton.Content = _services.Coordinator.State == OperationState.Armed ? "Cancel" : "Stop and save";
-        HotkeyButton.IsEnabled = !busy && !_rebindingHotkey;
+        HotkeyButton.IsEnabled = !busy && !_rebindingHotkey && !_capturingPlayMenuKey;
         UiScaleOverlayButton.IsEnabled = !busy && !_uiScaleOverlayChanging;
         if (busy && _capturingHotkey) CancelHotkeyCapture("Stop the current operation before changing the hotkey.");
+        if (busy && _capturingPlayMenuKey) CancelPlayMenuKeyCapture("Stop the current operation before changing the Play menu key.");
     }
 
     private async void RefreshDetector_Click(object sender, RoutedEventArgs e) => await CheckForUpdatesAsync(automatic: false);

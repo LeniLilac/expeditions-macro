@@ -37,13 +37,24 @@
             <Border Grid.Row="2" Style="{StaticResource SectionDivider}">
                 <StackPanel Width="640" HorizontalAlignment="Left">
                     <TextBlock Style="{StaticResource SectionTitle}" Text="Controls" />
-                    <TextBlock Margin="0,5,0,0" Style="{StaticResource Caption}" Text="Choose the global start and stop key. F6 remains the default; the same key arms, starts, and stops every workflow." />
+                    <TextBlock Margin="0,5,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Choose a global start and stop key, then set the separate letter assigned to Toggle Play Menu in Anime Expeditions." />
                     <Grid Margin="0,16,0,0">
                         <StackPanel VerticalAlignment="Center">
                             <TextBlock Style="{StaticResource FieldLabel}" Text="Macro hotkey" />
-                            <TextBlock x:Name="HotkeyStatusText" Margin="0,5,180,0" Style="{StaticResource Caption}" Text="Click the button, then press a function key." />
+                            <TextBlock x:Name="HotkeyStatusText" Margin="0,5,180,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Click the button, then press a letter, number, punctuation key, numpad key, or function key." />
                         </StackPanel>
                         <Button x:Name="HotkeyButton" Width="160" HorizontalAlignment="Right" Content="F6" Click="HotkeyButton_Click" />
+                    </Grid>
+                    <Grid Margin="0,14,0,0">
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Play menu key" />
+                            <TextBlock x:Name="PlayMenuKeyStatusText" Margin="0,5,180,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Required before a macro can start." />
+                        </StackPanel>
+                        <Button x:Name="PlayMenuKeyButton"
+                                Width="160"
+                                HorizontalAlignment="Right"
+                                Content="Set key"
+                                Click="PlayMenuKeyButton_Click" />
                     </Grid>
                 </StackPanel>
             </Border>
@@ -112,6 +123,8 @@
                             <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Roblox window" /><TextBlock x:Name="RobloxText" HorizontalAlignment="Right" /></Grid>
                             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
                             <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Global hotkey" /><TextBlock x:Name="HotkeyText" HorizontalAlignment="Right" /></Grid>
+                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Play menu key" /><TextBlock x:Name="PlayMenuKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
                             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
                             <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Runtime" /><TextBlock HorizontalAlignment="Right" Text=".NET 10, Windows x64" /></Grid>
                         </StackPanel>
