@@ -25,6 +25,8 @@ jobs:
           sparse-checkout: |
             datasets
             detector-packs
+            docs
+            scripts
             src
             tests
       - uses: actions/setup-dotnet@v6
