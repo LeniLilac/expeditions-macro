@@ -108,6 +108,7 @@ The complete golden-image suite is intentionally slower than ordinary unit tests
 
 1. Inspect `git status` and preserve unrelated user changes.
 2. Reproduce a bug with the supplied log, screenshot, video, or fixture before changing code.
+   - For deep-debug archives, inspect transitions as a timestamped multi-frame contact sheet before opening singleton frames. Use `scripts/New-DiagnosticContactSheet.ps1`; reserve individual-frame inspection for pixel-level follow-up after the relevant interval is known.
 3. Make the smallest cross-layer change that fixes the root cause while preserving the invariants above.
 4. Add focused regression coverage and then run the relevant broader suite.
 5. Review `git diff --check`, the full staged diff, and generated artifacts before committing.

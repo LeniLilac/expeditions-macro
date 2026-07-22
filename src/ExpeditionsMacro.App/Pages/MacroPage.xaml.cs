@@ -491,7 +491,11 @@ public partial class MacroPage : UserControl, IAppPage
     {
         try
         {
+            string webhook = CurrentWebhook();
+            string discordUserId = DiscordUserIdText.Text.Trim();
+            ValidateDiscord(webhook, discordUserId);
             MacroPlan plan = await SavePlanInternalAsync();
+            await SaveReportingSettingsAsync(webhook, discordUserId);
             PhaseText.Text = $"Plan '{plan.Name}' saved locally.";
         }
         catch (Exception error)
@@ -830,6 +834,7 @@ public partial class MacroPage : UserControl, IAppPage
     private async void TestWebhook_Click(object sender, RoutedEventArgs e)
     {
         string webhook = CurrentWebhook();
+        string discordUserId = DiscordUserIdText.Text.Trim();
         WebhookStatusText.Text = string.Empty;
         if (string.IsNullOrWhiteSpace(webhook))
         {
@@ -841,6 +846,15 @@ public partial class MacroPage : UserControl, IAppPage
             WebhookStatusText.Text = "Enter a valid Discord webhook URL.";
             return;
         }
+        try
+        {
+            ValidateDiscord(webhook, discordUserId);
+        }
+        catch (Exception error)
+        {
+            WebhookStatusText.Text = error.Message;
+            return;
+        }
 
         _testingWebhook = true;
         TestWebhookButton.IsEnabled = false;
@@ -849,6 +863,7 @@ public partial class MacroPage : UserControl, IAppPage
         {
             using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(15));
             await _services.TestDiscordWebhookAsync(webhook, timeout.Token);
+            await SaveReportingSettingsAsync(webhook, discordUserId);
             WebhookStatusText.Text = "Test message sent.";
         }
         catch (OperationCanceledException)

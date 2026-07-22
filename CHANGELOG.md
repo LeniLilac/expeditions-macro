@@ -4,6 +4,26 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.5] - 2026-07-22
+
+### Added
+
+- Added a reusable timestamped contact-sheet script for reviewing deep-debug frame transitions together with their detector and automation context.
+
+### Changed
+
+- Captures detector frames from the Roblox window compositor surface in linear FP16, then converts HDR/Auto HDR content to stable SDR pixels before existing vision logic runs. Other applications covering Roblox no longer appear in macro screenshots.
+
+### Fixed
+
+- Saving a Macro plan now also persists the DPAPI-protected Discord webhook and failure-alert user ID. A successful webhook test persists the same fields, so replacing or updating the app no longer appears to reset them.
+- Story/Raid handoffs now leave post-match party and map-selector screens through their verified live actions before the scheduler starts another mode.
+- Distinguished the current compact cyan Victory rail from the visually similar red Defeat panel without broadening terminal recognition across unrelated UI.
+
+### Tests
+
+- Added FP16 scRGB conversion, HDR highlight compression, window-surface crop mapping, settings restart, compact terminal, and scheduled handoff regressions.
+
 ## [1.3.0-beta.4] - 2026-07-22
 
 ### Fixed
@@ -463,7 +483,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.4...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.5...HEAD
+[1.3.0-beta.5]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.4...v1.3.0-beta.5
 [1.3.0-beta.4]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.3...v1.3.0-beta.4
 [1.3.0-beta.3]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.2...v1.3.0-beta.3
 [1.3.0-beta.2]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.1...v1.3.0-beta.2

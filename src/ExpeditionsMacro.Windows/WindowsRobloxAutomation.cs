@@ -52,6 +52,7 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation, IDisposable
 
     private readonly object _windowStateGate = new();
     private readonly SemaphoreSlim _sizingGate = new(1, 1);
+    private readonly WindowsGraphicsCapture _windowCapture = new();
     private readonly Dictionary<nint, nint> _windowAliases = [];
     private readonly Dictionary<nint, ForcedWindowState> _forcedWindows = [];
     private ClientSizeTarget? _activeClientSizeTarget;
@@ -209,6 +210,7 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation, IDisposable
 
     public void Dispose()
     {
+        _windowCapture.Dispose();
         KeyValuePair<nint, ForcedWindowState>[] states;
         lock (_windowStateGate)
         {
@@ -225,7 +227,22 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation, IDisposable
 
     public ImageFrame CaptureScreen(ScreenRegion region) => GdiScreenCapture.Capture(region);
 
-    public ImageFrame CaptureClient(RobloxWindow window) => GdiScreenCapture.Capture(GetClientBounds(window).AsRegion());
+    public ImageFrame CaptureClient(RobloxWindow window)
+    {
+        nint handle = ResolveHandle(window);
+        ClientBounds client = GetClientBounds(handle);
+        WindowBounds bounds = GetWindowBounds(handle);
+        WindowBounds extended = GetExtendedFrameBounds(handle) ?? bounds;
+        return _windowCapture.CaptureClient(handle, client, bounds, extended);
+    }
+
+    private static WindowBounds? GetExtendedFrameBounds(nint handle)
+    {
+        uint size = (uint)Marshal.SizeOf<NativeMethods.Rect>();
+        int result = NativeMethods.DwmGetWindowAttribute(handle, NativeMethods.DwmwaExtendedFrameBounds, out NativeMethods.Rect rectangle, size);
+        if (result != 0 || rectangle.Right <= rectangle.Left || rectangle.Bottom <= rectangle.Top) return null;
+        return new WindowBounds(rectangle.Left, rectangle.Top, rectangle.Right - rectangle.Left, rectangle.Bottom - rectangle.Top);
+    }
 
     public Task MoveCursorToClientCenterAsync(RobloxWindow window, CancellationToken cancellationToken)
     {

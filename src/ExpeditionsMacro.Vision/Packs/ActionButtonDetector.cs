@@ -75,6 +75,11 @@ internal static class ActionButtonDetector
         ["stage_party_start_upper"] = new(new ScreenRegion(400, 360, 145, 65), ButtonColor.Green, 480, 394, 45, 22, 90, 120, 20, 38, 0.42),
         ["stage_party_change_map_upper"] = new(new ScreenRegion(520, 360, 135, 65), ButtonColor.Purple, 588, 394, 45, 22, 90, 125, 20, 38, 0.25),
         ["stage_party_disband_upper"] = new(new ScreenRegion(630, 360, 150, 65), ButtonColor.Red, 696, 394, 45, 22, 90, 125, 20, 38, 0.42),
+        // After a Story/Raid result, Disband is replaced by Change Gamemode.
+        // Detect that yellow action explicitly so stage handoff never borrows a
+        // similarly positioned action from the Challenge detector.
+        ["stage_party_change_mode"] = new(new ScreenRegion(630, 390, 150, 60), ButtonColor.Yellow, 696, 421, 45, 25, 90, 125, 20, 38, 0.36),
+        ["stage_party_change_mode_upper"] = new(new ScreenRegion(630, 360, 150, 65), ButtonColor.Yellow, 696, 394, 45, 22, 90, 125, 20, 38, 0.36),
         // The current Story/Raid Victory panel uses a compact yellow Repeat Stage
         // action beside Next Stage and View Party. It is narrower and farther
         // right than the legacy terminal action used by Expeditions.

@@ -39,35 +39,21 @@ public static class StageScreenDetector
     private static readonly ScreenRegion DetailHeader = new(80, 105, 270, 100);
     private static readonly ScreenRegion DetailTopEdge = new(105, 125, 600, 65);
     private static readonly ScreenRegion DetailPanel = new(120, 135, 575, 340);
-    private static readonly ScreenRegion StageVictoryHeader = new(65, 105, 280, 105);
-    private static readonly ScreenRegion StageVictoryTopEdge = new(100, 120, 610, 70);
+    // Victory's cyan title rail appears at y=137 in the legacy panel and y=151
+    // in the current compact panel. Stop before y=169, where the map artwork in
+    // a red Defeat panel can contain a long unrelated cyan Story banner.
+    private static readonly ScreenRegion StageVictoryHeader = new(65, 125, 280, 40);
+    private static readonly ScreenRegion StageVictoryTopEdge = new(100, 125, 610, 35);
 
     public static StageScreenMatch Detect(ImageFrame image)
     {
         ValidateClient(image);
-        ChallengeScreenMatch shared = ChallengeScreenDetector.Detect(image);
-        if (shared.State == ChallengeScreenState.Defeat)
-        {
-            return Trace(new StageScreenMatch(StageScreenState.Defeat, shared.Confidence, shared.ActionX, shared.ActionY));
-        }
-
         double stageVictory = StageVictoryScore(image);
         if (stageVictory >= 0.78)
         {
             (int X, int Y)? close = ActionButtonDetector.ActionFor(image, "challenge_victory_close");
             return Trace(new StageScreenMatch(StageScreenState.Victory, stageVictory, close?.X, close?.Y));
         }
-
-        StageScreenMatch? terminal = shared.State switch
-        {
-            ChallengeScreenState.Victory => new(StageScreenState.Victory, shared.Confidence, shared.ActionX, shared.ActionY),
-            ChallengeScreenState.Prestart => new(StageScreenState.Prestart, shared.Confidence, shared.ActionX, shared.ActionY),
-            ChallengeScreenState.PreviewReady => new(StageScreenState.PreviewReady, shared.Confidence, shared.ActionX, shared.ActionY),
-            ChallengeScreenState.PostMatchPreview or ChallengeScreenState.PostMatchHud => new(StageScreenState.PostMatchPreview, shared.Confidence, shared.ActionX, shared.ActionY),
-            ChallengeScreenState.GameModeSelector => new(StageScreenState.GameModeSelector, shared.Confidence),
-            _ => null,
-        };
-        if (terminal is not null) return Trace(terminal);
 
         double lowerStageParty = StagePartyScore(
             image,
@@ -88,6 +74,41 @@ public static class StageScreenDetector
             (int X, int Y)? action = ActionButtonDetector.ActionFor(image, startProfile);
             return Trace(new StageScreenMatch(StageScreenState.PreviewReady, stageParty, action?.X, action?.Y));
         }
+
+        double lowerPostMatchParty = StagePostMatchPartyScore(
+            image,
+            "stage_party_change_map",
+            "stage_party_change_mode");
+        double upperPostMatchParty = StagePostMatchPartyScore(
+            image,
+            "stage_party_change_map_upper",
+            "stage_party_change_mode_upper");
+        double postMatchParty = Math.Max(lowerPostMatchParty, upperPostMatchParty);
+        if (postMatchParty > 0)
+        {
+            string changeModeProfile = upperPostMatchParty > lowerPostMatchParty
+                ? "stage_party_change_mode_upper"
+                : "stage_party_change_mode";
+            (int X, int Y)? action = ActionButtonDetector.ActionFor(image, changeModeProfile);
+            return Trace(new StageScreenMatch(StageScreenState.PostMatchPreview, postMatchParty, action?.X, action?.Y));
+        }
+
+        ChallengeScreenMatch shared = ChallengeScreenDetector.Detect(image);
+        if (shared.State == ChallengeScreenState.Defeat)
+        {
+            return Trace(new StageScreenMatch(StageScreenState.Defeat, shared.Confidence, shared.ActionX, shared.ActionY));
+        }
+
+        StageScreenMatch? terminal = shared.State switch
+        {
+            ChallengeScreenState.Victory => new(StageScreenState.Victory, shared.Confidence, shared.ActionX, shared.ActionY),
+            ChallengeScreenState.Prestart => new(StageScreenState.Prestart, shared.Confidence, shared.ActionX, shared.ActionY),
+            ChallengeScreenState.PreviewReady => new(StageScreenState.PreviewReady, shared.Confidence, shared.ActionX, shared.ActionY),
+            ChallengeScreenState.PostMatchPreview or ChallengeScreenState.PostMatchHud => new(StageScreenState.PostMatchPreview, shared.Confidence, shared.ActionX, shared.ActionY),
+            ChallengeScreenState.GameModeSelector => new(StageScreenState.GameModeSelector, shared.Confidence),
+            _ => null,
+        };
+        if (terminal is not null) return Trace(terminal);
 
         double narrowSelectStage = ActionButtonDetector.Score(image, "stage_select_stage");
         double wideSelectStage = ActionButtonDetector.Score(image, "stage_select_stage_wide");
@@ -172,6 +193,12 @@ public static class StageScreenDetector
         ?? ActionButtonDetector.ActionFor(image, "challenge_preview_start")
         ?? (480, 418);
 
+    public static (int X, int Y)? PostMatchChangeModeAction(ImageFrame image) =>
+        ActionButtonDetector.ActionFor(image, "stage_party_change_mode_upper")
+        ?? ActionButtonDetector.ActionFor(image, "stage_party_change_mode");
+
+    public static (int X, int Y) SelectorBackAction => (62, 588);
+
     private static double StorySelectorScore(ImageFrame image)
     {
         double header = ColorFraction(image, StorySelectorHeader, IsCyan);
@@ -245,6 +272,18 @@ public static class StageScreenDetector
         return start == 0 || changeMap == 0 || disband == 0
             ? 0
             : Math.Clamp(0.40 * start + 0.30 * changeMap + 0.30 * disband, 0, 1);
+    }
+
+    private static double StagePostMatchPartyScore(
+        ImageFrame image,
+        string changeMapProfile,
+        string changeModeProfile)
+    {
+        double changeMap = ActionButtonDetector.Score(image, changeMapProfile);
+        double changeMode = ActionButtonDetector.Score(image, changeModeProfile);
+        return changeMap == 0 || changeMode == 0
+            ? 0
+            : Math.Clamp(0.50 * changeMap + 0.50 * changeMode, 0, 1);
     }
 
     private static double ColorFraction(ImageFrame image, ScreenRegion region, Func<byte, byte, byte, bool> predicate)

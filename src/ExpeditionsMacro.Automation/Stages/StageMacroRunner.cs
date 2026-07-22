@@ -25,6 +25,16 @@ public sealed class StageMacroRunner
     private readonly TeamSelectionService _teams;
     private readonly IDiscordNotifier _discord;
 
+    internal enum GameModeHandoffCommand
+    {
+        Complete,
+        CloseTerminal,
+        ChangeGamemode,
+        Back,
+        PressPlayKey,
+        Wait,
+    }
+
     public StageMacroRunner(
         IRobloxAutomation automation,
         CameraAlignmentEngine camera,
@@ -459,7 +469,6 @@ public sealed class StageMacroRunner
             if (current.State == StageScreenState.GameModeSelector) return recovered;
 
             string? recovery = detector.RecoveryState(frame);
-            if (recovery == "play") return recovered;
             string? stableRecovery = recoveryTracker.Update(IsRootRecovery(recovery) ? recovery : null);
             if (stableRecovery is not null)
             {
@@ -477,8 +486,7 @@ public sealed class StageMacroRunner
                         playMenuKey,
                         () => CaptureClient(window, detector),
                         candidate => string.Equals(detector.RecoveryState(candidate), "lobby", StringComparison.OrdinalIgnoreCase),
-                        candidate => StageScreenDetector.Detect(candidate).State == StageScreenState.GameModeSelector ||
-                            string.Equals(detector.RecoveryState(candidate), "play", StringComparison.OrdinalIgnoreCase),
+                        candidate => StageScreenDetector.Detect(candidate).State == StageScreenState.GameModeSelector,
                         (key, token) => _automation.TapLetterKeyAsync(window, key, token),
                         (timeout, token) => TryWaitForStateAsync(window, StageScreenState.GameModeSelector, timeout, detector, stableDetections, token),
                         attempt => report?.Invoke("Recovery", 0, $"Lobby recognized. Opening Play with {playMenuKey} (attempt {attempt}/{LobbyPlayNavigator.MaximumAttempts}).", stableRecovery, null),
@@ -499,45 +507,69 @@ public sealed class StageMacroRunner
                 continue;
             }
 
-            if (current.State == StageScreenState.PostMatchPreview)
+            (int X, int Y)? changeMode = StageScreenDetector.PostMatchChangeModeAction(frame);
+            switch (SelectGameModeHandoffCommand(current.State, changeMode is not null))
             {
-                ChallengeScreenMatch shared = ChallengeScreenDetector.Detect(frame);
-                (int X, int Y)? action = ChallengeScreenDetector.ActionFor(shared.State, frame);
-                if (action is not null)
+                case GameModeHandoffCommand.Complete:
+                    return recovered;
+                case GameModeHandoffCommand.CloseTerminal:
                 {
-                    await ClickAsync(window, action.Value.X, action.Value.Y, cancellationToken).ConfigureAwait(false);
-                    if (await TryWaitForStateAsync(window, StageScreenState.GameModeSelector, NavigationTimeout, detector, stableDetections, cancellationToken).ConfigureAwait(false)) return recovered;
+                    (int closeX, int closeY) = current.ActionX is int actionX && current.ActionY is int actionY
+                        ? (actionX, actionY)
+                        : ChallengeScreenDetector.TerminalCloseAction(frame);
+                    await ClickAsync(window, closeX, closeY, cancellationToken).ConfigureAwait(false);
+                    await Task.Delay(700, cancellationToken).ConfigureAwait(false);
                     continue;
                 }
-            }
-
-            if (current.State is StageScreenState.Victory or StageScreenState.Defeat)
-            {
-                (int closeX, int closeY) = ChallengeScreenDetector.TerminalCloseAction(frame);
-                await ClickAsync(window, closeX, closeY, cancellationToken).ConfigureAwait(false);
-                await Task.Delay(700, cancellationToken).ConfigureAwait(false);
-                continue;
-            }
-
-            if (playMenuAttempts < 3)
-            {
-                playMenuAttempts++;
-                report?.Invoke("Navigation", 0, playMenuAttempts == 1
-                    ? $"Opening the Play menu with {playMenuKey}."
-                    : $"Retrying the {playMenuKey} Play-menu key ({playMenuAttempts}/3).", "play_menu_key", null);
-                Focus(window);
-                await _automation.TapLetterKeyAsync(window, playMenuKey, cancellationToken).ConfigureAwait(false);
-                if (await TryWaitForStateAsync(window, StageScreenState.GameModeSelector, TimeSpan.FromSeconds(4), detector, stableDetections, cancellationToken).ConfigureAwait(false)) return recovered;
-            }
-            else
-            {
-                await Task.Delay(500, cancellationToken).ConfigureAwait(false);
+                case GameModeHandoffCommand.ChangeGamemode:
+                    report?.Invoke("Handoff", 0, $"Leaving the completed {Label(mode)} party through Change Gamemode.", "stage_change_gamemode", current.Confidence);
+                    await ClickAsync(window, changeMode!.Value.X, changeMode.Value.Y, cancellationToken).ConfigureAwait(false);
+                    playMenuAttempts = 0;
+                    if (await TryWaitForStateAsync(window, StageScreenState.GameModeSelector, NavigationTimeout, detector, stableDetections, cancellationToken).ConfigureAwait(false)) return recovered;
+                    continue;
+                case GameModeHandoffCommand.Back:
+                    report?.Invoke("Handoff", 0, $"Leaving the nested {Label(mode)} interface through Back.", "stage_back", current.Confidence);
+                    (int backX, int backY) = StageScreenDetector.SelectorBackAction;
+                    await ClickAsync(window, backX, backY, cancellationToken).ConfigureAwait(false);
+                    playMenuAttempts = 0;
+                    if (await TryWaitForStateAsync(window, StageScreenState.GameModeSelector, NavigationTimeout, detector, stableDetections, cancellationToken).ConfigureAwait(false)) return recovered;
+                    continue;
+                case GameModeHandoffCommand.Wait:
+                    await Task.Delay(250, cancellationToken).ConfigureAwait(false);
+                    continue;
+                case GameModeHandoffCommand.PressPlayKey:
+                    if (playMenuAttempts >= LobbyPlayNavigator.MaximumAttempts)
+                    {
+                        throw new PlayMenuBindingException(char.ToUpperInvariant(playMenuKey));
+                    }
+                    playMenuAttempts++;
+                    report?.Invoke("Navigation", 0, playMenuAttempts == 1
+                        ? $"Opening the Play menu with {playMenuKey}."
+                        : $"Retrying the {playMenuKey} Play-menu key ({playMenuAttempts}/{LobbyPlayNavigator.MaximumAttempts}).", "play_menu_key", null);
+                    Focus(window);
+                    await _automation.TapLetterKeyAsync(window, playMenuKey, cancellationToken).ConfigureAwait(false);
+                    if (await TryWaitForStateAsync(window, StageScreenState.GameModeSelector, TimeSpan.FromSeconds(4), detector, stableDetections, cancellationToken).ConfigureAwait(false)) return recovered;
+                    continue;
+                default:
+                    throw new InvalidOperationException("The stage handoff policy returned an unknown command.");
             }
         }
 
         StageScreenMatch last = StageScreenDetector.Detect(CaptureClient(window, detector));
         throw new TimeoutException($"Timed out opening the Play menu. Last detected state: {last.State} ({last.Confidence:P0}).");
     }
+
+    internal static GameModeHandoffCommand SelectGameModeHandoffCommand(
+        StageScreenState state,
+        bool hasStageChangeModeAction) => state switch
+        {
+            StageScreenState.GameModeSelector => GameModeHandoffCommand.Complete,
+            StageScreenState.Victory or StageScreenState.Defeat => GameModeHandoffCommand.CloseTerminal,
+            StageScreenState.PostMatchPreview when hasStageChangeModeAction => GameModeHandoffCommand.ChangeGamemode,
+            StageScreenState.PostMatchPreview => GameModeHandoffCommand.Wait,
+            StageScreenState.StorySelector or StageScreenState.RaidSelector or StageScreenState.PreviewReady => GameModeHandoffCommand.Back,
+            _ => GameModeHandoffCommand.PressPlayKey,
+        };
 
     private async Task<StageScreenMatch> WaitForStateAsync(
         RobloxWindow window,
