@@ -45,8 +45,12 @@ public sealed class TeamSelectionService
         (int loadX, int loadY) = TeamScreenDetector.LoadTeamAction(teamSlot);
         EnsureFocus(window);
         await _automation.ClickClientAsync(window, loadX, loadY, cancellationToken).ConfigureAwait(false);
-        await WaitForAsync(window, state => state == TeamScreenState.LoadConfirm, TimeSpan.FromSeconds(5), cancellationToken).ConfigureAwait(false);
-        (int confirmX, int confirmY) = TeamScreenDetector.LoadConfirmAction;
+        TeamScreenMatch loadConfirm = await WaitForAsync(
+            window,
+            state => state == TeamScreenState.LoadConfirm,
+            TimeSpan.FromSeconds(5),
+            cancellationToken).ConfigureAwait(false);
+        (int confirmX, int confirmY) = ResolveAction(loadConfirm, TeamScreenDetector.LoadConfirmAction);
         EnsureFocus(window);
         await _automation.ClickClientAsync(window, confirmX, confirmY, cancellationToken).ConfigureAwait(false);
 
@@ -57,7 +61,7 @@ public sealed class TeamSelectionService
             cancellationToken).ConfigureAwait(false);
         if (afterLoad.State == TeamScreenState.EquipmentConfirm)
         {
-            (int includeX, int includeY) = TeamScreenDetector.IncludeEquipmentAction;
+            (int includeX, int includeY) = ResolveAction(afterLoad, TeamScreenDetector.IncludeEquipmentAction);
             EnsureFocus(window);
             await _automation.ClickClientAsync(window, includeX, includeY, cancellationToken).ConfigureAwait(false);
             await WaitForAsync(window, state => state == TeamScreenState.Teams, TimeSpan.FromSeconds(6), cancellationToken).ConfigureAwait(false);
@@ -125,6 +129,9 @@ public sealed class TeamSelectionService
     {
         if (!_automation.Focus(window)) throw new InvalidOperationException("Windows could not focus Roblox while changing teams.");
     }
+
+    private static (int X, int Y) ResolveAction(TeamScreenMatch match, (int X, int Y) fallback) =>
+        match.ActionX is int x && match.ActionY is int y ? (x, y) : fallback;
 
     private ImageFrame CaptureClient(RobloxWindow window)
     {

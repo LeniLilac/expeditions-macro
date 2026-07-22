@@ -14,7 +14,7 @@ public enum TeamScreenState
     EquipmentConfirm,
 }
 
-public sealed record TeamScreenMatch(TeamScreenState State, double Confidence);
+public sealed record TeamScreenMatch(TeamScreenState State, double Confidence, int? ActionX = null, int? ActionY = null);
 
 public static class TeamScreenDetector
 {
@@ -41,15 +41,17 @@ public static class TeamScreenDetector
         double exclude = ActionButtonDetector.Score(image, "team_equipment_exclude");
         if (modalTeams >= 0.70 && modalDark >= 0.58 && include > 0 && exclude > 0)
         {
+            (int X, int Y)? action = ActionButtonDetector.ActionFor(image, "team_equipment_include");
             double confidence = Math.Clamp(0.35 * modalTeams + 0.20 * Ramp(modalDark, 0.58, 0.90) + 0.25 * include + 0.20 * exclude, 0, 1);
-            return Trace(new TeamScreenMatch(TeamScreenState.EquipmentConfirm, confidence));
+            return Trace(new TeamScreenMatch(TeamScreenState.EquipmentConfirm, confidence, action?.X, action?.Y));
         }
 
         double loadConfirm = ActionButtonDetector.Score(image, "team_load_confirm");
         if (modalTeams >= 0.70 && modalDark >= 0.58 && loadConfirm > 0)
         {
+            (int X, int Y)? action = ActionButtonDetector.ActionFor(image, "team_load_confirm");
             double confidence = Math.Clamp(0.45 * modalTeams + 0.20 * Ramp(modalDark, 0.58, 0.90) + 0.35 * loadConfirm, 0, 1);
-            return Trace(new TeamScreenMatch(TeamScreenState.LoadConfirm, confidence));
+            return Trace(new TeamScreenMatch(TeamScreenState.LoadConfirm, confidence, action?.X, action?.Y));
         }
 
         double teams = TeamsBaseScore(image);
@@ -166,7 +168,7 @@ public static class TeamScreenDetector
 
     private static TeamScreenMatch Trace(TeamScreenMatch match)
     {
-        VisionTrace.Emit("team_screen", match.State.ToString(), match.Confidence);
+        VisionTrace.Emit("team_screen", match.State.ToString(), match.Confidence, new { match.ActionX, match.ActionY });
         return match;
     }
 }

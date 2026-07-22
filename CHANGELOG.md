@@ -4,6 +4,26 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.3] - 2026-07-22
+
+### Added
+
+- Added a source-only Deep Debug Viewer with ZIP browsing, video-like frame playback and scrubbing, synchronized event/input/state context, adjustable speed, and a configurable decoded-frame cache.
+
+### Changed
+
+- Sharded the five longest full-corpus golden checks and the remaining golden suite across six independent GitHub Actions jobs, reducing validation wall time without skipping coverage.
+
+### Fixed
+
+- Recognized Act, Infinite, and Mastery Story detail panels across their cyan, green, and purple semantic accents and both reviewed Select Stage layouts, with the click mapped from the live button.
+- Detected the compact Include Equipment dialog and clicked its live Include action instead of a stale fixed vertical coordinate.
+- Refined strong saved fine-yaw neighborhood candidates as soon as they appear during camera fallback, avoiding an unnecessary full rotation while preserving the direct-score threshold and three-frame verification.
+
+### Tests
+
+- Added reviewed Story detail and compact team-dialog fixtures plus focused camera regressions for successful early refinement and false-candidate full-scan fallback.
+
 ## [1.3.0-beta.2] - 2026-07-22
 
 ### Changed
@@ -424,7 +444,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.2...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.3...HEAD
+[1.3.0-beta.3]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.2...v1.3.0-beta.3
 [1.3.0-beta.2]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.1...v1.3.0-beta.2
 [1.3.0-beta.1]: https://github.com/LeniLilac/expeditions-macro/compare/v1.2.1...v1.3.0-beta.1
 [1.2.1]: https://github.com/LeniLilac/expeditions-macro/compare/v1.2.0...v1.2.1

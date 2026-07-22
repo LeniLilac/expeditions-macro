@@ -11,5 +11,7 @@
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/ExpeditionsMacro.DatasetBuilder/ExpeditionsMacro.DatasetBuilder.csproj" />
+    <Project Path="tools/ExpeditionsMacro.DeepDebugViewer/ExpeditionsMacro.DeepDebugViewer.csproj" />
+    <Project Path="tools/ExpeditionsMacro.DeepDebugViewer.Tests/ExpeditionsMacro.DeepDebugViewer.Tests.csproj" />
   </Folder>
 </Solution>

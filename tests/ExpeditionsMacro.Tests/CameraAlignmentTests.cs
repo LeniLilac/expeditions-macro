@@ -479,6 +479,73 @@ public sealed class CameraAlignmentTests
     }
 
     [Fact]
+    public async Task Align_WhenFullTurnFindsStrongFineNeighborhood_RefinesBeforeCompletingTurn()
+    {
+        ImageFrame goal = VisionScorerTests.Pattern(RobloxClientProfile.Width, RobloxClientProfile.Height);
+        ImageFrame wrong = Blank(goal.Width, goal.Height);
+        ImageFrame nearby = Shift(goal, 24);
+        CameraModel model = WithFineNeighborhoodReference(
+            CreateModel(goal, Enumerable.Repeat(wrong, 13).ToArray()),
+            offset: -4,
+            nearby);
+        FakeAutomation automation = new(wrong)
+        {
+            FullYawSteps = 12,
+            CaptureAtYaw = (yaw, mouse) => yaw == 4
+                ? mouse == 4 ? goal : nearby
+                : wrong,
+        };
+        List<MacroProgress> updates = [];
+        CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
+
+        double score = await engine.AlignAsync(
+            model,
+            manageShiftLock: false,
+            progress: new InlineProgress<MacroProgress>(updates.Add));
+
+        Assert.True(score > 0.90, $"Neighborhood alignment score was {score:P1}.");
+        Assert.Contains(updates, update => update.Message.Contains("Strong saved fine-yaw neighborhood found", StringComparison.Ordinal));
+        Assert.Contains(updates, update => update.Message.Contains("skipped the remaining full-turn scan", StringComparison.Ordinal));
+        Assert.DoesNotContain(updates, update => update.Message.Contains("full-turn scan complete", StringComparison.Ordinal));
+        Assert.Equal(4, automation.YawStep);
+    }
+
+    [Fact]
+    public async Task Align_WhenStrongFineNeighborhoodDoesNotVerify_RestartsCompleteScan()
+    {
+        ImageFrame goal = VisionScorerTests.Pattern(RobloxClientProfile.Width, RobloxClientProfile.Height);
+        ImageFrame wrong = Blank(goal.Width, goal.Height);
+        ImageFrame nearby = Shift(goal, 24);
+        CameraModel model = WithFineNeighborhoodReference(
+            CreateModel(goal, Enumerable.Repeat(wrong, 13).ToArray()),
+            offset: -4,
+            nearby);
+        FakeAutomation automation = new(wrong)
+        {
+            FullYawSteps = 12,
+            CaptureAtYaw = (yaw, _) => yaw switch
+            {
+                4 => nearby,
+                8 => goal,
+                _ => wrong,
+            },
+        };
+        List<MacroProgress> updates = [];
+        CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
+
+        double score = await engine.AlignAsync(
+            model,
+            manageShiftLock: false,
+            progress: new InlineProgress<MacroProgress>(updates.Add));
+
+        Assert.True(score > 0.90, $"Fallback alignment score was {score:P1}.");
+        Assert.Contains(updates, update => update.Message.Contains("restarting a complete scan", StringComparison.Ordinal));
+        Assert.Contains(updates, update => update.Message.Contains("Stable goal found during full-turn scan", StringComparison.Ordinal));
+        Assert.DoesNotContain(updates, update => update.Message.Contains("skipped the remaining full-turn scan", StringComparison.Ordinal));
+        Assert.Equal(8, automation.YawStep);
+    }
+
+    [Fact]
     public async Task Align_WhenArrowFullTurnFallbackStaysBelowTarget_StopsWithFailure()
     {
         ImageFrame goal = VisionScorerTests.Pattern(RobloxClientProfile.Width, RobloxClientProfile.Height);
@@ -537,6 +604,15 @@ public sealed class CameraAlignmentTests
             CameraRegionAnalyzer.AnnotateGoal(goal, TestRegions),
             fineAtlas,
             atlas);
+    }
+
+    private static CameraModel WithFineNeighborhoodReference(CameraModel model, int offset, ImageFrame frame)
+    {
+        ImageFrame[] fineAtlas = model.FineYawAtlas.ToArray();
+        int index = Array.IndexOf(model.Manifest.FineYawOffsets.ToArray(), offset);
+        Assert.True(index >= 0, $"Fine-yaw offset {offset} is not present in the test model.");
+        fineAtlas[index] = VisionScorer.MakeThumbnail(CameraRegionAnalyzer.BuildComposite(frame, TestRegions));
+        return model with { FineYawAtlas = fineAtlas };
     }
 
     private static CameraCalibrationSettings CalibrationSettings(string name) => new()

@@ -17,8 +17,18 @@ jobs:
         include:
           - name: fast
             filter: Category!=Golden
-          - name: golden images
-            filter: Category=Golden
+          - name: golden corpus thresholds
+            filter: Category=Golden&FullyQualifiedName~EveryCapturedUiDataset_MeetsItsCompiledStateThreshold
+          - name: golden AFK negatives
+            filter: Category=Golden&FullyQualifiedName~AfkChamberDetector_DoesNotMatchOtherCapturedUiStates
+          - name: golden corpus classification
+            filter: Category=Golden&FullyQualifiedName~EveryCapturedUiDataset_ClassifiesAsItsExpectedState
+          - name: golden pause negatives
+            filter: Category=Golden&FullyQualifiedName~PauseButtonDetectors_DoNotMatchOtherCapturedUiStates
+          - name: golden start negatives
+            filter: Category=Golden&FullyQualifiedName~StartDetector_DoesNotMatchOtherCapturedUiStates
+          - name: golden remaining
+            filter: Category=Golden&FullyQualifiedName!~EveryCapturedUiDataset_MeetsItsCompiledStateThreshold&FullyQualifiedName!~AfkChamberDetector_DoesNotMatchOtherCapturedUiStates&FullyQualifiedName!~EveryCapturedUiDataset_ClassifiesAsItsExpectedState&FullyQualifiedName!~PauseButtonDetectors_DoNotMatchOtherCapturedUiStates&FullyQualifiedName!~StartDetector_DoesNotMatchOtherCapturedUiStates
     steps:
       - uses: actions/checkout@v7
         with:
@@ -29,6 +39,7 @@ jobs:
             scripts
             src
             tests
+            tools
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.302
@@ -50,6 +61,14 @@ jobs:
             --filter '${{ matrix.filter }}' `
             --results-directory "artifacts/test-results/$resultName" `
             --logger "trx;LogFileName=$resultName.trx"
+      - name: Run Deep Debug Viewer tests
+        if: matrix.name == 'fast'
+        shell: pwsh
+        run: |
+          dotnet test tools/ExpeditionsMacro.DeepDebugViewer.Tests/ExpeditionsMacro.DeepDebugViewer.Tests.csproj `
+            -c Release `
+            --results-directory "artifacts/test-results/deep-debug-viewer" `
+            --logger "trx;LogFileName=deep-debug-viewer.trx"
       - name: Upload ${{ matrix.name }} results
         if: always()
         uses: actions/upload-artifact@v7
