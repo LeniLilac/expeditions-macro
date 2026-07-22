@@ -23,7 +23,9 @@ internal static partial class NativeMethods
     internal const uint WmKeyUp = 0x0101;
     internal const uint WmSysKeyDown = 0x0104;
     internal const uint WmSysKeyUp = 0x0105;
+    internal const uint WmMouseMove = 0x0200;
     internal const uint WmLButtonDown = 0x0201;
+    internal const uint WmLButtonUp = 0x0202;
     internal const int VkLeftControl = 0xA2;
     internal const uint KeyeventfExtendedKey = 0x0001;
     internal const uint KeyeventfKeyUp = 0x0002;

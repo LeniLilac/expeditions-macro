@@ -1,6 +1,7 @@
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
+using ExpeditionsMacro.Vision.Diagnostics;
 using ExpeditionsMacro.Vision.Packs;
 
 namespace ExpeditionsMacro.Vision.Challenges;
@@ -14,6 +15,7 @@ public enum ChallengeScreenState
     ChallengeAvailable,
     ChallengeCooldown,
     PreviewReady,
+    Teleporting,
     PostMatchPreview,
     PostMatchHud,
     Prestart,
@@ -52,6 +54,8 @@ public static class ChallengeScreenDetector
     private static readonly ScreenRegion ChallengeListSecondSeparatorRegion = new(265, 373, 435, 15);
     private static readonly ScreenRegion RegularChallengeTabRegion = new(135, 180, 135, 75);
     private static readonly ScreenRegion VictoryRosterRegion = new(510, 180, 150, 275);
+    private static readonly ScreenRegion TeleportLogoRegion = new(190, 145, 430, 160);
+    private static readonly ScreenRegion TeleportBottomFadeRegion = new(0, 455, ClientWidth, 156);
 
     private static readonly IReadOnlyDictionary<ChallengeType, (int X, int Y)> TypeActions =
         new Dictionary<ChallengeType, (int X, int Y)>
@@ -74,6 +78,7 @@ public static class ChallengeScreenDetector
             ChallengeScreenState.ChallengeListUnavailable,
             ChallengeScreenState.Victory,
             ChallengeScreenState.Prestart,
+            ChallengeScreenState.Teleporting,
             ChallengeScreenState.PostMatchHud,
             ChallengeScreenState.PreviewReady,
             ChallengeScreenState.PostMatchPreview,
@@ -84,8 +89,11 @@ public static class ChallengeScreenDetector
         {
             if (scores[state] < Threshold(state)) continue;
             (int X, int Y)? action = ActionFor(state, image);
-            return new ChallengeScreenMatch(state, scores[state], action?.X, action?.Y);
+            ChallengeScreenMatch match = new(state, scores[state], action?.X, action?.Y);
+            VisionTrace.Emit("challenge_screen", state.ToString(), match.Confidence, new { Scores = scores, match.ActionX, match.ActionY });
+            return match;
         }
+        VisionTrace.Emit("challenge_screen", ChallengeScreenState.None.ToString(), 0, new { Scores = scores });
         return new ChallengeScreenMatch(ChallengeScreenState.None, 0);
     }
 
@@ -134,8 +142,9 @@ public static class ChallengeScreenDetector
         double victory = victoryClose == 0 || victoryParty == 0
             ? 0
             : Math.Clamp(0.30 * panel + 0.25 * victoryClose + 0.30 * victoryParty + 0.15 * VictoryRosterScore(image), 0, 1);
+        double teleporting = TeleportingScore(image);
 
-        return new Dictionary<ChallengeScreenState, double>
+        Dictionary<ChallengeScreenState, double> scores = new()
         {
             [ChallengeScreenState.None] = 0,
             [ChallengeScreenState.GameModeSelector] = GameModeSelectorScore(image),
@@ -144,12 +153,15 @@ public static class ChallengeScreenDetector
             [ChallengeScreenState.ChallengeAvailable] = challengeAvailable,
             [ChallengeScreenState.ChallengeCooldown] = challengeCooldown,
             [ChallengeScreenState.PreviewReady] = preview,
+            [ChallengeScreenState.Teleporting] = teleporting,
             [ChallengeScreenState.PostMatchPreview] = postMatchPreview,
             [ChallengeScreenState.PostMatchHud] = postMatchHud,
             [ChallengeScreenState.Prestart] = prestart,
             [ChallengeScreenState.Victory] = victory,
             [ChallengeScreenState.Defeat] = defeat,
         };
+        VisionTrace.Emit("challenge_screen_scores", "scored", scores.Values.Max(), new { Scores = scores });
+        return scores;
     }
 
     public static (int X, int Y) ActionForType(ChallengeType type) =>
@@ -168,6 +180,8 @@ public static class ChallengeScreenDetector
     public static (int X, int Y)? PlayAction(ImageFrame image) =>
         ActionButtonDetector.ActionFor(image, "challenge_post_match_play");
 
+    public static ScreenRegion? PrestartOcclusion(ImageFrame image) => StartDialogDetector.OcclusionFor(image);
+
     public static (int X, int Y)? ActionFor(ChallengeScreenState state, ImageFrame image) => state switch
     {
         ChallengeScreenState.GameModeSelector => (480, 205),
@@ -175,6 +189,7 @@ public static class ChallengeScreenDetector
         ChallengeScreenState.ChallengeAvailable => ChallengeAvailableAction(image),
         ChallengeScreenState.ChallengeCooldown => (308, 437),
         ChallengeScreenState.PreviewReady => PreviewReadyAction(image),
+        ChallengeScreenState.Teleporting => null,
         ChallengeScreenState.PostMatchPreview => ChangeModeAction(image),
         ChallengeScreenState.PostMatchHud => PostMatchPlayAction(image),
         ChallengeScreenState.Prestart => StartDialogDetector.ActionFor(image),
@@ -191,6 +206,7 @@ public static class ChallengeScreenDetector
         ChallengeScreenState.ChallengeAvailable => 0.76,
         ChallengeScreenState.ChallengeCooldown => 0.76,
         ChallengeScreenState.PreviewReady => 0.78,
+        ChallengeScreenState.Teleporting => 0.80,
         ChallengeScreenState.PostMatchPreview => 0.76,
         ChallengeScreenState.PostMatchHud => 0.76,
         ChallengeScreenState.Prestart => 0.82,
@@ -242,6 +258,22 @@ public static class ChallengeScreenDetector
         ActionButtonDetector.Score(image, "challenge_party_disband") > 0
             ? ActionButtonDetector.ActionFor(image, "challenge_party_start")
             : ActionButtonDetector.ActionFor(image, "challenge_preview_start");
+
+    private static double TeleportingScore(ImageFrame image)
+    {
+        // The route name and animated loading emblems change by map and frame.
+        // The centered white product mark and nearly black lower fade are the
+        // stable, independent structure shared by the teleport transition.
+        double logo = ColorFraction(image, TeleportLogoRegion, IsBrightNeutral);
+        double bottomFade = ColorFraction(image, TeleportBottomFadeRegion, IsNearBlack);
+        if (logo < 0.055 || bottomFade < 0.90) return 0;
+        return Math.Clamp(
+            0.76 +
+            0.12 * Ramp(logo, 0.055, 0.11) +
+            0.12 * Ramp(bottomFade, 0.90, 0.99),
+            0,
+            1);
+    }
 
     private static double PostMatchHudScore(ImageFrame image)
     {
@@ -462,6 +494,16 @@ public static class ChallengeScreenDetector
 
     private static bool IsDark(byte red, byte green, byte blue) =>
         red + green + blue <= 150;
+
+    private static bool IsNearBlack(byte red, byte green, byte blue) =>
+        red + green + blue <= 150;
+
+    private static bool IsBrightNeutral(byte red, byte green, byte blue)
+    {
+        int maximum = Math.Max(red, Math.Max(green, blue));
+        int minimum = Math.Min(red, Math.Min(green, blue));
+        return minimum >= 200 && maximum - minimum <= 45;
+    }
 
     private static bool IsNeutralGray(byte red, byte green, byte blue)
     {

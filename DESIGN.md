@@ -33,22 +33,22 @@ colors:
   on-accent: "#FFFFFF"
 typography:
   page-title:
-    fontFamily: "Segoe UI Variable Text, Segoe UI"
+    fontFamily: "Fredoka"
     fontSize: "22px"
     fontWeight: 600
     lineHeight: 1.25
   section-title:
-    fontFamily: "Segoe UI Variable Text, Segoe UI"
+    fontFamily: "Fredoka"
     fontSize: "14px"
     fontWeight: 600
     lineHeight: 1.35
   body:
-    fontFamily: "Segoe UI Variable Text, Segoe UI"
+    fontFamily: "Fredoka"
     fontSize: "13px"
     fontWeight: 400
     lineHeight: 1.45
   caption:
-    fontFamily: "Segoe UI Variable Text, Segoe UI"
+    fontFamily: "Fredoka"
     fontSize: "12px"
     fontWeight: 400
     lineHeight: 1.4
@@ -140,11 +140,11 @@ The palette is neutral and low-chroma, with a restrained indigo signal and seman
 
 ## Typography
 
-**Display Font:** Segoe UI Variable Text (with Segoe UI fallback)
-**Body Font:** Segoe UI Variable Text (with Segoe UI fallback)
-**Icon Font:** Segoe Fluent Icons
+**Display Font:** Fredoka (embedded static family)
+**Body Font:** Fredoka (embedded static family)
+**Icons:** Lucide native vector geometry, inheriting the surrounding semantic color
 
-**Character:** Native, quiet, and highly legible. A single Windows system family keeps the product feeling precise and integrated instead of branded for its own sake.
+**Character:** Friendly but precise. Fredoka softens the dense utility without weakening hierarchy; restrained weights and spacing keep operational text easy to scan.
 
 ### Hierarchy
 

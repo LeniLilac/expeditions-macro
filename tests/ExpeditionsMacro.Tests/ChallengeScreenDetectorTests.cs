@@ -1,3 +1,4 @@
+using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Vision.Challenges;
@@ -7,6 +8,27 @@ namespace ExpeditionsMacro.Tests;
 
 public sealed class ChallengeScreenDetectorTests
 {
+    [Fact]
+    public void FairyKingForestPrestart_ExposesTheDialogOcclusionAroundTheStartButton()
+    {
+        string file = Path.Combine(
+            TestPaths.ChallengeDatasets,
+            "Prestart_FairyKingForest",
+            "Prestart_FairyKingForest_01.png");
+
+        ImageFrame image = ImageCodec.Load(file);
+        ScreenRegion? occlusion = ChallengeScreenDetector.PrestartOcclusion(image);
+
+        Assert.NotNull(occlusion);
+        Assert.True(occlusion.Value.Contains(384, 184));
+        Assert.True(occlusion.Value.Contains(485, 182));
+        Assert.False(occlusion.Value.Contains(363, 246));
+        Assert.False(occlusion.Value.Contains(578, 190));
+        (int X, int Y)? action = ChallengeScreenDetector.ActionFor(ChallengeScreenState.Prestart, image);
+        Assert.NotNull(action);
+        Assert.True(occlusion.Value.Contains(action.Value.X, action.Value.Y));
+    }
+
     [Fact]
     public void FixedChallengeTypes_MapToStableSelectorRows()
     {
@@ -216,6 +238,7 @@ public sealed class ChallengeScreenDetectorTests
     [InlineData("ChallengeAvailable", ChallengeScreenState.ChallengeAvailable)]
     [InlineData("ChallengeCooldown", ChallengeScreenState.ChallengeCooldown)]
     [InlineData("PreviewReady", ChallengeScreenState.PreviewReady)]
+    [InlineData("Teleporting", ChallengeScreenState.Teleporting)]
     [InlineData("PostMatchPreview", ChallengeScreenState.PostMatchPreview)]
     [InlineData("PostMatchHud", ChallengeScreenState.PostMatchHud)]
     [InlineData("Victory", ChallengeScreenState.Victory)]
@@ -355,6 +378,7 @@ public sealed class ChallengeScreenDetectorTests
             ChallengeScreenState.ChallengeAvailable,
             ChallengeScreenState.ChallengeCooldown,
             ChallengeScreenState.PreviewReady,
+            ChallengeScreenState.Teleporting,
             ChallengeScreenState.PostMatchPreview,
             ChallengeScreenState.PostMatchHud,
             ChallengeScreenState.Victory,

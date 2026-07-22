@@ -1,12 +1,13 @@
-using System.Diagnostics;
 using System.ComponentModel;
-using System.Reflection;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using ExpeditionsMacro.App.Controls;
 using ExpeditionsMacro.App.Pages;
 using ExpeditionsMacro.App.Services;
+using ExpeditionsMacro.Core.Runtime;
 
 namespace ExpeditionsMacro.App;
 
@@ -24,11 +25,13 @@ public partial class MainWindow : Window
     {
         _services = services;
         InitializeComponent();
-        ExpeditionsPage expeditions = new(services);
         _pages = new Dictionary<string, IAppPage>(StringComparer.OrdinalIgnoreCase)
         {
-            ["Expeditions"] = expeditions,
+            ["Macro"] = new MacroPage(services),
+            ["Expeditions"] = new ExpeditionsPage(services),
             ["Challenges"] = new ChallengesPage(services),
+            ["Story"] = new StoryPage(services),
+            ["Raid"] = new RaidPage(services),
             ["Camera Models"] = new CameraModelsPage(services),
             ["Placement Models"] = new PlacementModelsPage(services),
             ["Settings"] = new SettingsPage(services),
@@ -41,11 +44,11 @@ public partial class MainWindow : Window
         {
             Loaded += async (_, _) =>
             {
-                await ShowPageAsync("Expeditions");
+                await ShowPageAsync("Macro");
                 if (_pages["Settings"] is SettingsPage settings) await settings.CheckForUpdatesAsync(automatic: true);
             };
         }
-        StateChanged += (_, _) => MaximizeButton.Content = WindowState == WindowState.Maximized ? "\uE923" : "\uE922";
+        StateChanged += (_, _) => Lucide.SetIcon(MaximizeButton, WindowState == WindowState.Maximized ? LucideIconKind.Copy : LucideIconKind.Square);
     }
 
     private async void Navigation_Checked(object sender, RoutedEventArgs e)
@@ -67,8 +70,11 @@ public partial class MainWindow : Window
     {
         RadioButton navigation = key switch
         {
+            "Macro" => MacroNav,
             "Expeditions" => ExpeditionsNav,
             "Challenges" => ChallengesNav,
+            "Story" => StoryNav,
+            "Raid" => RaidNav,
             "Camera Models" => CameraNav,
             "Placement Models" => PlacementNav,
             "Settings" => SettingsNav,
@@ -86,6 +92,7 @@ public partial class MainWindow : Window
         }
 
         await ShowPageAsync(key);
+        if (_pages[key] is MacroPage macro) macro.SetSnapshotScroll(showPageEnd);
         if (_pages[key] is SettingsPage settings) settings.SetSnapshotScroll(showPageEnd);
         if (_pages[key] is ChallengesPage challenges) challenges.SetSnapshotScroll(showPageEnd);
     }
@@ -128,7 +135,7 @@ public partial class MainWindow : Window
     private void UpdateProductFooter()
     {
         HotkeyHint.Text = $"{_services.Hotkey.DisplayName} start / stop";
-        string version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
+        string version = ProductVersion.Current;
         VersionLabel.Text = $"Version {version}";
     }
 

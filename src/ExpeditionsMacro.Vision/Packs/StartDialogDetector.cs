@@ -21,6 +21,19 @@ internal static class StartDialogDetector
             (int)Math.Round(match.Component.Top + (match.Component.Height - 1) / 2d, MidpointRounding.AwayFromZero));
     }
 
+    public static ScreenRegion? OcclusionFor(ImageFrame image)
+    {
+        if (Find(image) is not ButtonMatch match) return null;
+        GreenComponent component = match.Component;
+        int panelHeight = PanelHeight(component);
+        const int safetyMargin = 8;
+        int left = Math.Max(0, component.Left - safetyMargin);
+        int top = Math.Max(0, component.Top - panelHeight - safetyMargin);
+        int right = Math.Min(image.Width, component.Left + component.Width + safetyMargin);
+        int bottom = Math.Min(image.Height, component.Top + component.Height + safetyMargin);
+        return new ScreenRegion(left, top, right - left, bottom - top);
+    }
+
     private static ButtonMatch? Find(ImageFrame image)
     {
         if (image.Format != PixelFormat.Rgb24 || !SearchRegion.FitsWithin(image.Width, image.Height)) return null;
@@ -117,9 +130,7 @@ internal static class StartDialogDetector
         // thicker on another PC. Width remains stable, while deriving the
         // dialog height from border thickness can move the header sample into
         // the world background and reject an otherwise identical dialog.
-        int panelHeight = Math.Min(
-            (int)Math.Round(component.Height * 3.35),
-            (int)Math.Round(component.Width * 0.41));
+        int panelHeight = PanelHeight(component);
         int headerHeight = Math.Max(1, (int)Math.Round(panelHeight * 0.58));
         int headerTop = component.Top - panelHeight;
         int headerLeft = Math.Max(0, component.Left - 5);
@@ -173,6 +184,10 @@ internal static class StartDialogDetector
         green - red >= 45 &&
         green - blue >= 35 &&
         green * 4 >= red * 5;
+
+    private static int PanelHeight(GreenComponent component) => Math.Min(
+        (int)Math.Round(component.Height * 3.35),
+        (int)Math.Round(component.Width * 0.41));
 
     private static double Ramp(double value, double minimum, double maximum) =>
         Math.Clamp((value - minimum) / (maximum - minimum), 0, 1);

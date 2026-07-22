@@ -5,7 +5,9 @@ using System.Windows.Controls;
 using ExpeditionsMacro.App.Services;
 using ExpeditionsMacro.App.Windows;
 using ExpeditionsMacro.Automation.Camera;
+using ExpeditionsMacro.Automation.Diagnostics;
 using ExpeditionsMacro.Core.Models;
+using ExpeditionsMacro.Core.Persistence;
 using ExpeditionsMacro.Core.Runtime;
 
 namespace ExpeditionsMacro.App.Pages;
@@ -64,6 +66,7 @@ public partial class CameraModelsPage : UserControl, IAppPage
         ModelsList.SelectedItem = null;
         _selectedModel = null;
         ModelNameText.Text = "Camera model";
+        SettleText.Text = "200";
         RegionText.Text = "Automatic regions: chosen during setup";
         PreviewImage.Source = null;
         PreviewPlaceholder.Visibility = Visibility.Visible;
@@ -86,6 +89,11 @@ public partial class CameraModelsPage : UserControl, IAppPage
             CameraModel model = await _services.Camera.CalibrateAsync(settings, progress, token);
             await Dispatcher.InvokeAsync(() => _selectedModel = model);
             await RefreshModelsAsync(model.Manifest.Id);
+        }, new DeepDebugOperationContext
+        {
+            CameraModelIds = [ModelId.FromName(settings.Name)],
+            OperationSettings = settings,
+            RefreshReferencedModelsAfterOperation = true,
         });
         string hotkey = _services.Hotkey.DisplayName;
         StatusText.Text = $"Camera setup armed. Focus Roblox and press {hotkey}; zoom, pitch, and shift lock are prepared automatically.";
@@ -102,6 +110,10 @@ public partial class CameraModelsPage : UserControl, IAppPage
         {
             double score = await _services.Camera.AlignAsync(_selectedModel, progress: progress, cancellationToken: token);
             await Dispatcher.InvokeAsync(() => StatusText.Text = $"Alignment finished at {score:P0} confidence.");
+        }, new DeepDebugOperationContext
+        {
+            CameraModelIds = [_selectedModel.Manifest.Id],
+            OperationSettings = new { Model = _selectedModel.Manifest.Id },
         });
         string hotkey = _services.Hotkey.DisplayName;
         StatusText.Text = $"Alignment armed. Focus Roblox and press {hotkey} to begin.";
@@ -193,6 +205,7 @@ public partial class CameraModelsPage : UserControl, IAppPage
 
     private void UpdateProgress(MacroProgress progress)
     {
+        _services.DeepDebug.RecordProgress(progress);
         OperationProgress.Value = progress.Percent;
         StatusText.Text = progress.Message;
         AppendLog(progress.Message);

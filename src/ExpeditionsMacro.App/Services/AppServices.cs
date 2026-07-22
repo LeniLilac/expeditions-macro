@@ -2,15 +2,20 @@ using System.IO;
 using System.Windows.Threading;
 using ExpeditionsMacro.Automation.Camera;
 using ExpeditionsMacro.Automation.Challenges;
+using ExpeditionsMacro.Automation.Diagnostics;
 using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Expeditions;
 using ExpeditionsMacro.Automation.Placement;
+using ExpeditionsMacro.Automation.Scheduling;
+using ExpeditionsMacro.Automation.Stages;
+using ExpeditionsMacro.Automation.Teams;
 using ExpeditionsMacro.Automation.Updates;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
 using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Camera;
+using ExpeditionsMacro.Vision.Diagnostics;
 using ExpeditionsMacro.Vision.Packs;
 using ExpeditionsMacro.Windows;
 
@@ -35,23 +40,46 @@ public sealed class AppServices : IDisposable
         PlacementModels = new PlacementModelRepository(Paths);
         Presets = new PresetRepository(Paths);
         ChallengePresets = new ChallengePresetRepository(Paths);
+        StoryPresets = new StoryPresetRepository(Paths);
+        RaidPresets = new RaidPresetRepository(Paths);
+        MacroPlans = new MacroPlanRepository(Paths);
+        PresetDeletion = new PresetDeletionService(Presets, ChallengePresets, StoryPresets, RaidPresets, MacroPlans);
         CameraModels = new CameraModelRepository(Paths);
         DetectorPacks = new DetectorPackRepository(Paths);
         WindowsRobloxAutomation automation = new();
         automation.DiagnosticMessage += Log.Info;
-        Automation = automation;
+        DeepDebug = new DeepDebugSessionService(
+            Paths,
+            () => Settings,
+            () => Log.CurrentFile,
+            Log.Info,
+            Log.Warning);
+        VisionTrace.Detected += DeepDebug.RecordVisionTrace;
+        automation.AutomationTrace += DeepDebug.RecordWindowsTrace;
+        Automation = new DeepDebugRobloxAutomation(automation, DeepDebug);
         SecretProtector = new DpapiSecretProtector();
         Hotkey = new GlobalHotkeyService();
         Coordinator = new OperationCoordinator(dispatcher);
+        Coordinator.OperationRunner = DeepDebug.RunOperationAsync;
         DiagnosticCapture = new DiagnosticCaptureService(Automation, Paths);
-        PlacementCapture = new PlacementCaptureService(Automation);
+        PlacementCaptureService placementCapture = new(Automation);
+        placementCapture.InputTrace += DeepDebug.RecordPlacementInput;
+        placementCapture.TraceEnabled = () => DeepDebug.IsActive;
+        PlacementCapture = placementCapture;
         Placement = new PlacementService(Automation, PlacementCapture, PlacementModels);
         Camera = new CameraAlignmentEngine(Automation, CameraModels);
         _discord = new DiscordWebhookClient();
-        Challenges = new ChallengeMacroRunner(Automation, Camera, Placement, _discord);
-        Expeditions = new ExpeditionMacroRunner(Automation, Camera, Placement, _discord);
+        Teams = new TeamSelectionService(Automation);
+        Stages = new StageMacroRunner(Automation, Camera, Placement, Teams, _discord);
+        Scheduler = new MacroScheduler(MacroPlans);
+        Challenges = new ChallengeMacroRunner(Automation, Camera, Placement, Teams, _discord);
+        Expeditions = new ExpeditionMacroRunner(Automation, Camera, Placement, Teams, _discord);
         DetectorUpdates = new DetectorPackUpdateService(DetectorPacks);
-        Hotkey.Pressed += (_, _) => Coordinator.HandleHotkey();
+        Hotkey.Pressed += (_, _) =>
+        {
+            DeepDebug.RecordEvent("input", "global_hotkey_pressed", new { Hotkey = Hotkey.DisplayName, CoordinatorState = Coordinator.State });
+            Coordinator.HandleHotkey();
+        };
         Hotkey.BindingChanged += (_, _) => Coordinator.HotkeyDisplayName = Hotkey.DisplayName;
     }
 
@@ -61,8 +89,13 @@ public sealed class AppServices : IDisposable
     public PlacementModelRepository PlacementModels { get; }
     public PresetRepository Presets { get; }
     public ChallengePresetRepository ChallengePresets { get; }
+    public StoryPresetRepository StoryPresets { get; }
+    public RaidPresetRepository RaidPresets { get; }
+    public MacroPlanRepository MacroPlans { get; }
+    public PresetDeletionService PresetDeletion { get; }
     public CameraModelRepository CameraModels { get; }
     public DetectorPackRepository DetectorPacks { get; }
+    public DeepDebugSessionService DeepDebug { get; }
     public IRobloxAutomation Automation { get; }
     public ISecretProtector SecretProtector { get; }
     public GlobalHotkeyService Hotkey { get; }
@@ -71,6 +104,9 @@ public sealed class AppServices : IDisposable
     public IPlacementCaptureService PlacementCapture { get; }
     public PlacementService Placement { get; }
     public CameraAlignmentEngine Camera { get; }
+    public TeamSelectionService Teams { get; }
+    public StageMacroRunner Stages { get; }
+    public MacroScheduler Scheduler { get; }
     public ChallengeMacroRunner Challenges { get; }
     public ExpeditionMacroRunner Expeditions { get; }
     public DetectorPackUpdateService DetectorUpdates { get; }
@@ -103,6 +139,8 @@ public sealed class AppServices : IDisposable
         await SettingsStore.SaveAsync(Settings);
     }
 
+    public IDetectorPack TraceDetector(IDetectorPack detector) => new DeepDebugDetectorPack(detector, DeepDebug);
+
     public async Task<MacroFailureHandlingResult> HandleMacroFailureAsync(
         string macroName,
         string webhookUrl,
@@ -132,6 +170,7 @@ public sealed class AppServices : IDisposable
     public void Dispose()
     {
         Coordinator.Cancel();
+        VisionTrace.Detected -= DeepDebug.RecordVisionTrace;
         if (Automation is IDisposable automation) automation.Dispose();
         Log.Info("Application closing.");
         Hotkey.Dispose();

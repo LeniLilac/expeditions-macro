@@ -28,6 +28,12 @@ internal static class TestPaths
         "anime-expeditions",
         "challenges");
 
+    public static string StageDatasets => Path.Combine(
+        RepositoryRoot,
+        "datasets",
+        "anime-expeditions",
+        "stages");
+
     public static string CameraRotations => Path.Combine(
         RepositoryRoot,
         "datasets",

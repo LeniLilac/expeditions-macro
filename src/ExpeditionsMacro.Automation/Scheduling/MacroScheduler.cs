@@ -1,0 +1,148 @@
+using ExpeditionsMacro.Core.Models;
+using ExpeditionsMacro.Core.Persistence;
+using ExpeditionsMacro.Core.Runtime;
+
+namespace ExpeditionsMacro.Automation.Scheduling;
+
+public sealed record ScheduledTaskResult(
+    int Victories,
+    int Defeats,
+    TimeSpan Runtime,
+    DateTimeOffset? NextEligibleAtUtc = null,
+    bool Skipped = false);
+
+public sealed class MacroScheduler
+{
+    private readonly MacroPlanRepository _plans;
+
+    public MacroScheduler(MacroPlanRepository plans) => _plans = plans;
+
+    public async Task RunAsync(
+        MacroPlan initialPlan,
+        Func<MacroTaskDefinition, CancellationToken, Task<ScheduledTaskResult>> execute,
+        IProgress<MacroProgress>? progress = null,
+        Action<MacroPlan>? planChanged = null,
+        Action<MacroEvent>? log = null,
+        CancellationToken cancellationToken = default)
+    {
+        initialPlan.Validate();
+        MacroPlan plan = NormalizeProgress(initialPlan);
+        await SaveAsync(plan, planChanged, cancellationToken).ConfigureAwait(false);
+
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            MacroTaskDefinition? next = SelectNext(plan, now);
+            if (next is null)
+            {
+                DateTimeOffset? wake = NextWake(plan, now);
+                string message = wake is null
+                    ? "Every finite task is complete. Waiting for the task list to change."
+                    : $"No task is currently eligible. Waiting until {wake.Value.LocalDateTime:t}.";
+                progress?.Report(new MacroProgress("Waiting", 0, message, "scheduler_waiting"));
+                log?.Invoke(new MacroEvent(DateTimeOffset.Now, MacroEventLevel.Information, message, "scheduler_waiting"));
+                TimeSpan delay = wake is null
+                    ? TimeSpan.FromSeconds(10)
+                    : TimeSpan.FromMilliseconds(Math.Clamp((wake.Value - now).TotalMilliseconds, 500, 10000));
+                await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+
+            MacroTaskProgress before = plan.ProgressFor(next.Id);
+            progress?.Report(new MacroProgress("Task", 0, $"Starting priority {next.Priority}: {DisplayName(next)}.", "scheduler_task"));
+            log?.Invoke(new MacroEvent(DateTimeOffset.Now, MacroEventLevel.Information, $"Scheduler selected priority {next.Priority}: {DisplayName(next)}.", "scheduler_task"));
+            ScheduledTaskResult result = await execute(next, cancellationToken).ConfigureAwait(false);
+            DateTimeOffset completedAt = DateTimeOffset.UtcNow;
+            MacroTaskProgress after = Advance(next, before, result, completedAt);
+            plan = plan with
+            {
+                Progress = plan.Tasks.Select(task => string.Equals(task.Id, next.Id, StringComparison.OrdinalIgnoreCase)
+                    ? after
+                    : plan.ProgressFor(task.Id)).ToArray(),
+                UpdatedAt = completedAt,
+            };
+            await SaveAsync(plan, planChanged, cancellationToken).ConfigureAwait(false);
+            string outcome = result.Skipped
+                ? "skipped"
+                : result.Victories > 0
+                    ? $"recorded {result.Victories} victory"
+                    : result.Defeats > 0
+                        ? $"recorded {result.Defeats} defeat"
+                        : "updated eligibility";
+            log?.Invoke(new MacroEvent(DateTimeOffset.Now, MacroEventLevel.Information, $"{DisplayName(next)} {outcome}.", "scheduler_progress"));
+        }
+    }
+
+    public async Task<MacroPlan> ResetProgressAsync(MacroPlan plan, CancellationToken cancellationToken = default)
+    {
+        MacroPlan reset = plan.ResetProgress();
+        await _plans.SaveAsync(reset, cancellationToken).ConfigureAwait(false);
+        return reset;
+    }
+
+    public static MacroTaskDefinition? SelectNext(MacroPlan plan, DateTimeOffset now) =>
+        plan.Tasks
+            .Select((task, index) => new { Task = task, Index = index, Progress = plan.ProgressFor(task.Id) })
+            .Where(value => value.Task.Enabled)
+            .Where(value => value.Task.IsRecurring || !value.Progress.Completed)
+            .Where(value => value.Progress.NextEligibleAtUtc is null || value.Progress.NextEligibleAtUtc <= now)
+            .OrderBy(value => value.Task.Priority)
+            .ThenBy(value => value.Index)
+            .Select(value => value.Task)
+            .FirstOrDefault();
+
+    internal static MacroTaskProgress Advance(
+        MacroTaskDefinition task,
+        MacroTaskProgress before,
+        ScheduledTaskResult result,
+        DateTimeOffset completedAt)
+    {
+        int victories = before.Victories + Math.Max(0, result.Victories);
+        int defeats = before.Defeats + Math.Max(0, result.Defeats);
+        long runtime = before.RuntimeSeconds + Math.Max(0, (long)Math.Ceiling(result.Runtime.TotalSeconds));
+        bool completed = task.Kind switch
+        {
+            MacroTaskKind.Challenge => false,
+            MacroTaskKind.Story when task.CompleteOnRuntimeDefeat =>
+                result.Defeats > 0 && runtime >= task.TargetRuntimeMinutes * 60L,
+            _ => victories >= task.TargetVictories,
+        };
+        return before with
+        {
+            Victories = victories,
+            Defeats = defeats,
+            RuntimeSeconds = runtime,
+            Completed = completed,
+            LastAttemptAt = completedAt,
+            LastCompletedAt = completed ? completedAt : before.LastCompletedAt,
+            // Any task can become temporarily ineligible. Challenges use this for
+            // their global reset, while finite modes use it after a safe skip so a
+            // higher-priority camera/model problem cannot spin forever and starve
+            // the rest of the plan.
+            NextEligibleAtUtc = completed ? null : result.NextEligibleAtUtc,
+        };
+    }
+
+    private static MacroPlan NormalizeProgress(MacroPlan plan) => plan with
+    {
+        Progress = plan.Tasks.Select(task => plan.ProgressFor(task.Id)).ToArray(),
+    };
+
+    private static DateTimeOffset? NextWake(MacroPlan plan, DateTimeOffset now) =>
+        plan.Tasks
+            .Where(task => task.Enabled && (task.IsRecurring || !plan.ProgressFor(task.Id).Completed))
+            .Select(task => plan.ProgressFor(task.Id).NextEligibleAtUtc)
+            .Where(value => value > now)
+            .OrderBy(value => value)
+            .FirstOrDefault();
+
+    private async Task SaveAsync(MacroPlan plan, Action<MacroPlan>? changed, CancellationToken cancellationToken)
+    {
+        await _plans.SaveAsync(plan, cancellationToken).ConfigureAwait(false);
+        changed?.Invoke(plan);
+    }
+
+    private static string DisplayName(MacroTaskDefinition task) =>
+        string.IsNullOrWhiteSpace(task.Name) ? $"{task.Kind} preset {task.PresetId}" : task.Name;
+}

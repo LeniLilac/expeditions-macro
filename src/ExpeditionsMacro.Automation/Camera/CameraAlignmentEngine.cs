@@ -349,12 +349,56 @@ public sealed class CameraAlignmentEngine
                 progress,
                 cancellationToken).ConfigureAwait(false);
 
-            return await AlignAsync(
-                model,
-                window,
-                manageShiftLock: false,
-                progress,
-                cancellationToken).ConfigureAwait(false);
+            try
+            {
+                return await AlignAsync(
+                    model,
+                    window,
+                    manageShiftLock: false,
+                    progress,
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (CameraAlignmentException firstStateFailure)
+            {
+                // The atlas comparison is deliberately tolerant of lighting and
+                // translation. In a heavily animated scene that ranking can still
+                // choose the wrong camera-lock pose. Do not spend the whole run in
+                // that pose: test the alternate state with a fresh pitch clamp and
+                // a complete alignment search before declaring the model unusable.
+                progress?.Report(new MacroProgress(
+                    "Camera preparation",
+                    15,
+                    $"The preferred camera-lock state reached only {firstStateFailure.BestConfidence:P0}. Retrying in the alternate state.",
+                    Confidence: firstStateFailure.BestConfidence));
+                await ToggleShiftStateAsync(window, cancellationToken).ConfigureAwait(false);
+                toggledFromInitialState = !toggledFromInitialState;
+                await ClampPitchAsync(
+                    window,
+                    pitchDragPixels,
+                    model.Manifest.SettleMilliseconds,
+                    model.Manifest.Regions,
+                    "Camera preparation",
+                    16,
+                    progress,
+                    cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    return await AlignAsync(
+                        model,
+                        window,
+                        manageShiftLock: false,
+                        progress,
+                        cancellationToken).ConfigureAwait(false);
+                }
+                catch (CameraAlignmentException alternateStateFailure)
+                {
+                    double best = Math.Max(firstStateFailure.BestConfidence, alternateStateFailure.BestConfidence);
+                    int attempts = firstStateFailure.Attempts + alternateStateFailure.Attempts;
+                    string failure = $"Camera alignment failed in both camera-lock states after {attempts} attempts. Best confidence was {best:P0}; the model requires {model.Manifest.SuccessThreshold:P0}. Unit placement was not started.";
+                    progress?.Report(new MacroProgress("Camera alignment", 100, failure, Confidence: best));
+                    throw new CameraAlignmentException(failure, best, attempts);
+                }
+            }
         }
         finally
         {

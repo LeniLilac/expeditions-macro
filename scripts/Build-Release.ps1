@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidatePattern('^\d+\.\d+\.\d+$')]
+    [ValidatePattern('^\d+\.\d+\.\d+(?:-(?:[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*))?$')]
     [string]$Version,
 
     [string]$DotNetPath = 'dotnet',
@@ -12,6 +12,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$numericVersion = $Version.Split('-', 2)[0]
 $repository = [System.IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
 $artifacts = [System.IO.Path]::GetFullPath((Join-Path $repository 'artifacts'))
 if (-not $artifacts.StartsWith($repository, [System.StringComparison]::OrdinalIgnoreCase)) {
@@ -108,7 +109,7 @@ if (-not $SkipInstaller) {
     }
     if ($compiler) {
         $compilerPath = if ($compiler.PSObject.Properties.Name -contains 'Source') { $compiler.Source } else { $compiler.FullName }
-        & $compilerPath "/DAppVersion=$Version" "/DRepositoryRoot=$repository" "/DOutputDir=$release" (Join-Path $repository 'installer\ExpeditionsMacro.iss')
+        & $compilerPath "/DAppVersion=$Version" "/DAppNumericVersion=$numericVersion" "/DRepositoryRoot=$repository" "/DOutputDir=$release" (Join-Path $repository 'installer\ExpeditionsMacro.iss')
         if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed.' }
     }
     else {

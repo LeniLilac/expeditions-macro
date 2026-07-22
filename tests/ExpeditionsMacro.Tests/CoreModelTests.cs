@@ -170,6 +170,28 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public void AppSettings_UnitMenuKeyIsOptionalUntilATeamUsesIt_AndNormalizesLetters()
+    {
+        AppSettings settings = new();
+
+        Assert.Equal(string.Empty, settings.UnitMenuKey);
+        Assert.Equal('U', AppSettings.ParseUnitMenuKey(" u ", AppSettings.DefaultMacroHotkeyVirtualKey, "P"));
+        Assert.Throws<InvalidDataException>(() => AppSettings.ParseUnitMenuKey(string.Empty, AppSettings.DefaultMacroHotkeyVirtualKey, "P"));
+    }
+
+    [Fact]
+    public void AppSettings_UnitMenuKeyMustDifferFromBothControlKeys()
+    {
+        InvalidDataException macroConflict = Assert.Throws<InvalidDataException>(
+            () => AppSettings.ParseUnitMenuKey("u", 0x55, "P"));
+        InvalidDataException playConflict = Assert.Throws<InvalidDataException>(
+            () => AppSettings.ParseUnitMenuKey("u", AppSettings.DefaultMacroHotkeyVirtualKey, "U"));
+
+        Assert.Contains("start/stop hotkey", macroConflict.Message, StringComparison.Ordinal);
+        Assert.Contains("Play menu key", playConflict.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ModelId_IsReadableStableAndNameSensitive()
     {
         string first = ModelId.FromName("Expedition Map 1");

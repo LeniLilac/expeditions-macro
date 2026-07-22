@@ -12,6 +12,7 @@ public sealed class ChallengeMapRow : INotifyPropertyChanged
     private string _prestartPlacementModelId = string.Empty;
     private string _delayedPlacementModelId = string.Empty;
     private int _delayedPlacementSeconds = 30;
+    private int _teamSlot;
 
     public ChallengeMapRow(ChallengeMapId map)
     {
@@ -56,6 +57,12 @@ public sealed class ChallengeMapRow : INotifyPropertyChanged
         set => SetField(ref _delayedPlacementSeconds, value);
     }
 
+    public int TeamSlot
+    {
+        get => _teamSlot;
+        set => SetField(ref _teamSlot, value);
+    }
+
     public ChallengeMapProfile ToProfile() => new()
     {
         Map = Map,
@@ -63,6 +70,7 @@ public sealed class ChallengeMapRow : INotifyPropertyChanged
         PrestartPlacementModelId = PrestartPlacementModelId,
         DelayedPlacementModelId = DelayedPlacementModelId,
         DelayedPlacementSeconds = DelayedPlacementSeconds,
+        TeamSlot = TeamSlot,
     };
 
     public void Apply(ChallengeMapProfile profile)
@@ -72,6 +80,7 @@ public sealed class ChallengeMapRow : INotifyPropertyChanged
         PrestartPlacementModelId = profile.PrestartPlacementModelId;
         DelayedPlacementModelId = profile.DelayedPlacementModelId;
         DelayedPlacementSeconds = profile.DelayedPlacementSeconds;
+        TeamSlot = profile.TeamSlot;
     }
 
     private void SetField<T>(ref T field, T value, [CallerMemberName] string? propertyName = null)

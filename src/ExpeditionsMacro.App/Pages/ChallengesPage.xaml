@@ -1,6 +1,7 @@
 <UserControl x:Class="ExpeditionsMacro.App.Pages.ChallengesPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:icons="clr-namespace:ExpeditionsMacro.App.Controls">
     <ScrollViewer x:Name="PageScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <Grid Margin="34,27,40,30" MaxWidth="1060" HorizontalAlignment="Left">
             <Grid.RowDefinitions>
@@ -16,19 +17,20 @@
                 <StackPanel Margin="0,0,24,0">
                     <TextBlock Style="{StaticResource PageTitle}" Text="Challenges" />
                 </StackPanel>
-                <StackPanel Grid.Column="1" HorizontalAlignment="Right" Orientation="Horizontal">
-                    <Button x:Name="StartButton" Style="{StaticResource PrimaryButton}" Content="Start macro  F6" Click="Start_Click" />
-                    <Button x:Name="StopButton" Margin="8,0,0,0" Style="{StaticResource DangerButton}" Content="Stop macro  F6" IsEnabled="False" Click="Stop_Click" />
+                <StackPanel Grid.Column="1" HorizontalAlignment="Right" Orientation="Horizontal" Visibility="Collapsed">
+                    <Button x:Name="StartButton" Style="{StaticResource PrimaryButton}" icons:Lucide.Icon="Play" Content="Start macro  F6" Click="Start_Click" />
+                    <Button x:Name="StopButton" Margin="8,0,0,0" Style="{StaticResource DangerButton}" icons:Lucide.Icon="Square" Content="Stop macro  F6" IsEnabled="False" Click="Stop_Click" />
                 </StackPanel>
             </Grid>
 
             <Border Grid.Row="1" Padding="0,0,0,18" Margin="0,0,0,22" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
                 <Grid>
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="90" /><ColumnDefinition Width="290" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="90" /><ColumnDefinition Width="290" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                     <TextBlock Style="{StaticResource FieldLabel}" Text="Preset" />
                     <ComboBox x:Name="PresetCombo" Grid.Column="1" DisplayMemberPath="Name" SelectionChanged="PresetCombo_SelectionChanged" />
-                    <Button Grid.Column="2" Margin="8,0,0,0" Content="Save preset" Click="SavePreset_Click" />
-                    <Button Grid.Column="3" Margin="8,0,0,0" Content="New" Click="NewPreset_Click" />
+                    <Button x:Name="SavePresetButton" Grid.Column="2" Margin="8,0,0,0" icons:Lucide.Icon="Save" Content="Save preset" Click="SavePreset_Click" />
+                    <Button x:Name="NewPresetButton" Grid.Column="3" Margin="8,0,0,0" icons:Lucide.Icon="Plus" Content="New" Click="NewPreset_Click" />
+                    <Button x:Name="DeletePresetButton" Grid.Column="4" Margin="8,0,0,0" Style="{StaticResource DangerButton}" icons:Lucide.Icon="Trash2" Content="Delete" IsEnabled="False" Click="DeletePreset_Click" />
                 </Grid>
             </Border>
 
@@ -89,19 +91,20 @@
                     <Border Margin="0,16,0,0" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
                         <StackPanel>
                             <Grid Height="38" Background="{DynamicResource RaisedBrush}">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="96" /></Grid.ColumnDefinitions>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="130" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="96" /><ColumnDefinition Width="110" /></Grid.ColumnDefinitions>
                                 <TextBlock Margin="12,0,8,0" VerticalAlignment="Center" Style="{StaticResource Caption}" Text="Map" />
                                 <TextBlock Grid.Column="1" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Caption}" Text="Camera" />
                                 <TextBlock Grid.Column="2" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Caption}" Text="Before start" />
                                 <TextBlock Grid.Column="3" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Caption}" Text="After start" />
                                 <TextBlock Grid.Column="4" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Caption}" Text="Delay, sec" />
+                                <TextBlock Grid.Column="5" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Caption}" Text="Team" />
                             </Grid>
                             <ItemsControl x:Name="MapItems" ItemsSource="{Binding MapRows}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
                                             <Grid MinHeight="52">
-                                                <Grid.ColumnDefinitions><ColumnDefinition Width="150" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="96" /></Grid.ColumnDefinitions>
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="130" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="96" /><ColumnDefinition Width="110" /></Grid.ColumnDefinitions>
                                                 <TextBlock Margin="12,0,8,0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding MapName}" />
                                                 <ComboBox Grid.Column="1" Height="36" Margin="6,8" Padding="8,0,30,0"
                                                           ItemsSource="{Binding DataContext.CameraOptions, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
@@ -113,6 +116,9 @@
                                                           ItemsSource="{Binding DataContext.PlacementOptions, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
                                                           DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding DelayedPlacementModelId, Mode=TwoWay}" />
                                                 <TextBox Grid.Column="4" Height="36" Margin="6,8" Padding="9,0" Text="{Binding DelayedPlacementSeconds, Mode=TwoWay, UpdateSourceTrigger=LostFocus}" />
+                                                <ComboBox Grid.Column="5" Height="36" Margin="6,8" Padding="8,0,30,0"
+                                                          ItemsSource="{Binding DataContext.TeamOptions, RelativeSource={RelativeSource AncestorType={x:Type UserControl}}}"
+                                                          DisplayMemberPath="Name" SelectedValuePath="Value" SelectedValue="{Binding TeamSlot, Mode=TwoWay}" />
                                             </Grid>
                                         </Border>
                                     </DataTemplate>
@@ -130,16 +136,16 @@
                         <TextBlock Style="{StaticResource SectionTitle}" Text="Detection and timing" />
                         <TextBlock Margin="0,6,0,0" Style="{StaticResource Caption}" Text="Shared camera and input defaults apply to every map. Selector thumbnails choose the matching map profile before teleporting." />
                     </StackPanel>
-                    <Button x:Name="TuningToggle" Grid.Column="1" Height="34" Content="Show tuning" Click="TuningToggle_Click" />
+                    <Button x:Name="TuningToggle" Grid.Column="1" Height="34" icons:Lucide.Icon="SlidersHorizontal" Content="Show tuning" Click="TuningToggle_Click" />
                 </Grid>
 
                 <Grid Margin="0,15,0,0">
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="18" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="0" /><ColumnDefinition Width="0" /></Grid.ColumnDefinitions>
                     <StackPanel>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="Preset name" />
                         <TextBox x:Name="PresetNameText" Margin="0,7,0,0" Text="Challenge rotation" />
                     </StackPanel>
-                    <StackPanel Grid.Column="2">
+                    <StackPanel Grid.Column="2" Visibility="Collapsed">
                         <TextBlock Style="{StaticResource FieldLabel}" Text="Webhook, optional" />
                         <Grid Margin="0,7,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="86" /></Grid.ColumnDefinitions>
@@ -149,14 +155,14 @@
                         </Grid>
                         <Grid Margin="0,8,0,0">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                            <Button x:Name="TestWebhookButton" Height="34" MinWidth="108" Content="Test webhook" Click="TestWebhook_Click" />
+                            <Button x:Name="TestWebhookButton" Height="34" MinWidth="108" icons:Lucide.Icon="Send" Content="Test webhook" Click="TestWebhook_Click" />
                             <TextBlock x:Name="WebhookTestStatusText" Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Style="{StaticResource Caption}" TextWrapping="Wrap" />
                         </Grid>
                     </StackPanel>
                 </Grid>
-                <TextBlock Margin="0,12,0,0" Style="{StaticResource FieldLabel}" Text="Error ping user ID, optional" />
-                <TextBox x:Name="DiscordErrorUserIdText" Margin="0,7,0,0" />
-                <TextBlock Margin="0,7,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Shared with Expeditions. Unexpected errors ping this user five times. Manual Stop never alerts. Victory and defeat include a screenshot." />
+                <TextBlock Margin="0,12,0,0" Style="{StaticResource FieldLabel}" Text="Error ping user ID, optional" Visibility="Collapsed" />
+                <TextBox x:Name="DiscordErrorUserIdText" Margin="0,7,0,0" Visibility="Collapsed" />
+                <TextBlock Margin="0,7,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Shared with the Macro page." Visibility="Collapsed" />
 
                 <Grid x:Name="TuningPanel" Margin="0,15,0,0" Visibility="Collapsed">
                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
@@ -173,13 +179,13 @@
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                     <StackPanel Margin="0,0,24,0">
                         <TextBlock x:Name="StatusText" FontWeight="SemiBold" Text="Ready to start." />
-                        <TextBlock x:Name="DetectionText" Margin="0,4,0,0" Style="{StaticResource Caption}" Text="Last detection: none" />
+                        <TextBlock x:Name="DetectionText" Margin="0,4,0,0" Style="{StaticResource Caption}" Text="Run this preset from the Macro page." />
                     </StackPanel>
-                    <Button Grid.Column="1" Content="Validate setup" Click="ValidateSetup_Click" />
-                    <Button Grid.Column="2" Margin="8,0,0,0" Style="{StaticResource PrimaryButton}" Content="Save changes" Click="SavePreset_Click" />
+                    <Button Grid.Column="1" icons:Lucide.Icon="CircleCheck" Content="Validate setup" Click="ValidateSetup_Click" />
+                    <Button Grid.Column="2" Margin="8,0,0,0" Style="{StaticResource PrimaryButton}" icons:Lucide.Icon="Save" Content="Save changes" Click="SavePreset_Click" />
                 </Grid>
 
-                <Grid Margin="0,16,0,0">
+                <Grid Margin="0,16,0,0" Visibility="Collapsed">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="100" /><ColumnDefinition Width="84" /><ColumnDefinition Width="84" /><ColumnDefinition Width="84" /><ColumnDefinition Width="92" /></Grid.ColumnDefinitions>
                     <TextBlock VerticalAlignment="Center" Style="{StaticResource Caption}" Text="Challenge run totals" />
                     <StackPanel Grid.Column="1"><TextBlock Style="{StaticResource Caption}" Text="Runtime" /><TextBlock x:Name="RuntimeText" Margin="0,3,0,0" FontWeight="SemiBold" Text="00:00:00" /></StackPanel>
@@ -188,9 +194,9 @@
                     <StackPanel Grid.Column="4"><TextBlock Style="{StaticResource Caption}" Text="Defeats" /><TextBlock x:Name="DefeatsText" Margin="0,3,0,0" FontWeight="SemiBold" Foreground="{DynamicResource ErrorBrush}" Text="0" /></StackPanel>
                     <StackPanel Grid.Column="5"><TextBlock Style="{StaticResource Caption}" Text="Retries / recovery" /><TextBlock x:Name="RecoveryText" Margin="0,3,0,0" FontWeight="SemiBold" Foreground="{DynamicResource WarningBrush}" Text="0 / 0" /></StackPanel>
                 </Grid>
-                <ProgressBar x:Name="MacroProgress" Margin="0,13,0,12" Minimum="0" Maximum="100" />
-                <Border MinHeight="110" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
-                    <TextBox x:Name="LogText" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" BorderThickness="0" FontFamily="Cascadia Mono, Consolas" FontSize="11" />
+                <ProgressBar x:Name="MacroProgress" Margin="0,13,0,12" Minimum="0" Maximum="100" Visibility="Collapsed" />
+                <Border MinHeight="110" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4" Visibility="Collapsed">
+                    <TextBox x:Name="LogText" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" BorderThickness="0" FontSize="11" />
                 </Border>
             </StackPanel>
         </Grid>

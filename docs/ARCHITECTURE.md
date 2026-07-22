@@ -4,8 +4,8 @@ The application separates reusable automation behavior from the WPF shell:
 
 - `ExpeditionsMacro.Core` contains immutable geometry, image, model, preset, persistence, and workflow contracts.
 - `ExpeditionsMacro.Windows` owns Win32 window discovery, exact client sizing, GDI capture, DPAPI, the configurable global macro hotkey, keyboard input, Roblox-compatible mouse nudging, Roblox `O`-key zoom with a wheel fallback, extended scan-code camera arrows, and relative right-drag fine camera input. The global hotkey accepts safe single-key letters, digits, punctuation, numpad keys, and supported function keys.
-- `ExpeditionsMacro.Vision` owns lighting-normalized scoring, temporal medians, detector-pack compilation, validation, classification, map and difficulty selection, node hues, and hotbar checks.
-- `ExpeditionsMacro.Automation` owns camera calibration/alignment, placement recording/playback, the Expeditions state machine, recovery, Discord Components V2, and detector updates.
+- `ExpeditionsMacro.Vision` owns lighting-normalized scoring, temporal medians, detector-pack compilation, validation, classification, Expedition and Challenge states, Story/Raid stage navigation, saved-team dialogs, map and difficulty selection, node hues, and hotbar checks.
+- `ExpeditionsMacro.Automation` owns camera calibration/alignment, placement recording/playback, saved-team loading, the Expedition, Challenge, Story, and Raid runners, the prioritized Macro scheduler, recovery, Discord Components V2, and detector updates.
 - `ExpeditionsMacro.App` is the single WPF interface and exclusive input-owner coordinator.
 - `ExpeditionsMacro.DatasetBuilder` compiles a local capture corpus into a small, hashed detector pack.
 
@@ -14,3 +14,9 @@ All saved coordinates are relative to the Roblox client. Camera calibration and 
 The workflow never reads Roblox memory or injects into the process. It observes screen pixels and emits ordinary Windows keyboard and mouse input.
 
 Play navigation uses a separately configured A-Z key matching Anime Expeditions' **Toggle Play Menu** binding. The runner presses it from the lobby, terminal, or prestart state, verifies the expected selector or party preview, and retries boundedly; it does not depend on the position or visibility of either on-screen Play button.
+
+Macro plans persist immutable task definitions separately from per-task progress. The scheduler selects the lowest priority number among enabled, incomplete, and currently eligible tasks. A runner owns Roblox input until it returns a result; only then does the scheduler persist progress and choose again. Challenge tasks remain recurring and carry a next-eligible timestamp, while Expedition, Story, and Raid tasks complete against saved victory or Infinite-runtime targets.
+
+Story and Raid navigation uses specialized structural detectors for the mode selector, map selector, detail panel, party preview, prestart, terminal screens, and saved-team dialogs. Team loading is a separate service that validates the canonical client size before every capture and action. The Windows layer supplies bounded relative wheel input for deterministic team and map-list positioning.
+
+Deep debug logging decorates the shared `IRobloxAutomation` boundary and the exclusive operation coordinator. The Windows implementation emits exact low-level key/mouse events, the vision layer emits detector scores and selected states, and the app forwards workflow progress and decisions. A bounded writer preserves ordering and applies backpressure rather than dropping frames. Each enabled operation snapshots a secret-free configuration graph and finalizes its own Zip64-capable archive for success, cancellation, or failure; if finalization fails, its staging directory is intentionally retained.

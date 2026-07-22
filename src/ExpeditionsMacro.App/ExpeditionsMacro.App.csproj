@@ -23,6 +23,21 @@
     <Resource Include="..\..\assets\app.ico"><Link>Resources\app.ico</Link></Resource>
     <Resource Include="..\..\assets\app-preview.png"><Link>Resources\app-preview.png</Link></Resource>
     <Resource Include="..\..\assets\standard-ui-overlay.png"><Link>Resources\standard-ui-overlay.png</Link></Resource>
+    <Resource Include="..\..\assets\fonts\Fredoka-Light.ttf"><Link>Resources\Fonts\Fredoka-Light.ttf</Link></Resource>
+    <Resource Include="..\..\assets\fonts\Fredoka-Regular.ttf"><Link>Resources\Fonts\Fredoka-Regular.ttf</Link></Resource>
+    <Resource Include="..\..\assets\fonts\Fredoka-Medium.ttf"><Link>Resources\Fonts\Fredoka-Medium.ttf</Link></Resource>
+    <Resource Include="..\..\assets\fonts\Fredoka-SemiBold.ttf"><Link>Resources\Fonts\Fredoka-SemiBold.ttf</Link></Resource>
+    <Resource Include="..\..\assets\fonts\Fredoka-Bold.ttf"><Link>Resources\Fonts\Fredoka-Bold.ttf</Link></Resource>
+    <Content Include="..\..\assets\fonts\Fredoka-OFL.txt">
+      <Link>Licenses\Fredoka-OFL.txt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\..\assets\licenses\Lucide-LICENSE.txt">
+      <Link>Licenses\Lucide-LICENSE.txt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
     <Content Include="..\..\detector-packs\anime-expeditions-expeditions\1.0.2\**\*">
       <Link>Resources\DetectorPacks\anime-expeditions-expeditions\1.0.2\%(RecursiveDir)%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

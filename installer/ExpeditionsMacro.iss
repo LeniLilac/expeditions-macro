@@ -1,6 +1,9 @@
 #ifndef AppVersion
   #define AppVersion "1.0.6"
 #endif
+#ifndef AppNumericVersion
+  #define AppNumericVersion AppVersion
+#endif
 #ifndef RepositoryRoot
   #define RepositoryRoot ".."
 #endif
@@ -32,11 +35,11 @@ WizardStyle=modern
 CloseApplications=yes
 RestartApplications=no
 LicenseFile={#RepositoryRoot}\LICENSE.md
-VersionInfoVersion={#AppVersion}.0
+VersionInfoVersion={#AppNumericVersion}.0
 VersionInfoCompany=Expeditions Macro contributors
 VersionInfoDescription=Expeditions Macro installer
 VersionInfoProductName=Expeditions Macro
-VersionInfoProductVersion={#AppVersion}
+VersionInfoProductVersion={#AppNumericVersion}
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"

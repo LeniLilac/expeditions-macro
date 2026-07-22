@@ -17,7 +17,7 @@ public sealed record CameraCalibrationSettings
 
     public int FineSearchPixels { get; init; } = 16;
 
-    public int SettleMilliseconds { get; init; } = 100;
+    public int SettleMilliseconds { get; init; } = 200;
 
     public int MaximumSamples { get; init; } = 300;
 

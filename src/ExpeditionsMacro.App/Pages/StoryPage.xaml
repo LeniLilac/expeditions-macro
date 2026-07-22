@@ -1,0 +1,79 @@
+<UserControl x:Class="ExpeditionsMacro.App.Pages.StoryPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:icons="clr-namespace:ExpeditionsMacro.App.Controls">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <Grid Margin="34,27,40,30" MaxWidth="1060" HorizontalAlignment="Stretch">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock Style="{StaticResource PageTitle}" Text="Story" />
+
+            <Border Grid.Row="1" Margin="0,22,0,22" Padding="0,0,0,18" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="90" /><ColumnDefinition Width="300" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource FieldLabel}" Text="Preset" />
+                    <ComboBox x:Name="PresetCombo" Grid.Column="1" DisplayMemberPath="Name" SelectionChanged="PresetCombo_SelectionChanged" />
+                    <Button x:Name="SavePresetButton" Grid.Column="2" Margin="8,0,0,0" icons:Lucide.Icon="Save" Content="Save preset" Click="Save_Click" />
+                    <Button x:Name="NewPresetButton" Grid.Column="3" Margin="8,0,0,0" icons:Lucide.Icon="Plus" Content="New" Click="New_Click" />
+                    <Button x:Name="DeletePresetButton" Grid.Column="4" Margin="8,0,0,0" Style="{StaticResource DangerButton}" icons:Lucide.Icon="Trash2" Content="Delete" IsEnabled="False" Click="DeletePreset_Click" />
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="28" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="Stage" />
+                    <TextBlock Margin="0,12,0,0" Style="{StaticResource FieldLabel}" Text="Preset name" />
+                    <TextBox x:Name="NameText" Margin="0,7,0,0" Text="Story route" />
+                    <TextBlock Margin="0,14,0,0" Style="{StaticResource FieldLabel}" Text="Map" />
+                    <ComboBox x:Name="MapCombo" Margin="0,7,0,0" DisplayMemberPath="Name" />
+                    <TextBlock Margin="0,14,0,0" Style="{StaticResource FieldLabel}" Text="Run type" />
+                    <ComboBox x:Name="RunKindCombo" Margin="0,7,0,0" DisplayMemberPath="Name" SelectionChanged="RunKind_Changed" />
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <StackPanel><TextBlock Style="{StaticResource FieldLabel}" Text="Act" /><ComboBox x:Name="ActCombo" Margin="0,7,0,0" /></StackPanel>
+                        <StackPanel Grid.Column="2" VerticalAlignment="Bottom"><CheckBox x:Name="HardCheck" Margin="0,0,0,11" Content="Hard difficulty" /></StackPanel>
+                    </Grid>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2">
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="Models and team" />
+                    <TextBlock Margin="0,12,0,0" Style="{StaticResource FieldLabel}" Text="Camera model" />
+                    <ComboBox x:Name="CameraCombo" Margin="0,7,0,0" DisplayMemberPath="Name" SelectedValuePath="Id" />
+                    <TextBlock Margin="0,14,0,0" Style="{StaticResource FieldLabel}" Text="Before-start placement" />
+                    <ComboBox x:Name="PrestartCombo" Margin="0,7,0,0" DisplayMemberPath="Name" SelectedValuePath="Id" />
+                    <TextBlock Margin="0,14,0,0" Style="{StaticResource FieldLabel}" Text="After-start placement" />
+                    <ComboBox x:Name="DelayedCombo" Margin="0,7,0,0" DisplayMemberPath="Name" SelectedValuePath="Id" />
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <StackPanel><TextBlock Style="{StaticResource FieldLabel}" Text="After-start delay, sec" /><TextBox x:Name="DelayText" Margin="0,7,0,0" Text="30" /></StackPanel>
+                        <StackPanel Grid.Column="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Team" /><ComboBox x:Name="TeamCombo" Margin="0,7,0,0" DisplayMemberPath="Name" /></StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Grid>
+
+            <Border Grid.Row="3" Margin="0,24,0,0" Padding="0,20,0,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                <StackPanel>
+                    <Grid><TextBlock Style="{StaticResource SectionTitle}" Text="Behavior" /><Button x:Name="TuningToggle" HorizontalAlignment="Right" Height="34" icons:Lucide.Icon="SlidersHorizontal" Content="Show tuning" Click="TuningToggle_Click" /></Grid>
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="180" /><ColumnDefinition Width="120" /><ColumnDefinition Width="24" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <TextBlock Style="{StaticResource FieldLabel}" Text="Retries after defeat" /><TextBox x:Name="RetriesText" Grid.Column="1" Text="0" />
+                        <CheckBox x:Name="AutoRecoverCheck" Grid.Column="3" IsChecked="True" Content="Return after lobby, disconnect, or AFK recovery" />
+                    </Grid>
+                    <Grid x:Name="TuningPanel" Margin="0,16,0,0" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="12" /><ColumnDefinition Width="*" /><ColumnDefinition Width="12" /><ColumnDefinition Width="*" /><ColumnDefinition Width="12" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <StackPanel><TextBlock Style="{StaticResource FieldLabel}" Text="Zoom ticks" /><TextBox x:Name="ZoomText" Margin="0,7,0,0" Text="30" /></StackPanel>
+                        <StackPanel Grid.Column="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Pitch drag, px" /><TextBox x:Name="PitchText" Margin="0,7,0,0" Text="1800" /></StackPanel>
+                        <StackPanel Grid.Column="4"><TextBlock Style="{StaticResource FieldLabel}" Text="Detection, ms" /><TextBox x:Name="PollText" Margin="0,7,0,0" Text="450" /></StackPanel>
+                        <StackPanel Grid.Column="6"><TextBlock Style="{StaticResource FieldLabel}" Text="Stable frames" /><TextBox x:Name="StableText" Margin="0,7,0,0" Text="2" /></StackPanel>
+                    </Grid>
+                    <Grid Margin="0,20,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock x:Name="StatusText" VerticalAlignment="Center" FontWeight="SemiBold" Text="Ready to edit a Story preset." /><Button Grid.Column="1" Style="{StaticResource PrimaryButton}" icons:Lucide.Icon="Save" Content="Save changes" Click="Save_Click" /></Grid>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

@@ -1,6 +1,7 @@
 <UserControl x:Class="ExpeditionsMacro.App.Pages.PlacementModelsPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:icons="clr-namespace:ExpeditionsMacro.App.Controls">
     <Grid>
         <Grid.ColumnDefinitions><ColumnDefinition Width="238" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
         <Border Grid.Column="0" Background="{DynamicResource SidebarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
@@ -8,10 +9,10 @@
                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                 <Grid Margin="6,0,6,10">
                     <TextBlock VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource MutedBrush}" Text="PLACEMENT MODELS" />
-                    <Button HorizontalAlignment="Right" Style="{StaticResource IconButton}" Width="32" MinWidth="32" Height="32" Content="&#xE710;" ToolTip="New model" Click="NewModel_Click" />
+                    <Button HorizontalAlignment="Right" Style="{StaticResource IconButton}" Width="32" MinWidth="32" Height="32" icons:Lucide.Icon="Plus" ToolTip="New model" Click="NewModel_Click" />
                 </Grid>
                 <ListBox x:Name="ModelsList" Grid.Row="1" DisplayMemberPath="Name" SelectionChanged="ModelsList_SelectionChanged" />
-                <Button Grid.Row="2" Style="{StaticResource DangerButton}" Content="Delete selected" Click="DeleteModel_Click" />
+                <Button Grid.Row="2" Style="{StaticResource DangerButton}" icons:Lucide.Icon="Trash2" Content="Delete selected" Click="DeleteModel_Click" />
             </Grid>
         </Border>
 
@@ -27,11 +28,11 @@
                     <TextBlock x:Name="RecordingDescription" Margin="0,5,0,18" MaxWidth="680" HorizontalAlignment="Left" Style="{StaticResource Caption}" Text="Recording starts after F6 and ends when F6 is pressed again." />
                     <Grid MaxWidth="680" HorizontalAlignment="Stretch">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="14" /><ColumnDefinition Width="150" /></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="64" /><RowDefinition Height="48" /></Grid.RowDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="64" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
                         <StackPanel><TextBlock Style="{StaticResource FieldLabel}" Text="Model name" /><TextBox x:Name="ModelNameText" Margin="0,7,0,0" Text="Placement model" /></StackPanel>
                         <StackPanel Grid.Column="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Default delay, ms" /><TextBox x:Name="DefaultDelayText" Margin="0,7,0,0" Text="900" /></StackPanel>
-                        <CheckBox x:Name="RecordedTimingCheck" Grid.Row="1" VerticalAlignment="Center" Content="Use recorded click-to-next-selection timing" />
-                        <CheckBox x:Name="PlaybackOverrideCheck" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Content="Override test timing" IsChecked="True" />
+                        <CheckBox x:Name="RecordedTimingCheck" Grid.Row="1" Grid.ColumnSpan="3" VerticalAlignment="Center" Content="Use recorded click-to-next-selection timing" />
+                        <CheckBox x:Name="PlaybackOverrideCheck" Grid.Row="2" Grid.ColumnSpan="3" Margin="0,10,0,0" VerticalAlignment="Center" Content="Override playback with the default delay" IsChecked="True" />
                     </Grid>
                 </StackPanel>
             </Border>
@@ -39,10 +40,10 @@
             <Grid Grid.Row="2" Margin="0,0,0,10">
                 <TextBlock VerticalAlignment="Center" Style="{StaticResource SectionTitle}" Text="Ordered placements" />
                 <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-                    <Button Height="34" MinWidth="68" Content="Add row" Click="AddRow_Click" />
-                    <Button Height="34" MinWidth="68" Margin="6,0,0,0" Content="Remove" Click="RemoveRow_Click" />
-                    <Button Height="34" MinWidth="56" Margin="6,0,0,0" Content="Up" Click="MoveUp_Click" />
-                    <Button Height="34" MinWidth="56" Margin="6,0,0,0" Content="Down" Click="MoveDown_Click" />
+                    <Button Height="34" MinWidth="68" icons:Lucide.Icon="Plus" Content="Add row" Click="AddRow_Click" />
+                    <Button Height="34" MinWidth="68" Margin="6,0,0,0" icons:Lucide.Icon="Trash2" Content="Remove" Click="RemoveRow_Click" />
+                    <Button Height="34" MinWidth="56" Margin="6,0,0,0" icons:Lucide.Icon="ArrowUp" Content="Up" Click="MoveUp_Click" />
+                    <Button Height="34" MinWidth="56" Margin="6,0,0,0" icons:Lucide.Icon="ArrowDown" Content="Down" Click="MoveDown_Click" />
                 </StackPanel>
             </Grid>
 
@@ -63,10 +64,10 @@
                     <TextBlock x:Name="DetailText" Margin="0,4,0,0" Style="{StaticResource Caption}" Text="Coordinates are stored relative to the recorded Roblox client size." />
                 </StackPanel>
                 <WrapPanel Grid.Row="1" Margin="0,12,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
-                    <Button x:Name="SaveButton" Content="Save changes" Click="Save_Click" />
-                    <Button x:Name="RecordButton" Margin="8,0,0,0" Style="{StaticResource PrimaryButton}" Content="Record placements" Click="Record_Click" />
-                    <Button x:Name="TestButton" Margin="8,0,0,0" Content="Test playback" Click="Test_Click" />
-                    <Button x:Name="StopButton" Margin="8,0,0,0" Style="{StaticResource DangerButton}" Content="Stop" IsEnabled="False" Click="Stop_Click" />
+                    <Button x:Name="SaveButton" icons:Lucide.Icon="Save" Content="Save changes" Click="Save_Click" />
+                    <Button x:Name="RecordButton" Margin="8,0,0,0" Style="{StaticResource PrimaryButton}" icons:Lucide.Icon="MousePointerClick" Content="Record placements" Click="Record_Click" />
+                    <Button x:Name="TestButton" Margin="8,0,0,0" icons:Lucide.Icon="Play" Content="Test playback" Click="Test_Click" />
+                    <Button x:Name="StopButton" Margin="8,0,0,0" Style="{StaticResource DangerButton}" icons:Lucide.Icon="Square" Content="Stop" IsEnabled="False" Click="Stop_Click" />
                 </WrapPanel>
                 <ProgressBar x:Name="OperationProgress" Grid.Row="2" Margin="0,16,0,0" Minimum="0" Maximum="100" />
             </Grid>

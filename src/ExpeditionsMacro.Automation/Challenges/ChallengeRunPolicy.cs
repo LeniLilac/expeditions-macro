@@ -1,9 +1,24 @@
+using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Models;
 
 namespace ExpeditionsMacro.Automation.Challenges;
 
 public static class ChallengeRunPolicy
 {
+    public static ChallengePlacementPartition PartitionPrestartPlacements(
+        IReadOnlyList<PlacementStep> steps,
+        ScreenRegion dialogOcclusion)
+    {
+        ArgumentNullException.ThrowIfNull(steps);
+        List<PlacementStep> beforeStart = [];
+        List<PlacementStep> afterStart = [];
+        foreach (PlacementStep step in steps)
+        {
+            (dialogOcclusion.Contains(step.X, step.Y) ? afterStart : beforeStart).Add(step);
+        }
+        return new ChallengePlacementPartition(beforeStart, afterStart);
+    }
+
     public static DateTimeOffset ResetEpoch(DateTimeOffset now)
     {
         int minute = now.Minute < 30 ? 0 : 30;
@@ -58,6 +73,10 @@ public static class ChallengeRunPolicy
         return new DateTimeOffset(utc.Year, utc.Month, utc.Day, 0, 0, 0, TimeSpan.Zero).AddDays(1);
     }
 }
+
+public sealed record ChallengePlacementPartition(
+    IReadOnlyList<PlacementStep> BeforeStart,
+    IReadOnlyList<PlacementStep> AfterStart);
 
 public sealed class ChallengeRotationState
 {

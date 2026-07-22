@@ -3,6 +3,7 @@ using ExpeditionsMacro.Automation.Camera;
 using ExpeditionsMacro.Automation.Expeditions;
 using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Automation.Placement;
+using ExpeditionsMacro.Automation.Teams;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
@@ -15,9 +16,13 @@ namespace ExpeditionsMacro.Automation.Challenges;
 
 public sealed class ChallengeMacroRunner : IGameModeWorkflow
 {
+    internal static readonly TimeSpan InitialPrestartTimeout = TimeSpan.FromSeconds(35);
+    internal static readonly TimeSpan TeleportingPrestartTimeout = TimeSpan.FromMinutes(3);
+
     private readonly IRobloxAutomation _automation;
     private readonly CameraAlignmentEngine _camera;
     private readonly PlacementService _placements;
+    private readonly TeamSelectionService _teams;
     private readonly IDiscordNotifier _discord;
     private readonly object _notificationGate = new();
     private readonly HashSet<Task> _pendingNotifications = [];
@@ -26,11 +31,13 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         IRobloxAutomation automation,
         CameraAlignmentEngine camera,
         PlacementService placements,
+        TeamSelectionService teams,
         IDiscordNotifier discord)
     {
         _automation = automation;
         _camera = camera;
         _placements = placements;
+        _teams = teams;
         _discord = discord;
     }
 
@@ -49,8 +56,12 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         Action<MacroEvent>? log = null,
         Action<ChallengeRunSummary>? summaryChanged = null,
         CancellationToken cancellationToken = default,
-        Func<Exception, CancellationToken, Task>? recoverableFailure = null)
+        Func<Exception, CancellationToken, Task>? recoverableFailure = null,
+        int? maximumCompletedRuns = null,
+        bool returnWhenUnavailable = false,
+        char? unitMenuKey = null)
     {
+        if (maximumCompletedRuns is < 1) throw new ArgumentOutOfRangeException(nameof(maximumCompletedRuns));
         preset.ValidateReady();
         playMenuKey = ValidatePlayMenuKey(playMenuKey);
         if (!detector.SupportsChallengeMaps)
@@ -58,6 +69,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
             throw new InvalidDataException(DetectorPackCapabilities.ChallengeMapsUnavailableMessage(detector.Manifest));
         }
         ValidateRuntimeModels(preset, mapModels, detector.Manifest);
+        ValidateTeamKey(preset.Maps.Any(profile => profile.TeamSlot > 0), unitMenuKey);
         RobloxWindow window = _automation.FindWindow() ?? throw new InvalidOperationException("No visible Roblox window was found.");
         DateTimeOffset startedAt = DateTimeOffset.UtcNow;
         Stopwatch runtime = Stopwatch.StartNew();
@@ -182,6 +194,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
                             detector,
                             webhookUrl,
                             playMenuKey,
+                            unitMenuKey,
                             runtime,
                             victories,
                             defeats,
@@ -253,6 +266,11 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
                     completed++;
                     rotation.MarkAttempted(type);
                     PublishSummary();
+                    if (maximumCompletedRuns is int maximum && completed >= maximum)
+                    {
+                        Write($"Completed {completed} scheduled Challenge match(es). Returning control to the task scheduler.", MacroEventLevel.Success);
+                        return;
+                    }
                     ranChallenge = true;
                     break;
                 }
@@ -294,6 +312,11 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
                     mapNumber: 0,
                     route: "Regular Challenge rotation",
                     Write);
+                if (returnWhenUnavailable)
+                {
+                    Write($"Challenge rotation is unavailable until {waitUntil:HH:mm} UTC. Returning control to the task scheduler.");
+                    return;
+                }
                 await WaitUntilAsync(window, preset, detector, playMenuKey, waitUntil, dailyLimit, idleWorkflow, Write, Report, cancellationToken).ConfigureAwait(false);
                 waitingUntil = null;
                 PublishSummary();
@@ -314,6 +337,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         IDetectorPack detector,
         string webhookUrl,
         char playMenuKey,
+        char? unitMenuKey,
         Stopwatch runtime,
         int priorVictories,
         int priorDefeats,
@@ -335,15 +359,44 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         if (startPreview is null) throw new InvalidOperationException("The Challenge preview Start button could not be located.");
         await ClickAsync(window, startPreview.Value.X, startPreview.Value.Y, cancellationToken).ConfigureAwait(false);
         bool attemptNotified = false;
+        bool teamLoaded = profile.TeamSlot == 0;
         while (true)
         {
-            await WaitForScreenAsync(window, preset, detector, ChallengeScreenState.Prestart, TimeSpan.FromSeconds(35), report, cancellationToken).ConfigureAwait(false);
+            ImageFrame prestart = await WaitForPrestartAfterPreviewAsync(window, preset, detector, report, cancellationToken).ConfigureAwait(false);
+            if (!teamLoaded)
+            {
+                await _teams.SelectAsync(window, profile.TeamSlot, unitMenuKey!.Value, progress: null, cancellationToken).ConfigureAwait(false);
+                teamLoaded = true;
+                prestart = await WaitForScreenAsync(
+                    window,
+                    preset,
+                    detector,
+                    ChallengeScreenState.Prestart,
+                    TimeSpan.FromSeconds(10),
+                    report,
+                    cancellationToken).ConfigureAwait(false);
+            }
             report("Camera preparation", 20, $"Preparing {Label(map)} for {Label(type)}.", "prestart", null);
             await PrepareCameraAsync(window, preset, models.Camera, report, log, cancellationToken).ConfigureAwait(false);
+            ChallengePlacementPartition? prestartPlacements = null;
             if (models.PrestartPlacement is not null)
             {
-                report("Placement", 45, "Placing the before-start units.", null, null);
-                await PlaceAsync(window, preset, models.PrestartPlacement, log, cancellationToken).ConfigureAwait(false);
+                ScreenRegion dialogOcclusion = ChallengeScreenDetector.PrestartOcclusion(prestart)
+                    ?? throw new InvalidOperationException("The Challenge Start Game dialog could not be measured before placement.");
+                prestartPlacements = ChallengeRunPolicy.PartitionPrestartPlacements(models.PrestartPlacement.Steps, dialogOcclusion);
+                report("Placement", 45, "Placing units outside the Start Game dialog.", null, null);
+                if (prestartPlacements.BeforeStart.Count > 0)
+                {
+                    await PlaceAsync(window, preset, models.PrestartPlacement, prestartPlacements.BeforeStart, log, cancellationToken).ConfigureAwait(false);
+                }
+                if (prestartPlacements.AfterStart.Count > 0)
+                {
+                    log(
+                        $"Deferred {prestartPlacements.AfterStart.Count} before-start placement(s) hidden by the Start Game dialog.",
+                        MacroEventLevel.Information,
+                        null,
+                        null);
+                }
             }
 
             (int X, int Y)? start = await LocateActionAfterParkingAsync(
@@ -369,6 +422,12 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
                     ChallengeRoute(type, map),
                     log);
                 attemptNotified = true;
+            }
+            if (prestartPlacements is { AfterStart.Count: > 0 } && models.PrestartPlacement is not null)
+            {
+                await Task.Delay(550, cancellationToken).ConfigureAwait(false);
+                report("Placement", 50, $"Placing {prestartPlacements.AfterStart.Count} unit(s) that were covered by the Start Game dialog.", null, null);
+                await PlaceAsync(window, preset, models.PrestartPlacement, prestartPlacements.AfterStart, log, cancellationToken).ConfigureAwait(false);
             }
             await Task.Delay(2200, cancellationToken).ConfigureAwait(false);
             MatchTerminal terminal = await MonitorMatchAsync(window, preset, profile, models, detector, log, report, cancellationToken).ConfigureAwait(false);
@@ -772,9 +831,23 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
                 }
                 if (recovery == "lobby")
                 {
-                    report("Navigation", 0, $"Lobby recognized. Opening Play with {playMenuKey}.", recovery, null);
-                    await _automation.TapLetterKeyAsync(window, playMenuKey, cancellationToken).ConfigureAwait(false);
-                    await Task.Delay(1200, cancellationToken).ConfigureAwait(false);
+                    await LobbyPlayNavigator.OpenWithVerificationAsync(
+                        playMenuKey,
+                        () => CaptureClient(window, detector),
+                        candidate => string.Equals(detector.RecoveryState(candidate), "lobby", StringComparison.OrdinalIgnoreCase),
+                        candidate => ChallengeScreenDetector.Detect(candidate).State == ChallengeScreenState.GameModeSelector,
+                        (key, token) => _automation.TapLetterKeyAsync(window, key, token),
+                        async (timeout, token) => await TryWaitForScreenAsync(
+                            window,
+                            preset,
+                            detector,
+                            ChallengeScreenState.GameModeSelector,
+                            timeout,
+                            report,
+                            token).ConfigureAwait(false) is not null,
+                        attempt => report("Navigation", 0, $"Lobby recognized. Opening Play with {playMenuKey} (attempt {attempt}/{LobbyPlayNavigator.MaximumAttempts}).", recovery, null),
+                        attempt => log($"The {playMenuKey} Play-menu key did not open navigation from the lobby (attempt {attempt}/{LobbyPlayNavigator.MaximumAttempts}).", MacroEventLevel.Warning, recovery, null),
+                        cancellationToken).ConfigureAwait(false);
                 }
                 else
                 {
@@ -936,6 +1009,72 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         return frame ?? throw new InvalidOperationException($"Timed out waiting for {Label(desired)}.");
     }
 
+    private async Task<ImageFrame> WaitForPrestartAfterPreviewAsync(
+        RobloxWindow window,
+        ChallengePreset preset,
+        IDetectorPack detector,
+        Action<string, int, string, string?, double?> report,
+        CancellationToken cancellationToken)
+    {
+        DateTimeOffset startedAt = DateTimeOffset.UtcNow;
+        DateTimeOffset deadline = startedAt + InitialPrestartTimeout;
+        StableStateTracker<ChallengeScreenState> prestartTracker = new(preset.StableDetections);
+        StableStateTracker<string> recoveryTracker = new(preset.StableDetections);
+        bool teleportingSeen = false;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ImageFrame frame = CaptureClient(window, detector);
+            ChallengeScreenMatch match = ChallengeScreenDetector.Detect(frame);
+            DateTimeOffset extendedDeadline = ExtendPrestartDeadline(startedAt, deadline, match.State);
+            if (extendedDeadline > deadline)
+            {
+                deadline = extendedDeadline;
+                teleportingSeen = true;
+                report(
+                    "Teleporting",
+                    0,
+                    "Roblox is still teleporting. Waiting up to three minutes for the Challenge prestart screen.",
+                    "teleporting",
+                    match.Confidence);
+            }
+
+            ChallengeScreenState? stable = prestartTracker.Update(
+                match.State == ChallengeScreenState.Prestart
+                    ? ChallengeScreenState.Prestart
+                    : ChallengeScreenState.None);
+            if (stable == ChallengeScreenState.Prestart) return frame;
+
+            string? recovery = detector.RecoveryState(frame);
+            string recoveryCandidate = recovery is "afk" or "disconnect" or "lobby" ? recovery : string.Empty;
+            if (recoveryTracker.Update(recoveryCandidate) is string stableRecovery && !string.IsNullOrEmpty(stableRecovery))
+            {
+                throw new ChallengeRecoveryException(stableRecovery);
+            }
+
+            if (match.State is not (ChallengeScreenState.None or ChallengeScreenState.Teleporting))
+            {
+                report("Waiting", 0, $"Detected {Label(match.State)}.", match.State.ToString(), match.Confidence);
+            }
+            await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
+        }
+
+        throw new InvalidOperationException(
+            teleportingSeen
+                ? "Roblox remained on the Teleporting screen for three minutes and did not reach the Challenge prestart screen. The server or connection did not finish loading the stage."
+                : "Timed out waiting for Prestart.");
+    }
+
+    internal static DateTimeOffset ExtendPrestartDeadline(
+        DateTimeOffset startedAt,
+        DateTimeOffset currentDeadline,
+        ChallengeScreenState observedState)
+    {
+        if (observedState != ChallengeScreenState.Teleporting) return currentDeadline;
+        DateTimeOffset teleportDeadline = startedAt + TeleportingPrestartTimeout;
+        return teleportDeadline > currentDeadline ? teleportDeadline : currentDeadline;
+    }
+
     private async Task<ImageFrame?> TryWaitForScreenAsync(
         RobloxWindow window,
         ChallengePreset preset,
@@ -1013,10 +1152,19 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         PlacementModel model,
         Action<string, MacroEventLevel, string?, double?> log,
         CancellationToken cancellationToken) =>
+        PlaceAsync(window, preset, model, model.Steps, log, cancellationToken);
+
+    private Task PlaceAsync(
+        RobloxWindow window,
+        ChallengePreset preset,
+        PlacementModel model,
+        IReadOnlyList<PlacementStep> steps,
+        Action<string, MacroEventLevel, string?, double?> log,
+        CancellationToken cancellationToken) =>
         _placements.PlayStepsAsync(
             window,
             model,
-            model.Steps,
+            steps,
             useDefaultInterval: false,
             defaultIntervalMilliseconds: 0,
             preset.UnitKeyHoldMilliseconds,
@@ -1175,6 +1323,16 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         }
 
         return normalized;
+    }
+
+    private static void ValidateTeamKey(bool required, char? value)
+    {
+        if (!required) return;
+        if (value is null || !char.IsAsciiLetter(value.Value))
+        {
+            throw new InvalidDataException(
+                "Set the Unit menu key under Settings > Controls so it matches Anime Expeditions' Units binding before using a saved team.");
+        }
     }
 
     private static string Label(ChallengeMapId map) => map switch

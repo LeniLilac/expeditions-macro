@@ -11,9 +11,13 @@ internal static class UiSnapshotRenderer
 {
     private static readonly (string Key, string File, bool ShowPageEnd)[] Pages =
     [
+        ("Macro", "macro", false),
+        ("Macro", "macro-status", true),
         ("Expeditions", "expeditions", false),
         ("Challenges", "challenges", false),
         ("Challenges", "challenges-status", true),
+        ("Story", "story", false),
+        ("Raid", "raid", false),
         ("Camera Models", "camera-models", false),
         ("Placement Models", "placement-models", false),
         ("Settings", "settings", false),
@@ -35,6 +39,7 @@ internal static class UiSnapshotRenderer
             ShowActivated = false,
             Opacity = 0.01,
         };
+        VerifyBundledFont(window);
         window.Show();
         try
         {
@@ -64,6 +69,14 @@ internal static class UiSnapshotRenderer
         finally
         {
             window.Close();
+        }
+    }
+
+    private static void VerifyBundledFont(MainWindow window)
+    {
+        if (!window.FontFamily.FamilyNames.Values.Any(name => string.Equals(name, "Fredoka", StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException("The main window did not inherit the embedded Fredoka font. WPF would silently use a fallback typeface.");
         }
     }
 
