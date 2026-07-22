@@ -20,6 +20,7 @@ It uses screen capture and ordinary Windows input. It does not inject into Roblo
 - Fully zooms out with Roblox's `O` key (with mouse-wheel input retained as a fallback), toggles shift lock, sets a top-down pitch, and aligns yaw against a learned full-turn camera model.
 - Records, edits, saves, and tests Roblox-relative unit placements in one tool.
 - Detects start, checkpoint, continue, confirmation, reward, victory, defeat, lobby, disconnect, and AFK Chamber screens.
+- Captures the Roblox window directly instead of reading overlapping desktop windows, and normalizes HDR/Auto HDR pixels to SDR before detection.
 - Detects reward cards from the stable reward overlay and available Select Upgrade controls, including layouts where a card is still collapsed or moving and regardless of rarity color.
 - Extracts at the first real checkpoint or after a configured number of boss nodes. The spawn is not counted because it has no Extract action.
 - Handles an early defeat even when extraction was planned later.

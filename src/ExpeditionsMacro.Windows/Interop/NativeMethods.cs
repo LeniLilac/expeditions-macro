@@ -43,6 +43,7 @@ internal static partial class NativeMethods
     internal const uint CaptureBlt = 0x40000000;
     internal const uint DibRgbColors = 0;
     internal const uint CryptprotectUiForbidden = 0x1;
+    internal const uint DwmwaExtendedFrameBounds = 9;
 
     internal delegate bool EnumWindowsProc(nint window, nint parameter);
     internal delegate nint HookProc(int code, nuint wParam, nint lParam);
@@ -204,6 +205,9 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool GetWindowRect(nint window, out Rect rectangle);
+
+    [LibraryImport("dwmapi.dll")]
+    internal static partial int DwmGetWindowAttribute(nint window, uint attribute, out Rect value, uint size);
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

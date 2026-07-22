@@ -1,4 +1,5 @@
 using ExpeditionsMacro.Core.Abstractions;
+using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Windows;
 
 namespace ExpeditionsMacro.Tests;
@@ -82,5 +83,79 @@ public sealed class WindowsRobloxAutomationTests
 
         Assert.NotEqual(0, forced & unrelatedFlag);
         Assert.Equal(0, forced & decorativeEdges);
+    }
+
+    [Fact]
+    public void WindowCapture_MapsClientPixelsInsideTheExtendedFrame()
+    {
+        ScreenRegion crop = WindowsGraphicsCapture.ResolveClientCrop(
+            surfaceWidth: 824,
+            surfaceHeight: 650,
+            client: new ClientBounds(108, 131, 808, 611),
+            windowBounds: new WindowBounds(100, 100, 824, 650),
+            extendedFrameBounds: new WindowBounds(100, 100, 824, 650));
+
+        Assert.Equal(new ScreenRegion(8, 31, 808, 611), crop);
+    }
+
+    [Fact]
+    public void WindowCapture_AcceptsAClientOnlySurface()
+    {
+        ScreenRegion crop = WindowsGraphicsCapture.ResolveClientCrop(
+            surfaceWidth: 808,
+            surfaceHeight: 611,
+            client: new ClientBounds(320, 240, 808, 611),
+            windowBounds: new WindowBounds(312, 209, 824, 650),
+            extendedFrameBounds: new WindowBounds(312, 209, 824, 650));
+
+        Assert.Equal(new ScreenRegion(0, 0, 808, 611), crop);
+    }
+
+    [Fact]
+    public void WindowCapture_ConvertsLinearScRgbToSrgbAndUsesTheClientCrop()
+    {
+        byte[] pixels = new byte[2 * 8];
+        WriteRgbaHalf(pixels, 0, 0f, 0f, 0f, 1f);
+        WriteRgbaHalf(pixels, 8, 0.5f, 0.25f, 0f, 1f);
+
+        var frame = WindowsGraphicsCapture.ConvertScRgbRgba16ToRgb(
+            pixels,
+            surfaceWidth: 2,
+            surfaceHeight: 1,
+            new ScreenRegion(1, 0, 1, 1));
+
+        Assert.Equal(new byte[] { 188, 137, 0 }, frame.Pixels);
+    }
+
+    [Fact]
+    public void WindowCapture_CompressesHdrHighlightsInsteadOfClippingTheCapturePipeline()
+    {
+        byte[] pixels = new byte[8];
+        WriteRgbaHalf(pixels, 0, 2f, 2f, 2f, 1f);
+
+        var frame = WindowsGraphicsCapture.ConvertScRgbRgba16ToRgb(
+            pixels,
+            surfaceWidth: 1,
+            surfaceHeight: 1,
+            new ScreenRegion(0, 0, 1, 1));
+
+        Assert.InRange(frame.Pixels[0], 230, 250);
+        Assert.Equal(frame.Pixels[0], frame.Pixels[1]);
+        Assert.Equal(frame.Pixels[0], frame.Pixels[2]);
+    }
+
+    private static void WriteRgbaHalf(byte[] target, int offset, float red, float green, float blue, float alpha)
+    {
+        WriteHalf(target, offset, red);
+        WriteHalf(target, offset + 2, green);
+        WriteHalf(target, offset + 4, blue);
+        WriteHalf(target, offset + 6, alpha);
+    }
+
+    private static void WriteHalf(byte[] target, int offset, float value)
+    {
+        ushort bits = BitConverter.HalfToUInt16Bits((Half)value);
+        target[offset] = (byte)bits;
+        target[offset + 1] = (byte)(bits >> 8);
     }
 }
