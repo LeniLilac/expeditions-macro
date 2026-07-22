@@ -4,6 +4,25 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.4] - 2026-07-22
+
+### Fixed
+
+- Recognized the settled upper Story party-preview rail after its entrance animation, preserving two-frame stability while mapping the live Start action.
+- Recognized the current compact Story/Raid Victory action rail so terminal results complete instead of polling indefinitely.
+- Closed and verified the Challenge selector before a cooldown task returns to the Macro scheduler, preventing the next Expedition, Story, or Raid task from waiting behind a Challenge-owned panel.
+- Restored shared game-mode navigation before a recoverable Story/Raid camera-alignment skip is handed to the scheduler; an unverifiable handoff now stops safely.
+- Snapshotted Placement recording and playback timing switches before background execution, preventing WPF thread-affinity errors when either operation starts.
+- Accepted coherent cross-session vertical projection drift during full-resolution camera verification only when at least three saved world regions agree, while retaining the tight thumbnail atlas and wrong-yaw rejection.
+- Re-observed the live camera after a complete arrow-key turn and return before applying any fine mouse correction, preventing a stale first-visit offset from sending the camera away from an already strong match.
+- Tested strong fine-neighborhood candidates earlier when session rendering lowers them below the calibration baseline; unchanged direct verification still rejects false candidates.
+
+### Tests
+
+- Added privacy-reviewed fixtures for the reported King's Tomb Mastery preview and compact Spirit City Victory screen, including full cross-state regression coverage.
+- Added Challenge cooldown handoff retries, fail-closed navigation coverage, and a scheduler ownership regression proving lower-priority modes run only after Challenge becomes ineligible.
+- Added privacy-safe composites from a reported camera failure plus regressions for coherent projection drift, nearby and wrong yaw, and full-turn return re-observation.
+
 ## [1.3.0-beta.3] - 2026-07-22
 
 ### Added
@@ -444,7 +463,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.3...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.4...HEAD
+[1.3.0-beta.4]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.3...v1.3.0-beta.4
 [1.3.0-beta.3]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.2...v1.3.0-beta.3
 [1.3.0-beta.2]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.1...v1.3.0-beta.2
 [1.3.0-beta.1]: https://github.com/LeniLilac/expeditions-macro/compare/v1.2.1...v1.3.0-beta.1

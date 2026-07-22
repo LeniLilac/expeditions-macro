@@ -9,8 +9,8 @@ namespace ExpeditionsMacro.Vision.Camera;
 public static class CameraRegionAnalyzer
 {
     public const int SelectedRegionCount = 4;
-    private const int CompositeTileWidth = 152;
-    private const int CompositeTileHeight = 96;
+    public const int CompositeTileWidth = 152;
+    public const int CompositeTileHeight = 96;
 
     private sealed record Candidate(ScreenRegion Region, double Stability, double Texture)
     {

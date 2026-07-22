@@ -28,12 +28,14 @@ public sealed class StageScreenDetectorTests
     [InlineData("RaidSelector_01.png", StageScreenState.RaidSelector)]
     [InlineData("RaidDetail_01.png", StageScreenState.RaidDetail)]
     [InlineData("RaidPartyPreview_01.png", StageScreenState.PreviewReady)]
+    [InlineData("StoryPartyPreview_Mastery_01.png", StageScreenState.PreviewReady)]
     [InlineData("StoryVictory_Act_01.png", StageScreenState.Victory)]
     [InlineData("StoryVictory_Mastery_01.png", StageScreenState.Victory)]
     [InlineData("StoryDefeat_Act_01.png", StageScreenState.Defeat)]
     [InlineData("StoryDefeat_Infinite_01.png", StageScreenState.Defeat)]
     [InlineData("StoryDefeat_Mastery_01.png", StageScreenState.Defeat)]
     [InlineData("RaidVictory_01.png", StageScreenState.Victory)]
+    [InlineData("RaidVictory_CompactActions_01.png", StageScreenState.Victory)]
     [InlineData("RaidDefeat_01.png", StageScreenState.Defeat)]
     [InlineData("GameModeNegative_01.png", StageScreenState.GameModeSelector)]
     public void ReviewedStageFixtures_MatchTheirExpectedState(string fileName, StageScreenState expected)
@@ -76,14 +78,16 @@ public sealed class StageScreenDetectorTests
         Assert.Equal((420, 105), StageScreenDetector.ModeTileAction(StageMode.Story));
     }
 
-    [Fact]
-    public void ThreeActionPartyPreview_MapsTheLiveStartButton()
+    [Theory]
+    [InlineData("RaidPartyPreview_01.png", 415, 425)]
+    [InlineData("StoryPartyPreview_Mastery_01.png", 388, 400)]
+    public void ThreeActionPartyPreview_MapsTheLiveStartButton(string fileName, int minimumY, int maximumY)
     {
-        StageScreenMatch match = StageScreenDetector.Detect(Load("RaidPartyPreview_01.png"));
+        StageScreenMatch match = StageScreenDetector.Detect(Load(fileName));
 
         Assert.Equal(StageScreenState.PreviewReady, match.State);
         Assert.InRange(match.ActionX!.Value, 475, 485);
-        Assert.InRange(match.ActionY!.Value, 415, 425);
+        Assert.InRange(match.ActionY!.Value, minimumY, maximumY);
     }
 
     [Theory]
@@ -97,6 +101,16 @@ public sealed class StageScreenDetectorTests
         Assert.Equal(StageScreenState.Victory, match.State);
         Assert.InRange(match.ActionX!.Value, 670, 690);
         Assert.InRange(match.ActionY!.Value, 135, 170);
+    }
+
+    [Fact]
+    public void CompactRaidVictory_MapsTheLiveCloseControl()
+    {
+        StageScreenMatch match = StageScreenDetector.Detect(Load("RaidVictory_CompactActions_01.png"));
+
+        Assert.Equal(StageScreenState.Victory, match.State);
+        Assert.InRange(match.ActionX!.Value, 650, 665);
+        Assert.InRange(match.ActionY!.Value, 155, 170);
     }
 
     [Theory]

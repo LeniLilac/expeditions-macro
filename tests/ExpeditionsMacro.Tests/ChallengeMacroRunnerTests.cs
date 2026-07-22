@@ -277,4 +277,64 @@ public sealed class ChallengeMacroRunnerTests
         Assert.Equal(1, presses);
     }
 
+    [Fact]
+    public async Task CooldownSchedulerHandoff_RetriesUntilTheSharedGameModeSelectorIsVerified()
+    {
+        ImageFrame cooldown = ImageCodec.Load(Path.Combine(
+            TestPaths.ChallengeDatasets,
+            "ChallengeListUnavailable",
+            "ChallengeListUnavailable_02.png"));
+        ChallengeScreenMatch selector = ChallengeScreenDetector.Detect(cooldown);
+        List<(int X, int Y)> clicks = [];
+        List<int> started = [];
+        List<int> missed = [];
+        int verifications = 0;
+
+        double confidence = await ChallengeMacroRunner.CloseChallengeSelectorForHandoffAsync(
+            _ => Task.FromResult(selector),
+            (x, y, _) =>
+            {
+                clicks.Add((x, y));
+                return Task.CompletedTask;
+            },
+            _ => Task.FromResult<double?>(++verifications == 2 ? 0.97 : null),
+            (attempt, _) => started.Add(attempt),
+            (attempt, _) => missed.Add(attempt),
+            CancellationToken.None);
+
+        Assert.Equal(ChallengeScreenState.ChallengeListUnavailable, selector.State);
+        Assert.Equal(0.97, confidence);
+        Assert.Equal([1, 2], started);
+        Assert.Equal([1], missed);
+        Assert.Equal(2, clicks.Count);
+        Assert.All(clicks, click => Assert.Equal((selector.ActionX, selector.ActionY), ((int?)click.X, (int?)click.Y)));
+    }
+
+    [Fact]
+    public async Task CooldownSchedulerHandoff_NeverReturnsWhileTheOwnerPanelRemainsOpen()
+    {
+        ImageFrame cooldown = ImageCodec.Load(Path.Combine(
+            TestPaths.ChallengeDatasets,
+            "ChallengeListUnavailable",
+            "ChallengeListUnavailable_01.png"));
+        ChallengeScreenMatch selector = ChallengeScreenDetector.Detect(cooldown);
+        int clicks = 0;
+
+        InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            ChallengeMacroRunner.CloseChallengeSelectorForHandoffAsync(
+                _ => Task.FromResult(selector),
+                (_, _, _) =>
+                {
+                    clicks++;
+                    return Task.CompletedTask;
+                },
+                _ => Task.FromResult<double?>(null),
+                closeAttemptStarted: null,
+                closeAttemptMissed: null,
+                CancellationToken.None));
+
+        Assert.Equal(ChallengeMacroRunner.SchedulerHandoffMaximumAttempts, clicks);
+        Assert.Contains("control was not returned to the task scheduler", error.Message, StringComparison.Ordinal);
+    }
+
 }

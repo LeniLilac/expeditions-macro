@@ -18,6 +18,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
 {
     internal static readonly TimeSpan InitialPrestartTimeout = TimeSpan.FromSeconds(35);
     internal static readonly TimeSpan TeleportingPrestartTimeout = TimeSpan.FromMinutes(3);
+    internal const int SchedulerHandoffMaximumAttempts = 3;
 
     private readonly IRobloxAutomation _automation;
     private readonly CameraAlignmentEngine _camera;
@@ -314,7 +315,9 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
                     Write);
                 if (returnWhenUnavailable)
                 {
-                    Write($"Challenge rotation is unavailable until {waitUntil:HH:mm} UTC. Returning control to the task scheduler.");
+                    Write($"Challenge rotation is unavailable until {waitUntil:HH:mm} UTC. Preparing shared navigation for the next scheduled task.");
+                    await PrepareSchedulerHandoffAsync(window, preset, detector, Write, Report, cancellationToken).ConfigureAwait(false);
+                    Write("Challenge handoff is ready. Returning control to the task scheduler.", MacroEventLevel.Success, "game_mode_selector", null);
                     return;
                 }
                 await WaitUntilAsync(window, preset, detector, playMenuKey, waitUntil, dailyLimit, idleWorkflow, Write, Report, cancellationToken).ConfigureAwait(false);
@@ -582,7 +585,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         if (preset.IdleBehavior == ChallengeIdleBehavior.RunExpeditions && idleWorkflow is not null)
         {
             report("Waiting", 0, dailyLimit ? "Daily Challenge limits reached. Running Expeditions until midnight UTC." : "Challenges complete. Running Expeditions until the next reset.", null, null);
-            await PrepareExpeditionsIdleHandoffAsync(window, preset, detector, log, report, cancellationToken).ConfigureAwait(false);
+            await PrepareSchedulerHandoffAsync(window, preset, detector, log, report, cancellationToken).ConfigureAwait(false);
             await idleWorkflow(untilUtc, cancellationToken).ConfigureAwait(false);
             await ReturnFromIdleModeAsync(window, preset, detector, playMenuKey, log, report, cancellationToken).ConfigureAwait(false);
             return;
@@ -601,7 +604,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         log("Challenge wait finished. Rechecking the selector.", MacroEventLevel.Information, null, null);
     }
 
-    private async Task PrepareExpeditionsIdleHandoffAsync(
+    private async Task PrepareSchedulerHandoffAsync(
         RobloxWindow window,
         ChallengePreset preset,
         IDetectorPack detector,
@@ -609,56 +612,85 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         Action<string, int, string, string?, double?> report,
         CancellationToken cancellationToken)
     {
-        for (int attempt = 1; attempt <= 3; attempt++)
-        {
-            ChallengeSelectorObservation selector = await WaitForChallengeSelectorAsync(
+        double confidence = await CloseChallengeSelectorForHandoffAsync(
+            async token => (await WaitForChallengeSelectorAsync(
                 window,
                 preset,
                 detector,
                 TimeSpan.FromSeconds(8),
                 report,
-                cancellationToken).ConfigureAwait(false);
-            if (selector.Match.ActionX is not int closeX || selector.Match.ActionY is not int closeY)
+                token).ConfigureAwait(false)).Match,
+            (x, y, token) => ClickAsync(window, x, y, token),
+            async token =>
+            {
+                ImageFrame? gameModes = await TryWaitForScreenAsync(
+                    window,
+                    preset,
+                    detector,
+                    ChallengeScreenState.GameModeSelector,
+                    TimeSpan.FromSeconds(5),
+                    report,
+                    token).ConfigureAwait(false);
+                return gameModes is null
+                    ? null
+                    : ChallengeScreenDetector.ScoreStates(gameModes)[ChallengeScreenState.GameModeSelector];
+            },
+            (attempt, selector) => report(
+                "Handoff",
+                0,
+                attempt == 1
+                    ? "Closing the Challenge selector before handing off navigation."
+                    : $"Challenge selector is still open; retrying its close button ({attempt}/{SchedulerHandoffMaximumAttempts}).",
+                selector.State.ToString(),
+                selector.Confidence),
+            (attempt, selector) => log(
+                $"Challenge selector did not close (attempt {attempt}/{SchedulerHandoffMaximumAttempts}).",
+                MacroEventLevel.Warning,
+                selector.State.ToString(),
+                selector.Confidence),
+            cancellationToken).ConfigureAwait(false);
+
+        log(
+            "Challenge selector closed. Shared game-mode navigation is ready for the next workflow.",
+            MacroEventLevel.Success,
+            "game_mode_selector",
+            confidence);
+    }
+
+    internal static async Task<double> CloseChallengeSelectorForHandoffAsync(
+        Func<CancellationToken, Task<ChallengeScreenMatch>> observeSelector,
+        Func<int, int, CancellationToken, Task> clickClose,
+        Func<CancellationToken, Task<double?>> waitForGameModeSelector,
+        Action<int, ChallengeScreenMatch>? closeAttemptStarted,
+        Action<int, ChallengeScreenMatch>? closeAttemptMissed,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(observeSelector);
+        ArgumentNullException.ThrowIfNull(clickClose);
+        ArgumentNullException.ThrowIfNull(waitForGameModeSelector);
+
+        for (int attempt = 1; attempt <= SchedulerHandoffMaximumAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ChallengeScreenMatch selector = await observeSelector(cancellationToken).ConfigureAwait(false);
+            if (selector.State is not (ChallengeScreenState.ChallengeList or ChallengeScreenState.ChallengeListUnavailable))
+            {
+                throw new InvalidOperationException($"Cannot hand off from the unexpected Challenge state {selector.State}.");
+            }
+            if (selector.ActionX is not int closeX || selector.ActionY is not int closeY)
             {
                 throw new InvalidOperationException("The Challenge selector close button could not be located.");
             }
 
-            report(
-                "Handoff",
-                0,
-                attempt == 1
-                    ? "Closing the Challenge selector before starting Expeditions."
-                    : $"Challenge selector is still open; retrying its close button ({attempt}/3).",
-                selector.Match.State.ToString(),
-                selector.Match.Confidence);
-            await ClickAsync(window, closeX, closeY, cancellationToken).ConfigureAwait(false);
-            ImageFrame? gameModes = await TryWaitForScreenAsync(
-                window,
-                preset,
-                detector,
-                ChallengeScreenState.GameModeSelector,
-                TimeSpan.FromSeconds(5),
-                report,
-                cancellationToken).ConfigureAwait(false);
-            if (gameModes is not null)
-            {
-                log(
-                    "Challenge selector closed. Handing navigation to the Expeditions recovery flow.",
-                    MacroEventLevel.Success,
-                    "game_mode_selector",
-                    ChallengeScreenDetector.ScoreStates(gameModes)[ChallengeScreenState.GameModeSelector]);
-                return;
-            }
-
-            log(
-                $"Challenge selector did not close (attempt {attempt}/3).",
-                MacroEventLevel.Warning,
-                selector.Match.State.ToString(),
-                selector.Match.Confidence);
+            closeAttemptStarted?.Invoke(attempt, selector);
+            await clickClose(closeX, closeY, cancellationToken).ConfigureAwait(false);
+            double? confidence = await waitForGameModeSelector(cancellationToken).ConfigureAwait(false);
+            if (confidence is not null) return confidence.Value;
+            closeAttemptMissed?.Invoke(attempt, selector);
         }
 
         throw new InvalidOperationException(
-            "The Challenge selector remained open after three focused close attempts, so Expeditions was not started.");
+            $"The Challenge selector remained open after {SchedulerHandoffMaximumAttempts} focused close attempts, so control was not returned to the task scheduler.");
     }
 
     private async Task ReturnFromIdleModeAsync(
