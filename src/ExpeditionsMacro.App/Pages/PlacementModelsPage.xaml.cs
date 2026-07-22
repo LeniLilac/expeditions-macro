@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using ExpeditionsMacro.App.Models;
 using ExpeditionsMacro.App.Services;
+using ExpeditionsMacro.Automation.Diagnostics;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
 
@@ -100,16 +101,24 @@ public partial class PlacementModelsPage : UserControl, IAppPage
                 name,
                 delay,
                 RecordedTimingCheck.IsChecked == true,
-                captured: capture => Dispatcher.BeginInvoke(() =>
+                captured: capture =>
                 {
-                    _steps.Add(new PlacementStepRow { UnitKey = capture.UnitKey, X = capture.X, Y = capture.Y, DelayAfterMilliseconds = delay });
-                    OperationProgress.Value = Math.Min(95, _steps.Count * 10);
-                }),
-                status: message => Dispatcher.BeginInvoke(() =>
+                    _services.DeepDebug.RecordEvent("placement", "capture_recorded", capture);
+                    Dispatcher.BeginInvoke(() =>
+                    {
+                        _steps.Add(new PlacementStepRow { UnitKey = capture.UnitKey, X = capture.X, Y = capture.Y, DelayAfterMilliseconds = delay });
+                        OperationProgress.Value = Math.Min(95, _steps.Count * 10);
+                    });
+                },
+                status: message =>
                 {
-                    StatusText.Text = message;
-                    DetailText.Text = message.Contains("Recording", StringComparison.OrdinalIgnoreCase) ? $"Press {_services.Hotkey.DisplayName} again to finish and save." : DetailText.Text;
-                }),
+                    _services.DeepDebug.RecordEvent("placement", "recording_status", new { Message = message });
+                    Dispatcher.BeginInvoke(() =>
+                    {
+                        StatusText.Text = message;
+                        DetailText.Text = message.Contains("Recording", StringComparison.OrdinalIgnoreCase) ? $"Press {_services.Hotkey.DisplayName} again to finish and save." : DetailText.Text;
+                    });
+                },
                 cancellationToken: token);
             await Dispatcher.InvokeAsync(() =>
             {
@@ -117,6 +126,16 @@ public partial class PlacementModelsPage : UserControl, IAppPage
                 OperationProgress.Value = 100;
             });
             await RefreshModelsAsync(model.Id);
+        }, new DeepDebugOperationContext
+        {
+            PlacementModelIds = [ModelId.FromName(name)],
+            OperationSettings = new
+            {
+                Name = name,
+                DefaultDelayMilliseconds = delay,
+                UseRecordedTiming = RecordedTimingCheck.IsChecked == true,
+            },
+            RefreshReferencedModelsAfterOperation = true,
         });
         StatusText.Text = "Placement recording armed.";
         string hotkey = _services.Hotkey.DisplayName;
@@ -145,9 +164,26 @@ public partial class PlacementModelsPage : UserControl, IAppPage
                 model,
                 PlaybackOverrideCheck.IsChecked == true,
                 delay,
-                stepSent: (index, total, _) => Dispatcher.BeginInvoke(() => OperationProgress.Value = 100d * index / total),
-                status: message => Dispatcher.BeginInvoke(() => StatusText.Text = message),
+                stepSent: (index, total, step) =>
+                {
+                    _services.DeepDebug.RecordEvent("placement", "playback_step", new { Index = index, Total = total, Step = step });
+                    Dispatcher.BeginInvoke(() => OperationProgress.Value = 100d * index / total);
+                },
+                status: message =>
+                {
+                    _services.DeepDebug.RecordEvent("placement", "playback_status", new { Message = message });
+                    Dispatcher.BeginInvoke(() => StatusText.Text = message);
+                },
                 cancellationToken: token);
+        }, new DeepDebugOperationContext
+        {
+            PlacementModelIds = [model.Id],
+            OperationSettings = new
+            {
+                Model = model.Id,
+                UseDefaultInterval = PlaybackOverrideCheck.IsChecked == true,
+                DefaultDelayMilliseconds = delay,
+            },
         });
         StatusText.Text = $"Playback armed. Focus Roblox and press {_services.Hotkey.DisplayName} to begin.";
         DetailText.Text = "Roblox will temporarily match the model's recorded client size.";

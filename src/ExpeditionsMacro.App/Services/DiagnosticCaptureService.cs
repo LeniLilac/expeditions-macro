@@ -1,6 +1,5 @@
 using System.IO;
 using System.IO.Compression;
-using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Windows.Media.Imaging;
@@ -10,6 +9,7 @@ using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
+using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Packs;
 
 namespace ExpeditionsMacro.App.Services;
@@ -194,7 +194,7 @@ public sealed class DiagnosticCaptureService
             DiagnosticDetectorPack? detectorPack = await TryReadDetectorPackAsync().ConfigureAwait(false);
             DiagnosticCaptureManifest manifest = new(
                 safeName,
-                Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "unknown",
+                ProductVersion.Current,
                 startedAt,
                 DateTimeOffset.UtcNow,
                 ClientWidth,
@@ -316,7 +316,7 @@ public sealed class DiagnosticCaptureService
             DiagnosticDetectorPack? detectorPack = await TryReadDetectorPackAsync().ConfigureAwait(false);
             DiagnosticCaptureManifest manifest = new(
                 safeName,
-                Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "unknown",
+                ProductVersion.Current,
                 startedAt,
                 DateTimeOffset.UtcNow,
                 ClientWidth,

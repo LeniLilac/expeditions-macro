@@ -27,7 +27,7 @@ public sealed class CameraAlignmentTests
         CameraCalibrationSettings settings = new();
 
         Assert.Equal(30, settings.ArrowHoldMilliseconds);
-        Assert.Equal(100, settings.SettleMilliseconds);
+        Assert.Equal(200, settings.SettleMilliseconds);
         Assert.Equal(30, settings.ZoomTicks);
         Assert.Equal(1800, settings.PitchDragPixels);
         settings.Validate();
@@ -320,6 +320,28 @@ public sealed class CameraAlignmentTests
     }
 
     [Fact]
+    public async Task Align_WhenPoseRankingChoosesWrongShiftState_RetriesTheAlternateState()
+    {
+        ImageFrame goal = VisionScorerTests.Pattern(RobloxClientProfile.Width, RobloxClientProfile.Height);
+        ImageFrame decoy = Shift(goal, 80);
+        CameraModel model = CreateModel(goal, [decoy, goal, goal, goal, goal, goal, goal]);
+        FakeAutomation automation = new(decoy)
+        {
+            FullYawSteps = 6,
+            CaptureAtCameraState = (_, _, shiftLock) => shiftLock ? goal : decoy,
+        };
+        List<MacroProgress> updates = [];
+        CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
+
+        double score = await engine.AlignAsync(model, progress: new InlineProgress<MacroProgress>(updates.Add));
+
+        Assert.True(score > 0.90, $"Alternate-state alignment score was {score:P1}.");
+        Assert.Contains(updates, update => update.Message.Contains("Retrying in the alternate state", StringComparison.Ordinal));
+        Assert.Equal(4, automation.LeftControlTapCount);
+        Assert.False(automation.ShiftLockState);
+    }
+
+    [Fact]
     public async Task Align_WhenShiftLockIsAlreadyManaged_DoesNotToggleIt()
     {
         ImageFrame goal = VisionScorerTests.Pattern(RobloxClientProfile.Width, RobloxClientProfile.Height);
@@ -472,10 +494,10 @@ public sealed class CameraAlignmentTests
         CameraAlignmentException error = await Assert.ThrowsAsync<CameraAlignmentException>(() => engine.AlignAsync(model));
 
         Assert.Contains("Unit placement was not started", error.Message, StringComparison.Ordinal);
-        Assert.Equal(3, error.Attempts);
+        Assert.Equal(6, error.Attempts);
         Assert.True(automation.ArrowPulses.Count(pulse => pulse == CameraYawDirection.Right) >= 12);
         Assert.True(automation.ArrowPulses.Count(pulse => pulse == CameraYawDirection.Left) >= 12);
-        Assert.Equal(2, automation.LeftControlTapCount);
+        Assert.Equal(4, automation.LeftControlTapCount);
     }
 
     private static CameraModel CreateModel(ImageFrame goal, IReadOnlyList<ImageFrame> yawFrames)
@@ -635,6 +657,7 @@ public sealed class CameraAlignmentTests
         }
         public Task ParkCursorAsync(RobloxWindow window, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task ClickClientAsync(RobloxWindow window, int x, int y, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task ScrollClientAsync(RobloxWindow window, int notches, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task DragCameraAsync(RobloxWindow window, int deltaX, int deltaY, int chunkPixels, CancellationToken cancellationToken)
         {
             Drags.Add((deltaX, deltaY));

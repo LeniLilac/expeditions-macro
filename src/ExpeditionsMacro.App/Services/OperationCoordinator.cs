@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Threading;
+using ExpeditionsMacro.Automation.Diagnostics;
 
 namespace ExpeditionsMacro.App.Services;
 
@@ -18,6 +19,7 @@ public sealed class OperationCoordinator : INotifyPropertyChanged
     private readonly object _gate = new();
     private Func<CancellationToken, Task>? _armedAction;
     private string? _armedDescription;
+    private DeepDebugOperationContext? _armedDebugContext;
     private CancellationTokenSource? _cancellation;
     private OperationState _state;
     private string _description = "Ready";
@@ -34,6 +36,8 @@ public sealed class OperationCoordinator : INotifyPropertyChanged
     public event EventHandler<Exception>? OperationFailed;
 
     public Func<Task>? DefaultIdleHotkeyAction { get; set; }
+
+    public Func<string, DeepDebugOperationContext?, Func<CancellationToken, Task>, CancellationToken, Task>? OperationRunner { get; set; }
 
     public string HotkeyDisplayName { get; set; } = "F6";
 
@@ -63,7 +67,10 @@ public sealed class OperationCoordinator : INotifyPropertyChanged
 
     public bool IsBusy => State is not OperationState.Idle;
 
-    public void Arm(string description, Func<CancellationToken, Task> action)
+    public void Arm(
+        string description,
+        Func<CancellationToken, Task> action,
+        DeepDebugOperationContext? debugContext = null)
     {
         ArgumentNullException.ThrowIfNull(action);
         lock (_gate)
@@ -71,18 +78,23 @@ public sealed class OperationCoordinator : INotifyPropertyChanged
             if (State != OperationState.Idle) throw new InvalidOperationException("Another workflow already owns Roblox input.");
             _armedAction = action;
             _armedDescription = description;
+            _armedDebugContext = debugContext;
             Description = $"{description}: press {HotkeyDisplayName} to begin";
             State = OperationState.Armed;
         }
     }
 
-    public Task RunNowAsync(string description, Func<CancellationToken, Task> action)
+    public Task RunNowAsync(
+        string description,
+        Func<CancellationToken, Task> action,
+        DeepDebugOperationContext? debugContext = null)
     {
         lock (_gate)
         {
             if (State != OperationState.Idle) throw new InvalidOperationException("Another workflow already owns Roblox input.");
             _armedAction = action;
             _armedDescription = description;
+            _armedDebugContext = debugContext;
         }
         return BeginAsync(description);
     }
@@ -95,6 +107,7 @@ public sealed class OperationCoordinator : INotifyPropertyChanged
             {
                 _armedAction = null;
                 _armedDescription = null;
+                _armedDebugContext = null;
                 Description = "Ready";
                 State = OperationState.Idle;
                 return;
@@ -130,18 +143,28 @@ public sealed class OperationCoordinator : INotifyPropertyChanged
     private async Task BeginAsync(string description)
     {
         Func<CancellationToken, Task> action;
+        DeepDebugOperationContext? debugContext;
         lock (_gate)
         {
             action = _armedAction ?? throw new InvalidOperationException("No operation is armed.");
+            debugContext = _armedDebugContext;
             _armedAction = null;
             _armedDescription = null;
+            _armedDebugContext = null;
             _cancellation = new CancellationTokenSource();
             Description = description;
             State = OperationState.Running;
         }
         try
         {
-            await action(_cancellation.Token);
+            if (OperationRunner is null)
+            {
+                await action(_cancellation.Token);
+            }
+            else
+            {
+                await OperationRunner(description, debugContext, action, _cancellation.Token);
+            }
         }
         catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)
         {

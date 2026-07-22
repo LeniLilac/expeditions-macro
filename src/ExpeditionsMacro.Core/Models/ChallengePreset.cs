@@ -34,10 +34,13 @@ public sealed record ChallengeMapProfile
 
     public int DelayedPlacementSeconds { get; init; } = 30;
 
+    public int TeamSlot { get; init; }
+
     public void Validate()
     {
         if (!Enum.IsDefined(Map)) throw new InvalidDataException("Challenge map is invalid.");
         if (DelayedPlacementSeconds is < 0 or > 3600) throw new InvalidDataException("Delayed placement time must be 0 through 3600 seconds.");
+        if (TeamSlot is < 0 or > 8) throw new InvalidDataException("Team must be Don't change or Team 1 through 8.");
         ValidateOptionalId(CameraModelId, "camera model");
         ValidateOptionalId(PrestartPlacementModelId, "prestart placement model");
         ValidateOptionalId(DelayedPlacementModelId, "delayed placement model");

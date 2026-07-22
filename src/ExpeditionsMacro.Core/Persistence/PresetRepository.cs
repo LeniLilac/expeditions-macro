@@ -46,6 +46,13 @@ public sealed class PresetRepository
         return JsonFileStore.WriteAtomicAsync(Path.Combine(_paths.Presets, $"{ValidateId(preset.Id)}.json"), preset, cancellationToken);
     }
 
+    public Task DeleteAsync(string id, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        File.Delete(Path.Combine(_paths.Presets, $"{ValidateId(id)}.json"));
+        return Task.CompletedTask;
+    }
+
     private static string ValidateId(string id)
     {
         string name = Path.GetFileName(id);

@@ -126,7 +126,7 @@ public sealed class ChallengeMapDetectorTests
                 })
                 .ToArray(),
         };
-        ChallengeMacroRunner runner = new(null!, null!, null!, null!);
+        ChallengeMacroRunner runner = new(null!, null!, null!, null!, null!);
 
         InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(() => runner.RunAsync(
             preset,

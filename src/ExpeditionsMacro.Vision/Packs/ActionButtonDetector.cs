@@ -53,6 +53,8 @@ internal static class ActionButtonDetector
         ["disconnect"] = new(new ScreenRegion(320, 320, 330, 145), ButtonColor.Neutral, 496, 394, 95, 60, 120, 230, 22, 58, 0.55),
         ["challenge_select_stage"] = new(new ScreenRegion(300, 395, 250, 80), ButtonColor.ChallengeGreen, 426, 437, 90, 35, 75, 190, 16, 42, 0.28),
         ["challenge_select_stage_wide"] = new(new ScreenRegion(300, 395, 390, 80), ButtonColor.ChallengeGreen, 507, 437, 170, 35, 190, 350, 16, 42, 0.28),
+        ["stage_select_stage"] = new(new ScreenRegion(145, 405, 220, 80), ButtonColor.ChallengeGreen, 256, 449, 70, 38, 125, 195, 18, 44, 0.28),
+        ["stage_enter_matchmaking"] = new(new ScreenRegion(325, 405, 220, 80), ButtonColor.Purple, 428, 449, 70, 38, 125, 195, 18, 44, 0.25),
         ["challenge_enter_matchmaking"] = new(new ScreenRegion(480, 395, 230, 80), ButtonColor.Purple, 589, 437, 100, 35, 70, 190, 16, 42, 0.25),
         ["challenge_preview_start"] = new(new ScreenRegion(390, 335, 230, 85), ButtonColor.Green, 506, 376, 65, 35, 130, 190, 20, 42, 0.42),
         ["challenge_change_mode"] = new(new ScreenRegion(550, 335, 230, 85), ButtonColor.Yellow, 668, 376, 65, 35, 130, 190, 20, 42, 0.42),
@@ -64,6 +66,13 @@ internal static class ActionButtonDetector
         ["challenge_victory_close"] = new(new ScreenRegion(625, 125, 90, 80), ButtonColor.Red, 670, 155, 48, 35, 14, 34, 14, 34, 0.35, 0.40),
         ["challenge_post_match_play"] = new(new ScreenRegion(152, 570, 28, 28), ButtonColor.Cyan, 164, 584, 16, 16, 8, 28, 8, 28, 0.08, 0.30, 40),
         ["challenge_game_results"] = new(new ScreenRegion(330, 450, 150, 75), ButtonColor.Yellow, 403, 491, 85, 40, 25, 120, 12, 40, 0.20, 0.38),
+        ["team_close"] = new(new ScreenRegion(610, 100, 110, 110), ButtonColor.Red, 660, 150, 55, 65, 14, 36, 14, 36, 0.35, 0.40),
+        ["units_unequip_all"] = new(new ScreenRegion(105, 405, 155, 70), ButtonColor.Red, 180, 442, 48, 35, 85, 135, 18, 42, 0.30),
+        ["units_teams"] = new(new ScreenRegion(215, 405, 165, 70), ButtonColor.Purple, 294, 442, 48, 35, 85, 135, 18, 42, 0.25),
+        ["units_quick_sell"] = new(new ScreenRegion(330, 405, 165, 70), ButtonColor.Yellow, 410, 442, 48, 35, 85, 135, 18, 42, 0.30),
+        ["team_load_confirm"] = new(new ScreenRegion(260, 300, 165, 70), ButtonColor.Green, 340, 334, 48, 35, 95, 145, 18, 42, 0.34),
+        ["team_equipment_include"] = new(new ScreenRegion(260, 340, 125, 70), ButtonColor.Green, 319, 376, 42, 35, 60, 105, 18, 42, 0.34),
+        ["team_equipment_exclude"] = new(new ScreenRegion(345, 340, 125, 70), ButtonColor.Red, 405, 376, 42, 35, 60, 105, 18, 42, 0.30),
     };
 
     public static double Score(ImageFrame image, string state)

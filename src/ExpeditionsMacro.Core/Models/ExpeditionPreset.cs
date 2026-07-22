@@ -18,6 +18,8 @@ public sealed record ExpeditionPreset
 
     public string PlacementModelId { get; init; } = string.Empty;
 
+    public int TeamSlot { get; init; }
+
     public string DetectorPackId { get; init; } = "anime-expeditions-expeditions";
 
     public bool ExtractAtCheckpoint { get; init; } = true;
@@ -47,6 +49,7 @@ public sealed record ExpeditionPreset
         if (MapNumber is < 1 or > 3) throw new InvalidDataException("Map must be 1, 2, or 3.");
         if (Difficulty is < 1 or > 3) throw new InvalidDataException("Difficulty must be 1, 2, or 3.");
         if (string.IsNullOrWhiteSpace(CameraModelId) || string.IsNullOrWhiteSpace(PlacementModelId)) throw new InvalidDataException("Choose both a camera and placement model.");
+        if (TeamSlot is < 0 or > 8) throw new InvalidDataException("Team must be Don't change or Team 1 through 8.");
         if (BossesBeforeExtract is < 0 or > 99) throw new InvalidDataException("Boss checkpoint target must be 0 through 99.");
         if (ZoomTicks is < 5 or > 80 || PitchDragPixels is < 300 or > 5000) throw new InvalidDataException("Camera preparation settings are out of range.");
         if (PollMilliseconds is < 150 or > 5000 || StableDetections is < 1 or > 5) throw new InvalidDataException("Detection timing is out of range.");

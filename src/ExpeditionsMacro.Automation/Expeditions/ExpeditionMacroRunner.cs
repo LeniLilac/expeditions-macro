@@ -2,6 +2,7 @@ using System.Diagnostics;
 using ExpeditionsMacro.Automation.Camera;
 using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Automation.Placement;
+using ExpeditionsMacro.Automation.Teams;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
@@ -24,6 +25,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
     private readonly IRobloxAutomation _automation;
     private readonly CameraAlignmentEngine _camera;
     private readonly PlacementService _placements;
+    private readonly TeamSelectionService _teams;
     private readonly IDiscordNotifier _discord;
     private readonly object _notificationGate = new();
     private readonly HashSet<Task> _pendingNotifications = [];
@@ -32,11 +34,13 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         IRobloxAutomation automation,
         CameraAlignmentEngine camera,
         PlacementService placements,
+        TeamSelectionService teams,
         IDiscordNotifier discord)
     {
         _automation = automation;
         _camera = camera;
         _placements = placements;
+        _teams = teams;
         _discord = discord;
     }
 
@@ -56,13 +60,17 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         Action<ExpeditionRunSummary>? summaryChanged = null,
         CancellationToken cancellationToken = default,
         DateTimeOffset? stopAfterCurrentRunUtc = null,
-        Func<Exception, CancellationToken, Task>? recoverableFailure = null)
+        Func<Exception, CancellationToken, Task>? recoverableFailure = null,
+        int? maximumRuns = null,
+        char? unitMenuKey = null)
     {
+        if (maximumRuns is < 1) throw new ArgumentOutOfRangeException(nameof(maximumRuns));
         preset.Validate();
         playMenuKey = ValidatePlayMenuKey(playMenuKey);
         cameraModel.Manifest.Validate();
         placementModel.Validate();
         ValidateCompatibility(preset, cameraModel, placementModel, detector.Manifest);
+        ValidateTeamKey(preset.TeamSlot > 0, unitMenuKey);
         RobloxWindow window = _automation.FindWindow() ?? throw new InvalidOperationException("No visible Roblox window was found.");
         DateTimeOffset startedAt = DateTimeOffset.UtcNow;
         Stopwatch runtime = Stopwatch.StartNew();
@@ -71,6 +79,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         int defeats = 0;
         int recoveries = 0;
         int bossesSeen = 0;
+        bool teamLoaded = preset.TeamSlot == 0;
 
         void Write(string message, MacroEventLevel level = MacroEventLevel.Information, string? state = null, double? confidence = null) =>
             log?.Invoke(new MacroEvent(DateTimeOffset.Now, level, message, state, confidence));
@@ -126,6 +135,11 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                         return;
                     }
                     Write("Prestart screen recognized. Preparing camera.", MacroEventLevel.Success);
+                    if (!teamLoaded)
+                    {
+                        await _teams.SelectAsync(window, preset.TeamSlot, unitMenuKey!.Value, progress, cancellationToken).ConfigureAwait(false);
+                        teamLoaded = true;
+                    }
                     await PrepareCameraAsync(window, preset, cameraModel, progress, Write, cancellationToken).ConfigureAwait(false);
                     await ThrowIfRecoveryAsync(window, detector, preset, cancellationToken).ConfigureAwait(false);
                     if (ExpeditionRunPolicy.StopDeadlineReached(DateTimeOffset.UtcNow, stopAfterCurrentRunUtc))
@@ -163,6 +177,13 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                     PublishSummary();
                     string detail = terminal.State == "victory" ? "The run reached the Victory screen." : "The run reached the Defeat screen.";
                     QueueNotification(webhookUrl, terminal.State, detail, terminal.Frame, runtime.Elapsed, victories, defeats, preset, Write);
+                    if (maximumRuns is int maximum && repeats >= maximum)
+                    {
+                        Report("Completed", 100, "Scheduled Expedition match finished. Returning to the task list.", terminal.State, null);
+                        Write("Scheduled Expedition match finished. Opening the Play interface before returning to the task scheduler.", MacroEventLevel.Information);
+                        await OpenPlayMenuForModeSwitchAsync(window, detector, terminal, preset, playMenuKey, Report, Write, cancellationToken).ConfigureAwait(false);
+                        return;
+                    }
                     if (ExpeditionRunPolicy.StopDeadlineReached(DateTimeOffset.UtcNow, stopAfterCurrentRunUtc))
                     {
                         Report("Completed", 100, "Current Expedition run finished. Returning to Challenges.", terminal.State, null);
@@ -624,9 +645,20 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                     state = await WaitForRecoveryChangeAsync(window, detector, "disconnect", TimeSpan.FromSeconds(12), preset, report, log, cancellationToken).ConfigureAwait(false) ?? state;
                     break;
                 case "lobby":
-                    report("Recovery", 0, $"Lobby recognized. Opening Play with {playMenuKey}.", state, null);
-                    await _automation.TapLetterKeyAsync(window, playMenuKey, cancellationToken).ConfigureAwait(false);
-                    state = await WaitForRecoveryChangeAsync(window, detector, "lobby", TimeSpan.FromSeconds(15), preset, report, log, cancellationToken).ConfigureAwait(false) ?? state;
+                    await LobbyPlayNavigator.OpenWithVerificationAsync(
+                        playMenuKey,
+                        () => CaptureClient(window, detector),
+                        candidate => string.Equals(detector.RecoveryState(candidate), "lobby", StringComparison.OrdinalIgnoreCase),
+                        candidate => string.Equals(detector.RecoveryState(candidate), "play", StringComparison.OrdinalIgnoreCase),
+                        (key, token) => _automation.TapLetterKeyAsync(window, key, token),
+                        async (timeout, token) => string.Equals(
+                            await WaitForRecoveryChangeAsync(window, detector, "lobby", timeout, preset, report, log, token).ConfigureAwait(false),
+                            "play",
+                            StringComparison.OrdinalIgnoreCase),
+                        attempt => report("Recovery", 0, $"Lobby recognized. Opening Play with {playMenuKey} (attempt {attempt}/{LobbyPlayNavigator.MaximumAttempts}).", state, null),
+                        attempt => log($"The {playMenuKey} Play-menu key did not open navigation from the lobby (attempt {attempt}/{LobbyPlayNavigator.MaximumAttempts}).", MacroEventLevel.Warning, state, null),
+                        cancellationToken).ConfigureAwait(false);
+                    state = "play";
                     break;
                 case "play":
                     report("Recovery", 0, "Play screen recognized. Opening Expeditions.", state, null);
@@ -1170,6 +1202,16 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         }
 
         return normalized;
+    }
+
+    private static void ValidateTeamKey(bool required, char? value)
+    {
+        if (!required) return;
+        if (value is null || !char.IsAsciiLetter(value.Value))
+        {
+            throw new InvalidDataException(
+                "Set the Unit menu key under Settings > Controls so it matches Anime Expeditions' Units binding before using a saved team.");
+        }
     }
 
     private static void ValidateCompatibility(ExpeditionPreset preset, CameraModel camera, PlacementModel placement, DetectorPackManifest detector)

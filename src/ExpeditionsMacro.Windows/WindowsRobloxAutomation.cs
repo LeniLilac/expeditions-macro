@@ -8,6 +8,21 @@ using ExpeditionsMacro.Windows.Interop;
 
 namespace ExpeditionsMacro.Windows;
 
+public sealed record WindowsAutomationTrace(
+    DateTimeOffset TimestampUtc,
+    string Device,
+    string Action,
+    int? X = null,
+    int? Y = null,
+    int? DeltaX = null,
+    int? DeltaY = null,
+    int? VirtualKey = null,
+    int? ScanCode = null,
+    int? HoldMilliseconds = null,
+    uint? Flags = null,
+    uint? Data = null,
+    bool? Extended = null);
+
 public sealed class WindowsRobloxAutomation : IRobloxAutomation, IDisposable
 {
     private const long WsCaption = 0x00C00000L;
@@ -50,6 +65,8 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation, IDisposable
     private sealed record ClientSizeTarget(int Width, int Height);
 
     public event Action<string>? DiagnosticMessage;
+
+    public event Action<WindowsAutomationTrace>? AutomationTrace;
 
     public RobloxWindow? FindWindow(string titleFragment = "Roblox")
     {
@@ -237,6 +254,7 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation, IDisposable
         // before pressing so the click is hit-tested at the visible target.
         await Task.Delay(ClickPositionSettleMilliseconds, cancellationToken).ConfigureAwait(false);
         NativeMethods.mouse_event(NativeMethods.MouseeventfLeftDown, 0, 0, 0, 0);
+        EmitTrace(new WindowsAutomationTrace(DateTimeOffset.UtcNow, "mouse", "left_down", X: x, Y: y, Flags: NativeMethods.MouseeventfLeftDown));
         try
         {
             await Task.Delay(ClickHoldMilliseconds, cancellationToken).ConfigureAwait(false);
@@ -244,10 +262,30 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation, IDisposable
         finally
         {
             NativeMethods.mouse_event(NativeMethods.MouseeventfLeftUp, 0, 0, 0, 0);
+            EmitTrace(new WindowsAutomationTrace(DateTimeOffset.UtcNow, "mouse", "left_up", X: x, Y: y, Flags: NativeMethods.MouseeventfLeftUp));
         }
         // SetCursorPos alone can move the Windows pointer without making Roblox
         // process a mouse-motion event. Keep the pointer safely inside the client and
         // send spaced motion pulses so Roblox cannot coalesce the entire hover clear.
+        await ParkCursorWithAcknowledgedMotionAsync(bounds, cancellationToken).ConfigureAwait(false);
+        await Task.Delay(HoverRenderSettleMilliseconds, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task ScrollClientAsync(RobloxWindow window, int notches, CancellationToken cancellationToken)
+    {
+        if (notches is < -100 or > 100) throw new ArgumentOutOfRangeException(nameof(notches));
+        if (notches == 0) return;
+        if (!Focus(window)) throw new InvalidOperationException("Windows could not focus Roblox.");
+        ClientBounds bounds = GetClientBounds(window);
+        MoveCursorWithRegisteredMotion(bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2, 1, "Windows could not move the cursor into Roblox for scrolling.");
+        int direction = Math.Sign(notches);
+        for (int index = 0; index < Math.Abs(notches); index++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            uint data = unchecked((uint)(direction * NativeMethods.WheelDelta));
+            SendMouse(NativeMethods.MouseeventfWheel, data: data);
+            await Task.Delay(45, cancellationToken).ConfigureAwait(false);
+        }
         await ParkCursorWithAcknowledgedMotionAsync(bounds, cancellationToken).ConfigureAwait(false);
         await Task.Delay(HoverRenderSettleMilliseconds, cancellationToken).ConfigureAwait(false);
     }
@@ -375,6 +413,7 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation, IDisposable
     {
         if (!Focus(window)) throw new InvalidOperationException("Windows could not focus Roblox.");
         NativeMethods.keybd_event((byte)virtualKey, (byte)scanCode, 0, 0);
+        EmitTrace(new WindowsAutomationTrace(DateTimeOffset.UtcNow, "keyboard", "key_down", VirtualKey: virtualKey, ScanCode: scanCode, HoldMilliseconds: holdMilliseconds, Flags: 0));
         try
         {
             await Task.Delay(holdMilliseconds, cancellationToken).ConfigureAwait(false);
@@ -382,10 +421,11 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation, IDisposable
         finally
         {
             NativeMethods.keybd_event((byte)virtualKey, (byte)scanCode, NativeMethods.KeyeventfKeyUp, 0);
+            EmitTrace(new WindowsAutomationTrace(DateTimeOffset.UtcNow, "keyboard", "key_up", VirtualKey: virtualKey, ScanCode: scanCode, HoldMilliseconds: holdMilliseconds, Flags: NativeMethods.KeyeventfKeyUp));
         }
     }
 
-    private static void SendMouse(uint flags, int dx = 0, int dy = 0, uint data = 0)
+    private void SendMouse(uint flags, int dx = 0, int dy = 0, uint data = 0)
     {
         NativeMethods.Input[] inputs =
         [
@@ -399,9 +439,17 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation, IDisposable
             },
         ];
         if (NativeMethods.SendInput(1, inputs, Marshal.SizeOf<NativeMethods.Input>()) != 1) throw new Win32Exception("Windows rejected a simulated mouse input event.");
+        EmitTrace(new WindowsAutomationTrace(
+            DateTimeOffset.UtcNow,
+            "mouse",
+            MouseAction(flags),
+            DeltaX: dx,
+            DeltaY: dy,
+            Flags: flags,
+            Data: data));
     }
 
-    private static void SendKeyboard(ushort scanCode, bool keyUp, bool extended = true)
+    private void SendKeyboard(ushort scanCode, bool keyUp, bool extended = true)
     {
         uint flags = NativeMethods.KeyeventfScanCode;
         if (extended) flags |= NativeMethods.KeyeventfExtendedKey;
@@ -421,17 +469,27 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation, IDisposable
         {
             throw new Win32Exception("Windows rejected a simulated camera key event.");
         }
+        EmitTrace(new WindowsAutomationTrace(
+            DateTimeOffset.UtcNow,
+            "keyboard",
+            keyUp ? "key_up" : "key_down",
+            ScanCode: scanCode,
+            Flags: flags,
+            Extended: extended));
     }
 
-    private static void MoveCursorWithRegisteredMotion(int x, int y, int nudgeX, string failureMessage)
+    private void MoveCursorWithRegisteredMotion(int x, int y, int nudgeX, string failureMessage)
     {
         if (!NativeMethods.SetCursorPos(x, y)) throw new Win32Exception(failureMessage);
+        EmitTrace(new WindowsAutomationTrace(DateTimeOffset.UtcNow, "mouse", "set_cursor", X: x, Y: y));
         int delta = nudgeX < 0 ? -1 : 1;
         NativeMethods.mouse_event(NativeMethods.MouseeventfMove, delta, 0, 0, 0);
+        EmitTrace(new WindowsAutomationTrace(DateTimeOffset.UtcNow, "mouse", "move", DeltaX: delta, DeltaY: 0, Flags: NativeMethods.MouseeventfMove));
         NativeMethods.mouse_event(NativeMethods.MouseeventfMove, -delta, 0, 0, 0);
+        EmitTrace(new WindowsAutomationTrace(DateTimeOffset.UtcNow, "mouse", "move", DeltaX: -delta, DeltaY: 0, Flags: NativeMethods.MouseeventfMove));
     }
 
-    private static async Task ParkCursorWithAcknowledgedMotionAsync(ClientBounds bounds, CancellationToken cancellationToken)
+    private async Task ParkCursorWithAcknowledgedMotionAsync(ClientBounds bounds, CancellationToken cancellationToken)
     {
         int horizontalInset = Math.Min(CursorParkingInsetPixels, Math.Max(0, bounds.Width - 2));
         int verticalInset = Math.Min(CursorParkingInsetPixels, Math.Max(0, bounds.Height - 2));
@@ -441,18 +499,43 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation, IDisposable
         {
             throw new Win32Exception("Windows could not park the cursor away from the Roblox control.");
         }
+        EmitTrace(new WindowsAutomationTrace(DateTimeOffset.UtcNow, "mouse", "set_cursor", X: parkingX, Y: parkingY));
 
         for (int pulse = 0; pulse < HoverClearPulseCount; pulse++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             int delta = pulse % 2 == 0 ? -1 : 1;
             NativeMethods.mouse_event(NativeMethods.MouseeventfMove, delta, 0, 0, 0);
+            EmitTrace(new WindowsAutomationTrace(DateTimeOffset.UtcNow, "mouse", "move", DeltaX: delta, DeltaY: 0, Flags: NativeMethods.MouseeventfMove));
             if (pulse + 1 < HoverClearPulseCount)
             {
                 await Task.Delay(HoverClearPulseIntervalMilliseconds, cancellationToken).ConfigureAwait(false);
             }
         }
     }
+
+    private void EmitTrace(WindowsAutomationTrace trace)
+    {
+        try
+        {
+            AutomationTrace?.Invoke(trace);
+        }
+        catch
+        {
+            // Diagnostic observers must never prevent key or mouse release.
+        }
+    }
+
+    private static string MouseAction(uint flags) => flags switch
+    {
+        NativeMethods.MouseeventfMove => "move",
+        NativeMethods.MouseeventfLeftDown => "left_down",
+        NativeMethods.MouseeventfLeftUp => "left_up",
+        NativeMethods.MouseeventfRightDown => "right_down",
+        NativeMethods.MouseeventfRightUp => "right_up",
+        NativeMethods.MouseeventfWheel => "wheel",
+        _ => "input",
+    };
 
     internal static bool IsSupportedRobloxProcessName(string processName) => SupportedRobloxProcesses.Contains(processName);
 

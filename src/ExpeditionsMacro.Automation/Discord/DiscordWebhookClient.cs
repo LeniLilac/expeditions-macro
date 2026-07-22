@@ -24,9 +24,13 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
     public async Task SendAsync(DiscordNotification notification, CancellationToken cancellationToken)
     {
         if (!ValidateWebhookUrl(notification.WebhookUrl)) throw new ArgumentException("The Discord webhook URL is not valid.", nameof(notification));
-        string attachmentPrefix = notification.AttachmentPrefix.Equals("challenge", StringComparison.OrdinalIgnoreCase)
-            ? "challenge"
-            : "expeditions";
+        string attachmentPrefix = notification.AttachmentPrefix.ToLowerInvariant() switch
+        {
+            "challenge" => "challenge",
+            "story" => "story",
+            "raid" => "raid",
+            _ => "expeditions",
+        };
         string? filename = notification.Screenshot is null
             ? null
             : $"{attachmentPrefix}_{notification.Event.ToLowerInvariant()}_{DateTimeOffset.Now:yyyyMMdd_HHmmss}.png";

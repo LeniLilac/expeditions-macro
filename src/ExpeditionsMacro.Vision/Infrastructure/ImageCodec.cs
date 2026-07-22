@@ -38,8 +38,9 @@ public static class ImageCodec
         return FromMat(rgb, PixelFormat.Rgb24);
     }
 
-    public static void SavePng(string path, ImageFrame image)
+    public static void SavePng(string path, ImageFrame image, int compression = 7)
     {
+        if (compression is < 0 or > 9) throw new ArgumentOutOfRangeException(nameof(compression));
         Directory.CreateDirectory(Path.GetDirectoryName(path) ?? throw new InvalidOperationException("Image has no parent directory."));
         using Mat source = ToMat(image);
         using Mat encoded = new();
@@ -51,7 +52,7 @@ public static class ImageCodec
         {
             source.CopyTo(encoded);
         }
-        if (!Cv2.ImWrite(path, encoded, [new ImageEncodingParam(ImwriteFlags.PngCompression, 7)])) throw new IOException($"Could not write image '{path}'.");
+        if (!Cv2.ImWrite(path, encoded, [new ImageEncodingParam(ImwriteFlags.PngCompression, compression)])) throw new IOException($"Could not write image '{path}'.");
     }
 
     public static byte[] EncodePng(ImageFrame image)

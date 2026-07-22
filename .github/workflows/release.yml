@@ -2,7 +2,11 @@ name: Release
 
 on:
   push:
-    tags: ['v*.*.*']
+    tags:
+      - 'v*.*.*'
+      - '!v*-alpha.*'
+      - '!v*-beta.*'
+      - '!v*-rc.*'
 
 permissions:
   contents: write

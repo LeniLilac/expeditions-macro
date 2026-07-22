@@ -4,6 +4,39 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.1] - 2026-07-22
+
+### Added
+
+- Added saved Macro plans that prioritize and sequence Challenge, Expedition, Story, and Raid presets without interrupting an active match. Per-task victories, defeats, runtime, completion, and Challenge reset eligibility persist locally.
+- Added Story presets for five maps with Act 1-5, Infinite, Mastery, Normal/Hard selection, two placement phases, defeat retries, recovery, and optional saved-team loading.
+- Added Raid presets for Spirit City Acts 1-3 with two placement phases, defeat retries, recovery, and optional saved-team loading.
+- Added a separately configured Unit-menu key and automated Team 1-8 loading through the in-game Units interface.
+- Added Fredoka as the embedded application typeface and native Lucide vector icons for navigation and actions.
+- Added an explicitly confirmed, disabled-by-default deep debug mode that archives every detector frame, state/action trace, generated input, placement-recording input, sanitized settings, selected plans/presets, detector pack, and referenced camera/placement models after successful, canceled, and failed operations.
+- Added a dedicated silent prerelease workflow for alpha, beta, and release-candidate tags. It publishes verified GitHub prerelease assets without reading or sending the Discord release webhook.
+
+### Changed
+
+- Replaced small checkbox controls with larger switch controls and separated task state from task actions in the Macro editor.
+- Camera preparation now retries the complete alignment search in the alternate shift-lock state before declaring alignment failure.
+- New camera-model setup uses a 200 ms settle interval by default.
+
+### Fixed
+
+- Deferred Challenge placement points covered by the Start Game dialog until immediately after the deliberate Start click. This prevents a placement coordinate from starting the match early or being swallowed by the dialog.
+- Kept Challenge, Story, Raid, and Expedition task handoffs inside the Play interface so the Macro scheduler can switch modes deterministically.
+- Stopped lobby recovery with clear in-game Toggle Play Menu setup instructions when the configured key fails to open Play, instead of waiting silently or continuing through the visible Play button.
+- Extended Challenge prestart waiting to three minutes only after the stable Roblox teleport transition is recognized, instead of failing after 35 seconds while the stage is still loading.
+- Moved saved-team loading for Story, Raid, and Challenge runs behind a verified prestart state.
+- Added safe preset deletion with clear blocking details when a Macro plan or fallback preset still references the selection.
+- Fixed dark-theme tooltips, Debug capture status overlap, and compact action/status rails.
+
+### Tests
+
+- Added reviewed Story, Raid, team-selection, scheduler, alternate-shift camera, Start-dialog occlusion, stage-teleporting, and saved-team regression coverage.
+- Expanded dark and light snapshot coverage to every application page, including long-running Macro status views.
+
 ## [1.2.1] - 2026-07-22
 
 ### Changed
@@ -373,7 +406,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.1...HEAD
+[1.3.0-beta.1]: https://github.com/LeniLilac/expeditions-macro/compare/v1.2.1...v1.3.0-beta.1
 [1.2.1]: https://github.com/LeniLilac/expeditions-macro/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.6...v1.2.0
 [1.1.6]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.5...v1.1.6

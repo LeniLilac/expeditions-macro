@@ -1,12 +1,12 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using ExpeditionsMacro.App.Services;
 using ExpeditionsMacro.App.Windows;
+using ExpeditionsMacro.Automation.Diagnostics;
 using ExpeditionsMacro.Automation.Updates;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
@@ -23,8 +23,10 @@ public partial class SettingsPage : UserControl, IAppPage
     private bool _captureOperationActive;
     private bool _capturingHotkey;
     private bool _capturingPlayMenuKey;
+    private bool _capturingUnitMenuKey;
     private bool _rebindingHotkey;
     private bool _savingPlayMenuKey;
+    private bool _savingUnitMenuKey;
     private bool _uiScaleOverlayChanging;
     private UiScaleOverlayWindow? _uiScaleOverlay;
 
@@ -40,11 +42,13 @@ public partial class SettingsPage : UserControl, IAppPage
         {
             if (_capturingHotkey) CancelHotkeyCapture($"{_services.Hotkey.DisplayName} is already the macro hotkey.");
             if (_capturingPlayMenuKey) CancelPlayMenuKeyCapture($"{_services.Hotkey.DisplayName} is already the macro hotkey. Choose a different letter for Toggle Play Menu.");
+            if (_capturingUnitMenuKey) CancelUnitMenuKeyCapture($"{_services.Hotkey.DisplayName} is already the macro hotkey. Choose a different letter for Toggle Units.");
         });
         Unloaded += (_, _) =>
         {
             if (_capturingHotkey) CancelHotkeyCapture("Key change canceled.");
             if (_capturingPlayMenuKey) CancelPlayMenuKeyCapture("Key change canceled.");
+            if (_capturingUnitMenuKey) CancelUnitMenuKeyCapture("Key change canceled.");
             CloseUiScaleOverlay();
         };
     }
@@ -53,6 +57,9 @@ public partial class SettingsPage : UserControl, IAppPage
 
     internal void SetSnapshotScroll(bool showDebug)
     {
+        // CI publishes UI snapshots as build artifacts; keep the local Windows
+        // profile path out of those images.
+        DataPath.Text = @"C:\Users\example\AppData\Local\ExpeditionsMacro";
         SettingsScroll.UpdateLayout();
         if (showDebug) SettingsScroll.ScrollToEnd();
         else SettingsScroll.ScrollToTop();
@@ -66,13 +73,16 @@ public partial class SettingsPage : UserControl, IAppPage
         AutoUpdateCheck.IsChecked = _services.Settings.CheckDetectorUpdates;
         AutoCaptureOnErrorCheck.IsChecked = _services.Settings.AutoCaptureOnMacroError;
         IncludeLogsCheck.IsChecked = _services.Settings.IncludeLogsInDiagnosticArchives;
+        DeepDebugCheck.IsChecked = _services.Settings.DeepDebugEnabled;
         _loading = false;
-        VersionText.Text = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
+        VersionText.Text = ProductVersion.Current;
         RobloxText.Text = _services.Automation.FindWindow() is { } window
             ? $"Found: {window.Title} ({window.ProcessDescription})"
             : "Not found";
         UpdateHotkeyDisplay();
         UpdatePlayMenuKeyDisplay();
+        UpdateUnitMenuKeyDisplay();
+        UpdateDeepDebugStatus();
         await RefreshDetectorAsync();
         UpdateCaptureState();
     }
@@ -102,10 +112,53 @@ public partial class SettingsPage : UserControl, IAppPage
         await _services.UpdateSettingsAsync(settings => settings with { IncludeLogsInDiagnosticArchives = IncludeLogsCheck.IsChecked == true });
     }
 
+    private async void DeepDebugCheck_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_loading) return;
+        bool enable = DeepDebugCheck.IsChecked == true;
+        if (enable)
+        {
+            MessageBoxResult confirmation = MessageBox.Show(
+                Window.GetWindow(this),
+                "Deep debug saves every detector frame and input event, plus the selected settings, presets, detector pack, and camera/placement models. A single long run can create a multi-gigabyte ZIP, slow automation, and fill the disk. Files are not deleted automatically.\n\nWebhook values and Discord user IDs are excluded.\n\nEnable deep debug logging?",
+                "Enable deep debug logging?",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning,
+                MessageBoxResult.No);
+            if (confirmation != MessageBoxResult.Yes)
+            {
+                _loading = true;
+                DeepDebugCheck.IsChecked = false;
+                _loading = false;
+                DeepDebugStatusText.Text = "Deep debug remains disabled.";
+                return;
+            }
+        }
+
+        DeepDebugCheck.IsEnabled = false;
+        try
+        {
+            await _services.UpdateSettingsAsync(settings => settings with { DeepDebugEnabled = enable });
+            UpdateDeepDebugStatus();
+        }
+        catch (Exception error)
+        {
+            _loading = true;
+            DeepDebugCheck.IsChecked = _services.Settings.DeepDebugEnabled;
+            _loading = false;
+            DeepDebugStatusText.Text = $"Deep debug setting could not be saved: {error.Message}";
+        }
+        finally
+        {
+            UpdateCaptureState();
+        }
+    }
+
     private void PlayMenuKeyButton_Click(object sender, RoutedEventArgs e)
     {
         if (_services.Coordinator.IsBusy || _savingPlayMenuKey || _capturingPlayMenuKey) return;
         if (_capturingHotkey) CancelHotkeyCapture("Macro hotkey change canceled.");
+        if (_capturingUnitMenuKey) CancelUnitMenuKeyCapture("Unit menu key change canceled.");
         _capturingPlayMenuKey = true;
         PlayMenuKeyButton.Content = "Press a letter...";
         PlayMenuKeyStatusText.Text = "Press the letter assigned to Toggle Play Menu in Anime Expeditions. Escape cancels.";
@@ -120,8 +173,13 @@ public partial class SettingsPage : UserControl, IAppPage
         try
         {
             _ = AppSettings.ParsePlayMenuKey(key.ToString(), _services.Hotkey.VirtualKey);
+            if (!string.IsNullOrWhiteSpace(_services.Settings.UnitMenuKey))
+            {
+                _ = AppSettings.ParseUnitMenuKey(_services.Settings.UnitMenuKey, _services.Hotkey.VirtualKey, key.ToString());
+            }
             await _services.UpdateSettingsAsync(settings => settings with { PlayMenuKey = key.ToString() });
             UpdatePlayMenuKeyDisplay();
+            UpdateUnitMenuKeyDisplay();
         }
         catch (Exception error)
         {
@@ -132,6 +190,63 @@ public partial class SettingsPage : UserControl, IAppPage
         {
             _savingPlayMenuKey = false;
             UpdateCaptureState();
+        }
+    }
+
+    private void UnitMenuKeyButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_services.Coordinator.IsBusy || _savingUnitMenuKey || _capturingUnitMenuKey) return;
+        if (_capturingHotkey) CancelHotkeyCapture("Macro hotkey change canceled.");
+        if (_capturingPlayMenuKey) CancelPlayMenuKeyCapture("Play menu key change canceled.");
+        _capturingUnitMenuKey = true;
+        UnitMenuKeyButton.Content = "Press a letter...";
+        UnitMenuKeyStatusText.Text = "Press the letter assigned to Toggle Units in Anime Expeditions. Escape cancels.";
+        Keyboard.Focus(UnitMenuKeyButton);
+        UpdateCaptureState();
+    }
+
+    private async Task ApplyUnitMenuKeyAsync(char key)
+    {
+        _savingUnitMenuKey = true;
+        UpdateCaptureState();
+        try
+        {
+            _ = AppSettings.ParseUnitMenuKey(key.ToString(), _services.Hotkey.VirtualKey, _services.Settings.PlayMenuKey);
+            await _services.UpdateSettingsAsync(settings => settings with { UnitMenuKey = key.ToString() });
+            UpdateUnitMenuKeyDisplay();
+        }
+        catch (Exception error)
+        {
+            UpdateUnitMenuKeyDisplay();
+            UnitMenuKeyStatusText.Text = $"Could not save the Unit menu key: {error.Message}";
+        }
+        finally
+        {
+            _savingUnitMenuKey = false;
+            UpdateCaptureState();
+        }
+    }
+
+    private void UpdateUnitMenuKeyDisplay()
+    {
+        try
+        {
+            char key = AppSettings.ParseUnitMenuKey(
+                _services.Settings.UnitMenuKey,
+                _services.Hotkey.VirtualKey,
+                _services.Settings.PlayMenuKey);
+            if (!_capturingUnitMenuKey) UnitMenuKeyButton.Content = key.ToString();
+            UnitMenuKeyStatusText.Text = $"{key} must match Anime Expeditions' Toggle Units binding.";
+            UnitMenuKeyDiagnosticText.Text = key.ToString();
+        }
+        catch (InvalidDataException error)
+        {
+            bool empty = string.IsNullOrWhiteSpace(_services.Settings.UnitMenuKey);
+            if (!_capturingUnitMenuKey) UnitMenuKeyButton.Content = empty ? "Set key" : _services.Settings.UnitMenuKey;
+            UnitMenuKeyStatusText.Text = empty
+                ? "Required only when a preset changes the active team."
+                : error.Message;
+            UnitMenuKeyDiagnosticText.Text = empty ? "Not set" : "Conflict";
         }
     }
 
@@ -159,6 +274,7 @@ public partial class SettingsPage : UserControl, IAppPage
     {
         if (_services.Coordinator.IsBusy || _rebindingHotkey) return;
         if (_capturingPlayMenuKey) CancelPlayMenuKeyCapture("Play menu key change canceled.");
+        if (_capturingUnitMenuKey) CancelUnitMenuKeyCapture("Unit menu key change canceled.");
         _capturingHotkey = true;
         HotkeyButton.Content = "Press a key...";
         HotkeyStatusText.Text = "Press a letter, number, punctuation key, numpad key, F1-F11, or F13-F24. Escape cancels; F12 is reserved.";
@@ -167,7 +283,7 @@ public partial class SettingsPage : UserControl, IAppPage
 
     private async void SettingsPage_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (!_capturingHotkey && !_capturingPlayMenuKey) return;
+        if (!_capturingHotkey && !_capturingPlayMenuKey && !_capturingUnitMenuKey) return;
         e.Handled = true;
         Key key = e.Key == Key.System ? e.SystemKey : e.Key;
         if (_capturingPlayMenuKey)
@@ -193,6 +309,39 @@ public partial class SettingsPage : UserControl, IAppPage
 
             _capturingPlayMenuKey = false;
             await ApplyPlayMenuKeyAsync((char)playMenuVirtualKey);
+            return;
+        }
+
+        if (_capturingUnitMenuKey)
+        {
+            if (key == Key.Escape)
+            {
+                CancelUnitMenuKeyCapture("Key change canceled.");
+                return;
+            }
+
+            int unitMenuVirtualKey = KeyInterop.VirtualKeyFromKey(key);
+            if (unitMenuVirtualKey is < 0x41 or > 0x5A)
+            {
+                UnitMenuKeyStatusText.Text = "Toggle Units must use one letter from A through Z. Press a letter, or Escape to cancel.";
+                return;
+            }
+
+            try
+            {
+                _ = AppSettings.ParseUnitMenuKey(
+                    ((char)unitMenuVirtualKey).ToString(),
+                    _services.Hotkey.VirtualKey,
+                    _services.Settings.PlayMenuKey);
+            }
+            catch (InvalidDataException error)
+            {
+                UnitMenuKeyStatusText.Text = error.Message;
+                return;
+            }
+
+            _capturingUnitMenuKey = false;
+            await ApplyUnitMenuKeyAsync((char)unitMenuVirtualKey);
             return;
         }
 
@@ -228,6 +377,10 @@ public partial class SettingsPage : UserControl, IAppPage
             if (!string.IsNullOrWhiteSpace(_services.Settings.PlayMenuKey))
             {
                 _ = AppSettings.ParsePlayMenuKey(_services.Settings.PlayMenuKey, virtualKey);
+            }
+            if (!string.IsNullOrWhiteSpace(_services.Settings.UnitMenuKey))
+            {
+                _ = AppSettings.ParseUnitMenuKey(_services.Settings.UnitMenuKey, virtualKey, _services.Settings.PlayMenuKey);
             }
         }
         catch (InvalidDataException error)
@@ -266,6 +419,7 @@ public partial class SettingsPage : UserControl, IAppPage
             _rebindingHotkey = false;
             UpdateHotkeyDisplay(updateStatus: false);
             UpdatePlayMenuKeyDisplay();
+            UpdateUnitMenuKeyDisplay();
             UpdateCaptureState();
         }
     }
@@ -283,6 +437,14 @@ public partial class SettingsPage : UserControl, IAppPage
         _capturingPlayMenuKey = false;
         UpdatePlayMenuKeyDisplay();
         PlayMenuKeyStatusText.Text = status;
+        UpdateCaptureState();
+    }
+
+    private void CancelUnitMenuKeyCapture(string status)
+    {
+        _capturingUnitMenuKey = false;
+        UpdateUnitMenuKeyDisplay();
+        UnitMenuKeyStatusText.Text = status;
         UpdateCaptureState();
     }
 
@@ -305,6 +467,15 @@ public partial class SettingsPage : UserControl, IAppPage
     private void OpenLogs_Click(object sender, RoutedEventArgs e) => OpenFolder(_services.Paths.Logs);
 
     private void OpenCaptures_Click(object sender, RoutedEventArgs e) => OpenFolder(_services.Paths.Diagnostics);
+
+    private void UpdateDeepDebugStatus()
+    {
+        DeepDebugStatusText.Text = _services.Settings.DeepDebugEnabled
+            ? "Deep debug is enabled. Every completed, canceled, or failed operation will produce a ZIP in Diagnostics."
+            : "Deep debug is disabled.";
+        DeepDebugStatusText.Foreground = (System.Windows.Media.Brush)FindResource(
+            _services.Settings.DeepDebugEnabled ? "ErrorBrush" : "MutedBrush");
+    }
 
     private async void UiScaleOverlayButton_Click(object sender, RoutedEventArgs e)
     {
@@ -384,7 +555,11 @@ public partial class SettingsPage : UserControl, IAppPage
 
         try
         {
-            Progress<DiagnosticCaptureProgress> progress = new(value => CaptureStatusText.Text = value.Message);
+            Progress<DiagnosticCaptureProgress> progress = new(value =>
+            {
+                _services.DeepDebug.RecordEvent("diagnostic_capture", "progress", value);
+                CaptureStatusText.Text = value.Message;
+            });
             _captureOperationActive = true;
             _services.Coordinator.Arm("Diagnostic capture", async token =>
             {
@@ -414,6 +589,9 @@ public partial class SettingsPage : UserControl, IAppPage
                 {
                     _captureOperationActive = false;
                 }
+            }, new DeepDebugOperationContext
+            {
+                OperationSettings = new { CaptureName = name, IntervalSeconds = seconds },
             });
             CaptureStatusText.Text = $"Capture armed. Focus Roblox and press {_services.Hotkey.DisplayName} to begin.";
             UpdateCaptureState();
@@ -441,13 +619,16 @@ public partial class SettingsPage : UserControl, IAppPage
         CaptureIntervalText.IsEnabled = !busy;
         AutoCaptureOnErrorCheck.IsEnabled = !busy;
         IncludeLogsCheck.IsEnabled = !busy;
-        PlayMenuKeyButton.IsEnabled = !busy && !_capturingHotkey && !_savingPlayMenuKey;
+        DeepDebugCheck.IsEnabled = !busy;
+        PlayMenuKeyButton.IsEnabled = !busy && !_capturingHotkey && !_capturingUnitMenuKey && !_savingPlayMenuKey;
+        UnitMenuKeyButton.IsEnabled = !busy && !_capturingHotkey && !_capturingPlayMenuKey && !_savingUnitMenuKey;
         CaptureStopButton.IsEnabled = _captureOperationActive && busy;
         CaptureStopButton.Content = _services.Coordinator.State == OperationState.Armed ? "Cancel" : "Stop and save";
-        HotkeyButton.IsEnabled = !busy && !_rebindingHotkey && !_capturingPlayMenuKey;
+        HotkeyButton.IsEnabled = !busy && !_rebindingHotkey && !_capturingPlayMenuKey && !_capturingUnitMenuKey;
         UiScaleOverlayButton.IsEnabled = !busy && !_uiScaleOverlayChanging;
         if (busy && _capturingHotkey) CancelHotkeyCapture("Stop the current operation before changing the hotkey.");
         if (busy && _capturingPlayMenuKey) CancelPlayMenuKeyCapture("Stop the current operation before changing the Play menu key.");
+        if (busy && _capturingUnitMenuKey) CancelUnitMenuKeyCapture("Stop the current operation before changing the Unit menu key.");
     }
 
     private async void RefreshDetector_Click(object sender, RoutedEventArgs e) => await CheckForUpdatesAsync(automatic: false);

@@ -1,6 +1,6 @@
 # Expeditions Macro
 
-Expeditions Macro is a Windows desktop utility for repeatable Anime Expeditions and regular Challenge runs in Roblox. It combines camera yaw alignment, editable unit placement, UI-state detection, lobby/disconnect/AFK recovery, scheduled Challenge rotation, checkpoint extraction, and optional Discord reporting in one native app.
+Expeditions Macro is a Windows desktop utility for repeatable Anime Expeditions, Challenge, Story, and Raid runs in Roblox. It combines prioritized task plans, camera yaw alignment, editable unit placement, saved-team selection, UI-state detection, recovery, checkpoint extraction, and optional Discord reporting in one native app.
 
 ![Expeditions Macro in dark mode](docs/images/app-dark.png)
 
@@ -14,6 +14,9 @@ It uses screen capture and ordinary Windows input. It does not inject into Roblo
 - Can begin from the Roblox lobby and navigate to the configured Expeditions map and difficulty.
 - Runs any enabled Trait, Stat, and Sprite Challenges on the global half-hour reset, recognizes five rotating maps, and loads the matching camera and placement models.
 - Supports separate prestart and delayed in-match Challenge placements, configurable defeat retries, and an optional Expeditions handoff while Challenges are on cooldown.
+- Navigates Story Acts 1-5, Infinite, and Mastery across five maps, plus Spirit City Raid Acts 1-3.
+- Saves prioritized Macro plans that can rotate Challenge, Expedition, Story, and Raid presets while preserving progress between launches.
+- Optionally opens Units and loads Team 1-8 before a configured run.
 - Fully zooms out with Roblox's `O` key (with mouse-wheel input retained as a fallback), toggles shift lock, sets a top-down pitch, and aligns yaw against a learned full-turn camera model.
 - Records, edits, saves, and tests Roblox-relative unit placements in one tool.
 - Detects start, checkpoint, continue, confirmation, reward, victory, defeat, lobby, disconnect, and AFK Chamber screens.
@@ -40,7 +43,9 @@ Follow the [Expeditions Macro setup guide](https://docs.google.com/document/d/10
 
 The instructions below refer to the **macro hotkey**. It defaults to **F6** and can be changed under **Settings > Controls** by clicking the key button and pressing a letter, number, punctuation key, numpad key, or supported function key.
 
-Before starting either macro, assign Anime Expeditions' **Toggle Play Menu** action to one letter from A through Z. Under **Settings > Controls**, click **Play menu key** and press that same letter. This setting intentionally starts empty, so the app shows an immediate setup popup and refuses to start until it is configured. Keep it different from the macro start/stop hotkey. The same key opens Play from the lobby as well as from Victory, Defeat, or an unstarted match, avoiding the small on-screen Play button.
+Before starting a macro, assign Anime Expeditions' **Toggle Play Menu** action to one letter from A through Z. Under **Settings > Controls**, click **Play menu key** and press that same letter. This setting intentionally starts empty, so the app shows an immediate setup popup and refuses to start until it is configured. Keep it different from the macro start/stop hotkey. The same key opens Play from the lobby as well as from Victory, Defeat, or an unstarted match, avoiding the small on-screen Play button. If three verified presses do not open Play, the macro stops with a setup popup instead of continuing through an unreliable click path.
+
+If a preset should load a saved Team, also assign the game's **Toggle Units** action to a letter and record it as **Unit menu key** under Settings. Leave a preset's Team setting at **Don't change** when the active team should remain untouched.
 
 ### 1. Create a camera model
 
@@ -89,6 +94,28 @@ The app waits for the difficulty carousel animation to settle and verifies the a
 
 The selector order is fixed by Challenge type. The macro recognizes the current map, skips entries without **Select Stage**, and resets its per-window attempts at `xx:00` and `xx:30`. If all three entries remain unavailable across a complete global reset, it treats the daily limit as reached and waits until midnight UTC.
 
+Before-start coordinates that fall beneath the centered Start Game dialog cannot reach the map. The Challenge runner automatically places unobstructed rows first, clicks Start deliberately, then immediately plays only the covered rows. A placement point therefore cannot accidentally start the match.
+
+### 5. Configure Story or Raid
+
+1. Open **Story** or **Raid** and create a named preset.
+2. For Story, choose one of the five maps and an Act, Infinite, or Mastery route. Act routes can use Normal or Hard difficulty.
+3. For Raid, choose Spirit City Act 1, 2, or 3.
+4. Choose a camera model and at least one before-start or after-start placement model.
+5. Optionally choose Team 1-8, set defeat retries, and save the preset.
+
+Story and Raid pages edit presets. Add the saved preset to a Macro plan to run it. A before-start model plays in the countdown; an after-start model runs after its configured delay. Victory completes one scheduled attempt, while the preset's retry limit controls immediate retries after defeat.
+
+### 6. Build a Macro plan
+
+1. Open **Macro**, create a plan, and add saved Challenge, Expedition, Story, or Raid presets.
+2. Order tasks with **Up** and **Down**. The first enabled, eligible row always runs next.
+3. Set a victory target for finite tasks. Challenge tasks recur after their global reset instead of completing permanently.
+4. For an Infinite Story preset, the target can be runtime: it completes after the configured runtime has elapsed and that run ends in defeat.
+5. Save the plan and press the macro hotkey.
+
+The scheduler never interrupts a live match. It updates saved task progress only after the current runner returns control, then reevaluates priority. **Reset progress** clears victories, defeats, runtime, completion, and Challenge eligibility for the plan.
+
 ## Runtime behavior
 
 The Expeditions loop prepares the camera, places units, starts the node, and watches for:
@@ -103,6 +130,8 @@ The Expeditions loop prepares the camera, places units, starts the node, and wat
 
 The Challenges loop navigates the fixed three-entry selector, recognizes the rotating map, runs its map-specific camera and two placement phases, handles Victory or Defeat, opens Play with the configured in-game key, and returns through **Change Gamemode**. The same key-driven path returns from an Expeditions fallback without depending on the small Play icon or hotbar layout. During a completed 30-minute window it either waits or runs the selected Expeditions preset until the current Expedition run finishes cleanly.
 
+Story and Raid runners navigate from Play to their configured route, optionally load a saved Team, align the camera, run the two placement phases, select reward cards, and return to Play after Victory or the final Defeat. The Macro scheduler consumes one result at a time and then selects the highest-priority eligible task.
+
 Stopping is cooperative. The app releases right mouse and shift-lock state where applicable, cancels pending work, and leaves Roblox at the standardized client size used for detection.
 
 Roblox discovery verifies the owning player process instead of trusting a window title alone, so unrelated windows such as a Notepad document containing “Roblox” are ignored. If Roblox recreates its window during a teleport, the app refreshes the verified handle and retries focus. Standard sizing first keeps the normal window frame; when Windows or Roblox clamps that frame above 808 by 611, the app temporarily uses a verified borderless window so the exact client geometry can still be applied. The original frame style is restored when the app exits or an explicit bounds restore is requested.
@@ -113,6 +142,8 @@ Open **Settings**, enter a capture name and interval under **Debug capture**, th
 
 Automatic failure capture is enabled by default. It retains the latest 10 action-state frames from the active macro, then captures 10 more Roblox-client frames at 0.5-second intervals after an unexpected Expeditions or Challenge error. These captures use timestamped ZIP names and do not run after a normal completion or manual Stop. The app keeps the 10 newest automatic error ZIPs and removes older ones; manual diagnostic ZIPs are not affected.
 
+**Deep debug logging** is a separate, disabled-by-default option in Settings. Enabling it requires confirming a red storage warning because every operation can produce a multi-gigabyte ZIP. While enabled, every detector capture, detector score/state, high-level action, generated key/mouse event, and placement-recording input is written in sequence. The archive also contains sanitized app settings, the selected plan and presets, the active detector pack, the referenced camera/placement models, and a sanitized run log. A ZIP is finalized after success, cancellation, or failure and is never removed automatically. Discord webhook values, protected webhook material, and Discord user IDs are excluded.
+
 ## Local files and privacy
 
 Application data is stored under `%LocalAppData%\ExpeditionsMacro`:
@@ -121,6 +152,9 @@ Application data is stored under `%LocalAppData%\ExpeditionsMacro`:
 - `placement-models/`
 - `presets/`
 - `challenge-presets/`
+- `story-presets/`
+- `raid-presets/`
+- `macro-plans/`
 - `detector-packs/`
 - `diagnostics/`
 - `logs/`
@@ -154,7 +188,7 @@ Build release artifacts:
 
 The release script publishes the self-contained app, creates the portable ZIP, creates the detector-pack ZIP, optionally invokes Inno Setup, and writes SHA-256 checksums plus a dependency inventory.
 
-Pushing a version tag runs the release workflow. After GitHub publishes the verified assets, the workflow normally sends a Components V2 announcement to the public Discord `#releases` channel using the encrypted `DISCORD_RELEASE_WEBHOOK_URL` repository secret. Maintainers can include `[skip discord]` in the tagged commit message to publish without an announcement.
+Pushing a stable `vX.Y.Z` tag runs the normal release workflow. After GitHub publishes the verified assets, the workflow normally sends a Components V2 announcement to the public Discord `#releases` channel using the encrypted `DISCORD_RELEASE_WEBHOOK_URL` repository secret. Maintainers can include `[skip discord]` in the tagged commit message to suppress that announcement. Prerelease tags such as `vX.Y.Z-beta.N`, `vX.Y.Z-alpha.N`, and `vX.Y.Z-rc.N` instead use the silent prerelease workflow, are marked as GitHub prereleases, do not become the latest stable release, and never send a Discord announcement.
 
 ## Project layout
 

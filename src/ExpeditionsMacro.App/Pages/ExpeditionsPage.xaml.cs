@@ -4,8 +4,11 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
+using ExpeditionsMacro.App.Models;
 using ExpeditionsMacro.App.Services;
+using ExpeditionsMacro.Automation.Diagnostics;
 using ExpeditionsMacro.Automation.Discord;
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
@@ -33,13 +36,14 @@ public partial class ExpeditionsPage : UserControl, IAppPage
         PresetCombo.ItemsSource = _presets;
         CameraCombo.ItemsSource = _cameraModels;
         PlacementCombo.ItemsSource = _placementModels;
+        TeamCombo.ItemsSource = TeamChoices();
         _runtimeTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => UpdateRuntime(), Dispatcher);
         _runtimeTimer.Stop();
         _services.Coordinator.StateChanged += (_, _) => Dispatcher.BeginInvoke(CoordinatorStateChanged);
         _services.Hotkey.BindingChanged += (_, _) => Dispatcher.BeginInvoke(UpdateHotkeyText);
     }
 
-    public Func<Task>? IdleHotkeyAction => StartFromHotkeyAsync;
+    public Func<Task>? IdleHotkeyAction => null;
 
     public async Task OnShownAsync()
     {
@@ -110,7 +114,9 @@ public partial class ExpeditionsPage : UserControl, IAppPage
 
         CameraModel camera = await _services.CameraModels.LoadAsync(preset.CameraModelId) ?? throw new InvalidOperationException("The selected camera model could not be loaded.");
         PlacementModel placement = await _services.PlacementModels.LoadAsync(preset.PlacementModelId) ?? throw new InvalidOperationException("The selected placement model could not be loaded.");
-        IDetectorPack detector = await _services.DetectorPacks.LoadAsync(preset.DetectorPackId) ?? throw new InvalidOperationException("The selected detector pack could not be loaded.");
+        IDetectorPack detector = _services.TraceDetector(
+            await _services.DetectorPacks.LoadAsync(preset.DetectorPackId)
+            ?? throw new InvalidOperationException("The selected detector pack could not be loaded."));
         LogText.Clear();
         _runStarted = DateTimeOffset.Now;
         _macroOwned = true;
@@ -120,6 +126,7 @@ public partial class ExpeditionsPage : UserControl, IAppPage
         AppendLog("Starting Expeditions macro.");
         IProgress<MacroProgress> progress = new InlineProgress<MacroProgress>(value =>
         {
+            _services.DeepDebug.RecordProgress(value);
             TrackActionState(value.Phase, value.Message);
             Dispatcher.BeginInvoke(() =>
             {
@@ -142,13 +149,15 @@ public partial class ExpeditionsPage : UserControl, IAppPage
                 progress,
                 entry =>
                 {
+                    _services.DeepDebug.RecordMacroEvent(entry);
                     TrackActionState(entry.State ?? entry.Level.ToString(), entry.Message);
                     Dispatcher.BeginInvoke(() => AppendLog(entry.Level == MacroEventLevel.Error ? $"ERROR: {entry.Message}" : entry.Message));
                 },
                 summary => Dispatcher.BeginInvoke(() => ApplySummary(summary)),
                 cancellationToken: token,
                 recoverableFailure: (error, failureToken) => HandleRecoverableFailureAsync("Expeditions Macro", webhook, discordUserId, error, failureToken)),
-            token));
+            token),
+            new DeepDebugOperationContext { ExpeditionPresetId = preset.Id });
     }
 
     private async void SavePreset_Click(object sender, RoutedEventArgs e)
@@ -179,6 +188,7 @@ public partial class ExpeditionsPage : UserControl, IAppPage
             Difficulty = SelectedTag(DifficultyCombo),
             CameraModelId = camera.Id,
             PlacementModelId = placement.Id,
+            TeamSlot = (TeamCombo.SelectedItem as TeamChoice)?.Value ?? 0,
             DetectorPackId = detector.PackId,
             ExtractAtCheckpoint = ExtractCheck.IsChecked == true,
             BossesBeforeExtract = ParseInt(BossTargetText, "Boss nodes before extraction"),
@@ -211,9 +221,49 @@ public partial class ExpeditionsPage : UserControl, IAppPage
 
     private async void PresetCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        UpdateDeleteAvailability();
         if (_loading || PresetCombo.SelectedItem is not ExpeditionPreset preset) return;
         ApplyPreset(preset);
         await _services.UpdateSettingsAsync(settings => settings with { SelectedPresetId = preset.Id });
+    }
+
+    private async void DeletePreset_Click(object sender, RoutedEventArgs e)
+    {
+        if (_services.Coordinator.IsBusy || PresetCombo.SelectedItem is not ExpeditionPreset preset) return;
+        MessageBoxResult confirmation = MessageBox.Show(
+            Window.GetWindow(this),
+            $"Delete Expeditions preset '{preset.Name}'?\n\nCamera and placement models are kept.",
+            "Delete preset",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (confirmation != MessageBoxResult.Yes) return;
+
+        try
+        {
+            await _services.PresetDeletion.DeleteAsync(MacroTaskKind.Expedition, preset.Id);
+            _loading = true;
+            await RefreshPresetsAsync();
+            ExpeditionPreset? replacement = _presets.FirstOrDefault();
+            PresetCombo.SelectedItem = replacement;
+            if (replacement is not null) ApplyPreset(replacement);
+            else ApplyNewPreset();
+            await _services.UpdateSettingsAsync(settings => settings with { SelectedPresetId = replacement?.Id ?? string.Empty });
+            PhaseText.Text = $"Preset '{preset.Name}' deleted.";
+        }
+        catch (PresetInUseException error)
+        {
+            MessageBox.Show(Window.GetWindow(this), error.Message, "Preset in use", MessageBoxButton.OK, MessageBoxImage.Warning);
+            PhaseText.Text = error.Message;
+        }
+        catch (Exception error)
+        {
+            PhaseText.Text = error.Message;
+        }
+        finally
+        {
+            _loading = false;
+            UpdateDeleteAvailability();
+        }
     }
 
     private void ApplyPreset(ExpeditionPreset preset)
@@ -223,6 +273,7 @@ public partial class ExpeditionsPage : UserControl, IAppPage
         DifficultyCombo.SelectedIndex = preset.Difficulty - 1;
         CameraCombo.SelectedItem = _cameraModels.FirstOrDefault(model => model.Id == preset.CameraModelId);
         PlacementCombo.SelectedItem = _placementModels.FirstOrDefault(model => model.Id == preset.PlacementModelId);
+        TeamCombo.SelectedItem = TeamChoices().First(value => value.Value == preset.TeamSlot);
         ExtractCheck.IsChecked = preset.ExtractAtCheckpoint;
         BossTargetText.Text = preset.BossesBeforeExtract.ToString(CultureInfo.InvariantCulture);
         AutoRecoverCheck.IsChecked = preset.AutoRecover;
@@ -238,12 +289,19 @@ public partial class ExpeditionsPage : UserControl, IAppPage
     private void NewPreset_Click(object sender, RoutedEventArgs e)
     {
         PresetCombo.SelectedItem = null;
+        ApplyNewPreset();
+        UpdateDeleteAvailability();
+    }
+
+    private void ApplyNewPreset()
+    {
         PresetNameText.Text = "Expedition route";
         MapCombo.SelectedIndex = 0;
         DifficultyCombo.SelectedIndex = 0;
         ExtractCheck.IsChecked = true;
         BossTargetText.Text = "1";
         AutoRecoverCheck.IsChecked = true;
+        TeamCombo.SelectedIndex = 0;
         SelectCatalogDefaults();
     }
 
@@ -295,12 +353,16 @@ public partial class ExpeditionsPage : UserControl, IAppPage
 
     private void SetConfigurationEnabled(bool enabled)
     {
-        foreach (Control control in new Control[] { PresetCombo, PresetNameText, MapCombo, DifficultyCombo, CameraCombo, PlacementCombo, BossTargetText, WebhookPassword, WebhookVisible, DiscordErrorUserIdText, ZoomTicksText, PitchPixelsText, PollText, StableText, KeyHoldText, KeyDelayText }) control.IsEnabled = enabled;
+        foreach (Control control in new Control[] { PresetCombo, SavePresetButton, NewPresetButton, PresetNameText, MapCombo, DifficultyCombo, CameraCombo, PlacementCombo, TeamCombo, BossTargetText, WebhookPassword, WebhookVisible, DiscordErrorUserIdText, ZoomTicksText, PitchPixelsText, PollText, StableText, KeyHoldText, KeyDelayText }) control.IsEnabled = enabled;
         ExtractCheck.IsEnabled = enabled;
         AutoRecoverCheck.IsEnabled = enabled;
         ShowWebhookCheck.IsEnabled = enabled;
         TestWebhookButton.IsEnabled = enabled && !_testingWebhook;
+        UpdateDeleteAvailability();
     }
+
+    private void UpdateDeleteAvailability() =>
+        DeletePresetButton.IsEnabled = !_services.Coordinator.IsBusy && PresetCombo.SelectedItem is ExpeditionPreset;
 
     private void ExtractCheck_Changed(object sender, RoutedEventArgs e)
     {
@@ -402,6 +464,15 @@ public partial class ExpeditionsPage : UserControl, IAppPage
         {
             throw;
         }
+        catch (PlayMenuBindingException error)
+        {
+            await Dispatcher.InvokeAsync(() =>
+            {
+                PhaseText.Text = "Play menu key setup is required.";
+                AppendLog($"ERROR: {error.Message}");
+            });
+            throw;
+        }
         catch (Exception error)
         {
             await Dispatcher.InvokeAsync(() =>
@@ -479,4 +550,7 @@ public partial class ExpeditionsPage : UserControl, IAppPage
     private static int SelectedTag(ComboBox combo) => combo.SelectedItem is ComboBoxItem item && int.TryParse(item.Tag?.ToString(), out int value) ? value : throw new InvalidOperationException("Choose a route value.");
 
     private static string Label(string value) => CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '));
+
+    private static IReadOnlyList<TeamChoice> TeamChoices() =>
+        [new(0, "Don't change"), .. Enumerable.Range(1, 8).Select(value => new TeamChoice(value, $"Team {value}"))];
 }

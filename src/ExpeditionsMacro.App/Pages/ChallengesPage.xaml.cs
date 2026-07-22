@@ -7,7 +7,9 @@ using System.Windows.Threading;
 using ExpeditionsMacro.App.Models;
 using ExpeditionsMacro.App.Services;
 using ExpeditionsMacro.Automation.Challenges;
+using ExpeditionsMacro.Automation.Diagnostics;
 using ExpeditionsMacro.Automation.Discord;
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
@@ -51,7 +53,10 @@ public partial class ChallengesPage : UserControl, IAppPage
 
     public ObservableCollection<CatalogOption> PlacementOptions { get; } = [];
 
-    public Func<Task>? IdleHotkeyAction => StartFromHotkeyAsync;
+    public IReadOnlyList<TeamChoice> TeamOptions { get; } =
+        [new(0, "Don't change"), .. Enumerable.Range(1, 8).Select(value => new TeamChoice(value, $"Team {value}"))];
+
+    public Func<Task>? IdleHotkeyAction => null;
 
     internal void SetSnapshotScroll(bool showEnd)
     {
@@ -112,14 +117,18 @@ public partial class ChallengesPage : UserControl, IAppPage
             if (discordUserId.Length > 0 && webhook.Length == 0) throw new InvalidOperationException("A Discord webhook is required when an error-ping user ID is entered.");
             preset = await SavePresetInternalAsync();
             preset.ValidateReady();
-            detector = await _services.DetectorPacks.LoadAsync(preset.DetectorPackId) ?? throw new InvalidOperationException("The selected detector pack could not be loaded.");
+            detector = _services.TraceDetector(
+                await _services.DetectorPacks.LoadAsync(preset.DetectorPackId)
+                ?? throw new InvalidOperationException("The selected detector pack could not be loaded."));
             mapModels = await LoadMapModelsAsync(preset);
             if (preset.IdleBehavior == ChallengeIdleBehavior.RunExpeditions)
             {
                 ExpeditionPreset expedition = await _services.Presets.LoadAsync(preset.ExpeditionPresetId) ?? throw new InvalidOperationException("The selected Expeditions fallback preset could not be loaded.");
                 CameraModel camera = await _services.CameraModels.LoadAsync(expedition.CameraModelId) ?? throw new InvalidOperationException("The fallback Expeditions camera model could not be loaded.");
                 PlacementModel placement = await _services.PlacementModels.LoadAsync(expedition.PlacementModelId) ?? throw new InvalidOperationException("The fallback Expeditions placement model could not be loaded.");
-                IDetectorPack expeditionDetector = await _services.DetectorPacks.LoadAsync(expedition.DetectorPackId) ?? throw new InvalidOperationException("The fallback Expeditions detector pack could not be loaded.");
+                IDetectorPack expeditionDetector = _services.TraceDetector(
+                    await _services.DetectorPacks.LoadAsync(expedition.DetectorPackId)
+                    ?? throw new InvalidOperationException("The fallback Expeditions detector pack could not be loaded."));
                 idleWorkflow = (untilUtc, token) => RunExpeditionsUntilAsync(untilUtc, expedition, camera, placement, expeditionDetector, webhook, discordUserId, playMenuKey, token);
             }
         }
@@ -151,6 +160,7 @@ public partial class ChallengesPage : UserControl, IAppPage
         AppendLog("Starting Challenge macro.");
         IProgress<MacroProgress> progress = new InlineProgress<MacroProgress>(value =>
         {
+            _services.DeepDebug.RecordProgress(value);
             TrackActionState(value.Phase, value.Message);
             Dispatcher.BeginInvoke(() =>
             {
@@ -173,13 +183,15 @@ public partial class ChallengesPage : UserControl, IAppPage
                 progress,
                 entry =>
                 {
+                    _services.DeepDebug.RecordMacroEvent(entry);
                     TrackActionState(entry.State ?? entry.Level.ToString(), entry.Message);
                     Dispatcher.BeginInvoke(() => AppendLog(entry.Level == MacroEventLevel.Error ? $"ERROR: {entry.Message}" : entry.Message));
                 },
                 summary => Dispatcher.BeginInvoke(() => ApplySummary(summary)),
                 cancellationToken: token,
                 recoverableFailure: (error, failureToken) => HandleRecoverableFailureAsync("Challenge Macro", webhook, discordUserId, error, failureToken)),
-            token));
+            token),
+            new DeepDebugOperationContext { ChallengePresetId = preset.Id });
     }
 
     private async void SavePreset_Click(object sender, RoutedEventArgs e)
@@ -260,9 +272,49 @@ public partial class ChallengesPage : UserControl, IAppPage
 
     private async void PresetCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        UpdateDeleteAvailability();
         if (_loading || PresetCombo.SelectedItem is not ChallengePreset preset) return;
         ApplyPreset(preset);
         await _services.UpdateSettingsAsync(settings => settings with { SelectedChallengePresetId = preset.Id });
+    }
+
+    private async void DeletePreset_Click(object sender, RoutedEventArgs e)
+    {
+        if (_services.Coordinator.IsBusy || PresetCombo.SelectedItem is not ChallengePreset preset) return;
+        MessageBoxResult confirmation = MessageBox.Show(
+            Window.GetWindow(this),
+            $"Delete Challenge preset '{preset.Name}'?\n\nCamera and placement models are kept.",
+            "Delete preset",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (confirmation != MessageBoxResult.Yes) return;
+
+        try
+        {
+            await _services.PresetDeletion.DeleteAsync(MacroTaskKind.Challenge, preset.Id);
+            _loading = true;
+            await RefreshPresetsAsync();
+            ChallengePreset? replacement = _presets.FirstOrDefault();
+            PresetCombo.SelectedItem = replacement;
+            if (replacement is not null) ApplyPreset(replacement);
+            else ApplyNewPreset();
+            await _services.UpdateSettingsAsync(settings => settings with { SelectedChallengePresetId = replacement?.Id ?? string.Empty });
+            StatusText.Text = $"Preset '{preset.Name}' deleted.";
+        }
+        catch (PresetInUseException error)
+        {
+            MessageBox.Show(Window.GetWindow(this), error.Message, "Preset in use", MessageBoxButton.OK, MessageBoxImage.Warning);
+            StatusText.Text = error.Message;
+        }
+        catch (Exception error)
+        {
+            StatusText.Text = error.Message;
+        }
+        finally
+        {
+            _loading = false;
+            UpdateDeleteAvailability();
+        }
     }
 
     private void ApplyPreset(ChallengePreset preset)
@@ -293,6 +345,7 @@ public partial class ChallengesPage : UserControl, IAppPage
     {
         PresetCombo.SelectedItem = null;
         ApplyNewPreset();
+        UpdateDeleteAvailability();
     }
 
     private void ApplyNewPreset()
@@ -372,6 +425,8 @@ public partial class ChallengesPage : UserControl, IAppPage
         bool enabled = !_services.Coordinator.IsBusy;
         StopButton.IsEnabled = !enabled;
         PresetCombo.IsEnabled = enabled;
+        SavePresetButton.IsEnabled = enabled;
+        NewPresetButton.IsEnabled = enabled;
         PresetNameText.IsEnabled = enabled;
         TraitCheck.IsEnabled = enabled;
         StatCheck.IsEnabled = enabled;
@@ -392,6 +447,7 @@ public partial class ChallengesPage : UserControl, IAppPage
         TestWebhookButton.IsEnabled = enabled && !_testingWebhook;
         MapItems.IsEnabled = enabled;
         StartButton.IsEnabled = enabled;
+        UpdateDeleteAvailability();
         UpdateIdleBehaviorAvailability();
         if (enabled && _macroOwned && _runStarted is not null)
         {
@@ -401,6 +457,9 @@ public partial class ChallengesPage : UserControl, IAppPage
             AppendLog("Macro stopped.");
         }
     }
+
+    private void UpdateDeleteAvailability() =>
+        DeletePresetButton.IsEnabled = !_services.Coordinator.IsBusy && PresetCombo.SelectedItem is ChallengePreset;
 
     private void UpdateResetCountdown()
     {
@@ -555,6 +614,15 @@ public partial class ChallengesPage : UserControl, IAppPage
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+            throw;
+        }
+        catch (PlayMenuBindingException error)
+        {
+            await Dispatcher.InvokeAsync(() =>
+            {
+                StatusText.Text = "Play menu key setup is required.";
+                AppendLog($"ERROR: {error.Message}");
+            });
             throw;
         }
         catch (Exception error)
