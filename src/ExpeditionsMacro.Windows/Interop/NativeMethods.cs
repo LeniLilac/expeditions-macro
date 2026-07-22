@@ -4,9 +4,13 @@ namespace ExpeditionsMacro.Windows.Interop;
 
 internal static partial class NativeMethods
 {
+    internal const int GwlStyle = -16;
+    internal const int GwlExStyle = -20;
     internal const int SwpNoZOrder = 0x0004;
     internal const int SwpNoActivate = 0x0010;
     internal const int SwpFrameChanged = 0x0020;
+    internal const int SwpShowWindow = 0x0040;
+    internal const int SwRestore = 9;
     internal const uint MonitorDefaultToNearest = 0x00000002;
     internal const uint WmHotkey = 0x0312;
     internal const uint ModNoRepeat = 0x4000;
@@ -171,6 +175,13 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool IsWindowVisible(nint window);
 
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool IsWindow(nint window);
+
+    [LibraryImport("user32.dll")]
+    internal static partial uint GetWindowThreadProcessId(nint window, out uint processId);
+
     [LibraryImport("user32.dll", EntryPoint = "GetWindowTextLengthW")]
     internal static partial int GetWindowTextLength(nint window);
 
@@ -204,6 +215,12 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool SetWindowPos(nint window, nint insertAfter, int x, int y, int width, int height, uint flags);
 
+    [LibraryImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
+    internal static partial nint GetWindowLongPtr(nint window, int index);
+
+    [LibraryImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
+    internal static partial nint SetWindowLongPtr(nint window, int index, nint value);
+
     [LibraryImport("user32.dll")]
     internal static partial nint MonitorFromWindow(nint window, uint flags);
 
@@ -218,6 +235,10 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool SetForegroundWindow(nint window);
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool ShowWindowAsync(nint window, int command);
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

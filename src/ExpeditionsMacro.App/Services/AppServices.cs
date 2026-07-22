@@ -37,7 +37,9 @@ public sealed class AppServices : IDisposable
         ChallengePresets = new ChallengePresetRepository(Paths);
         CameraModels = new CameraModelRepository(Paths);
         DetectorPacks = new DetectorPackRepository(Paths);
-        Automation = new WindowsRobloxAutomation();
+        WindowsRobloxAutomation automation = new();
+        automation.DiagnosticMessage += Log.Info;
+        Automation = automation;
         SecretProtector = new DpapiSecretProtector();
         Hotkey = new GlobalHotkeyService();
         Coordinator = new OperationCoordinator(dispatcher);
@@ -108,7 +110,7 @@ public sealed class AppServices : IDisposable
         Exception error)
     {
         Task<(string? Path, string? Error)> diagnosticTask = Settings.AutoCaptureOnMacroError
-            ? CaptureFailureDiagnosticsAsync(macroName)
+            ? CaptureFailureDiagnosticsAsync(macroName, error.Message)
             : Task.FromResult<(string?, string?)>((null, null));
         Task<(bool Sent, string? Error)> pingTask =
             string.IsNullOrWhiteSpace(webhookUrl) || string.IsNullOrWhiteSpace(discordUserId)
@@ -130,6 +132,7 @@ public sealed class AppServices : IDisposable
     public void Dispose()
     {
         Coordinator.Cancel();
+        if (Automation is IDisposable automation) automation.Dispose();
         Log.Info("Application closing.");
         Hotkey.Dispose();
         DetectorUpdates.Dispose();
@@ -143,19 +146,22 @@ public sealed class AppServices : IDisposable
         await DetectorPacks.EnsureBundledAsync(source);
     }
 
-    private async Task<(string? Path, string? Error)> CaptureFailureDiagnosticsAsync(string macroName)
+    private async Task<(string? Path, string? Error)> CaptureFailureDiagnosticsAsync(string macroName, string failure)
     {
         try
         {
             using CancellationTokenSource timeout = new(TimeSpan.FromSeconds(30));
             string captureName = $"error-{macroName.ToLowerInvariant().Replace(' ', '-')}-{DateTimeOffset.Now:yyyyMMdd-HHmmss}";
-            DiagnosticCaptureResult result = await DiagnosticCapture.CaptureAsync(
+            DiagnosticCaptureResult result = await DiagnosticCapture.CaptureFailureAsync(
                 captureName,
-                TimeSpan.FromSeconds(1),
+                failure,
                 cancellationToken: timeout.Token,
-                maximumCaptures: 10,
                 logFilePath: Settings.IncludeLogsInDiagnosticArchives ? Log.CurrentFile : null);
             Log.Info($"Automatic failure diagnostics saved to {Path.GetFileName(result.ArchivePath)}.");
+            if (result.ArchivesPruned > 0)
+            {
+                Log.Info($"Removed {result.ArchivesPruned} older automatic error archive(s); retaining the newest {DiagnosticCaptureService.MaximumAutomaticArchives}.");
+            }
             return (result.ArchivePath, null);
         }
         catch (Exception captureError)
@@ -181,7 +187,7 @@ public sealed class AppServices : IDisposable
                 RobloxClientProfile.Width,
                 RobloxClientProfile.Height,
                 CancellationToken.None);
-            Log.Info($"Roblox client resized to {RobloxClientProfile.Width} by {RobloxClientProfile.Height} during startup.");
+            Log.Info($"Roblox client resized to {RobloxClientProfile.Width} by {RobloxClientProfile.Height} during startup using {window.Value.ProcessDescription}.");
         }
         catch (Exception error)
         {

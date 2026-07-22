@@ -135,8 +135,8 @@
             <StackPanel Grid.Row="7" Width="640" HorizontalAlignment="Left">
                 <TextBlock Style="{StaticResource SectionTitle}" Text="Debug capture" />
                 <TextBlock x:Name="DebugCaptureDescription" Margin="0,5,0,0" Style="{StaticResource Caption}" Text="Record the Roblox client at the standard 808 by 611 size. F6 starts and stops capture and saves a ZIP for bug reports." />
-                <CheckBox x:Name="AutoCaptureOnErrorCheck" Margin="0,14,0,0" Content="Automatically save 10 screenshots when a macro fails" Checked="AutoCaptureOnErrorCheck_Changed" Unchecked="AutoCaptureOnErrorCheck_Changed" />
-                <TextBlock Margin="25,5,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Captures one Roblox-client frame per second in a timestamped ZIP. Manual Stop does not create a capture." />
+                <CheckBox x:Name="AutoCaptureOnErrorCheck" Margin="0,14,0,0" Content="Automatically save 20 screenshots when a macro fails" Checked="AutoCaptureOnErrorCheck_Changed" Unchecked="AutoCaptureOnErrorCheck_Changed" />
+                <TextBlock Margin="25,5,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Keeps the latest 10 action-state frames, then captures 10 more at 0.5-second intervals after the failure. The 10 newest automatic error ZIPs are retained." />
                 <CheckBox x:Name="IncludeLogsCheck" Margin="0,12,0,0" Content="Include the current macro run log in diagnostic ZIPs" Checked="IncludeLogsCheck_Changed" Unchecked="IncludeLogsCheck_Changed" />
                 <TextBlock Margin="25,5,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Applies to manual and automatic captures. Review the log before sharing because it can contain local paths and operational details." />
                 <Grid Margin="0,16,0,0">

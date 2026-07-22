@@ -149,11 +149,15 @@ public partial class ChallengesPage : UserControl, IAppPage
         CompletedText.Text = VictoriesText.Text = DefeatsText.Text = "0";
         RecoveryText.Text = "0 / 0";
         AppendLog("Starting Challenge macro.");
-        Progress<MacroProgress> progress = new(value =>
+        IProgress<MacroProgress> progress = new InlineProgress<MacroProgress>(value =>
         {
-            StatusText.Text = value.Message;
-            MacroProgress.Value = value.Percent;
-            if (value.DetectedState is not null) DetectionText.Text = $"Last detection: {Label(value.DetectedState)}{(value.Confidence is null ? string.Empty : $" ({value.Confidence:P0})")}";
+            TrackActionState(value.Phase, value.Message);
+            Dispatcher.BeginInvoke(() =>
+            {
+                StatusText.Text = value.Message;
+                MacroProgress.Value = value.Percent;
+                if (value.DetectedState is not null) DetectionText.Text = $"Last detection: {Label(value.DetectedState)}{(value.Confidence is null ? string.Empty : $" ({value.Confidence:P0})")}";
+            });
         });
         await _services.Coordinator.RunNowAsync("Challenge macro", token => RunWithFailureHandlingAsync(
             "Challenge Macro",
@@ -167,7 +171,11 @@ public partial class ChallengesPage : UserControl, IAppPage
                 playMenuKey,
                 idleWorkflow,
                 progress,
-                entry => Dispatcher.BeginInvoke(() => AppendLog(entry.Level == MacroEventLevel.Error ? $"ERROR: {entry.Message}" : entry.Message)),
+                entry =>
+                {
+                    TrackActionState(entry.State ?? entry.Level.ToString(), entry.Message);
+                    Dispatcher.BeginInvoke(() => AppendLog(entry.Level == MacroEventLevel.Error ? $"ERROR: {entry.Message}" : entry.Message));
+                },
                 summary => Dispatcher.BeginInvoke(() => ApplySummary(summary)),
                 cancellationToken: token,
                 recoverableFailure: (error, failureToken) => HandleRecoverableFailureAsync("Challenge Macro", webhook, discordUserId, error, failureToken)),
@@ -439,8 +447,16 @@ public partial class ChallengesPage : UserControl, IAppPage
             detector,
             webhookUrl,
             playMenuKey,
-            progress: new Progress<MacroProgress>(value => DispatchUi(() => StatusText.Text = $"Expeditions fallback: {value.Message}")),
-            log: entry => AppendLog($"Expeditions: {entry.Message}"),
+            progress: new InlineProgress<MacroProgress>(value =>
+            {
+                TrackActionState($"Expeditions fallback · {value.Phase}", value.Message);
+                DispatchUi(() => StatusText.Text = $"Expeditions fallback: {value.Message}");
+            }),
+            log: entry =>
+            {
+                TrackActionState($"Expeditions fallback · {entry.State ?? entry.Level.ToString()}", entry.Message);
+                AppendLog($"Expeditions: {entry.Message}");
+            },
             summaryChanged: null,
             cancellationToken: cancellationToken,
             stopAfterCurrentRunUtc: untilUtc,
@@ -531,6 +547,8 @@ public partial class ChallengesPage : UserControl, IAppPage
         Func<Task> operation,
         CancellationToken cancellationToken)
     {
+        bool captureHistory = _services.Settings.AutoCaptureOnMacroError;
+        if (captureHistory) _services.DiagnosticCapture.BeginAutomaticHistory($"{macroName} started");
         try
         {
             await operation();
@@ -549,6 +567,10 @@ public partial class ChallengesPage : UserControl, IAppPage
             MacroFailureHandlingResult result = await _services.HandleMacroFailureAsync(macroName, webhook, discordUserId, error);
             await Dispatcher.InvokeAsync(() => AppendFailureHandlingResult(result));
             throw;
+        }
+        finally
+        {
+            if (captureHistory) _services.DiagnosticCapture.EndAutomaticHistory();
         }
     }
 
@@ -609,6 +631,9 @@ public partial class ChallengesPage : UserControl, IAppPage
         }
         LogText.ScrollToEnd();
     }
+
+    private void TrackActionState(string phase, string message) =>
+        _services.DiagnosticCapture.RecordActionState($"{phase}: {message}");
 
     private void DispatchUi(Action action)
     {

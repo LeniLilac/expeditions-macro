@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
@@ -7,14 +8,48 @@ using ExpeditionsMacro.Windows.Interop;
 
 namespace ExpeditionsMacro.Windows;
 
-public sealed class WindowsRobloxAutomation : IRobloxAutomation
+public sealed class WindowsRobloxAutomation : IRobloxAutomation, IDisposable
 {
+    private const long WsCaption = 0x00C00000L;
+    private const long WsThickFrame = 0x00040000L;
+    private const long WsMinimizeBox = 0x00020000L;
+    private const long WsMaximizeBox = 0x00010000L;
+    private const long WsSystemMenu = 0x00080000L;
+    private const long WsPopup = 0x80000000L;
+    private const long WsExDialogModalFrame = 0x00000001L;
+    private const long WsExWindowEdge = 0x00000100L;
+    private const long WsExClientEdge = 0x00000200L;
+    private const long WsExStaticEdge = 0x00020000L;
+    private const int ForcedResizeAttempts = 5;
     private const int ClickPositionSettleMilliseconds = 75;
     private const int ClickHoldMilliseconds = 20;
     private const int CursorParkingInsetPixels = 24;
     private const int HoverClearPulseCount = 4;
     private const int HoverClearPulseIntervalMilliseconds = 100;
     private const int HoverRenderSettleMilliseconds = 100;
+    internal static (char PrimaryKey, bool PrimaryIsExtended, bool UseWheelFallback) ZoomOutInputPolicy => ('O', false, true);
+    private static readonly HashSet<string> SupportedRobloxProcesses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "RobloxPlayerBeta",
+        "Windows10Universal",
+        "Roblox",
+    };
+
+    private readonly object _windowStateGate = new();
+    private readonly SemaphoreSlim _sizingGate = new(1, 1);
+    private readonly Dictionary<nint, nint> _windowAliases = [];
+    private readonly Dictionary<nint, ForcedWindowState> _forcedWindows = [];
+    private ClientSizeTarget? _activeClientSizeTarget;
+
+    private sealed record ForcedWindowState(
+        int ProcessId,
+        nint OriginalStyle,
+        nint OriginalExtendedStyle,
+        WindowBounds OriginalBounds);
+
+    private sealed record ClientSizeTarget(int Width, int Height);
+
+    public event Action<string>? DiagnosticMessage;
 
     public RobloxWindow? FindWindow(string titleFragment = "Roblox")
     {
@@ -24,29 +59,37 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation
         {
             if (!NativeMethods.IsWindowVisible(window)) return true;
             string title = WindowTitle(window);
-            if (title.Contains(fragment, StringComparison.OrdinalIgnoreCase)) matches.Add(new RobloxWindow(window, title));
+            if (title.Contains(fragment, StringComparison.OrdinalIgnoreCase) && TryDescribeRobloxWindow(window, title, out RobloxWindow match))
+            {
+                matches.Add(match);
+            }
             return true;
         };
         if (!NativeMethods.EnumWindows(callback, nint.Zero)) throw new Win32Exception(Marshal.GetLastWin32Error());
-        return matches
-            .OrderBy(match => string.Equals(match.Title, fragment, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
-            .ThenBy(match => match.Title.Length)
-            .Cast<RobloxWindow?>()
-            .FirstOrDefault();
+        return SelectBestWindow(matches, fragment);
     }
 
     public RobloxWindow? ForegroundWindow()
     {
         nint handle = NativeMethods.GetForegroundWindow();
-        return handle == nint.Zero ? null : new RobloxWindow(handle, WindowTitle(handle));
+        if (handle == nint.Zero) return null;
+        string title = WindowTitle(handle);
+        return TryDescribeWindow(handle, title, out RobloxWindow window)
+            ? window
+            : new RobloxWindow(handle, title);
     }
 
     public ClientBounds GetClientBounds(RobloxWindow window)
     {
-        if (!NativeMethods.GetClientRect(window.Handle, out NativeMethods.Rect rectangle)) throw new Win32Exception("Could not read the Roblox client rectangle.");
+        return GetClientBounds(ResolveHandle(window));
+    }
+
+    private static ClientBounds GetClientBounds(nint handle)
+    {
+        if (!NativeMethods.GetClientRect(handle, out NativeMethods.Rect rectangle)) throw new Win32Exception("Could not read the Roblox client rectangle.");
         NativeMethods.Point topLeft = new() { X = rectangle.Left, Y = rectangle.Top };
         NativeMethods.Point bottomRight = new() { X = rectangle.Right, Y = rectangle.Bottom };
-        if (!NativeMethods.ClientToScreen(window.Handle, ref topLeft) || !NativeMethods.ClientToScreen(window.Handle, ref bottomRight))
+        if (!NativeMethods.ClientToScreen(handle, ref topLeft) || !NativeMethods.ClientToScreen(handle, ref bottomRight))
         {
             throw new Win32Exception("Could not locate the Roblox client on screen.");
         }
@@ -59,49 +102,107 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation
 
     public WindowBounds GetWindowBounds(RobloxWindow window)
     {
-        if (!NativeMethods.GetWindowRect(window.Handle, out NativeMethods.Rect rectangle)) throw new Win32Exception("Could not read the Roblox window bounds.");
+        return GetWindowBounds(ResolveHandle(window));
+    }
+
+    private static WindowBounds GetWindowBounds(nint handle)
+    {
+        if (!NativeMethods.GetWindowRect(handle, out NativeMethods.Rect rectangle)) throw new Win32Exception("Could not read the Roblox window bounds.");
         return new WindowBounds(rectangle.Left, rectangle.Top, rectangle.Right - rectangle.Left, rectangle.Bottom - rectangle.Top);
     }
 
     public bool Focus(RobloxWindow window)
     {
-        if (NativeMethods.IsIconic(window.Handle)) return false;
-        NativeMethods.BringWindowToTop(window.Handle);
-        return NativeMethods.SetForegroundWindow(window.Handle) || NativeMethods.GetForegroundWindow() == window.Handle;
+        nint handle = ResolveHandle(window);
+        if (TryFocus(handle)) return true;
+
+        RobloxWindow? refreshed = FindWindow();
+        if (refreshed is null) return false;
+        RegisterAlias(window.Handle, refreshed.Value.Handle);
+        if (handle != refreshed.Value.Handle)
+        {
+            DiagnosticMessage?.Invoke($"Roblox window refreshed after a focus failure: {refreshed.Value.ProcessDescription}.");
+        }
+        RevalidateTrackedClientSize(refreshed.Value.Handle);
+        return TryFocus(refreshed.Value.Handle);
     }
 
     public async Task ResizeClientAsync(RobloxWindow window, int width, int height, CancellationToken cancellationToken)
     {
-        if (NativeMethods.IsIconic(window.Handle)) throw new InvalidOperationException("Roblox is minimized. Restore it before continuing.");
-        if (NativeMethods.IsZoomed(window.Handle)) throw new InvalidOperationException("Roblox is maximized. Restore it to a normal window before continuing.");
-        WindowBounds outer = GetWindowBounds(window);
-        ClientBounds client = GetClientBounds(window);
+        nint handle = ResolveHandle(window, revalidateTrackedSize: false);
+        await _sizingGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await ResizeClientCoreAsync(handle, width, height, cancellationToken).ConfigureAwait(false);
+            lock (_windowStateGate)
+            {
+                _activeClientSizeTarget = new ClientSizeTarget(width, height);
+            }
+        }
+        finally
+        {
+            _sizingGate.Release();
+        }
+    }
+
+    private async Task ResizeClientCoreAsync(nint handle, int width, int height, CancellationToken cancellationToken)
+    {
+        await RestoreForSizingAsync(handle, cancellationToken).ConfigureAwait(false);
+        if (IsForcedWindow(handle))
+        {
+            await ResizeForcedWindowAsync(handle, width, height, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        WindowBounds outer = GetWindowBounds(handle);
+        ForcedWindowState originalState = new(
+            WindowProcessId(handle),
+            ReadWindowLong(handle, NativeMethods.GwlStyle),
+            ReadWindowLong(handle, NativeMethods.GwlExStyle),
+            outer);
+        ClientBounds client = GetClientBounds(handle);
         int outerWidth = checked(width + outer.Width - client.Width);
         int outerHeight = checked(height + outer.Height - client.Height);
-        (int x, int y) = FitOnMonitor(window, outer.X, outer.Y, outerWidth, outerHeight);
-        if (!NativeMethods.SetWindowPos(window.Handle, nint.Zero, x, y, outerWidth, outerHeight, NativeMethods.SwpNoZOrder | NativeMethods.SwpNoActivate | NativeMethods.SwpFrameChanged))
+        (int x, int y) = FitOnMonitor(handle, outer.X, outer.Y, outerWidth, outerHeight);
+        if (!NativeMethods.SetWindowPos(handle, nint.Zero, x, y, outerWidth, outerHeight, NativeMethods.SwpNoZOrder | NativeMethods.SwpNoActivate | NativeMethods.SwpFrameChanged))
         {
             throw new Win32Exception("Windows could not resize Roblox.");
         }
 
-        DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(2);
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            ClientBounds current = GetClientBounds(window);
-            if (current.Width == width && current.Height == height) return;
-            await Task.Delay(30, cancellationToken).ConfigureAwait(false);
-        }
+        if (await WaitForClientSizeAsync(handle, width, height, TimeSpan.FromSeconds(2), cancellationToken).ConfigureAwait(false)) return;
 
-        ClientBounds actual = GetClientBounds(window);
-        throw new InvalidOperationException($"Roblox did not accept the required {width} × {height} client size (actual: {actual.Width} × {actual.Height}).");
+        ClientBounds clamped = GetClientBounds(handle);
+        DiagnosticMessage?.Invoke($"Roblox clamped normal sizing to {clamped.Width} by {clamped.Height}; enabling forced borderless sizing.");
+        await EnableForcedSizingAsync(handle, width, height, originalState, cancellationToken).ConfigureAwait(false);
     }
 
     public void RestoreWindowBounds(RobloxWindow window, WindowBounds bounds)
     {
-        if (!NativeMethods.SetWindowPos(window.Handle, nint.Zero, bounds.X, bounds.Y, bounds.Width, bounds.Height, NativeMethods.SwpNoZOrder | NativeMethods.SwpNoActivate | NativeMethods.SwpFrameChanged))
+        lock (_windowStateGate)
+        {
+            _activeClientSizeTarget = null;
+        }
+        nint handle = ResolveHandle(window, revalidateTrackedSize: false);
+        if (RestoreForcedStyle(handle, bounds, throwOnFailure: true)) return;
+        if (!NativeMethods.SetWindowPos(handle, nint.Zero, bounds.X, bounds.Y, bounds.Width, bounds.Height, NativeMethods.SwpNoZOrder | NativeMethods.SwpNoActivate | NativeMethods.SwpFrameChanged))
         {
             throw new Win32Exception("Windows could not restore the original Roblox bounds.");
+        }
+    }
+
+    public void Dispose()
+    {
+        KeyValuePair<nint, ForcedWindowState>[] states;
+        lock (_windowStateGate)
+        {
+            _activeClientSizeTarget = null;
+            _windowAliases.Clear();
+            states = _forcedWindows.ToArray();
+        }
+
+        foreach ((nint handle, ForcedWindowState state) in states)
+        {
+            RestoreForcedStyle(handle, state.OriginalBounds, throwOnFailure: false);
         }
     }
 
@@ -215,7 +316,36 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation
     public async Task ZoomOutFullyAsync(RobloxWindow window, int ticks, CancellationToken cancellationToken)
     {
         if (!Focus(window)) throw new InvalidOperationException("Windows could not focus Roblox.");
-        for (int index = 0; index < Math.Max(0, ticks); index++)
+        int pulseCount = Math.Max(0, ticks);
+        (char primaryKey, bool primaryIsExtended, bool useWheelFallback) = ZoomOutInputPolicy;
+        ushort zoomOutScanCode = checked((ushort)NativeMethods.MapVirtualKey(primaryKey, 0));
+        try
+        {
+            for (int index = 0; index < pulseCount; index++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                SendKeyboard(zoomOutScanCode, keyUp: false, extended: primaryIsExtended);
+                try
+                {
+                    await Task.Delay(35, cancellationToken).ConfigureAwait(false);
+                }
+                finally
+                {
+                    SendKeyboard(zoomOutScanCode, keyUp: true, extended: primaryIsExtended);
+                }
+                await Task.Delay(15, cancellationToken).ConfigureAwait(false);
+            }
+            return;
+        }
+        catch (Win32Exception) when (useWheelFallback)
+        {
+            // O is Roblox's built-in Zoom Out binding and avoids cursor-dependent
+            // wheel handling. Keep the former wheel path as an OS-input fallback
+            // for systems where Windows rejects the keyboard injection.
+        }
+
+        if (!Focus(window)) throw new InvalidOperationException("Windows could not focus Roblox for the zoom fallback.");
+        for (int index = 0; index < pulseCount; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             SendMouse(NativeMethods.MouseeventfWheel, data: unchecked((uint)-NativeMethods.WheelDelta));
@@ -271,9 +401,10 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation
         if (NativeMethods.SendInput(1, inputs, Marshal.SizeOf<NativeMethods.Input>()) != 1) throw new Win32Exception("Windows rejected a simulated mouse input event.");
     }
 
-    private static void SendKeyboard(ushort scanCode, bool keyUp)
+    private static void SendKeyboard(ushort scanCode, bool keyUp, bool extended = true)
     {
-        uint flags = NativeMethods.KeyeventfScanCode | NativeMethods.KeyeventfExtendedKey;
+        uint flags = NativeMethods.KeyeventfScanCode;
+        if (extended) flags |= NativeMethods.KeyeventfExtendedKey;
         if (keyUp) flags |= NativeMethods.KeyeventfKeyUp;
         NativeMethods.Input[] inputs =
         [
@@ -323,9 +454,338 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation
         }
     }
 
-    private static (int X, int Y) FitOnMonitor(RobloxWindow window, int x, int y, int width, int height)
+    internal static bool IsSupportedRobloxProcessName(string processName) => SupportedRobloxProcesses.Contains(processName);
+
+    internal static RobloxWindow? SelectBestWindow(IEnumerable<RobloxWindow> matches, string titleFragment) =>
+        matches
+            .OrderBy(match => string.Equals(match.Title, titleFragment, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+            .ThenBy(match => ProcessPreference(match.ProcessName))
+            .ThenBy(match => match.Title.Length)
+            .ThenBy(match => match.ProcessId)
+            .Cast<RobloxWindow?>()
+            .FirstOrDefault();
+
+    internal static long BuildForcedWindowStyle(long originalStyle)
     {
-        nint monitor = NativeMethods.MonitorFromWindow(window.Handle, NativeMethods.MonitorDefaultToNearest);
+        long normalized = unchecked((uint)originalStyle);
+        long removed = WsCaption | WsThickFrame | WsMinimizeBox | WsMaximizeBox | WsSystemMenu;
+        return (normalized & ~removed) | WsPopup;
+    }
+
+    internal static long BuildForcedExtendedWindowStyle(long originalStyle)
+    {
+        long normalized = unchecked((uint)originalStyle);
+        long removed = WsExDialogModalFrame | WsExWindowEdge | WsExClientEdge | WsExStaticEdge;
+        return normalized & ~removed;
+    }
+
+    private static int ProcessPreference(string processName) => processName.ToUpperInvariant() switch
+    {
+        "ROBLOXPLAYERBETA" => 0,
+        "WINDOWS10UNIVERSAL" => 1,
+        "ROBLOX" => 2,
+        _ => 3,
+    };
+
+    private static bool TryDescribeRobloxWindow(nint handle, string title, out RobloxWindow window)
+    {
+        if (!TryDescribeWindow(handle, title, out window)) return false;
+        return IsSupportedRobloxProcessName(window.ProcessName);
+    }
+
+    private static bool TryDescribeWindow(nint handle, string title, out RobloxWindow window)
+    {
+        window = default;
+        if (NativeMethods.GetWindowThreadProcessId(handle, out uint processId) == 0 || processId == 0) return false;
+        try
+        {
+            using Process process = Process.GetProcessById(checked((int)processId));
+            string processName = process.ProcessName;
+            if (string.IsNullOrWhiteSpace(processName)) return false;
+            window = new RobloxWindow(handle, title, checked((int)processId), processName);
+            return true;
+        }
+        catch (Exception error) when (error is ArgumentException or InvalidOperationException or Win32Exception)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsVerifiedRobloxHandle(nint handle)
+    {
+        if (handle == nint.Zero || !NativeMethods.IsWindow(handle)) return false;
+        return TryDescribeRobloxWindow(handle, WindowTitle(handle), out _);
+    }
+
+    private nint ResolveHandle(RobloxWindow window, bool revalidateTrackedSize = true)
+    {
+        nint handle = window.Handle;
+        lock (_windowStateGate)
+        {
+            HashSet<nint> visited = [];
+            while (_windowAliases.TryGetValue(handle, out nint next) && visited.Add(handle)) handle = next;
+        }
+        if (IsVerifiedRobloxHandle(handle))
+        {
+            if (revalidateTrackedSize) RevalidateTrackedClientSize(handle);
+            return handle;
+        }
+
+        RobloxWindow? refreshed = FindWindow();
+        if (refreshed is null) return handle;
+        RegisterAlias(window.Handle, refreshed.Value.Handle);
+        if (handle != refreshed.Value.Handle)
+        {
+            DiagnosticMessage?.Invoke($"Roblox window handle refreshed: {refreshed.Value.ProcessDescription}.");
+        }
+        if (revalidateTrackedSize) RevalidateTrackedClientSize(refreshed.Value.Handle);
+        return refreshed.Value.Handle;
+    }
+
+    private void RegisterAlias(nint original, nint replacement)
+    {
+        if (original == nint.Zero || replacement == nint.Zero || original == replacement) return;
+        lock (_windowStateGate)
+        {
+            _windowAliases[original] = replacement;
+        }
+    }
+
+    private static bool TryFocus(nint handle)
+    {
+        if (handle == nint.Zero || !NativeMethods.IsWindow(handle)) return false;
+        if (NativeMethods.IsIconic(handle)) NativeMethods.ShowWindowAsync(handle, NativeMethods.SwRestore);
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            NativeMethods.BringWindowToTop(handle);
+            if (NativeMethods.SetForegroundWindow(handle) || NativeMethods.GetForegroundWindow() == handle) return true;
+            if (attempt < 2) Thread.Sleep(25);
+        }
+        return false;
+    }
+
+    private bool IsForcedWindow(nint handle)
+    {
+        lock (_windowStateGate)
+        {
+            return _forcedWindows.ContainsKey(handle);
+        }
+    }
+
+    private async Task EnableForcedSizingAsync(
+        nint handle,
+        int width,
+        int height,
+        ForcedWindowState state,
+        CancellationToken cancellationToken)
+    {
+        bool styleChanged = false;
+        try
+        {
+            WriteWindowLong(handle, NativeMethods.GwlStyle, new nint(BuildForcedWindowStyle(state.OriginalStyle.ToInt64())));
+            styleChanged = true;
+            WriteWindowLong(handle, NativeMethods.GwlExStyle, new nint(BuildForcedExtendedWindowStyle(state.OriginalExtendedStyle.ToInt64())));
+            lock (_windowStateGate)
+            {
+                _forcedWindows[handle] = state;
+            }
+            await ResizeForcedWindowAsync(handle, width, height, cancellationToken).ConfigureAwait(false);
+            if (TryDescribeWindow(handle, WindowTitle(handle), out RobloxWindow window))
+            {
+                DiagnosticMessage?.Invoke($"Forced borderless sizing is active for {window.ProcessDescription}.");
+            }
+        }
+        catch
+        {
+            lock (_windowStateGate)
+            {
+                _forcedWindows.Remove(handle);
+            }
+            if (styleChanged)
+            {
+                TryRestoreWindowState(handle, state, state.OriginalBounds);
+            }
+            throw;
+        }
+    }
+
+    private async Task RestoreForSizingAsync(nint handle, CancellationToken cancellationToken)
+    {
+        if (!NativeMethods.IsIconic(handle) && !NativeMethods.IsZoomed(handle)) return;
+        NativeMethods.ShowWindowAsync(handle, NativeMethods.SwRestore);
+
+        DateTimeOffset deadline = DateTimeOffset.UtcNow.AddSeconds(2);
+        do
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!NativeMethods.IsIconic(handle) && !NativeMethods.IsZoomed(handle))
+            {
+                DiagnosticMessage?.Invoke("Roblox was restored from its minimized or maximized state before sizing.");
+                return;
+            }
+            await Task.Delay(30, cancellationToken).ConfigureAwait(false);
+        }
+        while (DateTimeOffset.UtcNow < deadline);
+
+        throw new InvalidOperationException("Windows could not restore Roblox to a resizable window state.");
+    }
+
+    private void RevalidateTrackedClientSize(nint handle)
+    {
+        ClientSizeTarget? target;
+        lock (_windowStateGate)
+        {
+            target = _activeClientSizeTarget;
+        }
+        if (target is null || HasClientSize(handle, target.Width, target.Height)) return;
+
+        _sizingGate.Wait();
+        try
+        {
+            lock (_windowStateGate)
+            {
+                target = _activeClientSizeTarget;
+            }
+            if (target is null || HasClientSize(handle, target.Width, target.Height)) return;
+
+            DiagnosticMessage?.Invoke($"Roblox client geometry changed after a window refresh or teleport; reapplying {target.Width} by {target.Height}.");
+            ResizeClientCoreAsync(handle, target.Width, target.Height, CancellationToken.None).GetAwaiter().GetResult();
+            DiagnosticMessage?.Invoke($"Roblox client geometry revalidated at {target.Width} by {target.Height}.");
+        }
+        finally
+        {
+            _sizingGate.Release();
+        }
+    }
+
+    private static bool HasClientSize(nint handle, int width, int height) =>
+        NativeMethods.GetClientRect(handle, out NativeMethods.Rect rectangle) &&
+        rectangle.Right - rectangle.Left == width &&
+        rectangle.Bottom - rectangle.Top == height;
+
+    private static async Task ResizeForcedWindowAsync(nint handle, int width, int height, CancellationToken cancellationToken)
+    {
+        int outerWidth = width;
+        int outerHeight = height;
+        WindowBounds startingBounds = GetWindowBounds(handle);
+        int x = startingBounds.X;
+        int y = startingBounds.Y;
+        for (int attempt = 0; attempt < ForcedResizeAttempts; attempt++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            (x, y) = FitOnMonitor(handle, x, y, outerWidth, outerHeight);
+            if (!NativeMethods.SetWindowPos(
+                handle,
+                nint.Zero,
+                x,
+                y,
+                outerWidth,
+                outerHeight,
+                NativeMethods.SwpNoZOrder | NativeMethods.SwpNoActivate | NativeMethods.SwpFrameChanged | NativeMethods.SwpShowWindow))
+            {
+                throw new Win32Exception("Windows could not force Roblox to the standard client size.");
+            }
+
+            if (await WaitForClientSizeAsync(handle, width, height, TimeSpan.FromMilliseconds(350), cancellationToken).ConfigureAwait(false)) return;
+            WindowBounds outer = GetWindowBounds(handle);
+            ClientBounds client = GetClientBounds(handle);
+            outerWidth = checked(outer.Width + width - client.Width);
+            outerHeight = checked(outer.Height + height - client.Height);
+        }
+
+        ClientBounds actual = GetClientBounds(handle);
+        throw new InvalidOperationException($"Roblox did not accept the required {width} × {height} client size, including forced borderless sizing (actual: {actual.Width} × {actual.Height}).");
+    }
+
+    private static async Task<bool> WaitForClientSizeAsync(
+        nint handle,
+        int width,
+        int height,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        DateTimeOffset deadline = DateTimeOffset.UtcNow.Add(timeout);
+        do
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ClientBounds current = GetClientBounds(handle);
+            if (current.Width == width && current.Height == height) return true;
+            await Task.Delay(30, cancellationToken).ConfigureAwait(false);
+        }
+        while (DateTimeOffset.UtcNow < deadline);
+        return false;
+    }
+
+    private bool RestoreForcedStyle(nint handle, WindowBounds bounds, bool throwOnFailure)
+    {
+        ForcedWindowState? state;
+        lock (_windowStateGate)
+        {
+            if (!_forcedWindows.Remove(handle, out state)) return false;
+        }
+        if (!IsSameWindowProcess(handle, state.ProcessId)) return true;
+        if (TryRestoreWindowState(handle, state, bounds)) return true;
+        if (throwOnFailure) throw new Win32Exception("Windows could not restore the original Roblox window style.");
+        DiagnosticMessage?.Invoke("Windows could not restore the original Roblox window style during shutdown.");
+        return true;
+    }
+
+    private static bool TryRestoreWindowState(nint handle, ForcedWindowState state, WindowBounds bounds)
+    {
+        if (!IsSameWindowProcess(handle, state.ProcessId)) return false;
+        try
+        {
+            WriteWindowLong(handle, NativeMethods.GwlStyle, state.OriginalStyle);
+            WriteWindowLong(handle, NativeMethods.GwlExStyle, state.OriginalExtendedStyle);
+            return NativeMethods.SetWindowPos(
+                handle,
+                nint.Zero,
+                bounds.X,
+                bounds.Y,
+                bounds.Width,
+                bounds.Height,
+                NativeMethods.SwpNoZOrder | NativeMethods.SwpNoActivate | NativeMethods.SwpFrameChanged | NativeMethods.SwpShowWindow);
+        }
+        catch (Win32Exception)
+        {
+            return false;
+        }
+    }
+
+    private static int WindowProcessId(nint handle)
+    {
+        if (NativeMethods.GetWindowThreadProcessId(handle, out uint processId) == 0 || processId == 0)
+        {
+            throw new Win32Exception("Windows could not identify the Roblox process that owns the window.");
+        }
+        return checked((int)processId);
+    }
+
+    private static bool IsSameWindowProcess(nint handle, int processId) =>
+        NativeMethods.IsWindow(handle) &&
+        NativeMethods.GetWindowThreadProcessId(handle, out uint currentProcessId) != 0 &&
+        currentProcessId == (uint)processId;
+
+    private static nint ReadWindowLong(nint handle, int index)
+    {
+        Marshal.SetLastPInvokeError(0);
+        nint value = NativeMethods.GetWindowLongPtr(handle, index);
+        int error = Marshal.GetLastPInvokeError();
+        if (value == nint.Zero && error != 0) throw new Win32Exception(error);
+        return value;
+    }
+
+    private static void WriteWindowLong(nint handle, int index, nint value)
+    {
+        Marshal.SetLastPInvokeError(0);
+        nint previous = NativeMethods.SetWindowLongPtr(handle, index, value);
+        int error = Marshal.GetLastPInvokeError();
+        if (previous == nint.Zero && error != 0) throw new Win32Exception(error);
+    }
+
+    private static (int X, int Y) FitOnMonitor(nint handle, int x, int y, int width, int height)
+    {
+        nint monitor = NativeMethods.MonitorFromWindow(handle, NativeMethods.MonitorDefaultToNearest);
         NativeMethods.MonitorInfo info = new() { Size = (uint)Marshal.SizeOf<NativeMethods.MonitorInfo>() };
         if (monitor == nint.Zero || !NativeMethods.GetMonitorInfo(monitor, ref info)) return (x, y);
         NativeMethods.Rect work = info.Work;

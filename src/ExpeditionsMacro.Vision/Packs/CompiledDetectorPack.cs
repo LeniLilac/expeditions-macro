@@ -168,6 +168,13 @@ public sealed class CompiledDetectorPack : IDetectorPack
 
     public int? SelectedMap(ImageFrame clientImage)
     {
+        ValidateClient(clientImage);
+        if (Manifest.PackId.Equals(AnimeExpeditionsDetectorSpec.PackId, StringComparison.OrdinalIgnoreCase) &&
+            MapSelectionDetector.Detect(clientImage) is int markerSelection)
+        {
+            return markerSelection;
+        }
+
         int? selected = BestSelection(_maps, clientImage, 0.90, 0.10, [(0, 0)]);
         return selected ?? BestAdaptiveSelection(_maps, clientImage, 0.90, 0.10);
     }

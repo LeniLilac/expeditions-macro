@@ -73,8 +73,8 @@ public static class ChallengeScreenDetector
             ChallengeScreenState.ChallengeCooldown,
             ChallengeScreenState.ChallengeListUnavailable,
             ChallengeScreenState.Victory,
-            ChallengeScreenState.PostMatchHud,
             ChallengeScreenState.Prestart,
+            ChallengeScreenState.PostMatchHud,
             ChallengeScreenState.PreviewReady,
             ChallengeScreenState.PostMatchPreview,
             ChallengeScreenState.ChallengeList,
@@ -104,8 +104,14 @@ public static class ChallengeScreenDetector
         double victoryParty = ActionButtonDetector.Score(image, "challenge_victory_party");
         double victoryClose = ActionButtonDetector.Score(image, "challenge_victory_close");
         double defeat = TerminalScreenDetector.Score(image, "defeat");
-        double postMatchHud = PostMatchHudScore(image);
         double prestart = RewardScreenDetector.HasHeader(image) ? 0 : StartDialogDetector.Score(image);
+        // A live prestart can contain both the cyan hotbar Play icon and bright
+        // yellow map geometry. Those pixels independently resemble the two
+        // post-match HUD anchors, but the centered Start Game dialog is the
+        // stronger, state-defining signal and must win the collision.
+        double postMatchHud = prestart >= Threshold(ChallengeScreenState.Prestart)
+            ? 0
+            : PostMatchHudScore(image);
         double challengeList = ChallengeListScore(image, panel);
         double challengeListUnavailable = ChallengeListUnavailableScore(image, panel);
         double availability = Math.Max(selectStage, enterMatchmaking);

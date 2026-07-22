@@ -15,6 +15,9 @@ public sealed class CameraAlignmentEngine
     private const double StableSceneSimilarity = 0.96;
     private const int StableSceneFrames = 5;
     private const int MaximumStableSceneSamples = 24;
+    private const double PoseClampSimilarity = 0.975;
+    private const int MaximumPoseClampProbes = 4;
+    private const int FinalVerificationFrames = 3;
 
     private readonly IRobloxAutomation _automation;
     private readonly ICameraModelRepository _models;
@@ -30,6 +33,8 @@ public sealed class CameraAlignmentEngine
     private readonly record struct AlignmentObservation(double DirectScore, FineYawMatch FineMatch);
 
     private readonly record struct AlignmentAttemptPlan(CameraYawDirection ScanDirection, int ScanPhasePixels);
+
+    private readonly record struct AtlasMatch(int Index, double Score);
 
     public CameraAlignmentEngine(IRobloxAutomation automation, ICameraModelRepository models)
     {
@@ -61,15 +66,26 @@ public sealed class CameraAlignmentEngine
             {
                 throw new InvalidOperationException($"Roblox did not accept the standard {RobloxClientProfile.Width} × {RobloxClientProfile.Height} client size.");
             }
-            progress?.Report(new MacroProgress("Camera setup", 2, "Zooming fully out."));
-            Focus(window);
-            await _automation.ZoomOutFullyAsync(window, settings.ZoomTicks, cancellationToken).ConfigureAwait(false);
+            await ClampZoomAsync(
+                window,
+                settings.ZoomTicks,
+                settings.SettleMilliseconds,
+                regions: null,
+                "Camera setup",
+                2,
+                progress,
+                cancellationToken).ConfigureAwait(false);
             await EnableShiftLockAsync(window, "Camera setup", 3, progress, cancellationToken).ConfigureAwait(false);
             shiftLockEnabled = true;
-            progress?.Report(new MacroProgress("Camera setup", 4, "Setting the top-down camera pitch."));
-            Focus(window);
-            await _automation.DragCameraAsync(window, 0, settings.PitchDragPixels, 90, cancellationToken).ConfigureAwait(false);
-            await Task.Delay(settings.SettleMilliseconds, cancellationToken).ConfigureAwait(false);
+            await ClampPitchAsync(
+                window,
+                settings.PitchDragPixels,
+                settings.SettleMilliseconds,
+                regions: null,
+                "Camera setup",
+                4,
+                progress,
+                cancellationToken).ConfigureAwait(false);
 
             List<ImageFrame> goalFrames = [];
             int interval = settings.CaptureCount <= 1
@@ -131,6 +147,8 @@ public sealed class CameraAlignmentEngine
                 FineYawOffsets = goalNeighborhood.Select(item => item.Offset).ToArray(),
                 FullYawSteps = fullYawSteps,
                 SettleMilliseconds = settings.SettleMilliseconds,
+                ZoomTicks = settings.ZoomTicks,
+                PitchDragPixels = settings.PitchDragPixels,
                 AtlasSampleCount = atlas.Count,
                 ScanScores = scanScores,
                 CreatedAt = DateTimeOffset.UtcNow,
@@ -162,6 +180,16 @@ public sealed class CameraAlignmentEngine
         IProgress<MacroProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        if (manageShiftLock)
+        {
+            return await PrepareAndAlignAsync(
+                model,
+                existingWindow,
+                model.Manifest.ZoomTicks,
+                model.Manifest.PitchDragPixels,
+                progress,
+                cancellationToken).ConfigureAwait(false);
+        }
         model.Manifest.Validate();
         RobloxWindow window = existingWindow ?? RequireWindow();
         Focus(window);
@@ -213,12 +241,17 @@ public sealed class CameraAlignmentEngine
                 bestConfidence = Math.Max(bestConfidence, refined);
                 if (refined >= model.Manifest.SuccessThreshold)
                 {
-                    progress?.Report(new MacroProgress(
-                        "Camera alignment",
-                        100,
-                        $"Aligned with {refined:P0} confidence on attempt {attempt + 1}/{MaximumRuntimeAlignmentAttempts}.",
-                        Confidence: refined));
-                    return refined;
+                    double verified = await VerifyAlignmentAsync(model, window, progress, cancellationToken).ConfigureAwait(false);
+                    bestConfidence = Math.Max(bestConfidence, verified);
+                    if (verified >= model.Manifest.SuccessThreshold)
+                    {
+                        progress?.Report(new MacroProgress(
+                            "Camera alignment",
+                            100,
+                            $"Aligned with {verified:P0} confidence on attempt {attempt + 1}/{MaximumRuntimeAlignmentAttempts}; multi-frame verification passed.",
+                            Confidence: verified));
+                        return verified;
+                    }
                 }
 
                 if (attempt + 1 < plans.Length)
@@ -242,6 +275,96 @@ public sealed class CameraAlignmentEngine
         }
     }
 
+    public async Task<double> PrepareAndAlignAsync(
+        CameraModel model,
+        RobloxWindow? existingWindow,
+        int zoomTicks,
+        int pitchDragPixels,
+        IProgress<MacroProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        model.Manifest.Validate();
+        RobloxWindow window = existingWindow ?? RequireWindow();
+        Focus(window);
+        await EnsureClientSizeAsync(window, model.Manifest, progress, cancellationToken).ConfigureAwait(false);
+        await _automation.MoveCursorToClientCenterAsync(window, cancellationToken).ConfigureAwait(false);
+        await ClampZoomAsync(
+            window,
+            zoomTicks,
+            model.Manifest.SettleMilliseconds,
+            model.Manifest.Regions,
+            "Camera preparation",
+            3,
+            progress,
+            cancellationToken).ConfigureAwait(false);
+
+        // Roblox exposes shift lock only as a toggle. Compare both states and
+        // use an even number of toggles so the caller's original state is
+        // restored after alignment, regardless of which state wins.
+        bool toggledFromInitialState = false;
+        try
+        {
+            await ClampPitchAsync(
+                window,
+                pitchDragPixels,
+                model.Manifest.SettleMilliseconds,
+                model.Manifest.Regions,
+                "Camera preparation",
+                7,
+                progress,
+                cancellationToken).ConfigureAwait(false);
+            double stateA = await BestYawAtlasScoreAsync(model, window, cancellationToken).ConfigureAwait(false);
+
+            progress?.Report(new MacroProgress("Camera preparation", 10, "Testing the alternate shift-lock state against the saved yaw atlas."));
+            await ToggleShiftStateAsync(window, cancellationToken).ConfigureAwait(false);
+            toggledFromInitialState = true;
+            await ClampPitchAsync(
+                window,
+                pitchDragPixels,
+                model.Manifest.SettleMilliseconds,
+                model.Manifest.Regions,
+                "Camera preparation",
+                12,
+                progress,
+                cancellationToken).ConfigureAwait(false);
+            double stateB = await BestYawAtlasScoreAsync(model, window, cancellationToken).ConfigureAwait(false);
+            if (stateA >= stateB)
+            {
+                await ToggleShiftStateAsync(window, cancellationToken).ConfigureAwait(false);
+                toggledFromInitialState = false;
+            }
+
+            progress?.Report(new MacroProgress(
+                "Camera preparation",
+                15,
+                $"Selected the better camera-lock state (A {stateA:P0}, B {stateB:P0}). Verifying the top-down pitch clamp.",
+                Confidence: Math.Max(stateA, stateB)));
+            await ClampPitchAsync(
+                window,
+                pitchDragPixels,
+                model.Manifest.SettleMilliseconds,
+                model.Manifest.Regions,
+                "Camera preparation",
+                16,
+                progress,
+                cancellationToken).ConfigureAwait(false);
+
+            return await AlignAsync(
+                model,
+                window,
+                manageShiftLock: false,
+                progress,
+                cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            if (toggledFromInitialState)
+            {
+                await ToggleShiftStateAsync(window, CancellationToken.None).ConfigureAwait(false);
+            }
+        }
+    }
+
     private async Task<double> AlignAttemptAsync(
         RobloxWindow window,
         CameraModel model,
@@ -251,8 +374,8 @@ public sealed class CameraAlignmentEngine
         CancellationToken cancellationToken)
     {
         ImageFrame currentThumbnail = await CurrentThumbnailAsync(model, window, model.YawAtlas[0].Width, 3, cancellationToken).ConfigureAwait(false);
-        double[] atlasScores = model.YawAtlas.Select(example => VisionScorer.RobustSimilarity(example, currentThumbnail)).ToArray();
-        int bestIndex = Array.IndexOf(atlasScores, atlasScores.Max());
+        AtlasMatch atlasMatch = BestAtlasMatch(model.YawAtlas, currentThumbnail);
+        int bestIndex = atlasMatch.Index;
         int fullTurn = model.Manifest.FullYawSteps;
         CameraYawDirection direction;
         int coarseSteps;
@@ -269,8 +392,8 @@ public sealed class CameraAlignmentEngine
         progress?.Report(new MacroProgress(
             "Camera alignment",
             30,
-            $"Attempt {attempt}/{MaximumRuntimeAlignmentAttempts} yaw-atlas match: {atlasScores[bestIndex]:P0}. Coarse correction: {coarseSteps} {DirectionLabel(direction)} arrow step{(coarseSteps == 1 ? string.Empty : "s")}.",
-            Confidence: atlasScores[bestIndex]));
+            $"Attempt {attempt}/{MaximumRuntimeAlignmentAttempts} registered yaw-atlas match: {atlasMatch.Score:P0}. Coarse correction: {coarseSteps} {DirectionLabel(direction)} arrow step{(coarseSteps == 1 ? string.Empty : "s")}.",
+            Confidence: atlasMatch.Score));
         if (coarseSteps > 0)
         {
             await PulseYawAsync(window, direction, coarseSteps, model.Manifest.ArrowHoldMilliseconds, model.Manifest.SettleMilliseconds, cancellationToken).ConfigureAwait(false);
@@ -772,7 +895,7 @@ public sealed class CameraAlignmentEngine
         ImageFrame stable = VisionScorer.Median(frames);
         ImageFrame thumbnail = VisionScorer.MakeThumbnail(stable, model.FineYawAtlas[0].Width);
         return new AlignmentObservation(
-            VisionScorer.RobustSimilarity(model.Reference, stable),
+            CameraRegisteredScorer.Score(model.Reference, stable).Score,
             BestFineYawMatch(model, thumbnail));
     }
 
@@ -904,7 +1027,7 @@ public sealed class CameraAlignmentEngine
         double bestScore = double.NegativeInfinity;
         for (int index = 0; index < model.FineYawAtlas.Count; index++)
         {
-            double score = VisionScorer.RobustSimilarity(model.FineYawAtlas[index], currentThumbnail);
+            double score = CameraRegisteredScorer.Score(model.FineYawAtlas[index], currentThumbnail).Score;
             if (score <= bestScore) continue;
             bestIndex = index;
             bestScore = score;
@@ -964,7 +1087,180 @@ public sealed class CameraAlignmentEngine
         CameraRegionAnalyzer.BuildComposite(_automation.CaptureClient(window), regions);
 
     private double Score(CameraModel model, RobloxWindow window) =>
-        VisionScorer.RobustSimilarity(model.Reference, CaptureComposite(window, model.Manifest.Regions));
+        GoalEvidence(model, _automation.CaptureClient(window));
+
+    private async Task EnsureClientSizeAsync(
+        RobloxWindow window,
+        CameraModelManifest manifest,
+        IProgress<MacroProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        ClientBounds current = _automation.GetClientBounds(window);
+        if (current.Width != manifest.ClientWidth || current.Height != manifest.ClientHeight)
+        {
+            progress?.Report(new MacroProgress("Camera alignment", 1, $"Resizing Roblox to {manifest.ClientWidth} × {manifest.ClientHeight}."));
+            await _automation.ResizeClientAsync(window, manifest.ClientWidth, manifest.ClientHeight, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(250, cancellationToken).ConfigureAwait(false);
+        }
+        ClientBounds resized = _automation.GetClientBounds(window);
+        if (resized.Width != manifest.ClientWidth || resized.Height != manifest.ClientHeight)
+        {
+            throw new InvalidOperationException("Roblox does not match the client size stored by the camera model.");
+        }
+    }
+
+    private async Task ClampZoomAsync(
+        RobloxWindow window,
+        int zoomTicks,
+        int settleMilliseconds,
+        IReadOnlyList<ScreenRegion>? regions,
+        string operation,
+        int percent,
+        IProgress<MacroProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        int batch = Math.Clamp(zoomTicks, 5, 80);
+        progress?.Report(new MacroProgress(operation, percent, "Zooming out until the rendered view stops changing."));
+        Focus(window);
+        await _automation.ZoomOutFullyAsync(window, batch, cancellationToken).ConfigureAwait(false);
+        await Task.Delay(Math.Max(75, settleMilliseconds), cancellationToken).ConfigureAwait(false);
+        ImageFrame previous = CapturePoseThumbnail(window, regions);
+        double similarity = 0;
+        for (int probe = 1; probe <= MaximumPoseClampProbes; probe++)
+        {
+            await _automation.ZoomOutFullyAsync(window, batch, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(Math.Max(75, settleMilliseconds), cancellationToken).ConfigureAwait(false);
+            ImageFrame current = CapturePoseThumbnail(window, regions);
+            similarity = CameraRegisteredScorer.Score(previous, current, maximumTranslation: 2).Score;
+            if (similarity >= PoseClampSimilarity)
+            {
+                progress?.Report(new MacroProgress(operation, percent, $"Zoom clamp verified at {similarity:P0} frame agreement.", Confidence: similarity));
+                return;
+            }
+            previous = current;
+        }
+        progress?.Report(new MacroProgress(operation, percent, $"Zoom received the maximum extra zoom passes; the scene remained animated ({similarity:P0}).", Confidence: similarity));
+    }
+
+    private async Task ClampPitchAsync(
+        RobloxWindow window,
+        int pitchDragPixels,
+        int settleMilliseconds,
+        IReadOnlyList<ScreenRegion>? regions,
+        string operation,
+        int percent,
+        IProgress<MacroProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        int initial = Math.Clamp(pitchDragPixels, 300, 5000);
+        int probePixels = Math.Clamp(initial / 3, 450, 900);
+        progress?.Report(new MacroProgress(operation, percent, "Dragging downward until the top-down pitch stops changing."));
+        Focus(window);
+        await _automation.DragCameraAsync(window, 0, initial, 90, cancellationToken).ConfigureAwait(false);
+        await Task.Delay(Math.Max(75, settleMilliseconds), cancellationToken).ConfigureAwait(false);
+        ImageFrame previous = CapturePoseThumbnail(window, regions);
+        double similarity = 0;
+        for (int probe = 1; probe <= MaximumPoseClampProbes; probe++)
+        {
+            await _automation.DragCameraAsync(window, 0, probePixels, 90, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(Math.Max(75, settleMilliseconds), cancellationToken).ConfigureAwait(false);
+            ImageFrame current = CapturePoseThumbnail(window, regions);
+            similarity = CameraRegisteredScorer.Score(previous, current, maximumTranslation: 2).Score;
+            if (similarity >= PoseClampSimilarity)
+            {
+                progress?.Report(new MacroProgress(operation, percent, $"Top-down pitch clamp verified at {similarity:P0} frame agreement.", Confidence: similarity));
+                return;
+            }
+            previous = current;
+        }
+        progress?.Report(new MacroProgress(operation, percent, $"Pitch received the maximum extra downward drags; the scene remained animated ({similarity:P0}).", Confidence: similarity));
+    }
+
+    private ImageFrame CapturePoseThumbnail(RobloxWindow window, IReadOnlyList<ScreenRegion>? regions)
+    {
+        ImageFrame frame = _automation.CaptureClient(window);
+        if (regions is null) return VisionScorer.PrepareGray(frame, 160, 101);
+        return VisionScorer.MakeThumbnail(CameraRegionAnalyzer.BuildComposite(frame, regions), 160);
+    }
+
+    private async Task ToggleShiftStateAsync(RobloxWindow window, CancellationToken cancellationToken)
+    {
+        Focus(window);
+        await _automation.MoveCursorToClientCenterAsync(window, cancellationToken).ConfigureAwait(false);
+        await Task.Delay(100, cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        await _automation.TapLeftControlAsync(window, CancellationToken.None).ConfigureAwait(false);
+        await Task.Delay(250, CancellationToken.None).ConfigureAwait(false);
+    }
+
+    private async Task<double> BestYawAtlasScoreAsync(
+        CameraModel model,
+        RobloxWindow window,
+        CancellationToken cancellationToken)
+    {
+        ImageFrame current = await CurrentThumbnailAsync(model, window, model.YawAtlas[0].Width, 3, cancellationToken).ConfigureAwait(false);
+        return BestAtlasMatch(model.YawAtlas, current).Score;
+    }
+
+    private static AtlasMatch BestAtlasMatch(IReadOnlyList<ImageFrame> atlas, ImageFrame current)
+    {
+        if (atlas.Count == 0) throw new ArgumentException("The yaw atlas is empty.", nameof(atlas));
+        double[] raw = atlas.Select(frame => VisionScorer.RobustSimilarity(frame, current)).ToArray();
+        int[] candidates = raw
+            .Select((score, index) => (Score: score, Index: index))
+            .OrderByDescending(item => item.Score)
+            .Take(Math.Min(8, atlas.Count))
+            .Select(item => item.Index)
+            .ToArray();
+        AtlasMatch best = new(candidates[0], double.NegativeInfinity);
+        foreach (int index in candidates)
+        {
+            double score = CameraRegisteredScorer.Score(atlas[index], current).Score;
+            if (score > best.Score) best = new AtlasMatch(index, score);
+        }
+        return best;
+    }
+
+    private static double GoalEvidence(CameraModel model, ImageFrame fullClient)
+    {
+        ImageFrame gray = CameraRegionAnalyzer.BuildComposite(fullClient, model.Manifest.Regions);
+        double registered = CameraRegisteredScorer.Score(model.Reference, gray).Score;
+        ImageFrame goalColor = CameraRegionAnalyzer.BuildColorComposite(model.GoalOverlay, model.Manifest.Regions, inset: 4);
+        ImageFrame currentColor = CameraRegionAnalyzer.BuildColorComposite(fullClient, model.Manifest.Regions, inset: 4);
+        double hue = CameraRegisteredScorer.HueSimilarity(goalColor, currentColor);
+        // Hue is deliberately a weak reranker. Geometry remains authoritative,
+        // while consistent map colors can separate close registered candidates.
+        return Math.Clamp(registered + 0.04 * (hue - 0.5), 0, 1);
+    }
+
+    private async Task<double> VerifyAlignmentAsync(
+        CameraModel model,
+        RobloxWindow window,
+        IProgress<MacroProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        progress?.Report(new MacroProgress("Camera alignment", 98, "Verifying the final yaw across three independently rendered frames."));
+        List<double> scores = [];
+        for (int frame = 0; frame < FinalVerificationFrames; frame++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            scores.Add(Score(model, window));
+            if (frame + 1 < FinalVerificationFrames)
+            {
+                await Task.Delay(Math.Max(100, model.Manifest.SettleMilliseconds), cancellationToken).ConfigureAwait(false);
+            }
+        }
+        double verified = Median(scores);
+        int passing = scores.Count(score => score >= model.Manifest.SuccessThreshold);
+        progress?.Report(new MacroProgress(
+            "Camera alignment",
+            99,
+            $"Final verification: {passing}/{FinalVerificationFrames} frames passed; median confidence {verified:P0}.",
+            Confidence: verified));
+        return passing >= 2
+            ? verified
+            : Math.Min(verified, Math.Max(0, model.Manifest.SuccessThreshold - 0.001));
+    }
 
     private async Task PulseYawAsync(
         RobloxWindow window,

@@ -4,7 +4,16 @@ using ExpeditionsMacro.Core.Models;
 
 namespace ExpeditionsMacro.Core.Abstractions;
 
-public readonly record struct RobloxWindow(nint Handle, string Title);
+public readonly record struct RobloxWindow(
+    nint Handle,
+    string Title,
+    int ProcessId = 0,
+    string ProcessName = "")
+{
+    public string ProcessDescription => ProcessId > 0 && !string.IsNullOrWhiteSpace(ProcessName)
+        ? $"{ProcessName}.exe, PID {ProcessId}"
+        : "process unavailable";
+}
 
 public enum CameraYawDirection
 {

@@ -101,6 +101,43 @@ public sealed class CameraAlignmentTests
         Assert.False(goal.Pixels.SequenceEqual(overlay.Pixels));
     }
 
+    [Fact]
+    public void RegisteredCameraScore_RecoversSmallTranslationAndScale()
+    {
+        ImageFrame source = VisionScorerTests.Pattern(304, 192);
+        ImageFrame goal = VisionScorer.PrepareGray(source);
+        ImageFrame shifted = VisionScorer.PrepareGray(Transform(source, 1.025, 5), goal.Width, goal.Height);
+
+        CameraRegisteredMatch match = CameraRegisteredScorer.Score(goal, shifted);
+
+        Assert.True(match.Score > 0.75, $"Registered score was {match.Score:P1}.");
+        Assert.Equal(0.975, match.Scale, 3);
+    }
+
+    [Fact]
+    public void RegisteredCameraScore_HandlesIdenticalClientThumbnail()
+    {
+        ImageFrame full = VisionScorerTests.Pattern(RobloxClientProfile.Width, RobloxClientProfile.Height);
+        ImageFrame goal = VisionScorer.PrepareGray(full, 160, 101);
+
+        CameraRegisteredMatch match = CameraRegisteredScorer.Score(goal, goal);
+
+        Assert.True(match.Score > 0.95, $"Registered score was {match.Score:P1}.");
+    }
+
+    [Fact]
+    public void HueSimilarity_ReranksMatchingMapColorWithoutOverridingGeometry()
+    {
+        ImageFrame cyan = SolidRgb(48, 32, 20, 190, 210);
+        ImageFrame violet = SolidRgb(48, 32, 170, 40, 210);
+
+        double same = CameraRegisteredScorer.HueSimilarity(cyan, cyan);
+        double different = CameraRegisteredScorer.HueSimilarity(cyan, violet);
+
+        Assert.True(same > 0.95, $"Matching hue score was {same:P1}.");
+        Assert.True(different < 0.50, $"Different hue score was {different:P1}.");
+    }
+
     [Theory]
     [InlineData("Expedition_Map1")]
     [InlineData("Expedition_Map2")]
@@ -119,10 +156,14 @@ public sealed class CameraAlignmentTests
         ImageFrame reference = CameraRegionAnalyzer.BuildComposite(goal, regions);
         ImageFrame wrong = CameraRegionAnalyzer.BuildComposite(wrongYaw, regions);
         double wrongScore = VisionScorer.RobustSimilarity(reference, wrong);
+        double registeredGoal = CameraRegisteredScorer.Score(reference, reference).Score;
+        double registeredWrong = CameraRegisteredScorer.Score(reference, wrong).Score;
 
         Assert.Equal(4, regions.Count);
         Assert.Equal(3, regions.Select(region => Math.Clamp((int)(3 * (region.X + region.Width / 2d) / goal.Width), 0, 2)).Distinct().Count());
         Assert.True(wrongScore < 0.55, $"{dataset} wrong-yaw score was {wrongScore:P1}.");
+        Assert.True(registeredGoal > 0.95, $"{dataset} registered goal score was {registeredGoal:P1}.");
+        Assert.True(registeredWrong < 0.72, $"{dataset} registered wrong-yaw score was {registeredWrong:P1}.");
     }
 
     [Fact]
@@ -244,7 +285,8 @@ public sealed class CameraAlignmentTests
         };
         CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
 
-        double score = await engine.AlignAsync(model);
+        List<MacroProgress> updates = [];
+        double score = await engine.AlignAsync(model, progress: new InlineProgress<MacroProgress>(updates.Add));
 
         Assert.True(score > 0.90, $"Alignment score was {score:P1}.");
         Assert.Equal((808, 611), automation.ResizeRequest);
@@ -252,8 +294,29 @@ public sealed class CameraAlignmentTests
         Assert.Contains(CameraYawDirection.Left, automation.ArrowPulses);
         Assert.NotEmpty(automation.Drags);
         Assert.Equal(0, automation.YawStep);
-        Assert.Equal(1, automation.MoveToCenterCount);
+        Assert.Equal(3, automation.MoveToCenterCount);
         Assert.Equal(2, automation.LeftControlTapCount);
+        Assert.Contains(updates, update => update.Message.Contains("Final verification:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Align_TestsBothShiftLockStatesAndRestoresTheOriginalState()
+    {
+        ImageFrame goal = VisionScorerTests.Pattern(RobloxClientProfile.Width, RobloxClientProfile.Height);
+        ImageFrame wrong = Blank(goal.Width, goal.Height);
+        CameraModel model = CreateModel(goal, Enumerable.Repeat(goal, 7).ToArray());
+        FakeAutomation automation = new(wrong)
+        {
+            FullYawSteps = 6,
+            CaptureAtCameraState = (_, _, shiftLock) => shiftLock ? goal : wrong,
+        };
+        CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
+
+        double score = await engine.AlignAsync(model);
+
+        Assert.True(score > 0.90, $"Alignment score was {score:P1}.");
+        Assert.Equal(2, automation.LeftControlTapCount);
+        Assert.False(automation.ShiftLockState);
     }
 
     [Fact]
@@ -340,7 +403,9 @@ public sealed class CameraAlignmentTests
         List<MacroProgress> updates = [];
         CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
 
-        CameraModel model = await engine.CalibrateAsync(settings, new InlineProgress<MacroProgress>(updates.Add));
+        CameraModel model = await engine.CalibrateAsync(
+            settings,
+            new InlineProgress<MacroProgress>(updates.Add));
 
         Assert.Equal(12, model.Manifest.FullYawSteps);
         Assert.Equal(-16, automation.MouseOffset);
@@ -349,7 +414,7 @@ public sealed class CameraAlignmentTests
     }
 
     [Fact]
-    public async Task Calibrate_RestoresAutomaticShiftLockWhenFullClientCaptureFails()
+    public async Task Calibrate_DoesNotToggleShiftLockWhenPoseCaptureFailsBeforeShiftSetup()
     {
         ImageFrame goal = VisionScorerTests.Pattern(RobloxClientProfile.Width, RobloxClientProfile.Height);
         FakeAutomation automation = new(goal)
@@ -363,8 +428,8 @@ public sealed class CameraAlignmentTests
 
         Assert.Equal("Synthetic capture failure.", error.Message);
         Assert.Equal((808, 611), automation.ResizeRequest);
-        Assert.Equal(1, automation.MoveToCenterCount);
-        Assert.Equal(2, automation.LeftControlTapCount);
+        Assert.Equal(0, automation.MoveToCenterCount);
+        Assert.Equal(0, automation.LeftControlTapCount);
     }
 
     [Fact]
@@ -481,6 +546,37 @@ public sealed class CameraAlignmentTests
         return new ImageFrame(source.Width, source.Height, source.Format, output, takeOwnership: true);
     }
 
+    private static ImageFrame Transform(ImageFrame source, double scale, int dx)
+    {
+        byte[] output = new byte[source.Pixels.Length];
+        double centerX = (source.Width - 1) / 2d;
+        double centerY = (source.Height - 1) / 2d;
+        for (int y = 0; y < source.Height; y++)
+        {
+            int sourceY = Math.Clamp((int)Math.Round((y - centerY) / scale + centerY), 0, source.Height - 1);
+            for (int x = 0; x < source.Width; x++)
+            {
+                int sourceX = Math.Clamp((int)Math.Round((x - centerX) / scale + centerX + dx), 0, source.Width - 1);
+                int destination = (y * source.Width + x) * 3;
+                int origin = (sourceY * source.Width + sourceX) * 3;
+                Buffer.BlockCopy(source.Pixels, origin, output, destination, 3);
+            }
+        }
+        return new ImageFrame(source.Width, source.Height, source.Format, output, takeOwnership: true);
+    }
+
+    private static ImageFrame SolidRgb(int width, int height, byte red, byte green, byte blue)
+    {
+        byte[] pixels = new byte[width * height * 3];
+        for (int offset = 0; offset < pixels.Length; offset += 3)
+        {
+            pixels[offset] = red;
+            pixels[offset + 1] = green;
+            pixels[offset + 2] = blue;
+        }
+        return new ImageFrame(width, height, PixelFormat.Rgb24, pixels, takeOwnership: true);
+    }
+
     private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
     {
         public void Report(T value) => report(value);
@@ -501,9 +597,11 @@ public sealed class CameraAlignmentTests
         public int ZoomTicks { get; private set; }
         public Exception? CaptureFailure { get; init; }
         public Func<int, int, ImageFrame>? CaptureAtYaw { get; init; }
+        public Func<int, int, bool, ImageFrame>? CaptureAtCameraState { get; init; }
         public int FullYawSteps { get; init; } = 12;
         public int YawStep { get; set; }
         public int MouseOffset { get; private set; }
+        public bool ShiftLockState { get; private set; }
 
         public RobloxWindow? FindWindow(string titleFragment = "Roblox") => _window;
         public RobloxWindow? ForegroundWindow() => _window;
@@ -526,7 +624,9 @@ public sealed class CameraAlignmentTests
         public ImageFrame CaptureClient(RobloxWindow window)
         {
             if (CaptureFailure is not null) throw CaptureFailure;
-            return (CaptureAtYaw?.Invoke(YawStep, MouseOffset) ?? screenCapture).Clone();
+            return (CaptureAtCameraState?.Invoke(YawStep, MouseOffset, ShiftLockState)
+                ?? CaptureAtYaw?.Invoke(YawStep, MouseOffset)
+                ?? screenCapture).Clone();
         }
         public Task MoveCursorToClientCenterAsync(RobloxWindow window, CancellationToken cancellationToken)
         {
@@ -556,6 +656,7 @@ public sealed class CameraAlignmentTests
         public Task TapLeftControlAsync(RobloxWindow window, CancellationToken cancellationToken)
         {
             LeftControlTapCount++;
+            ShiftLockState = !ShiftLockState;
             return Task.CompletedTask;
         }
         public Task TapLetterKeyAsync(RobloxWindow window, char key, CancellationToken cancellationToken) => Task.CompletedTask;

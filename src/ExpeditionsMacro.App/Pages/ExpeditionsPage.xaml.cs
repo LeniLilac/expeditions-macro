@@ -118,11 +118,15 @@ public partial class ExpeditionsPage : UserControl, IAppPage
         MacroProgress.Value = 0;
         RepeatsText.Text = VictoriesText.Text = DefeatsText.Text = RecoveriesText.Text = "0";
         AppendLog("Starting Expeditions macro.");
-        Progress<MacroProgress> progress = new(value =>
+        IProgress<MacroProgress> progress = new InlineProgress<MacroProgress>(value =>
         {
-            PhaseText.Text = value.Message;
-            MacroProgress.Value = value.Percent;
-            if (value.DetectedState is not null) DetectionText.Text = $"Last detection: {Label(value.DetectedState)}{(value.Confidence is null ? string.Empty : $" ({value.Confidence:P0})")}";
+            TrackActionState(value.Phase, value.Message);
+            Dispatcher.BeginInvoke(() =>
+            {
+                PhaseText.Text = value.Message;
+                MacroProgress.Value = value.Percent;
+                if (value.DetectedState is not null) DetectionText.Text = $"Last detection: {Label(value.DetectedState)}{(value.Confidence is null ? string.Empty : $" ({value.Confidence:P0})")}";
+            });
         });
         await _services.Coordinator.RunNowAsync("Expeditions macro", token => RunWithFailureHandlingAsync(
             "Expeditions Macro",
@@ -136,7 +140,11 @@ public partial class ExpeditionsPage : UserControl, IAppPage
                 webhook,
                 playMenuKey,
                 progress,
-                entry => Dispatcher.BeginInvoke(() => AppendLog(entry.Level == MacroEventLevel.Error ? $"ERROR: {entry.Message}" : entry.Message)),
+                entry =>
+                {
+                    TrackActionState(entry.State ?? entry.Level.ToString(), entry.Message);
+                    Dispatcher.BeginInvoke(() => AppendLog(entry.Level == MacroEventLevel.Error ? $"ERROR: {entry.Message}" : entry.Message));
+                },
                 summary => Dispatcher.BeginInvoke(() => ApplySummary(summary)),
                 cancellationToken: token,
                 recoverableFailure: (error, failureToken) => HandleRecoverableFailureAsync("Expeditions Macro", webhook, discordUserId, error, failureToken)),
@@ -384,6 +392,8 @@ public partial class ExpeditionsPage : UserControl, IAppPage
         Func<Task> operation,
         CancellationToken cancellationToken)
     {
+        bool captureHistory = _services.Settings.AutoCaptureOnMacroError;
+        if (captureHistory) _services.DiagnosticCapture.BeginAutomaticHistory($"{macroName} started");
         try
         {
             await operation();
@@ -402,6 +412,10 @@ public partial class ExpeditionsPage : UserControl, IAppPage
             MacroFailureHandlingResult result = await _services.HandleMacroFailureAsync(macroName, webhook, discordUserId, error);
             await Dispatcher.InvokeAsync(() => AppendFailureHandlingResult(result));
             throw;
+        }
+        finally
+        {
+            if (captureHistory) _services.DiagnosticCapture.EndAutomaticHistory();
         }
     }
 
@@ -456,6 +470,9 @@ public partial class ExpeditionsPage : UserControl, IAppPage
         }
         LogText.ScrollToEnd();
     }
+
+    private void TrackActionState(string phase, string message) =>
+        _services.DiagnosticCapture.RecordActionState($"{phase}: {message}");
 
     private static int ParseInt(TextBox field, string label) => int.TryParse(field.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) ? value : throw new FormatException($"{label} must be a whole number.");
 

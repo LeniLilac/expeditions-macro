@@ -1,3 +1,5 @@
+using System.Globalization;
+using ExpeditionsMacro.Core.Diagnostics;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
@@ -75,12 +77,64 @@ public sealed class CoreModelTests
     }
 
     [Fact]
-    public void AppSettings_DiagnosticCaptureOptionsDefaultOff()
+    public void AppSettings_DiagnosticCaptureOptionsDefaultOn()
     {
         AppSettings settings = new();
 
-        Assert.False(settings.AutoCaptureOnMacroError);
-        Assert.False(settings.IncludeLogsInDiagnosticArchives);
+        Assert.True(settings.AutoCaptureOnMacroError);
+        Assert.True(settings.IncludeLogsInDiagnosticArchives);
+    }
+
+    [Fact]
+    public void DiagnosticStateHistory_KeepsOnlyTheNewestFramesInOrder()
+    {
+        DiagnosticStateHistory history = new(3);
+        for (int index = 1; index <= 5; index++)
+        {
+            history.Add(
+                new ImageFrame(1, 1, PixelFormat.Gray8, [(byte)index]),
+                DateTimeOffset.UnixEpoch.AddSeconds(index),
+                $"action {index}");
+        }
+
+        IReadOnlyList<DiagnosticStateFrame> snapshot = history.Snapshot();
+
+        Assert.Equal(["action 3", "action 4", "action 5"], snapshot.Select(frame => frame.Action));
+        Assert.Equal([3, 4, 5], snapshot.Select(frame => (int)frame.Image.Pixels[0]));
+    }
+
+    [Fact]
+    public void DiagnosticArchiveRetention_KeepsTenNewestAutomaticErrorsOnly()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            DateTime started = new(2026, 7, 21, 12, 0, 0, DateTimeKind.Utc);
+            for (int index = 0; index < 12; index++)
+            {
+                string timestamp = started.AddSeconds(index).ToString("yyyyMMdd-HHmmss", CultureInfo.InvariantCulture);
+                string path = Path.Combine(root, $"error-challenge-macro-{timestamp}.zip");
+                File.WriteAllBytes(path, []);
+                File.SetLastWriteTimeUtc(path, started.AddSeconds(index));
+            }
+            string manual = Path.Combine(root, "diagnostic-capture.zip");
+            string similar = Path.Combine(root, "error-user-named-capture.zip");
+            File.WriteAllBytes(manual, []);
+            File.WriteAllBytes(similar, []);
+
+            int removed = DiagnosticArchiveRetention.PruneAutomaticErrorArchives(root, 10);
+
+            Assert.Equal(2, removed);
+            Assert.Equal(10, Directory.EnumerateFiles(root, "error-*-macro-*.zip").Count());
+            Assert.True(File.Exists(manual));
+            Assert.True(File.Exists(similar));
+            Assert.False(File.Exists(Path.Combine(root, "error-challenge-macro-20260721-120000.zip")));
+            Assert.False(File.Exists(Path.Combine(root, "error-challenge-macro-20260721-120001.zip")));
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
     }
 
     [Fact]

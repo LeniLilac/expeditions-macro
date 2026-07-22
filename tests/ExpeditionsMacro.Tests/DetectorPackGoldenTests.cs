@@ -495,6 +495,29 @@ public sealed class DetectorPackGoldenTests
     }
 
     [Theory]
+    [InlineData(1, "Map1_French.png")]
+    [InlineData(2, "Map2_Alternate.png")]
+    [InlineData(2, "Map2_Current.png")]
+    [Trait("Category", "Golden")]
+    public void SelectedMap_UsesTheLanguageIndependentActiveRowMarker(int expected, string fileName)
+    {
+        if (!DatasetsAvailable()) return;
+        string file = Path.Combine(TestPaths.Datasets, "Expedition_Map_Select_Selection_Regression", fileName);
+        Assert.Equal(expected, Pack.Value.SelectedMap(ImageCodec.Load(file)));
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void SelectedMap_DoesNotTreatGameplayAsAnActiveSelectorRow()
+    {
+        if (!DatasetsAvailable()) return;
+        foreach (string file in Pngs("Expedition_Recovery_Navigation_Negative"))
+        {
+            Assert.Null(Pack.Value.SelectedMap(ImageCodec.Load(file)));
+        }
+    }
+
+    [Theory]
     [InlineData(1, "Expedition_Map_Select_Difficultly1")]
     [InlineData(2, "Expedition_Map_Select_Difficultly2")]
     [InlineData(3, "Expedition_Map_Select_Difficultly3")]

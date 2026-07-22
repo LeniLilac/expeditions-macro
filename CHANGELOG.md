@@ -4,6 +4,28 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-07-22
+
+### Changed
+
+- Camera preparation now repeatedly clamps zoom and pitch, evaluates both shift-lock states, and verifies final alignment across three independently rendered frames.
+- Camera matching now tolerates small translation and scale differences and uses hue as a weak tie-breaker when geometry scores are close.
+- Zoom-out now presses Roblox's `O` key first and falls back to mouse-wheel input if key injection fails.
+- Automatic failure diagnostics now default to enabled, retain the latest ten action-state frames, capture ten additional half-second frames after a failure, include the run log by default, and keep only the ten newest automatic error archives.
+
+### Fixed
+
+- Replaced language- and artwork-dependent Expedition map-selection verification with the stable cyan active-row marker, fixing false Map 1 and Map 2 lock errors across current, alternate, and French layouts.
+- Prioritized valid centered **Start Game** dialogs over post-match HUD lookalikes, fixing reported King's Tomb prestart timeouts.
+- Re-detected extraction confirmation controls after every attempt and retried focused clicks up to three times instead of waiting indefinitely on a stale modal.
+- Verified Roblox windows by process name and PID, refreshed stale handles after teleports or focus failures, and retried focus against the newly discovered client.
+- Added a temporary borderless sizing fallback when Windows clamps Roblox's framed window, allowing the automation client area to reach exactly 808 by 611 pixels.
+
+### Tests
+
+- Added map-selection regressions for Map 1 and Map 2 across localized and alternate layouts, plus an active-gameplay negative.
+- Added a privacy-reviewed King's Tomb prestart regression and coverage for extraction retries, registered camera scoring, diagnostic retention, verified Roblox window discovery, forced sizing, and `O`-key zoom behavior.
+
 ## [1.2.0] - 2026-07-21
 
 ### Added
@@ -351,7 +373,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/LeniLilac/expeditions-macro/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.6...v1.2.0
 [1.1.6]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.5...v1.1.6
 [1.1.5]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.4...v1.1.5

@@ -1,6 +1,8 @@
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Runtime;
+using ExpeditionsMacro.Vision.Infrastructure;
+using OpenCvSharp;
 
 namespace ExpeditionsMacro.Vision.Camera;
 
@@ -108,6 +110,52 @@ public static class CameraRegionAnalyzer
             }
         }
         return new ImageFrame(outputWidth, rows * CompositeTileHeight, PixelFormat.Gray8, pixels, takeOwnership: true);
+    }
+
+    public static ImageFrame BuildColorComposite(
+        ImageFrame fullClientFrame,
+        IReadOnlyList<ScreenRegion> regions,
+        int inset = 0)
+    {
+        if (fullClientFrame.Format != PixelFormat.Rgb24) throw new ArgumentException("Color composite input must be RGB.", nameof(fullClientFrame));
+        if (regions.Count is < 2 or > 8) throw new ArgumentOutOfRangeException(nameof(regions));
+        if (inset < 0) throw new ArgumentOutOfRangeException(nameof(inset));
+        if (regions.Any(region => !region.FitsWithin(fullClientFrame.Width, fullClientFrame.Height)
+            || region.Width <= inset * 2
+            || region.Height <= inset * 2))
+        {
+            throw new ArgumentException("A camera region falls outside the client image or is too small for the requested inset.", nameof(regions));
+        }
+
+        const int columns = 2;
+        int rows = (regions.Count + columns - 1) / columns;
+        int outputWidth = columns * CompositeTileWidth;
+        byte[] pixels = new byte[checked(outputWidth * rows * CompositeTileHeight * 3)];
+        for (int index = 0; index < regions.Count; index++)
+        {
+            ScreenRegion region = regions[index];
+            ScreenRegion inner = new(
+                region.X + inset,
+                region.Y + inset,
+                region.Width - inset * 2,
+                region.Height - inset * 2);
+            using Mat source = ImageCodec.ToMat(fullClientFrame.Crop(inner));
+            using Mat resized = new();
+            Cv2.Resize(source, resized, new Size(CompositeTileWidth, CompositeTileHeight), 0, 0, InterpolationFlags.Area);
+            ImageFrame tile = ImageCodec.FromMat(resized, PixelFormat.Rgb24);
+            int destinationX = index % columns * CompositeTileWidth;
+            int destinationY = index / columns * CompositeTileHeight;
+            for (int row = 0; row < CompositeTileHeight; row++)
+            {
+                Buffer.BlockCopy(
+                    tile.Pixels,
+                    row * CompositeTileWidth * 3,
+                    pixels,
+                    ((destinationY + row) * outputWidth + destinationX) * 3,
+                    CompositeTileWidth * 3);
+            }
+        }
+        return new ImageFrame(outputWidth, rows * CompositeTileHeight, PixelFormat.Rgb24, pixels, takeOwnership: true);
     }
 
     public static ImageFrame AnnotateGoal(ImageFrame fullClientFrame, IReadOnlyList<ScreenRegion> regions)

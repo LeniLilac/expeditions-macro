@@ -68,7 +68,9 @@ public partial class SettingsPage : UserControl, IAppPage
         IncludeLogsCheck.IsChecked = _services.Settings.IncludeLogsInDiagnosticArchives;
         _loading = false;
         VersionText.Text = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
-        RobloxText.Text = _services.Automation.FindWindow() is { } window ? $"Found: {window.Title}" : "Not found";
+        RobloxText.Text = _services.Automation.FindWindow() is { } window
+            ? $"Found: {window.Title} ({window.ProcessDescription})"
+            : "Not found";
         UpdateHotkeyDisplay();
         UpdatePlayMenuKeyDisplay();
         await RefreshDetectorAsync();

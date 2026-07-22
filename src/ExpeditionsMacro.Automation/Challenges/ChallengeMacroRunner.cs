@@ -88,7 +88,7 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
             waitingUntil,
             rotation.DailyLimitUntilUtc is not null));
 
-        Write($"Using Roblox window '{window.Title}'.");
+        Write($"Using Roblox window '{window.Title}' ({window.ProcessDescription}).");
         PublishSummary();
         try
         {
@@ -997,35 +997,14 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         Action<string, MacroEventLevel, string?, double?> log,
         CancellationToken cancellationToken)
     {
-        Focus(window);
-        await _automation.MoveCursorToClientCenterAsync(window, cancellationToken).ConfigureAwait(false);
-        await _automation.ZoomOutFullyAsync(window, preset.ZoomTicks, cancellationToken).ConfigureAwait(false);
-        await _automation.TapLeftControlAsync(window, cancellationToken).ConfigureAwait(false);
-        try
-        {
-            await Task.Delay(250, cancellationToken).ConfigureAwait(false);
-            await _automation.DragCameraAsync(window, 0, preset.PitchDragPixels, 90, cancellationToken).ConfigureAwait(false);
-            await Task.Delay(450, cancellationToken).ConfigureAwait(false);
-            double score = await _camera.AlignAsync(
-                model,
-                window,
-                manageShiftLock: false,
-                progress: new Progress<MacroProgress>(value => report(value.Phase, value.Percent, value.Message, value.DetectedState, value.Confidence)),
-                cancellationToken: cancellationToken).ConfigureAwait(false);
-            log($"Camera alignment finished at {score:P0} confidence.", MacroEventLevel.Success, null, score);
-        }
-        finally
-        {
-            try
-            {
-                Focus(window);
-                await _automation.TapLeftControlAsync(window, CancellationToken.None).ConfigureAwait(false);
-            }
-            catch
-            {
-                // The outer window restoration still proceeds.
-            }
-        }
+        double score = await _camera.PrepareAndAlignAsync(
+            model,
+            window,
+            preset.ZoomTicks,
+            preset.PitchDragPixels,
+            progress: new Progress<MacroProgress>(value => report(value.Phase, value.Percent, value.Message, value.DetectedState, value.Confidence)),
+            cancellationToken: cancellationToken).ConfigureAwait(false);
+        log($"Camera alignment finished at {score:P0} confidence.", MacroEventLevel.Success, null, score);
     }
 
     private Task PlaceAsync(

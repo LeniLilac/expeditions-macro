@@ -32,9 +32,9 @@ public sealed record AppSettings
 
     public string DiscordErrorUserId { get; init; } = string.Empty;
 
-    public bool AutoCaptureOnMacroError { get; init; }
+    public bool AutoCaptureOnMacroError { get; init; } = true;
 
-    public bool IncludeLogsInDiagnosticArchives { get; init; }
+    public bool IncludeLogsInDiagnosticArchives { get; init; } = true;
 
     public bool CheckDetectorUpdates { get; init; } = true;
 

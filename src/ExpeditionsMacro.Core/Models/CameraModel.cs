@@ -72,6 +72,13 @@ public sealed record CameraModelManifest
 
     public required int SettleMilliseconds { get; init; }
 
+    // Schema 3 models created before camera-pose normalization omitted these
+    // values. Property defaults keep those models loadable while new models
+    // persist the exact preparation settings used during setup.
+    public int ZoomTicks { get; init; } = 30;
+
+    public int PitchDragPixels { get; init; } = 1800;
+
     public required int AtlasSampleCount { get; init; }
 
     public required IReadOnlyList<double> ScanScores { get; init; }
@@ -90,6 +97,10 @@ public sealed record CameraModelManifest
         if (ArrowHoldMilliseconds is < 1 or > 1000 || FineStepPixels is < 1 or > 25 || FineSearchPixels is < 4 or > 100)
         {
             throw new InvalidDataException("Camera model movement settings are invalid.");
+        }
+        if (ZoomTicks is < 5 or > 80 || PitchDragPixels is < 300 or > 5000)
+        {
+            throw new InvalidDataException("Camera model preparation settings are invalid.");
         }
         if (FineYawOffsets is null
             || FineYawOffsets.Count < 3

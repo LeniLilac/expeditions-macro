@@ -71,7 +71,6 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         int defeats = 0;
         int recoveries = 0;
         int bossesSeen = 0;
-        bool shiftLockEnabled = false;
 
         void Write(string message, MacroEventLevel level = MacroEventLevel.Information, string? state = null, double? confidence = null) =>
             log?.Invoke(new MacroEvent(DateTimeOffset.Now, level, message, state, confidence));
@@ -79,7 +78,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         void Report(string phase, int percent, string message, string? state = null, double? confidence = null) =>
             progress?.Report(new MacroProgress(phase, percent, message, state, confidence));
 
-        Write($"Using Roblox window '{window.Title}'.");
+        Write($"Using Roblox window '{window.Title}' ({window.ProcessDescription}).");
         PublishSummary();
         try
         {
@@ -127,8 +126,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                         return;
                     }
                     Write("Prestart screen recognized. Preparing camera.", MacroEventLevel.Success);
-                    await PrepareCameraAsync(window, preset, cameraModel, value => shiftLockEnabled = value, progress, Write, cancellationToken).ConfigureAwait(false);
-                    shiftLockEnabled = false;
+                    await PrepareCameraAsync(window, preset, cameraModel, progress, Write, cancellationToken).ConfigureAwait(false);
                     await ThrowIfRecoveryAsync(window, detector, preset, cancellationToken).ConfigureAwait(false);
                     if (ExpeditionRunPolicy.StopDeadlineReached(DateTimeOffset.UtcNow, stopAfterCurrentRunUtc))
                     {
@@ -237,18 +235,6 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         }
         finally
         {
-            if (shiftLockEnabled)
-            {
-                try
-                {
-                    _automation.Focus(window);
-                    await _automation.TapLeftControlAsync(window, CancellationToken.None).ConfigureAwait(false);
-                }
-                catch
-                {
-                    // Window restoration still proceeds.
-                }
-            }
             await FlushNotificationsAsync(Write).ConfigureAwait(false);
         }
     }
@@ -276,44 +262,18 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         RobloxWindow window,
         ExpeditionPreset preset,
         CameraModel model,
-        Action<bool> shiftLock,
         IProgress<MacroProgress>? progress,
         Action<string, MacroEventLevel, string?, double?> log,
         CancellationToken cancellationToken)
     {
-        Focus(window);
-        await _automation.MoveCursorToClientCenterAsync(window, cancellationToken).ConfigureAwait(false);
-        await Task.Delay(120, cancellationToken).ConfigureAwait(false);
-        progress?.Report(new MacroProgress("Camera preparation", 10, "Zooming out fully."));
-        await _automation.ZoomOutFullyAsync(window, preset.ZoomTicks, cancellationToken).ConfigureAwait(false);
-        progress?.Report(new MacroProgress("Camera preparation", 25, "Enabling shift lock and clamping camera pitch."));
-        await _automation.TapLeftControlAsync(window, cancellationToken).ConfigureAwait(false);
-        shiftLock(true);
-        try
-        {
-            await Task.Delay(250, cancellationToken).ConfigureAwait(false);
-            await _automation.DragCameraAsync(window, 0, preset.PitchDragPixels, 90, cancellationToken).ConfigureAwait(false);
-            await Task.Delay(450, cancellationToken).ConfigureAwait(false);
-            double score = await _camera.AlignAsync(
-                model,
-                window,
-                manageShiftLock: false,
-                progress: progress,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
-            log($"Camera alignment finished at {score:P0} confidence.", MacroEventLevel.Information, null, score);
-        }
-        finally
-        {
-            try
-            {
-                _automation.Focus(window);
-                await _automation.TapLeftControlAsync(window, CancellationToken.None).ConfigureAwait(false);
-            }
-            finally
-            {
-                shiftLock(false);
-            }
-        }
+        double score = await _camera.PrepareAndAlignAsync(
+            model,
+            window,
+            preset.ZoomTicks,
+            preset.PitchDragPixels,
+            progress,
+            cancellationToken).ConfigureAwait(false);
+        log($"Camera alignment finished at {score:P0} confidence.", MacroEventLevel.Information, null, score);
         await Task.Delay(350, cancellationToken).ConfigureAwait(false);
     }
 
@@ -385,7 +345,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                 {
                     ExtractionTransactionState transaction = new();
                     if (!transaction.TryBegin()) throw new InvalidOperationException("Could not begin extraction confirmation handling.");
-                    await ConfirmExtractionAsync(window, detector, preset, transaction, frame, report, cancellationToken).ConfigureAwait(false);
+                    await ConfirmExtractionAsync(window, detector, preset, transaction, frame, report, log, cancellationToken).ConfigureAwait(false);
                 }
                 else
                 {
@@ -432,7 +392,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
             throw new InvalidOperationException(
                 "Extraction confirmation did not appear within 30 seconds. The macro stopped without clicking Extract again to avoid a delayed duplicate action.");
         }
-        await ConfirmExtractionAsync(window, detector, preset, transaction, clientImage: null, report, cancellationToken).ConfigureAwait(false);
+        await ConfirmExtractionAsync(window, detector, preset, transaction, clientImage: null, report, log, cancellationToken).ConfigureAwait(false);
         log("Extraction confirmed. Waiting for Victory or an early Defeat screen.", MacroEventLevel.Success, "extract_confirm", null);
     }
 
@@ -519,26 +479,71 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         ExtractionTransactionState transaction,
         ImageFrame? clientImage,
         Action<string, int, string, string?, double?> report,
+        Action<string, MacroEventLevel, string?, double?> log,
         CancellationToken cancellationToken)
     {
         if (!transaction.TryConfirm()) throw new InvalidOperationException("Extraction confirmation was already clicked.");
-        report("Extraction", 0, "Confirming extraction once and waiting for the dialog to close.", "extract_confirm", null);
-        await ClickActionAsync(window, detector, "extract_confirm", clientImage, cancellationToken).ConfigureAwait(false);
-        bool dismissed = await WaitForStateToClearAsync(
-            window,
-            detector,
-            "extract_confirm",
-            ExtractionTransitionTimeout,
-            preset,
-            report,
-            cancellationToken).ConfigureAwait(false);
-        if (!dismissed)
+        ConfirmationDismissalState dismissal = new();
+        while (dismissal.TryBeginAttempt())
         {
-            throw new InvalidOperationException(
-                "Extraction confirmation remained visible for 30 seconds. The macro stopped without clicking Confirm again to avoid a delayed duplicate action.");
+            ImageFrame frame = clientImage ?? CaptureClient(window, detector);
+            clientImage = null;
+            IReadOnlyDictionary<string, double> scores = detector.ScoreStates(frame);
+            if (!ExpeditionRunPolicy.IsStateDetected(detector.Manifest, scores, "extract_confirm"))
+            {
+                if (!dismissal.TryComplete() || !transaction.TryComplete())
+                {
+                    throw new InvalidOperationException("Could not complete extraction confirmation handling.");
+                }
+                return;
+            }
+
+            report(
+                "Extraction",
+                0,
+                dismissal.Attempts == 1
+                    ? "Confirming extraction and waiting for the dialog to close."
+                    : $"Extraction confirmation is still visible; retrying the focused click ({dismissal.Attempts}/{ConfirmationDismissalState.MaximumAttempts}).",
+                "extract_confirm",
+                scores["extract_confirm"]);
+            await ClickActionAsync(window, detector, "extract_confirm", frame, cancellationToken).ConfigureAwait(false);
+            bool dismissed = await WaitForStateToClearAsync(
+                window,
+                detector,
+                "extract_confirm",
+                ConfirmationDismissalTimeout,
+                preset,
+                report,
+                cancellationToken).ConfigureAwait(false);
+            if (dismissed)
+            {
+                if (!dismissal.TryComplete() || !transaction.TryComplete())
+                {
+                    throw new InvalidOperationException("Could not complete extraction confirmation handling.");
+                }
+                log(
+                    $"Extraction confirmation closed after {dismissal.Attempts} focused click attempt(s).",
+                    MacroEventLevel.Success,
+                    "extract_confirm",
+                    null);
+                await Task.Delay(700, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            if (!dismissal.TryMarkStillVisible())
+            {
+                throw new InvalidOperationException("Could not continue extraction confirmation handling.");
+            }
+            log(
+                $"Extraction confirmation remained visible after click attempt {dismissal.Attempts}/{ConfirmationDismissalState.MaximumAttempts}.",
+                MacroEventLevel.Warning,
+                "extract_confirm",
+                scores["extract_confirm"]);
         }
-        if (!transaction.TryComplete()) throw new InvalidOperationException("Could not complete extraction confirmation handling.");
-        await Task.Delay(700, cancellationToken).ConfigureAwait(false);
+
+        throw new InvalidOperationException(
+            $"The Extraction confirmation remained visible after {ConfirmationDismissalState.MaximumAttempts} focused click attempts. " +
+            "Roblox did not acknowledge the button; retry after the client is responsive.");
     }
 
     private async Task RetryRemainingUnitsAsync(

@@ -1,6 +1,6 @@
 # Detector image dataset
 
-This repository includes 356 Roblox client-area captures used to build and regression-test the bundled Anime Expeditions detector pack, specialized UI detectors, and automatic camera-region selection: 270 Expeditions fixtures, 72 selective Challenge fixtures, and 14 camera-yaw fixtures. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
+This repository includes 360 Roblox client-area captures used to build and regression-test the bundled Anime Expeditions detector pack, specialized UI detectors, and automatic camera-region selection: 273 Expeditions fixtures, 73 selective Challenge fixtures, and 14 camera-yaw fixtures. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
 
 Captures are 808 by 611 PNG files organized under:
 
@@ -32,5 +32,7 @@ The three `Difficultly*_LayoutShift` folders and `AFK_Chamber` are golden-test f
 `Expedition_Recovery_Navigation_Negative` contains compact Map 2 and Map 3 full-run samples. Some ordinary Map 2 gameplay frames resemble the map selector, so these fixtures verify that navigation-only matches cannot start recovery without a Lobby, Disconnect, or AFK root state.
 
 `Play_UI` includes different avatars, current maps, reward icons, and Roblox UI scale/layout variants. Play-screen detection must use the stable Expedition tile structure rather than those changing details.
+
+`Expedition_Map_Select_Selection_Regression` contains English and French selector screens that reproduced false "map could not be selected" errors. Map selection must use the cyan active-row marker rather than localized map-name text.
 
 When extending the dataset, use several captures per state across lighting and moving-object variations. Crop to the Roblox client area and do not include desktop chrome, other applications, notifications, account names, webhook tokens, or chat content.
