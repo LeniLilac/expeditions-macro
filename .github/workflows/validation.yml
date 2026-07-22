@@ -7,6 +7,28 @@ permissions:
   contents: read
 
 jobs:
+  repository-policy:
+    name: Repository policy
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /AGENTS.md
+            /CONTRIBUTING.md
+            /datasets/README.md
+            /docs/
+            /eng/
+            /scripts/
+            /src/
+            /tests/
+            /tools/
+      - name: Check architecture and source health
+        shell: pwsh
+        run: ./scripts/Test-RepositoryPolicy.ps1
+
   tests:
     name: Tests (${{ matrix.name }})
     runs-on: windows-latest

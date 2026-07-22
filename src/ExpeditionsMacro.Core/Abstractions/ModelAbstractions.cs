@@ -13,6 +13,15 @@ public interface ICameraModelRepository
     Task DeleteAsync(string id, CancellationToken cancellationToken = default);
 }
 
+public interface ICameraSpawnShortcutRepository
+{
+    Task<CameraSpawnShortcut?> LoadAsync(string cameraModelId, CancellationToken cancellationToken = default);
+
+    Task SaveAsync(CameraSpawnShortcut shortcut, CancellationToken cancellationToken = default);
+
+    Task DeleteAsync(string cameraModelId, CancellationToken cancellationToken = default);
+}
+
 public interface IDetectorPack
 {
     DetectorPackManifest Manifest { get; }

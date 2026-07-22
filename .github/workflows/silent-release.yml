@@ -23,15 +23,36 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          sparse-checkout-cone-mode: false
           sparse-checkout: |
-            assets
-            detector-packs
-            docs
-            installer
-            scripts
-            src
-            tests
-            tools
+            /.editorconfig
+            /AGENTS.md
+            /CHANGELOG.md
+            /CONTRIBUTING.md
+            /Directory.Build.props
+            /Directory.Packages.props
+            /ExpeditionsMacro.slnx
+            /global.json
+            /LICENSE.md
+            /NOTICE.md
+            /PRIVACY.md
+            /README.md
+            /THIRD-PARTY-NOTICES.md
+            /assets/
+            /datasets/README.md
+            /detector-packs/
+            /docs/
+            /eng/
+            /installer/
+            /scripts/
+            /src/
+            /tests/
+            /tools/
+      - name: Verify prerelease metadata and repository policy
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          ./scripts/Invoke-ReleasePreflight.ps1 -Version $version -Silent -RequireCleanTree
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.302

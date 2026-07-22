@@ -56,6 +56,9 @@ internal static class ActionButtonDetector
         ["stage_select_stage"] = new(new ScreenRegion(145, 405, 220, 80), ButtonColor.ChallengeGreen, 256, 449, 70, 38, 125, 195, 18, 44, 0.28),
         ["stage_select_stage_wide"] = new(new ScreenRegion(170, 395, 380, 80), ButtonColor.ChallengeGreen, 355, 435, 180, 45, 280, 360, 18, 44, 0.28),
         ["stage_enter_matchmaking"] = new(new ScreenRegion(325, 405, 220, 80), ButtonColor.Purple, 428, 449, 70, 38, 125, 195, 18, 44, 0.25),
+        // Lobby and post-match mode details use the same close control, but the
+        // panel can shift about 22 pixels horizontally between party contexts.
+        ["stage_detail_close"] = new(new ScreenRegion(610, 100, 110, 110), ButtonColor.Red, 660, 150, 55, 65, 14, 36, 14, 36, 0.35, 0.40),
         ["challenge_enter_matchmaking"] = new(new ScreenRegion(480, 395, 230, 80), ButtonColor.Purple, 589, 437, 100, 35, 70, 190, 16, 42, 0.25),
         ["challenge_preview_start"] = new(new ScreenRegion(390, 335, 230, 85), ButtonColor.Green, 506, 376, 65, 35, 130, 190, 20, 42, 0.42),
         ["challenge_change_mode"] = new(new ScreenRegion(550, 335, 230, 85), ButtonColor.Yellow, 668, 376, 65, 35, 130, 190, 20, 42, 0.42),

@@ -19,6 +19,8 @@ if (-not $artifacts.StartsWith($repository, [System.StringComparison]::OrdinalIg
     throw 'Artifact output resolved outside the repository.'
 }
 
+& (Join-Path $repository 'scripts\Test-RepositoryPolicy.ps1') -RepositoryRoot $repository
+
 $publish = Join-Path $artifacts 'publish\ExpeditionsMacro'
 $release = Join-Path $artifacts 'release'
 if (Test-Path -LiteralPath $artifacts) { Remove-Item -LiteralPath $artifacts -Recurse -Force }

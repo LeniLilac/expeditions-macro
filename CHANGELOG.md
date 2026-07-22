@@ -4,6 +4,26 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.7] - 2026-07-22
+
+### Added
+
+- Learns a device-local camera shortcut after two matching normal load-in alignments, then tries one cached relative mouse drag with three-frame goal verification before falling back to the complete yaw atlas. Manual Auto Align remains independent of this cache.
+
+### Fixed
+
+- Cross-mode Story, Raid, and Expedition handoffs now press the configured Play key directly from the terminal screen, then follow the detected post-match party through Change Gamemode instead of dismissing the terminal and becoming stranded on the ordinary HUD.
+- Recognizes both lobby and post-match mode-detail action rails. Raid act selection no longer waits forever when the existing party omits **Enter Matchmaking**, and Story accepts the observed horizontally shifted lobby detail panel.
+
+### Documentation
+
+- Added a field-observed game-behavior ledger covering canonical Story, Raid, Expedition, and Challenge entry/exit navigation, the terminal Return to Lobby confirmation/teleport sequence, and the long-idle keepalive policy needed for planned 1.4.x workflows.
+- Split contributor details into focused development, testing, and release guides while keeping the root agent policy limited to repository-wide invariants.
+
+### Engineering
+
+- Added a CI and release-time repository policy check that enforces project dependency direction, blocks generated files from source control, caps new production/test/script file sizes, and prevents existing oversized files from growing.
+
 ## [1.3.0-beta.6] - 2026-07-22
 
 ### Changed
@@ -499,7 +519,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.6...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.7...HEAD
+[1.3.0-beta.7]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.6...v1.3.0-beta.7
 [1.3.0-beta.6]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.5...v1.3.0-beta.6
 [1.3.0-beta.5]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.4...v1.3.0-beta.5
 [1.3.0-beta.4]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.3...v1.3.0-beta.4

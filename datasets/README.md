@@ -1,6 +1,6 @@
 # Detector image dataset
 
-This repository includes 389 Roblox client-area captures used to build and regression-test the bundled Anime Expeditions detector pack, specialized UI detectors, and automatic camera-region selection: 273 Expeditions fixtures, 75 selective Challenge fixtures, 27 Story/Raid/team fixtures, and 14 camera-yaw fixtures. It also includes three privacy-safe 304 by 192 grayscale camera composites derived from a reported runtime-alignment failure. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
+This repository includes 397 Roblox client-area captures used to build and regression-test the bundled Anime Expeditions detector pack, specialized UI detectors, and automatic camera-region selection: 273 Expeditions fixtures, 75 selective Challenge fixtures, 27 Story/Raid/team fixtures, 8 cross-mode navigation variants, and 14 camera-yaw fixtures. It also includes three privacy-safe 304 by 192 grayscale camera composites derived from a reported runtime-alignment failure. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
 
 Captures are 808 by 611 PNG files organized under:
 
@@ -9,6 +9,8 @@ Captures are 808 by 611 PNG files organized under:
 Challenge-mode fixtures are organized under `datasets/anime-expeditions/challenges/`; see that directory's README for provenance and privacy filtering.
 
 Story, Raid, and saved-team fixtures are organized under `datasets/anime-expeditions/stages/`; see that directory's README for provenance and retained states.
+
+Lobby-entry and post-match Story, Raid, Challenge, and Expedition detail variants are organized under `datasets/anime-expeditions/navigation-variants/`. These fixtures prove that **Enter Matchmaking** is optional and that navigation must use the live **Select Stage** action in either party context.
 
 Camera-alignment fixtures are organized under `datasets/anime-expeditions/camera-rotations/`. Each of the three Expedition and four Story/Challenge maps contributes a goal frame plus a clearly incorrect yaw from a continuous right-arrow rotation. These fixtures verify that automatic setup selects four textured regions spanning the left, center, and right of the client and keeps an incorrect yaw well below the alignment threshold. The `RuntimeProjectionDrift` composites additionally verify that final alignment accepts a coherent cross-session vertical projection shift without broadening the thumbnail atlas or accepting a nearby wrong yaw.
 

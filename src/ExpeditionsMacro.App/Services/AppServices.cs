@@ -45,6 +45,7 @@ public sealed class AppServices : IDisposable
         MacroPlans = new MacroPlanRepository(Paths);
         PresetDeletion = new PresetDeletionService(Presets, ChallengePresets, StoryPresets, RaidPresets, MacroPlans);
         CameraModels = new CameraModelRepository(Paths);
+        CameraShortcuts = new CameraSpawnShortcutRepository(Paths);
         DetectorPacks = new DetectorPackRepository(Paths);
         WindowsRobloxAutomation automation = new();
         automation.DiagnosticMessage += Log.Info;
@@ -67,7 +68,7 @@ public sealed class AppServices : IDisposable
         placementCapture.TraceEnabled = () => DeepDebug.IsActive;
         PlacementCapture = placementCapture;
         Placement = new PlacementService(Automation, PlacementCapture, PlacementModels);
-        Camera = new CameraAlignmentEngine(Automation, CameraModels);
+        Camera = new CameraAlignmentEngine(Automation, CameraModels, CameraShortcuts);
         _discord = new DiscordWebhookClient();
         Teams = new TeamSelectionService(Automation);
         Stages = new StageMacroRunner(Automation, Camera, Placement, Teams, _discord);
@@ -94,6 +95,7 @@ public sealed class AppServices : IDisposable
     public MacroPlanRepository MacroPlans { get; }
     public PresetDeletionService PresetDeletion { get; }
     public CameraModelRepository CameraModels { get; }
+    public CameraSpawnShortcutRepository CameraShortcuts { get; }
     public DetectorPackRepository DetectorPacks { get; }
     public DeepDebugSessionService DeepDebug { get; }
     public IRobloxAutomation Automation { get; }

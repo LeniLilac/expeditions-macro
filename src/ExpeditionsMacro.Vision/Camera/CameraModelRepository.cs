@@ -122,8 +122,11 @@ public sealed class CameraModelRepository : ICameraModelRepository
     public Task DeleteAsync(string id, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        string directory = Path.Combine(_paths.CameraModels, ValidateId(id));
+        string validId = ValidateId(id);
+        string directory = Path.Combine(_paths.CameraModels, validId);
         if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        string shortcut = Path.Combine(_paths.CameraShortcuts, $"{validId}.json");
+        if (File.Exists(shortcut)) File.Delete(shortcut);
         return Task.CompletedTask;
     }
 

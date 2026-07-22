@@ -190,10 +190,10 @@ public sealed class ExpeditionRunPolicyTests
 
     [Theory]
     [InlineData(ChallengeScreenState.GameModeSelector, "Complete")]
-    [InlineData(ChallengeScreenState.Victory, "CloseTerminal")]
-    [InlineData(ChallengeScreenState.Defeat, "CloseTerminal")]
+    [InlineData(ChallengeScreenState.Victory, "PressPlayKey")]
+    [InlineData(ChallengeScreenState.Defeat, "PressPlayKey")]
     [InlineData(ChallengeScreenState.PostMatchPreview, "ChangeGamemode")]
-    [InlineData(ChallengeScreenState.PostMatchHud, "OpenPostMatchPlay")]
+    [InlineData(ChallengeScreenState.PostMatchHud, "PressPlayKey")]
     [InlineData(ChallengeScreenState.Teleporting, "Wait")]
     [InlineData(ChallengeScreenState.None, "Wait")]
     public void CompletedRunHandoff_UsesOnlyStateOwnedActions(

@@ -111,6 +111,19 @@ public sealed class StageScreenDetectorTests
     }
 
     [Fact]
+    public void PostMatchHud_RemainsDistinctFromThePartyPreview()
+    {
+        ImageFrame image = ImageCodec.Load(Path.Combine(
+            TestPaths.ChallengeDatasets,
+            "PostMatchHud",
+            "PostMatchHud_01.png"));
+
+        StageScreenMatch match = StageScreenDetector.Detect(image);
+
+        Assert.Equal(StageScreenState.PostMatchHud, match.State);
+    }
+
+    [Fact]
     public void SelectorBackAction_UsesTheStableBottomLeftControl()
     {
         Assert.Equal((62, 588), StageScreenDetector.SelectorBackAction);

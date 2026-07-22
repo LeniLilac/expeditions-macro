@@ -12,16 +12,14 @@ namespace ExpeditionsMacro.Automation.Camera;
 public sealed class CameraAlignmentEngine
 {
     private const int MaximumRuntimeAlignmentAttempts = 3;
-    private const double StableSceneSimilarity = 0.96;
-    private const int StableSceneFrames = 5;
-    private const int MaximumStableSceneSamples = 24;
     private const double PoseClampSimilarity = 0.975;
     private const int MaximumPoseClampProbes = 4;
     private const int FinalVerificationFrames = 3;
 
     private readonly IRobloxAutomation _automation;
     private readonly ICameraModelRepository _models;
-
+    private readonly CameraSceneStabilizer _sceneStabilizer;
+    private readonly CameraSpawnShortcutService? _spawnShortcuts;
     private readonly record struct FullTurnRefinement(int BestOffset, ImageFrame Frame, double Score);
 
     private readonly record struct VerifiedFullTurnCandidate(int Step, double RefinedScore);
@@ -36,10 +34,15 @@ public sealed class CameraAlignmentEngine
 
     private readonly record struct AtlasMatch(int Index, double Score);
 
-    public CameraAlignmentEngine(IRobloxAutomation automation, ICameraModelRepository models)
+    public CameraAlignmentEngine(
+        IRobloxAutomation automation,
+        ICameraModelRepository models,
+        ICameraSpawnShortcutRepository? spawnShortcuts = null)
     {
         _automation = automation;
         _models = models;
+        _sceneStabilizer = new CameraSceneStabilizer(automation);
+        _spawnShortcuts = spawnShortcuts is null ? null : new CameraSpawnShortcutService(automation, spawnShortcuts);
     }
 
     public async Task<CameraModel> CalibrateAsync(
@@ -178,7 +181,8 @@ public sealed class CameraAlignmentEngine
         RobloxWindow? existingWindow = null,
         bool manageShiftLock = true,
         IProgress<MacroProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool useSpawnShortcut = false)
     {
         if (manageShiftLock)
         {
@@ -188,7 +192,8 @@ public sealed class CameraAlignmentEngine
                 model.Manifest.ZoomTicks,
                 model.Manifest.PitchDragPixels,
                 progress,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                useSpawnShortcut).ConfigureAwait(false);
         }
         model.Manifest.Validate();
         RobloxWindow window = existingWindow ?? RequireWindow();
@@ -223,6 +228,8 @@ public sealed class CameraAlignmentEngine
                 new(CameraYawDirection.Right, -phase),
             ];
             double bestConfidence = 0;
+            CameraSpawnShortcutObservation? shortcutObservation = null;
+            CameraSpawnShortcutAttempt shortcutAttempt = new(false, false, 0);
             for (int attempt = 0; attempt < plans.Length; attempt++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -230,7 +237,25 @@ public sealed class CameraAlignmentEngine
                     "Camera alignment",
                     8,
                     $"Alignment attempt {attempt + 1}/{MaximumRuntimeAlignmentAttempts}: waiting for the rendered map to stabilize."));
-                await WaitForStableSceneAsync(window, model, attempt + 1, progress, cancellationToken).ConfigureAwait(false);
+                ImageFrame stable = await _sceneStabilizer.WaitAsync(
+                    window,
+                    model,
+                    attempt + 1,
+                    MaximumRuntimeAlignmentAttempts,
+                    progress,
+                    cancellationToken).ConfigureAwait(false);
+                if (attempt == 0 && useSpawnShortcut && _spawnShortcuts is not null)
+                {
+                    shortcutObservation = await _spawnShortcuts.ObserveAsync(model, stable, cancellationToken).ConfigureAwait(false);
+                    shortcutAttempt = await _spawnShortcuts.TryAsync(
+                        window,
+                        model,
+                        shortcutObservation,
+                        token => VerifyAlignmentAsync(model, window, progress, token),
+                        progress,
+                        cancellationToken).ConfigureAwait(false);
+                    if (shortcutAttempt.Succeeded) return shortcutAttempt.Confidence;
+                }
                 double refined = await AlignAttemptAsync(
                     window,
                     model,
@@ -245,6 +270,15 @@ public sealed class CameraAlignmentEngine
                     bestConfidence = Math.Max(bestConfidence, verified);
                     if (verified >= model.Manifest.SuccessThreshold)
                     {
+                        if (_spawnShortcuts is not null)
+                        {
+                            await _spawnShortcuts.RecordNormalSuccessAsync(
+                                model,
+                                shortcutObservation,
+                                shortcutAttempt.Attempted,
+                                progress,
+                                cancellationToken).ConfigureAwait(false);
+                        }
                         progress?.Report(new MacroProgress(
                             "Camera alignment",
                             100,
@@ -281,7 +315,8 @@ public sealed class CameraAlignmentEngine
         int zoomTicks,
         int pitchDragPixels,
         IProgress<MacroProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool useSpawnShortcut = true)
     {
         model.Manifest.Validate();
         RobloxWindow window = existingWindow ?? RequireWindow();
@@ -321,7 +356,8 @@ public sealed class CameraAlignmentEngine
                 window,
                 manageShiftLock: false,
                 progress,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                useSpawnShortcut).ConfigureAwait(false);
         }
         finally
         {
@@ -377,42 +413,6 @@ public sealed class CameraAlignmentEngine
             $"Attempt {attempt}/{MaximumRuntimeAlignmentAttempts} fast alignment reached only {refined:P0} (target {model.Manifest.SuccessThreshold:P0}). Scanning one full yaw turn {DirectionLabel(plan.ScanDirection)} with a {plan.ScanPhasePixels:+#;-#;0}-px sampling phase.",
             Confidence: refined));
         return await ScanFullTurnAsync(window, model, refined, plan, attempt, progress, cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task WaitForStableSceneAsync(
-        RobloxWindow window,
-        CameraModel model,
-        int attempt,
-        IProgress<MacroProgress>? progress,
-        CancellationToken cancellationToken)
-    {
-        ImageFrame previous = VisionScorer.MakeThumbnail(CaptureComposite(window, model.Manifest.Regions));
-        int stable = 0;
-        double similarity = 0;
-        int delay = Math.Max(75, model.Manifest.SettleMilliseconds);
-        for (int sample = 1; sample <= MaximumStableSceneSamples; sample++)
-        {
-            await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
-            ImageFrame current = VisionScorer.MakeThumbnail(CaptureComposite(window, model.Manifest.Regions), previous.Width);
-            similarity = VisionScorer.RobustSimilarity(previous, current);
-            stable = similarity >= StableSceneSimilarity ? stable + 1 : 0;
-            previous = current;
-            if (stable >= StableSceneFrames)
-            {
-                progress?.Report(new MacroProgress(
-                    "Camera alignment",
-                    12,
-                    $"Attempt {attempt}/{MaximumRuntimeAlignmentAttempts}: rendered map is stable ({similarity:P0}).",
-                    Confidence: similarity));
-                return;
-            }
-        }
-
-        progress?.Report(new MacroProgress(
-            "Camera alignment",
-            12,
-            $"Attempt {attempt}/{MaximumRuntimeAlignmentAttempts}: the scene remained animated ({similarity:P0}); continuing with median observations.",
-            Confidence: similarity));
     }
 
     private async Task EnableShiftLockAsync(

@@ -21,9 +21,8 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
     internal enum GameModeHandoffCommand
     {
         Complete,
-        CloseTerminal,
         ChangeGamemode,
-        OpenPostMatchPlay,
+        PressPlayKey,
         Wait,
     }
 
@@ -463,12 +462,19 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         Action<string, MacroEventLevel, string?, double?> log,
         CancellationToken cancellationToken)
     {
-        _ = playMenuKey;
-        report("Handoff", 100, "Closing the completed Expedition before selecting the next mode.", terminal.State, null);
-        (int closeX, int closeY) = ChallengeScreenDetector.TerminalCloseAction(terminal.Frame);
-        Focus(window);
-        await _automation.ClickClientAsync(window, closeX, closeY, cancellationToken).ConfigureAwait(false);
-        await Task.Delay(700, cancellationToken).ConfigureAwait(false);
+        report("Handoff", 100, $"Opening Play with {playMenuKey} from the completed Expedition.", terminal.State, null);
+        // Keep the terminal open: the Play binding owns this transition and opens the
+        // post-match party where Change Gamemode can be detected safely.
+        await OpenPlayMenuAsync(
+            window,
+            detector,
+            preset,
+            playMenuKey,
+            "Handoff",
+            terminal.State,
+            report,
+            log,
+            cancellationToken).ConfigureAwait(false);
 
         DateTimeOffset deadline = DateTimeOffset.UtcNow + GameModeHandoffTimeout;
         StableStateTracker<ChallengeScreenState> tracker = new(Math.Max(1, preset.StableDetections));
@@ -490,11 +496,6 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                 case GameModeHandoffCommand.Complete:
                     log("Expedition handoff reached the shared game-mode selector.", MacroEventLevel.Success, "game_mode_selector", last.Confidence);
                     return;
-                case GameModeHandoffCommand.CloseTerminal:
-                    (closeX, closeY) = ChallengeScreenDetector.TerminalCloseAction(frame);
-                    Focus(window);
-                    await _automation.ClickClientAsync(window, closeX, closeY, cancellationToken).ConfigureAwait(false);
-                    break;
                 case GameModeHandoffCommand.ChangeGamemode:
                 {
                     (int X, int Y)? changeMode = ChallengeScreenDetector.ActionFor(ChallengeScreenState.PostMatchPreview, frame);
@@ -508,18 +509,18 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                     await _automation.ClickClientAsync(window, changeMode.Value.X, changeMode.Value.Y, cancellationToken).ConfigureAwait(false);
                     break;
                 }
-                case GameModeHandoffCommand.OpenPostMatchPlay:
-                {
-                    (int X, int Y)? play = ChallengeScreenDetector.ActionFor(ChallengeScreenState.PostMatchHud, frame);
-                    if (play is null)
-                    {
-                        await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
-                        continue;
-                    }
-                    Focus(window);
-                    await _automation.ClickClientAsync(window, play.Value.X, play.Value.Y, cancellationToken).ConfigureAwait(false);
+                case GameModeHandoffCommand.PressPlayKey:
+                    await OpenPlayMenuAsync(
+                        window,
+                        detector,
+                        preset,
+                        playMenuKey,
+                        "Handoff",
+                        last.State.ToString(),
+                        report,
+                        log,
+                        cancellationToken).ConfigureAwait(false);
                     break;
-                }
                 case GameModeHandoffCommand.Wait:
                     await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
                     continue;
@@ -534,13 +535,13 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
     }
 
     internal static GameModeHandoffCommand SelectGameModeHandoffCommand(ChallengeScreenState state) => state switch
-    {
-        ChallengeScreenState.GameModeSelector => GameModeHandoffCommand.Complete,
-        ChallengeScreenState.Victory or ChallengeScreenState.Defeat => GameModeHandoffCommand.CloseTerminal,
-        ChallengeScreenState.PostMatchPreview => GameModeHandoffCommand.ChangeGamemode,
-        ChallengeScreenState.PostMatchHud => GameModeHandoffCommand.OpenPostMatchPlay,
-        _ => GameModeHandoffCommand.Wait,
-    };
+        {
+            ChallengeScreenState.GameModeSelector => GameModeHandoffCommand.Complete,
+            ChallengeScreenState.Victory or ChallengeScreenState.Defeat => GameModeHandoffCommand.PressPlayKey,
+            ChallengeScreenState.PostMatchPreview => GameModeHandoffCommand.ChangeGamemode,
+            ChallengeScreenState.PostMatchHud => GameModeHandoffCommand.PressPlayKey,
+            _ => GameModeHandoffCommand.Wait,
+        };
 
     private Task<ImageFrame> OpenPlayMenuAsync(
         RobloxWindow window,

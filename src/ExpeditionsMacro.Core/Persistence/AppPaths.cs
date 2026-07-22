@@ -8,6 +8,7 @@ public sealed class AppPaths
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "ExpeditionsMacro");
         CameraModels = Path.Combine(Root, "camera-models");
+        CameraShortcuts = Path.Combine(Root, "camera-shortcuts");
         PlacementModels = Path.Combine(Root, "placement-models");
         Presets = Path.Combine(Root, "presets");
         ChallengePresets = Path.Combine(Root, "challenge-presets");
@@ -23,6 +24,8 @@ public sealed class AppPaths
     public string Root { get; }
 
     public string CameraModels { get; }
+
+    public string CameraShortcuts { get; }
 
     public string PlacementModels { get; }
 
@@ -48,6 +51,7 @@ public sealed class AppPaths
     {
         Directory.CreateDirectory(Root);
         Directory.CreateDirectory(CameraModels);
+        Directory.CreateDirectory(CameraShortcuts);
         Directory.CreateDirectory(PlacementModels);
         Directory.CreateDirectory(Presets);
         Directory.CreateDirectory(ChallengePresets);

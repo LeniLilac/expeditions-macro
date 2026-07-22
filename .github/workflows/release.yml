@@ -17,6 +17,11 @@ jobs:
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
+      - name: Verify release metadata and repository policy
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          ./scripts/Invoke-ReleasePreflight.ps1 -Version $version -RequireCleanTree
       - name: Read release announcement preference
         id: discord_announcement
         shell: pwsh

@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "rootAgentsMaxLines": 120,
+  "requiredDocs": [
+    "CONTRIBUTING.md",
+    "docs/ARCHITECTURE.md",
+    "docs/DEVELOPMENT.md",
+    "docs/DETECTOR-PACKS.md",
+    "docs/GAME-BEHAVIOR.md",
+    "docs/RELEASING.md",
+    "docs/release-notes/TEMPLATE.md",
+    "docs/TESTING.md",
+    "datasets/README.md"
+  ],
+  "lineLimits": {
+    "production": 500,
+    "test": 800,
+    "script": 500
+  },
+  "lineDebt": [
+    {
+      "path": "src/ExpeditionsMacro.Automation/Challenges/ChallengeMacroRunner.cs",
+      "maxLines": 1408,
+      "reason": "Existing mode-runner orchestration debt; extract state-specific workflow services when touched."
+    },
+    {
+      "path": "src/ExpeditionsMacro.Automation/Camera/CameraAlignmentEngine.cs",
+      "maxLines": 1361,
+      "reason": "Existing calibration/alignment orchestration debt; split observation, search, and verification ownership."
+    },
+    {
+      "path": "src/ExpeditionsMacro.Automation/Expeditions/ExpeditionMacroRunner.cs",
+      "maxLines": 1341,
+      "reason": "Existing mode-runner orchestration debt; extract state-specific workflow services when touched."
+    },
+    {
+      "path": "src/ExpeditionsMacro.App/Pages/MacroPage.xaml.cs",
+      "maxLines": 986,
+      "reason": "Existing page-controller debt; move scheduling, persistence, and operation coordination into focused services."
+    },
+    {
+      "path": "src/ExpeditionsMacro.Windows/WindowsRobloxAutomation.cs",
+      "maxLines": 905,
+      "reason": "Existing Windows adapter debt; separate window, capture, keyboard, pointer, and diagnostics concerns."
+    },
+    {
+      "path": "src/ExpeditionsMacro.Automation/Stages/StageMacroRunner.cs",
+      "maxLines": 895,
+      "reason": "Existing shared Story/Raid orchestration debt; extract navigation and terminal handoff services."
+    },
+    {
+      "path": "src/ExpeditionsMacro.Automation/Diagnostics/DeepDebugSessionService.cs",
+      "maxLines": 780,
+      "reason": "Existing diagnostic lifecycle debt; split archive writing, manifest capture, and retention."
+    },
+    {
+      "path": "src/ExpeditionsMacro.App/Pages/ChallengesPage.xaml.cs",
+      "maxLines": 726,
+      "reason": "Existing page-controller debt; extract preset editing and operation coordination."
+    },
+    {
+      "path": "src/ExpeditionsMacro.App/Pages/SettingsPage.xaml.cs",
+      "maxLines": 699,
+      "reason": "Existing settings-page debt; split settings sections into focused controllers."
+    },
+    {
+      "path": "src/ExpeditionsMacro.Vision/Packs/CompiledDetectorPack.cs",
+      "maxLines": 565,
+      "reason": "Existing detector-pack composition debt; separate state scoring and action resolution."
+    },
+    {
+      "path": "src/ExpeditionsMacro.App/Pages/ExpeditionsPage.xaml.cs",
+      "maxLines": 556,
+      "reason": "Existing page-controller debt; extract preset editing and operation coordination."
+    },
+    {
+      "path": "src/ExpeditionsMacro.Windows/WindowsGraphicsCapture.cs",
+      "maxLines": 546,
+      "reason": "Existing capture-pipeline debt; isolate device/session lifecycle from frame conversion."
+    },
+    {
+      "path": "src/ExpeditionsMacro.Vision/Challenges/ChallengeScreenDetector.cs",
+      "maxLines": 525,
+      "reason": "Existing multi-state detector debt; split stable screen families without changing state priority."
+    },
+    {
+      "path": "tools/ExpeditionsMacro.DeepDebugViewer/MainWindow.xaml.cs",
+      "maxLines": 512,
+      "reason": "Existing tool window-controller debt; extract playback and archive navigation controllers."
+    },
+    {
+      "path": "tests/ExpeditionsMacro.Tests/CameraAlignmentTests.cs",
+      "maxLines": 879,
+      "reason": "Existing test-fixture debt; split setup, search, drift, and cancellation scenarios by behavior."
+    }
+  ],
+  "projectDependencies": {
+    "src/ExpeditionsMacro.Core/ExpeditionsMacro.Core.csproj": [],
+    "src/ExpeditionsMacro.Vision/ExpeditionsMacro.Vision.csproj": [
+      "src/ExpeditionsMacro.Core/ExpeditionsMacro.Core.csproj"
+    ],
+    "src/ExpeditionsMacro.Windows/ExpeditionsMacro.Windows.csproj": [
+      "src/ExpeditionsMacro.Core/ExpeditionsMacro.Core.csproj"
+    ],
+    "src/ExpeditionsMacro.Automation/ExpeditionsMacro.Automation.csproj": [
+      "src/ExpeditionsMacro.Core/ExpeditionsMacro.Core.csproj",
+      "src/ExpeditionsMacro.Vision/ExpeditionsMacro.Vision.csproj",
+      "src/ExpeditionsMacro.Windows/ExpeditionsMacro.Windows.csproj"
+    ],
+    "src/ExpeditionsMacro.App/ExpeditionsMacro.App.csproj": [
+      "src/ExpeditionsMacro.Automation/ExpeditionsMacro.Automation.csproj",
+      "src/ExpeditionsMacro.Core/ExpeditionsMacro.Core.csproj",
+      "src/ExpeditionsMacro.Vision/ExpeditionsMacro.Vision.csproj",
+      "src/ExpeditionsMacro.Windows/ExpeditionsMacro.Windows.csproj"
+    ],
+    "tests/ExpeditionsMacro.Tests/ExpeditionsMacro.Tests.csproj": [
+      "src/ExpeditionsMacro.Automation/ExpeditionsMacro.Automation.csproj",
+      "src/ExpeditionsMacro.Core/ExpeditionsMacro.Core.csproj",
+      "src/ExpeditionsMacro.Vision/ExpeditionsMacro.Vision.csproj",
+      "src/ExpeditionsMacro.Windows/ExpeditionsMacro.Windows.csproj"
+    ],
+    "tools/ExpeditionsMacro.DatasetBuilder/ExpeditionsMacro.DatasetBuilder.csproj": [
+      "src/ExpeditionsMacro.Core/ExpeditionsMacro.Core.csproj",
+      "src/ExpeditionsMacro.Vision/ExpeditionsMacro.Vision.csproj"
+    ],
+    "tools/ExpeditionsMacro.DeepDebugViewer/ExpeditionsMacro.DeepDebugViewer.csproj": [],
+    "tools/ExpeditionsMacro.DeepDebugViewer.Tests/ExpeditionsMacro.DeepDebugViewer.Tests.csproj": [
+      "tools/ExpeditionsMacro.DeepDebugViewer/ExpeditionsMacro.DeepDebugViewer.csproj"
+    ]
+  }
+}

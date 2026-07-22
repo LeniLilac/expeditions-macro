@@ -26,6 +26,7 @@ public enum StageScreenState
     Victory,
     Defeat,
     PostMatchPreview,
+    PostMatchHud,
 }
 
 public sealed record StageScreenMatch(StageScreenState State, double Confidence, int? ActionX = null, int? ActionY = null);
@@ -104,7 +105,8 @@ public static class StageScreenDetector
             ChallengeScreenState.Victory => new(StageScreenState.Victory, shared.Confidence, shared.ActionX, shared.ActionY),
             ChallengeScreenState.Prestart => new(StageScreenState.Prestart, shared.Confidence, shared.ActionX, shared.ActionY),
             ChallengeScreenState.PreviewReady => new(StageScreenState.PreviewReady, shared.Confidence, shared.ActionX, shared.ActionY),
-            ChallengeScreenState.PostMatchPreview or ChallengeScreenState.PostMatchHud => new(StageScreenState.PostMatchPreview, shared.Confidence, shared.ActionX, shared.ActionY),
+            ChallengeScreenState.PostMatchPreview => new(StageScreenState.PostMatchPreview, shared.Confidence, shared.ActionX, shared.ActionY),
+            ChallengeScreenState.PostMatchHud => new(StageScreenState.PostMatchHud, shared.Confidence, shared.ActionX, shared.ActionY),
             ChallengeScreenState.GameModeSelector => new(StageScreenState.GameModeSelector, shared.Confidence),
             _ => null,
         };
@@ -125,10 +127,16 @@ public static class StageScreenDetector
             (int X, int Y)? action = SelectStageAction(image);
             return Trace(new StageScreenMatch(StageScreenState.StoryDetail, Math.Clamp(0.35 * selectStage + 0.25 * storyActionSupport + 0.40 * storyDetail, 0, 1), action?.X, action?.Y));
         }
-        if (narrowSelectStage >= 0.65 && matchmaking >= 0.65 && redDetail >= 0.68)
+        // A fresh lobby party exposes Select Stage and Enter Matchmaking side by
+        // side. After a completed match, that party context persists across
+        // Change Gamemode and Raid expands Select Stage to the full action rail.
+        // Matchmaking is therefore useful corroboration, but it is not a
+        // state-defining requirement. See GB-010 in docs/GAME-BEHAVIOR.md.
+        double raidActionSupport = Math.Max(selectStage, matchmaking);
+        if (selectStage >= 0.65 && redDetail >= 0.68)
         {
             (int X, int Y)? action = SelectStageAction(image);
-            return Trace(new StageScreenMatch(StageScreenState.RaidDetail, Math.Clamp(0.35 * selectStage + 0.25 * matchmaking + 0.40 * redDetail, 0, 1), action?.X, action?.Y));
+            return Trace(new StageScreenMatch(StageScreenState.RaidDetail, Math.Clamp(0.35 * selectStage + 0.25 * raidActionSupport + 0.40 * redDetail, 0, 1), action?.X, action?.Y));
         }
 
         double raidSelector = RaidSelectorScore(image);
@@ -239,7 +247,7 @@ public static class StageScreenDetector
         double header = ColorFraction(image, DetailHeader, accent);
         double top = BestHorizontalLineFraction(image, DetailTopEdge, accent);
         double dark = ColorFraction(image, DetailPanel, IsDark);
-        double close = ActionButtonDetector.Score(image, "challenge_victory_close");
+        double close = ActionButtonDetector.Score(image, "stage_detail_close");
         if (header < 0.018 || top < 0.45 || dark < 0.38 || close == 0) return 0;
         return Math.Clamp(
             0.58 +
