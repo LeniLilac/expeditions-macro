@@ -10,10 +10,10 @@ public sealed class StageScreenDetectorTests
     [Fact]
     public void TeamLoadGuard_RequiresPrestartAndRejectsPlaySelector()
     {
-        StageMacroRunner.RequirePrestartForTeamLoad(new StageScreenMatch(StageScreenState.Prestart, 0.98));
+        StageNavigationPolicy.RequirePrestartForTeamLoad(new StageScreenMatch(StageScreenState.Prestart, 0.98));
 
         InvalidOperationException error = Assert.Throws<InvalidOperationException>(() =>
-            StageMacroRunner.RequirePrestartForTeamLoad(new StageScreenMatch(StageScreenState.GameModeSelector, 0.99)));
+            StageNavigationPolicy.RequirePrestartForTeamLoad(new StageScreenMatch(StageScreenState.GameModeSelector, 0.99)));
 
         Assert.Contains("requires a confirmed prestart screen", error.Message, StringComparison.Ordinal);
     }
@@ -82,15 +82,37 @@ public sealed class StageScreenDetectorTests
     }
 
     [Theory]
-    [InlineData("RaidPartyPreview_01.png", 415, 425)]
-    [InlineData("StoryPartyPreview_Mastery_01.png", 388, 400)]
-    public void ThreeActionPartyPreview_MapsTheLiveStartButton(string fileName, int minimumY, int maximumY)
+    [InlineData("RaidPartyPreview_01.png", StageScreenState.PreviewReady, 415, 425)]
+    [InlineData("StoryPartyPreview_Mastery_01.png", StageScreenState.PreviewReady, 388, 400)]
+    [InlineData("StoryPostMatchParty_Mastery_01.png", StageScreenState.PostMatchPreview, 368, 382)]
+    public void BothPartyPreviewFamilies_MapTheLiveStartButton(
+        string fileName,
+        StageScreenState expected,
+        int minimumY,
+        int maximumY)
     {
-        StageScreenMatch match = StageScreenDetector.Detect(Load(fileName));
+        ImageFrame image = Load(fileName);
+        StageScreenMatch match = StageScreenDetector.Detect(image);
+        (int X, int Y)? action = StageScreenDetector.PreviewStartAction(image);
 
-        Assert.Equal(StageScreenState.PreviewReady, match.State);
-        Assert.InRange(match.ActionX!.Value, 475, 485);
-        Assert.InRange(match.ActionY!.Value, minimumY, maximumY);
+        Assert.Equal(expected, match.State);
+        Assert.NotNull(action);
+        Assert.InRange(action!.Value.X, 475, 485);
+        Assert.InRange(action.Value.Y, minimumY, maximumY);
+    }
+
+    [Fact]
+    public void DisabledPostMatchStart_IsNotLaunchReady()
+    {
+        ImageFrame image = Load("RaidPostMatchParty_01.png");
+        StageScreenMatch match = StageScreenDetector.Detect(image);
+
+        Assert.Equal(StageScreenState.PostMatchPreview, match.State);
+        Assert.Null(StageScreenDetector.PreviewStartAction(image));
+        Assert.False(StageNavigationPolicy.MatchesExpectedState(
+            StageScreenState.PreviewReady,
+            match.State,
+            hasPreviewStartAction: false));
     }
 
     [Theory]

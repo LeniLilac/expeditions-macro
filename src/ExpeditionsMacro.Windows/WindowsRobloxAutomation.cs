@@ -52,10 +52,13 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation, IDisposable
 
     private readonly object _windowStateGate = new();
     private readonly SemaphoreSlim _sizingGate = new(1, 1);
+    private readonly WindowsKeyboardInput _keyboard;
     private readonly WindowsGraphicsCapture _windowCapture = new();
     private readonly Dictionary<nint, nint> _windowAliases = [];
     private readonly Dictionary<nint, ForcedWindowState> _forcedWindows = [];
     private ClientSizeTarget? _activeClientSizeTarget;
+
+    public WindowsRobloxAutomation() => _keyboard = new WindowsKeyboardInput(Focus, EmitTrace);
 
     private sealed record ForcedWindowState(
         int ProcessId,
@@ -408,39 +411,14 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation, IDisposable
         }
     }
 
-    public Task TapLeftControlAsync(RobloxWindow window, CancellationToken cancellationToken) => PulseKeyAsync(window, NativeMethods.VkLeftControl, 0x1D, 70, cancellationToken);
+    public Task TapShiftLockKeyAsync(RobloxWindow window, int virtualKey, CancellationToken cancellationToken) =>
+        _keyboard.TapShiftLockKeyAsync(window, virtualKey, cancellationToken);
 
-    public Task TapLetterKeyAsync(RobloxWindow window, char key, CancellationToken cancellationToken)
-    {
-        char normalized = char.ToUpperInvariant(key);
-        if (!char.IsAsciiLetter(normalized)) throw new ArgumentOutOfRangeException(nameof(key), "The Roblox key must be A through Z.");
-        int virtualKey = normalized;
-        int scanCode = checked((int)NativeMethods.MapVirtualKey((uint)virtualKey, 0));
-        return PulseKeyAsync(window, virtualKey, scanCode, 70, cancellationToken);
-    }
+    public Task TapLetterKeyAsync(RobloxWindow window, char key, CancellationToken cancellationToken) =>
+        _keyboard.TapLetterKeyAsync(window, key, cancellationToken);
 
-    public Task TapUnitKeyAsync(RobloxWindow window, int unitKey, int holdMilliseconds, CancellationToken cancellationToken)
-    {
-        if (unitKey is < 0 or > 9) throw new ArgumentOutOfRangeException(nameof(unitKey));
-        int scanCode = unitKey == 0 ? 0x0B : 0x01 + unitKey;
-        return PulseKeyAsync(window, 0x30 + unitKey, scanCode, holdMilliseconds, cancellationToken);
-    }
-
-    private async Task PulseKeyAsync(RobloxWindow window, int virtualKey, int scanCode, int holdMilliseconds, CancellationToken cancellationToken)
-    {
-        if (!Focus(window)) throw new InvalidOperationException("Windows could not focus Roblox.");
-        NativeMethods.keybd_event((byte)virtualKey, (byte)scanCode, 0, 0);
-        EmitTrace(new WindowsAutomationTrace(DateTimeOffset.UtcNow, "keyboard", "key_down", VirtualKey: virtualKey, ScanCode: scanCode, HoldMilliseconds: holdMilliseconds, Flags: 0));
-        try
-        {
-            await Task.Delay(holdMilliseconds, cancellationToken).ConfigureAwait(false);
-        }
-        finally
-        {
-            NativeMethods.keybd_event((byte)virtualKey, (byte)scanCode, NativeMethods.KeyeventfKeyUp, 0);
-            EmitTrace(new WindowsAutomationTrace(DateTimeOffset.UtcNow, "keyboard", "key_up", VirtualKey: virtualKey, ScanCode: scanCode, HoldMilliseconds: holdMilliseconds, Flags: NativeMethods.KeyeventfKeyUp));
-        }
-    }
+    public Task TapUnitKeyAsync(RobloxWindow window, int unitKey, int holdMilliseconds, CancellationToken cancellationToken) =>
+        _keyboard.TapUnitKeyAsync(window, unitKey, holdMilliseconds, cancellationToken);
 
     private void SendMouse(uint flags, int dx = 0, int dy = 0, uint data = 0)
     {

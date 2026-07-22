@@ -358,7 +358,7 @@ public sealed class CameraAlignmentTests
         Assert.NotEmpty(automation.Drags);
         Assert.Equal(0, automation.YawStep);
         Assert.Equal(2, automation.MoveToCenterCount);
-        Assert.Equal(2, automation.LeftControlTapCount);
+        Assert.Equal(2, automation.ShiftLockKeys.Count);
         Assert.All(automation.DragShiftLockStates, state => Assert.True(state));
         Assert.Contains(updates, update => update.Message.Contains("Final verification:", StringComparison.Ordinal));
     }
@@ -374,12 +374,12 @@ public sealed class CameraAlignmentTests
             FullYawSteps = 6,
             CaptureAtCameraState = (_, _, shiftLock) => shiftLock ? goal : wrong,
         };
-        CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
+        CameraAlignmentEngine engine = new(automation, new NullCameraRepository(), shiftLockVirtualKey: () => KeyboardKey.RightControl);
 
         double score = await engine.AlignAsync(model);
 
         Assert.True(score > 0.90, $"Alignment score was {score:P1}.");
-        Assert.Equal(2, automation.LeftControlTapCount);
+        Assert.Equal([KeyboardKey.RightControl, KeyboardKey.RightControl], automation.ShiftLockKeys);
         Assert.NotEmpty(automation.DragShiftLockStates);
         Assert.All(automation.DragShiftLockStates, state => Assert.True(state));
         Assert.False(automation.ShiftLockState);
@@ -399,7 +399,7 @@ public sealed class CameraAlignmentTests
         InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() => engine.AlignAsync(model));
 
         Assert.Equal("Synthetic pitch failure.", error.Message);
-        Assert.Equal(2, automation.LeftControlTapCount);
+        Assert.Equal(2, automation.ShiftLockKeys.Count);
         Assert.Single(automation.DragShiftLockStates);
         Assert.True(automation.DragShiftLockStates[0]);
         Assert.False(automation.ShiftLockState);
@@ -416,7 +416,7 @@ public sealed class CameraAlignmentTests
         await engine.AlignAsync(model, manageShiftLock: false);
 
         Assert.Equal(0, automation.MoveToCenterCount);
-        Assert.Equal(0, automation.LeftControlTapCount);
+        Assert.Empty(automation.ShiftLockKeys);
     }
 
     [Fact]
@@ -459,7 +459,7 @@ public sealed class CameraAlignmentTests
         Assert.Equal(Enumerable.Range(-4, 9), model.Manifest.FineYawOffsets);
         Assert.Equal(0, automation.YawStep);
         Assert.Equal(0, automation.MouseOffset);
-        Assert.Equal(2, automation.LeftControlTapCount);
+        Assert.Equal(2, automation.ShiftLockKeys.Count);
         Assert.Equal(30, automation.ZoomTicks);
         Assert.Contains((0, 1800), automation.Drags);
         Assert.All(automation.ArrowPulses.Take(12), pulse => Assert.Equal(CameraYawDirection.Right, pulse));
@@ -515,7 +515,7 @@ public sealed class CameraAlignmentTests
         Assert.Equal("Synthetic capture failure.", error.Message);
         Assert.Equal((808, 611), automation.ResizeRequest);
         Assert.Equal(0, automation.MoveToCenterCount);
-        Assert.Equal(0, automation.LeftControlTapCount);
+        Assert.Empty(automation.ShiftLockKeys);
     }
 
     [Fact]
@@ -660,7 +660,7 @@ public sealed class CameraAlignmentTests
         Assert.Equal(3, error.Attempts);
         Assert.True(automation.ArrowPulses.Count(pulse => pulse == CameraYawDirection.Right) >= 12);
         Assert.True(automation.ArrowPulses.Count(pulse => pulse == CameraYawDirection.Left) >= 12);
-        Assert.Equal(2, automation.LeftControlTapCount);
+        Assert.Equal(2, automation.ShiftLockKeys.Count);
         Assert.All(automation.DragShiftLockStates, state => Assert.True(state));
         Assert.Contains(updates, update => update.Message.Contains("Re-observed the returned full-turn candidate", StringComparison.Ordinal));
     }
@@ -790,7 +790,7 @@ public sealed class CameraAlignmentTests
         public List<bool> DragShiftLockStates { get; } = [];
         public List<CameraYawDirection> ArrowPulses { get; } = [];
         public int MoveToCenterCount { get; private set; }
-        public int LeftControlTapCount { get; private set; }
+        public List<int> ShiftLockKeys { get; } = [];
         public int ZoomTicks { get; private set; }
         public Exception? CaptureFailure { get; init; }
         public Exception? DragFailure { get; init; }
@@ -859,9 +859,9 @@ public sealed class CameraAlignmentTests
             ZoomTicks = ticks;
             return Task.CompletedTask;
         }
-        public Task TapLeftControlAsync(RobloxWindow window, CancellationToken cancellationToken)
+        public Task TapShiftLockKeyAsync(RobloxWindow window, int virtualKey, CancellationToken cancellationToken)
         {
-            LeftControlTapCount++;
+            ShiftLockKeys.Add(virtualKey);
             ShiftLockState = !ShiftLockState;
             return Task.CompletedTask;
         }

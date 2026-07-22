@@ -1,0 +1,81 @@
+<UserControl x:Class="ExpeditionsMacro.App.Controls.SettingsKeyBindingsPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:ExpeditionsMacro.App.Controls"
+             PreviewKeyDown="Panel_PreviewKeyDown">
+    <StackPanel Width="640" HorizontalAlignment="Left">
+        <TextBlock Style="{StaticResource SectionTitle}" Text="Controls" />
+        <TextBlock Margin="0,5,0,0"
+                   Style="{StaticResource Caption}"
+                   TextWrapping="Wrap"
+                   Text="Choose the macro hotkey, then match the Play Menu, Units, and Shift Lock bindings configured in Anime Expeditions." />
+
+        <Grid Margin="0,16,0,0">
+            <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Macro hotkey" />
+                <TextBlock x:Name="MacroStatusText"
+                           Margin="0,5,0,0"
+                           Style="{StaticResource Caption}"
+                           TextWrapping="Wrap"
+                           Text="Click the button, then press a supported key." />
+            </StackPanel>
+            <Button x:Name="MacroButton"
+                    Width="160"
+                    HorizontalAlignment="Right"
+                    controls:Lucide.Icon="Keyboard"
+                    Content="F6"
+                    Click="MacroButton_Click" />
+        </Grid>
+
+        <Grid Margin="0,14,0,0">
+            <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Play menu key" />
+                <TextBlock x:Name="PlayStatusText"
+                           Margin="0,5,0,0"
+                           Style="{StaticResource Caption}"
+                           TextWrapping="Wrap"
+                           Text="Required before a macro can start." />
+            </StackPanel>
+            <Button x:Name="PlayButton"
+                    Width="160"
+                    HorizontalAlignment="Right"
+                    controls:Lucide.Icon="Keyboard"
+                    Content="Set key"
+                    Click="PlayButton_Click" />
+        </Grid>
+
+        <Grid Margin="0,14,0,0">
+            <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Unit menu key" />
+                <TextBlock x:Name="UnitStatusText"
+                           Margin="0,5,0,0"
+                           Style="{StaticResource Caption}"
+                           TextWrapping="Wrap"
+                           Text="Required only when a preset changes the active team." />
+            </StackPanel>
+            <Button x:Name="UnitButton"
+                    Width="160"
+                    HorizontalAlignment="Right"
+                    controls:Lucide.Icon="Keyboard"
+                    Content="Set key"
+                    Click="UnitButton_Click" />
+        </Grid>
+
+        <Grid Margin="0,14,0,0">
+            <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Shift Lock key" />
+                <TextBlock x:Name="ShiftLockStatusText"
+                           Margin="0,5,0,0"
+                           Style="{StaticResource Caption}"
+                           TextWrapping="Wrap"
+                           Text="Defaults to Left Ctrl. Match Anime Expeditions' Shift Lock binding." />
+            </StackPanel>
+            <Button x:Name="ShiftLockButton"
+                    Width="160"
+                    HorizontalAlignment="Right"
+                    controls:Lucide.Icon="Keyboard"
+                    Content="Left Ctrl"
+                    Click="ShiftLockButton_Click" />
+        </Grid>
+    </StackPanel>
+</UserControl>

@@ -11,6 +11,8 @@ public sealed record AppSettings
 {
     public const int DefaultMacroHotkeyVirtualKey = 0x75;
 
+    public const int DefaultShiftLockVirtualKey = KeyboardKey.LeftControl;
+
     public const string DefaultPlayMenuKey = "";
 
     public const string DefaultUnitMenuKey = "";
@@ -54,9 +56,44 @@ public sealed record AppSettings
 
     public int MacroHotkeyVirtualKey { get; init; } = DefaultMacroHotkeyVirtualKey;
 
+    public int ShiftLockVirtualKey { get; init; } = DefaultShiftLockVirtualKey;
+
     public string PlayMenuKey { get; init; } = DefaultPlayMenuKey;
 
     public string UnitMenuKey { get; init; } = DefaultUnitMenuKey;
+
+    public static int ParseShiftLockKey(
+        int virtualKey,
+        int macroHotkeyVirtualKey,
+        string? playMenuKey,
+        string? unitMenuKey)
+    {
+        string displayName = KeyboardKey.GetDisplayName(virtualKey);
+        if (!KeyboardKey.IsSupportedShiftLockKey(virtualKey))
+        {
+            throw new InvalidDataException(
+                "Choose Left/Right Shift, Left/Right Ctrl, or a supported letter, number, symbol, numpad, function, or common control key for Shift Lock.");
+        }
+        if (virtualKey == macroHotkeyVirtualKey)
+        {
+            throw new InvalidDataException($"The Shift Lock key and macro start/stop hotkey cannot both be {displayName}.");
+        }
+
+        foreach ((string Label, string? Value) binding in new[]
+        {
+            ("Play menu", playMenuKey),
+            ("Unit menu", unitMenuKey),
+        })
+        {
+            string candidate = binding.Value?.Trim() ?? string.Empty;
+            if (candidate.Length == 1 && char.ToUpperInvariant(candidate[0]) == virtualKey)
+            {
+                throw new InvalidDataException($"The Shift Lock key and {binding.Label} key cannot both be {displayName}.");
+            }
+        }
+
+        return virtualKey;
+    }
 
     public static char ParsePlayMenuKey(string? value)
     {

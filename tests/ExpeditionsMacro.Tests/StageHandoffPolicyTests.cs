@@ -6,6 +6,25 @@ namespace ExpeditionsMacro.Tests;
 public sealed class StageHandoffPolicyTests
 {
     [Theory]
+    [InlineData(StageScreenState.PreviewReady, true, true)]
+    [InlineData(StageScreenState.PostMatchPreview, true, true)]
+    [InlineData(StageScreenState.PreviewReady, false, false)]
+    [InlineData(StageScreenState.PostMatchPreview, false, false)]
+    [InlineData(StageScreenState.GameModeSelector, true, false)]
+    public void PreviewWait_AcceptsEitherPartyFamilyOnlyWithADetectedStartAction(
+        StageScreenState actual,
+        bool hasPreviewStartAction,
+        bool expected)
+    {
+        Assert.Equal(
+            expected,
+            StageNavigationPolicy.MatchesExpectedState(
+                StageScreenState.PreviewReady,
+                actual,
+                hasPreviewStartAction));
+    }
+
+    [Theory]
     [InlineData(StageScreenState.GameModeSelector, false, "Complete")]
     [InlineData(StageScreenState.Victory, false, "PressPlayKey")]
     [InlineData(StageScreenState.Defeat, false, "PressPlayKey")]
@@ -22,7 +41,7 @@ public sealed class StageHandoffPolicyTests
         bool hasStageChangeModeAction,
         string expected)
     {
-        StageMacroRunner.GameModeHandoffCommand actual = StageMacroRunner.SelectGameModeHandoffCommand(
+        GameModeHandoffCommand actual = StageNavigationPolicy.SelectGameModeHandoffCommand(
             state,
             hasStageChangeModeAction);
 
@@ -43,7 +62,7 @@ public sealed class StageHandoffPolicyTests
         {
             Assert.Equal(
                 expected,
-                StageMacroRunner.SelectGameModeHandoffCommand(state, hasChangeMode).ToString());
+                StageNavigationPolicy.SelectGameModeHandoffCommand(state, hasChangeMode).ToString());
         }
     }
 }

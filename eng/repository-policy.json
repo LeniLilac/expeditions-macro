@@ -20,17 +20,17 @@
   "lineDebt": [
     {
       "path": "src/ExpeditionsMacro.Automation/Challenges/ChallengeMacroRunner.cs",
-      "maxLines": 1408,
+      "maxLines": 1322,
       "reason": "Existing mode-runner orchestration debt; extract state-specific workflow services when touched."
     },
     {
       "path": "src/ExpeditionsMacro.Automation/Camera/CameraAlignmentEngine.cs",
-      "maxLines": 1361,
+      "maxLines": 1351,
       "reason": "Existing calibration/alignment orchestration debt; split observation, search, and verification ownership."
     },
     {
       "path": "src/ExpeditionsMacro.Automation/Expeditions/ExpeditionMacroRunner.cs",
-      "maxLines": 1341,
+      "maxLines": 1298,
       "reason": "Existing mode-runner orchestration debt; extract state-specific workflow services when touched."
     },
     {
@@ -40,12 +40,12 @@
     },
     {
       "path": "src/ExpeditionsMacro.Windows/WindowsRobloxAutomation.cs",
-      "maxLines": 905,
+      "maxLines": 883,
       "reason": "Existing Windows adapter debt; separate window, capture, keyboard, pointer, and diagnostics concerns."
     },
     {
       "path": "src/ExpeditionsMacro.Automation/Stages/StageMacroRunner.cs",
-      "maxLines": 895,
+      "maxLines": 820,
       "reason": "Existing shared Story/Raid orchestration debt; extract navigation and terminal handoff services."
     },
     {
@@ -57,11 +57,6 @@
       "path": "src/ExpeditionsMacro.App/Pages/ChallengesPage.xaml.cs",
       "maxLines": 726,
       "reason": "Existing page-controller debt; extract preset editing and operation coordination."
-    },
-    {
-      "path": "src/ExpeditionsMacro.App/Pages/SettingsPage.xaml.cs",
-      "maxLines": 699,
-      "reason": "Existing settings-page debt; split settings sections into focused controllers."
     },
     {
       "path": "src/ExpeditionsMacro.Vision/Packs/CompiledDetectorPack.cs",

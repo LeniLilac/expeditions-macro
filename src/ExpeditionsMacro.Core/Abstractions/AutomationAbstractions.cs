@@ -1,6 +1,7 @@
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
+using ExpeditionsMacro.Core.Runtime;
 
 namespace ExpeditionsMacro.Core.Abstractions;
 
@@ -55,7 +56,7 @@ public interface IRobloxAutomation
 
     Task ZoomOutFullyAsync(RobloxWindow window, int ticks, CancellationToken cancellationToken);
 
-    Task TapLeftControlAsync(RobloxWindow window, CancellationToken cancellationToken);
+    Task TapShiftLockKeyAsync(RobloxWindow window, int virtualKey, CancellationToken cancellationToken);
 
     Task TapLetterKeyAsync(RobloxWindow window, char key, CancellationToken cancellationToken);
 
@@ -112,6 +113,8 @@ public sealed record DiscordNotification
 
     public required TimeSpan Runtime { get; init; }
 
+    public TimeSpan? MatchRuntime { get; init; }
+
     public required int Victories { get; init; }
 
     public required int Defeats { get; init; }
@@ -129,4 +132,8 @@ public sealed record DiscordNotification
     public string AttachmentPrefix { get; init; } = "expeditions";
 
     public ImageFrame? Screenshot { get; init; }
+
+    public DateTimeOffset OccurredAtUtc { get; init; } = DateTimeOffset.UtcNow;
+
+    public string AppVersion { get; init; } = ProductVersion.Current;
 }

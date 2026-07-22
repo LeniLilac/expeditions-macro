@@ -14,7 +14,7 @@ Challenge mode automates the three regular Anime Expeditions Challenges that res
 - Either waits during cooldown or runs a configured Expeditions preset until the next reset.
 - Treats all three entries remaining unavailable across a complete global reset as daily-limit evidence, then waits until midnight UTC.
 
-The optional Discord webhook reports monitoring start, match attempts, Victory or Defeat with a Roblox screenshot, recovery, and reset or daily-limit waiting. A numeric Discord user ID can also receive five restricted mention alerts after an unexpected error. It uses the same DPAPI-protected webhook storage and Components V2 payload path as Expeditions. Manual Stop does not send error alerts or trigger automatic failure capture.
+The optional Discord webhook reports monitoring start, match attempts, Victory or Defeat, recovery, and reset or daily-limit waiting. Monitoring and attempt starts include a Roblox screenshot, while result reports include the terminal screenshot plus the specific match runtime. A numeric Discord user ID can also receive five restricted mention alerts after an unexpected error. It uses the same DPAPI-protected webhook storage and Components V2 payload path as Expeditions. Manual Stop does not send error alerts or trigger automatic failure capture.
 
 ## Detection and input safety
 

@@ -1,8 +1,7 @@
 <UserControl x:Class="ExpeditionsMacro.App.Pages.SettingsPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:icons="clr-namespace:ExpeditionsMacro.App.Controls"
-             PreviewKeyDown="SettingsPage_PreviewKeyDown">
+             xmlns:icons="clr-namespace:ExpeditionsMacro.App.Controls">
     <ScrollViewer x:Name="SettingsScroll" VerticalScrollBarVisibility="Auto">
         <Grid Margin="34,28,42,34" MaxWidth="900" HorizontalAlignment="Left">
             <Grid.RowDefinitions>
@@ -36,41 +35,7 @@
             </Border>
 
             <Border Grid.Row="2" Style="{StaticResource SectionDivider}">
-                <StackPanel Width="640" HorizontalAlignment="Left">
-                    <TextBlock Style="{StaticResource SectionTitle}" Text="Controls" />
-                    <TextBlock Margin="0,5,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Choose a global start and stop key, then match the separate letters assigned to Toggle Play Menu and Toggle Units in Anime Expeditions." />
-                    <Grid Margin="0,16,0,0">
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Macro hotkey" />
-                            <TextBlock x:Name="HotkeyStatusText" Margin="0,5,180,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Click the button, then press a letter, number, punctuation key, numpad key, or function key." />
-                        </StackPanel>
-                        <Button x:Name="HotkeyButton" Width="160" HorizontalAlignment="Right" icons:Lucide.Icon="Keyboard" Content="F6" Click="HotkeyButton_Click" />
-                    </Grid>
-                    <Grid Margin="0,14,0,0">
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Play menu key" />
-                            <TextBlock x:Name="PlayMenuKeyStatusText" Margin="0,5,180,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Required before a macro can start." />
-                        </StackPanel>
-                        <Button x:Name="PlayMenuKeyButton"
-                                Width="160"
-                                HorizontalAlignment="Right"
-                                icons:Lucide.Icon="Keyboard"
-                                Content="Set key"
-                                Click="PlayMenuKeyButton_Click" />
-                    </Grid>
-                    <Grid Margin="0,14,0,0">
-                        <StackPanel VerticalAlignment="Center">
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Unit menu key" />
-                            <TextBlock x:Name="UnitMenuKeyStatusText" Margin="0,5,180,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Required only when a preset changes the active team." />
-                        </StackPanel>
-                        <Button x:Name="UnitMenuKeyButton"
-                                Width="160"
-                                HorizontalAlignment="Right"
-                                icons:Lucide.Icon="Keyboard"
-                                Content="Set key"
-                                Click="UnitMenuKeyButton_Click" />
-                    </Grid>
-                </StackPanel>
+                <icons:SettingsKeyBindingsPanel x:Name="KeyBindingsPanel" />
             </Border>
 
             <Border Grid.Row="3" Style="{StaticResource SectionDivider}">
@@ -142,6 +107,8 @@
                             <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Play menu key" /><TextBlock x:Name="PlayMenuKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
                             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
                             <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Unit menu key" /><TextBlock x:Name="UnitMenuKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Shift Lock key" /><TextBlock x:Name="ShiftLockKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
                             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
                             <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Runtime" /><TextBlock HorizontalAlignment="Right" Text=".NET 10, Windows x64" /></Grid>
                         </StackPanel>

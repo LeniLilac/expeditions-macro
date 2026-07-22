@@ -194,12 +194,11 @@ public static class StageScreenDetector
         ?? ActionButtonDetector.ActionFor(image, "stage_select_stage")
         ?? (256, 449);
 
-    public static (int X, int Y) PreviewStartAction(ImageFrame image) =>
+    public static (int X, int Y)? PreviewStartAction(ImageFrame image) =>
         ActionButtonDetector.ActionFor(image, "stage_party_start_upper")
         ?? ActionButtonDetector.ActionFor(image, "stage_party_start")
         ?? ActionButtonDetector.ActionFor(image, "challenge_party_start")
-        ?? ActionButtonDetector.ActionFor(image, "challenge_preview_start")
-        ?? (480, 418);
+        ?? ActionButtonDetector.ActionFor(image, "challenge_preview_start");
 
     public static (int X, int Y)? PostMatchChangeModeAction(ImageFrame image) =>
         ActionButtonDetector.ActionFor(image, "stage_party_change_mode_upper")

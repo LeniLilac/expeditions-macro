@@ -729,7 +729,6 @@ public sealed class DeepDebugSessionService
         string? WriterFailure,
         string? OperationError,
         string SecretPolicy);
-
     private sealed record SanitizedSettings(
         int SchemaVersion,
         AppTheme Theme,
@@ -745,6 +744,7 @@ public sealed class DeepDebugSessionService
         DateTimeOffset? LastDetectorUpdateCheck,
         bool MinimizeDuringAutomation,
         int MacroHotkeyVirtualKey,
+        int ShiftLockVirtualKey,
         string PlayMenuKey,
         string UnitMenuKey)
     {
@@ -763,10 +763,10 @@ public sealed class DeepDebugSessionService
             settings.LastDetectorUpdateCheck,
             settings.MinimizeDuringAutomation,
             settings.MacroHotkeyVirtualKey,
+            settings.ShiftLockVirtualKey,
             settings.PlayMenuKey,
             settings.UnitMenuKey);
     }
-
     private sealed class ResolvedArtifacts
     {
         public HashSet<string> ExpeditionPresetIds { get; } = new(StringComparer.OrdinalIgnoreCase);

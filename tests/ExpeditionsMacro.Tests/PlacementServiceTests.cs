@@ -97,7 +97,7 @@ public sealed class PlacementServiceTests
 
         public Task ZoomOutFullyAsync(RobloxWindow window, int ticks, CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task TapLeftControlAsync(RobloxWindow window, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task TapShiftLockKeyAsync(RobloxWindow window, int virtualKey, CancellationToken cancellationToken) => Task.CompletedTask;
 
         public Task TapLetterKeyAsync(RobloxWindow window, char key, CancellationToken cancellationToken) => Task.CompletedTask;
 

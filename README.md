@@ -17,7 +17,7 @@ It uses screen capture and ordinary Windows input. It does not inject into Roblo
 - Navigates Story Acts 1-5, Infinite, and Mastery across five maps, plus Spirit City Raid Acts 1-3.
 - Saves prioritized Macro plans that can rotate Challenge, Expedition, Story, and Raid presets while preserving progress between launches.
 - Optionally opens Units and loads Team 1-8 before a configured run.
-- Fully zooms out with Roblox's `O` key (with mouse-wheel input retained as a fallback), toggles shift lock, sets a top-down pitch, and aligns yaw against a learned full-turn camera model.
+- Fully zooms out with Roblox's `O` key (with mouse-wheel input retained as a fallback), toggles shift lock with the configured physical key, sets a top-down pitch, and aligns yaw against a learned full-turn camera model.
 - Records, edits, saves, and tests Roblox-relative unit placements in one tool.
 - Detects start, checkpoint, continue, confirmation, reward, victory, defeat, lobby, disconnect, and AFK Chamber screens.
 - Captures the Roblox window directly instead of reading overlapping desktop windows, and normalizes HDR/Auto HDR pixels to SDR before detection.
@@ -26,7 +26,7 @@ It uses screen capture and ordinary Windows input. It does not inject into Roblo
 - Handles an early defeat even when extraction was planned later.
 - Rejoins after a Roblox disconnect, an unexpected lobby teleport, or an inactivity teleport to the AFK Chamber. From the AFK Chamber it chooses **Return to Lobby**, then navigates back to the configured map and difficulty.
 - Confirms recovery screens across consecutive captures before rejoining, so one animation frame cannot reset an active run or its checkpoint-extraction progress.
-- Optionally sends Discord Components V2 reports with runtime, victory/defeat totals, recovery notices, and a Roblox screenshot. A configured Discord user ID receives five restricted mentions when a macro stops unexpectedly.
+- Optionally sends Discord Components V2 reports with a Roblox screenshot when each mode starts, per-match and total runtime on results, victory/defeat totals, recovery notices, semantic state accents, and localized Discord timestamps. A configured Discord user ID receives five restricted mentions when a macro stops unexpectedly.
 - Records an unlimited timed Roblox screenshot sequence from Settings and packages the frames plus a manifest into one diagnostic ZIP. Automatic failure diagnostics keep the latest 10 action-state frames and add 10 frames at half-second intervals after an unexpected macro error.
 - Stores webhook secrets with Windows DPAPI and emits no telemetry.
 
@@ -48,6 +48,8 @@ Before starting a macro, assign Anime Expeditions' **Toggle Play Menu** action t
 
 If a preset should load a saved Team, also assign the game's **Toggle Units** action to a letter and record it as **Unit menu key** under Settings. Leave a preset's Team setting at **Don't change** when the active team should remain untouched.
 
+The **Shift Lock key** defaults to **Left Ctrl**. If Anime Expeditions uses a different Shift Lock binding, click that key under **Settings > Controls** and press the matching physical key. Left and right Shift/Ctrl are stored separately; letters, numbers, symbols, numpad keys, function keys, and common control keys are also supported. Keep it different from the macro hotkey, Play menu key, and Unit menu key.
+
 ### 1. Create a camera model
 
 1. Open **Camera Models** and choose **New model**.
@@ -55,7 +57,7 @@ If a preset should load a saved Team, also assign the game's **Toggle Units** ac
 3. Choose **Setup model**. The app arms the workflow without stealing focus.
 4. Focus Roblox and press the macro hotkey.
 
-Leave shift lock off before pressing the macro hotkey. Setup uses the standard 808 by 611 client size, zooms fully out, enables shift lock, sets a top-down pitch, takes several full-client goal captures, and automatically chooses four stable, detailed map regions outside the usual HUD zones. The regions span the left, center, and right of the map so one animated structure or lighting effect cannot dominate the comparison. Setup first sweeps a small mouse-controlled neighborhood around the goal, then learns one full yaw turn with Right-arrow pulses. The neighborhood lets setup recognize a wrap that lands slightly beside the exact starting angle; a final fine sweep returns to the strongest goal view. The signed neighborhood atlas is saved with the model and applied before the live micro-search during later alignments. If the coarse scan only finds a degraded wraparound view, setup verifies the following yaw view and still requires a strong refined match before accepting it. The resulting atlases support large sensitivity-independent arrow corrections when far from the goal and learned one-pixel mouse correction near it. After two macro runs confirm the same load-in view, the app can try one locally learned mouse drag and verify the goal before falling back to normal atlas alignment; manual **Auto align** does not train or use this shortcut. Lighting normalization, temporal median capture, edge/gradient comparison, and multiple independent regions reduce sensitivity to lighting changes and moving units.
+Leave shift lock off before pressing the macro hotkey. Setup uses the standard 808 by 611 client size, zooms fully out, enables shift lock with the key configured under Settings, sets a top-down pitch, takes several full-client goal captures, and automatically chooses four stable, detailed map regions outside the usual HUD zones. The regions span the left, center, and right of the map so one animated structure or lighting effect cannot dominate the comparison. Setup first sweeps a small mouse-controlled neighborhood around the goal, then learns one full yaw turn with Right-arrow pulses. The neighborhood lets setup recognize a wrap that lands slightly beside the exact starting angle; a final fine sweep returns to the strongest goal view. The signed neighborhood atlas is saved with the model and applied before the live micro-search during later alignments. If the coarse scan only finds a degraded wraparound view, setup verifies the following yaw view and still requires a strong refined match before accepting it. The resulting atlases support large sensitivity-independent arrow corrections when far from the goal and learned one-pixel mouse correction near it. After two macro runs confirm the same load-in view, the app can try one locally learned mouse drag and verify the goal before falling back to normal atlas alignment; manual **Auto align** does not train or use this shortcut. Lighting normalization, temporal median capture, edge/gradient comparison, and multiple independent regions reduce sensitivity to lighting changes and moving units.
 
 Camera regions are saved relative to the Roblox client and shown as colored outlines in the goal preview. When using **Auto align** by itself, the app also manages shift lock automatically and applies the recorded client size. If the fast yaw estimate misses its confidence target, alignment scans one complete arrow-based turn and refines the strongest match. The Expeditions workflow does not place units unless the final result meets the model target. Use **Show 30% overlay** to visually confirm the result.
 
@@ -133,7 +135,7 @@ The Challenges loop navigates the fixed three-entry selector, recognizes the rot
 
 Story and Raid runners navigate from Play to their configured route, optionally load a saved Team, align the camera, run the two placement phases, select reward cards, and return to Play after Victory or the final Defeat. The Macro scheduler consumes one result at a time and then selects the highest-priority eligible task.
 
-Leave shift lock off before starting a camera workflow. Camera preparation centers the pointer, enables shift lock before any pitch or fine-yaw mouse drag, and disables it during cleanup after success, cancellation, or failure.
+Leave shift lock off before starting a camera workflow. Camera preparation centers the pointer, uses the configured Shift Lock key before any pitch or fine-yaw mouse drag, and uses that same key during cleanup after success, cancellation, or failure.
 
 Stopping is cooperative. The app releases right mouse and shift-lock state where applicable, cancels pending work, and leaves Roblox at the standardized client size used for detection.
 

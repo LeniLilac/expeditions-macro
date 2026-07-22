@@ -2,6 +2,7 @@ using System.Diagnostics;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
+using ExpeditionsMacro.Core.Models;
 
 namespace ExpeditionsMacro.Automation.Diagnostics;
 
@@ -157,12 +158,12 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
             new { Window = WindowData(window), Ticks = ticks },
             () => _inner.ZoomOutFullyAsync(window, ticks, cancellationToken));
 
-    public Task TapLeftControlAsync(RobloxWindow window, CancellationToken cancellationToken) =>
+    public Task TapShiftLockKeyAsync(RobloxWindow window, int virtualKey, CancellationToken cancellationToken) =>
         TraceAsync(
             "automation",
-            "tap_left_control",
-            new { Window = WindowData(window) },
-            () => _inner.TapLeftControlAsync(window, cancellationToken));
+            "tap_shift_lock_key",
+            new { Window = WindowData(window), VirtualKey = virtualKey, Key = KeyboardKey.GetDisplayName(virtualKey) },
+            () => _inner.TapShiftLockKeyAsync(window, virtualKey, cancellationToken));
 
     public Task TapLetterKeyAsync(RobloxWindow window, char key, CancellationToken cancellationToken) =>
         TraceAsync(

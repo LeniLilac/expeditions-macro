@@ -68,7 +68,15 @@ public sealed class AppServices : IDisposable
         placementCapture.TraceEnabled = () => DeepDebug.IsActive;
         PlacementCapture = placementCapture;
         Placement = new PlacementService(Automation, PlacementCapture, PlacementModels);
-        Camera = new CameraAlignmentEngine(Automation, CameraModels, CameraShortcuts);
+        Camera = new CameraAlignmentEngine(
+            Automation,
+            CameraModels,
+            CameraShortcuts,
+            () => AppSettings.ParseShiftLockKey(
+                Settings.ShiftLockVirtualKey,
+                Settings.MacroHotkeyVirtualKey,
+                Settings.PlayMenuKey,
+                Settings.UnitMenuKey));
         _discord = new DiscordWebhookClient();
         Teams = new TeamSelectionService(Automation);
         Stages = new StageMacroRunner(Automation, Camera, Placement, Teams, _discord);
@@ -126,6 +134,11 @@ public sealed class AppServices : IDisposable
             services.Settings = services.Settings with { MacroHotkeyVirtualKey = configuredHotkey };
             await services.SettingsStore.SaveAsync(services.Settings);
         }
+        if (!KeyboardKey.IsSupportedShiftLockKey(services.Settings.ShiftLockVirtualKey))
+        {
+            services.Settings = services.Settings with { ShiftLockVirtualKey = AppSettings.DefaultShiftLockVirtualKey };
+            await services.SettingsStore.SaveAsync(services.Settings);
+        }
         services.Hotkey.Configure(configuredHotkey);
         services.Coordinator.HotkeyDisplayName = services.Hotkey.DisplayName;
         await services.EnsureBundledDetectorPackAsync();
@@ -137,8 +150,9 @@ public sealed class AppServices : IDisposable
 
     public async Task UpdateSettingsAsync(Func<AppSettings, AppSettings> update)
     {
-        Settings = update(Settings);
-        await SettingsStore.SaveAsync(Settings);
+        AppSettings updated = update(Settings);
+        await SettingsStore.SaveAsync(updated);
+        Settings = updated;
     }
 
     public IDetectorPack TraceDetector(IDetectorPack detector) => new DeepDebugDetectorPack(detector, DeepDebug);

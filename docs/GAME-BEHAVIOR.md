@@ -10,6 +10,16 @@ This ledger records Anime Expeditions behavior that has been established from re
 
 ## Navigation ledger
 
+### GB-000: Toggle Shift Lock for camera workflows
+
+- Status: **Release retained** for Left Ctrl; configurable physical-key behavior is implemented for users whose in-game binding differs.
+- Entry: camera setup, manual Auto Align, or a macro camera-preparation stage with Shift Lock initially off.
+- Action: center the cursor, press the Shift Lock key saved under Settings > Controls, then perform pitch and fine-yaw movement while Roblox owns relative pointer motion.
+- Exit: press the same snapshotted key during cleanup after success, cancellation, or failure so Shift Lock returns off.
+- Key identity: Left/Right Shift and Left/Right Ctrl are distinct physical bindings. The app also supports ordinary letters, numbers, symbols, numpad keys, function keys, and common control keys accepted by the Settings picker.
+- Do not: change the configured binding while an operation is running, reuse the macro/Play/Units key, or replace the physical scan-code path with a visible absolute cursor movement.
+- Protected by: camera alignment custom-key/cleanup tests, Shift Lock settings validation, and Windows physical scan-code mapping tests.
+
 ### GB-001: Leave a completed match for a different mode
 
 - Status: the terminal-to-party transition is **field confirmed** for Story Victory and user confirmed for Story, Raid, Expedition, and Challenge match-end screens generally. The party-to-selector transition is **field confirmed** independently for all four modes.
@@ -78,7 +88,7 @@ This ledger records Anime Expeditions behavior that has been established from re
   1. Click the detected **Story** mode tile and verify the Story map selector.
   2. Click the configured Story map and verify its detail panel.
   3. Select the configured Act, **Infinite**, or **Mastery** option. An Act also requires its configured act number and difficulty.
-  4. Click the detected **Select Stage** action and verify the Story private-party preview.
+  4. Click the detected **Select Stage** action and verify a launch-ready Story party preview as described in GB-011.
   5. Click the detected **Start** action and wait through teleport/loading until the Story prestart screen is verified.
 - Do not: reuse one run-type accent as the detector for all Story variants; Act, Infinite, and Mastery use different accent colors and layouts.
 - Evidence: a 21-frame passive diagnostic capture reviewed on 2026-07-22 using v1.3.0-beta.6. Physical clicks are user reported; the capture shows every resulting screen from the shared selector through Story prestart.
@@ -92,7 +102,7 @@ This ledger records Anime Expeditions behavior that has been established from re
   1. Click the detected **Raid** mode tile and verify the Raid map selector.
   2. Click the configured Raid map and verify its detail panel.
   3. Select the configured Raid act.
-  4. Click the detected **Select Stage** action and verify the Raid private-party preview.
+  4. Click the detected **Select Stage** action and verify a launch-ready Raid party preview as described in GB-011.
   5. Click the detected **Start** action and wait through teleport/loading until the Raid prestart screen is verified.
 - Evidence: a 17-frame passive diagnostic capture reviewed on 2026-07-22 using v1.3.0-beta.6. Physical clicks are user reported; the capture shows the shared selector, Raid map selector, act changes, party preview, teleport, and prestart.
 - Protected by: current Raid screen/action detector tests and Raid navigation tests. Add a full workflow-sequence test when the navigation orchestrator is next changed.
@@ -105,7 +115,7 @@ This ledger records Anime Expeditions behavior that has been established from re
   1. Click the detected **Expedition** mode tile and verify the Expedition map-selection screen.
   2. Select the configured map and verify it is active.
   3. Select the configured difficulty and wait for the animated selection to settle before verifying the active value.
-  4. Click the detected **Select Stage** action and verify the Expedition private-party preview.
+  4. Click the detected **Select Stage** action and verify a launch-ready Expedition party preview as described in GB-011.
   5. Click the detected **Start** action and wait through teleport/loading until the Expedition prestart screen is verified.
 - Evidence: a 16-frame passive diagnostic capture reviewed on 2026-07-22 using v1.3.0-beta.6. Physical clicks are user reported; the capture shows map and difficulty selection, party preview, teleport, and prestart.
 - Protected by: Expedition recovery/navigation, map-selection, difficulty-stability, preview, and prestart tests.
@@ -118,7 +128,7 @@ This ledger records Anime Expeditions behavior that has been established from re
   1. Click the detected **Challenge** mode tile and verify the Challenge selector.
   2. Inspect the configured Challenge types and their cooldown or daily-limit state. Do not select a type that is unavailable.
   3. Select the eligible Challenge type and configured challenge row, then verify its detail panel.
-  4. Click the detected **Select Stage** action and verify the Challenge private-party preview.
+  4. Click the detected **Select Stage** action and verify a launch-ready Challenge party preview as described in GB-011.
   5. Click the detected **Start** action and wait through teleport/loading until the Challenge prestart screen is verified.
 - Unavailable rule: when all configured Challenge types are on cooldown or exhausted, leave the selector through its verified close action before returning control to the scheduler or waiting.
 - Evidence: a 16-frame passive diagnostic capture reviewed on 2026-07-22 using v1.3.0-beta.6. Physical clicks are user reported; the capture shows type availability checks, an eligible challenge detail, party preview, teleport, and prestart.
@@ -135,6 +145,18 @@ This ledger records Anime Expeditions behavior that has been established from re
 - Do not: require the purple action, use its absence as a cooldown/error signal, or reuse a fixed Select Stage coordinate across the narrow and wide rails.
 - Evidence: two passive diagnostic captures reviewed on 2026-07-22 provide lobby and post-match detail frames for all four modes. A reported Raid Act 2 failure proves the strict two-button gate blocked act selection before any Act 2 click was sent.
 - Protected by: `ModeDetailVariantTests` and the retained fixtures under `datasets/anime-expeditions/navigation-variants/`.
+
+### GB-011: Launch previews differ between lobby and retained post-match parties
+
+- Status: **Field confirmed** for Story Act, Story Infinite, Story Mastery, Raid, Challenge, and Expedition in both party contexts.
+- Entry: a mode's **Select Stage** action has been clicked and its party preview is visible.
+- Lobby family: the action rail contains **Start**, an optional **Change Map**, and **Disband**.
+- Post-match family: the retained party action rail contains **Start**, an optional **Change Map**, and **Change Gamemode**.
+- Launch rule: treat either family as launch-ready only when the live green **Start** component is independently detected across the configured stable-frame count, then click that detected component.
+- Handoff rule: keep the families distinct outside launch. **Change Gamemode** is the verified path back to the shared selector; **Disband** is not interchangeable with it.
+- Do not: require **Disband** before starting, click the `PostMatchPreview` state's Change Gamemode action when the current workflow is waiting to launch, or use a fixed Start coordinate without detecting the live button.
+- Evidence: one failing beta.7 deep-debug Story run and two passive beta.7 diagnostic captures reviewed on 2026-07-22. The deep log records Select Stage followed by repeated 94% `PostMatchPreview` recognition with no Start click; the passive captures cover all six listed route variants in both contexts.
+- Protected by: `StageHandoffPolicyTests.PreviewWait_AcceptsEitherPartyFamilyOnlyWithADetectedStartAction` and `StageScreenDetectorTests.BothPartyPreviewFamilies_MapTheLiveStartButton`. Challenge and Expedition retain their existing preview/action regression suites.
 
 ## Reusable evidence workflow
 

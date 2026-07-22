@@ -4,6 +4,26 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.8] - 2026-07-22
+
+### Added
+
+- Added a configurable Shift Lock key under Settings > Controls. It defaults to Left Ctrl and supports distinct left/right Shift and Ctrl keys, letters, numbers, symbols, numpad keys, function keys, and common control keys through physical scan-code input.
+- Story, Raid, Expedition, and Challenge reporting now sends a start message with a Roblox screenshot.
+
+### Changed
+
+- Discord Components V2 reports now use bulleted run facts, semantic accents for start, victory, defeat, and error states, and a footer containing the app version plus a localized Discord timestamp.
+- Victory and Defeat reports now distinguish the runtime of the completed match from the cumulative macro runtime.
+
+### Fixed
+
+- Story and Raid now start from both lobby-created and retained post-match party previews. The launch boundary requires a detected Start action instead of requiring the preview's rightmost action to be Disband.
+
+### Engineering
+
+- Extracted key-binding UI ownership from the Settings page, physical keyboard emission from the Windows automation adapter, and Story/Raid navigation policy from the shared stage runner, reducing existing monolith debts.
+
 ## [1.3.0-beta.7] - 2026-07-22
 
 ### Added
@@ -519,7 +539,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.7...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.8...HEAD
+[1.3.0-beta.8]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.7...v1.3.0-beta.8
 [1.3.0-beta.7]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.6...v1.3.0-beta.7
 [1.3.0-beta.6]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.5...v1.3.0-beta.6
 [1.3.0-beta.5]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.4...v1.3.0-beta.5

@@ -20,29 +20,19 @@ public sealed class CameraAlignmentEngine
     private readonly ICameraModelRepository _models;
     private readonly CameraSceneStabilizer _sceneStabilizer;
     private readonly CameraSpawnShortcutService? _spawnShortcuts;
-    private readonly record struct FullTurnRefinement(int BestOffset, ImageFrame Frame, double Score);
-
-    private readonly record struct VerifiedFullTurnCandidate(int Step, double RefinedScore);
-
-    private readonly record struct FineYawReference(int Offset, ImageFrame Thumbnail);
-
-    private readonly record struct FineYawMatch(int Offset, double Score);
-
-    private readonly record struct AlignmentObservation(double DirectScore, FineYawMatch FineMatch);
-
-    private readonly record struct AlignmentAttemptPlan(CameraYawDirection ScanDirection, int ScanPhasePixels);
-
-    private readonly record struct AtlasMatch(int Index, double Score);
+    private readonly Func<int> _shiftLockVirtualKey;
 
     public CameraAlignmentEngine(
         IRobloxAutomation automation,
         ICameraModelRepository models,
-        ICameraSpawnShortcutRepository? spawnShortcuts = null)
+        ICameraSpawnShortcutRepository? spawnShortcuts = null,
+        Func<int>? shiftLockVirtualKey = null)
     {
         _automation = automation;
         _models = models;
         _sceneStabilizer = new CameraSceneStabilizer(automation);
         _spawnShortcuts = spawnShortcuts is null ? null : new CameraSpawnShortcutService(automation, spawnShortcuts);
+        _shiftLockVirtualKey = shiftLockVirtualKey ?? (() => AppSettings.DefaultShiftLockVirtualKey);
     }
 
     public async Task<CameraModel> CalibrateAsync(
@@ -55,7 +45,7 @@ public sealed class CameraAlignmentEngine
         Focus(window);
         ClientBounds initialClient = _automation.GetClientBounds(window);
 
-        bool shiftLockEnabled = false;
+        int? shiftLockKey = null;
         try
         {
             if (initialClient.Width != RobloxClientProfile.Width || initialClient.Height != RobloxClientProfile.Height)
@@ -78,8 +68,7 @@ public sealed class CameraAlignmentEngine
                 2,
                 progress,
                 cancellationToken).ConfigureAwait(false);
-            await EnableShiftLockAsync(window, "Camera setup", 3, progress, cancellationToken).ConfigureAwait(false);
-            shiftLockEnabled = true;
+            shiftLockKey = await EnableShiftLockAsync(window, "Camera setup", 3, progress, cancellationToken).ConfigureAwait(false);
             await ClampPitchAsync(
                 window,
                 settings.PitchDragPixels,
@@ -172,7 +161,7 @@ public sealed class CameraAlignmentEngine
         }
         finally
         {
-            if (shiftLockEnabled) await DisableShiftLockAsync(window).ConfigureAwait(false);
+            if (shiftLockKey is int key) await DisableShiftLockAsync(window, key).ConfigureAwait(false);
         }
     }
 
@@ -199,7 +188,7 @@ public sealed class CameraAlignmentEngine
         RobloxWindow window = existingWindow ?? RequireWindow();
         Focus(window);
         ClientBounds currentClient = _automation.GetClientBounds(window);
-        bool shiftLockEnabled = false;
+        int? shiftLockKey = null;
         try
         {
             progress?.Report(new MacroProgress("Camera alignment", 2, "Starting camera alignment."));
@@ -216,8 +205,7 @@ public sealed class CameraAlignmentEngine
             }
             if (manageShiftLock)
             {
-                await EnableShiftLockAsync(window, "Camera alignment", 6, progress, cancellationToken).ConfigureAwait(false);
-                shiftLockEnabled = true;
+                shiftLockKey = await EnableShiftLockAsync(window, "Camera alignment", 6, progress, cancellationToken).ConfigureAwait(false);
             }
 
             int phase = Math.Max(model.Manifest.FineStepPixels, model.Manifest.FineSearchPixels / 2);
@@ -305,7 +293,7 @@ public sealed class CameraAlignmentEngine
         }
         finally
         {
-            if (shiftLockEnabled) await DisableShiftLockAsync(window).ConfigureAwait(false);
+            if (shiftLockKey is int key) await DisableShiftLockAsync(window, key).ConfigureAwait(false);
         }
     }
 
@@ -337,11 +325,10 @@ public sealed class CameraAlignmentEngine
         // requires users to begin with it disabled. Enable it before any right-drag
         // so Roblox captures relative motion instead of moving the visible pointer
         // across the hotbar. Always return to the documented disabled state.
-        bool shiftLockEnabled = false;
+        int? shiftLockKey = null;
         try
         {
-            await EnableShiftLockAsync(window, "Camera preparation", 6, progress, cancellationToken).ConfigureAwait(false);
-            shiftLockEnabled = true;
+            shiftLockKey = await EnableShiftLockAsync(window, "Camera preparation", 6, progress, cancellationToken).ConfigureAwait(false);
             await ClampPitchAsync(
                 window,
                 pitchDragPixels,
@@ -361,7 +348,7 @@ public sealed class CameraAlignmentEngine
         }
         finally
         {
-            if (shiftLockEnabled) await DisableShiftLockAsync(window).ConfigureAwait(false);
+            if (shiftLockKey is int key) await DisableShiftLockAsync(window, key).ConfigureAwait(false);
         }
     }
 
@@ -415,25 +402,28 @@ public sealed class CameraAlignmentEngine
         return await ScanFullTurnAsync(window, model, refined, plan, attempt, progress, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task EnableShiftLockAsync(
+    private async Task<int> EnableShiftLockAsync(
         RobloxWindow window,
         string operation,
         int percent,
         IProgress<MacroProgress>? progress,
         CancellationToken cancellationToken)
     {
-        progress?.Report(new MacroProgress(operation, percent, "Enabling shift lock for stable camera movement."));
+        int virtualKey = _shiftLockVirtualKey();
+        if (!KeyboardKey.IsSupportedShiftLockKey(virtualKey)) throw new InvalidDataException("The configured Shift Lock key is not supported.");
+        progress?.Report(new MacroProgress(operation, percent, $"Enabling shift lock with {KeyboardKey.GetDisplayName(virtualKey)} for stable camera movement."));
         await _automation.MoveCursorToClientCenterAsync(window, cancellationToken).ConfigureAwait(false);
         await Task.Delay(120, cancellationToken).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
-        await _automation.TapLeftControlAsync(window, CancellationToken.None).ConfigureAwait(false);
+        await _automation.TapShiftLockKeyAsync(window, virtualKey, CancellationToken.None).ConfigureAwait(false);
         await Task.Delay(250, CancellationToken.None).ConfigureAwait(false);
+        return virtualKey;
     }
 
-    private async Task DisableShiftLockAsync(RobloxWindow window)
+    private async Task DisableShiftLockAsync(RobloxWindow window, int virtualKey)
     {
         Focus(window);
-        await _automation.TapLeftControlAsync(window, CancellationToken.None).ConfigureAwait(false);
+        await _automation.TapShiftLockKeyAsync(window, virtualKey, CancellationToken.None).ConfigureAwait(false);
     }
 
     private async Task<(int FullYawSteps, IReadOnlyList<double> Scores, IReadOnlyList<ImageFrame> Atlas)> LearnFullTurnAsync(

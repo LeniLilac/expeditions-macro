@@ -17,6 +17,21 @@ public sealed class WindowsRobloxAutomationTests
     }
 
     [Theory]
+    [InlineData(0xA0, 0x2A, false)]
+    [InlineData(0xA1, 0x36, false)]
+    [InlineData(0xA2, 0x1D, false)]
+    [InlineData(0xA3, 0x1D, true)]
+    [InlineData(0x41, 0x1E, false)]
+    public void ShiftLockKeys_MapToPhysicalScanCodes(int virtualKey, int expectedScanCode, bool expectedExtended)
+    {
+        KeyboardInputDescriptor key = KeyboardInputDescriptor.FromShiftLockVirtualKey(virtualKey);
+
+        Assert.Equal(virtualKey, key.VirtualKey);
+        Assert.Equal(expectedScanCode, key.ScanCode);
+        Assert.Equal(expectedExtended, key.Extended);
+    }
+
+    [Theory]
     [InlineData("RobloxPlayerBeta")]
     [InlineData("Windows10Universal")]
     [InlineData("Roblox")]

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using ExpeditionsMacro.Automation.Camera;
+using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Automation.Teams;
@@ -24,14 +25,6 @@ public sealed class StageMacroRunner
     private readonly PlacementService _placements;
     private readonly TeamSelectionService _teams;
     private readonly IDiscordNotifier _discord;
-
-    internal enum GameModeHandoffCommand
-    {
-        Complete,
-        ChangeGamemode,
-        Back,
-        PressPlayKey,
-    }
 
     public StageMacroRunner(
         IRobloxAutomation automation,
@@ -145,6 +138,18 @@ public sealed class StageMacroRunner
         Write($"Using Roblox window '{window.Title}' ({window.ProcessDescription}).");
         Focus(window);
         await EnsureClientSizeAsync(window, detector.Manifest.ClientWidth, detector.Manifest.ClientHeight, cancellationToken).ConfigureAwait(false);
+        string route = RouteLabel(mode, story, raid);
+        DiscordRunTarget reportTarget = new(0, 0, route);
+        DiscordRunReporter reporter = new(_discord, webhookUrl, $"{Label(mode)} Macro", mode.ToString().ToLowerInvariant(), Write);
+        await reporter.SendAsync(
+            "started",
+            $"{route} is starting.",
+            TryCaptureClient(window, detector),
+            totalRuntime.Elapsed,
+            victories,
+            defeats,
+            reportTarget,
+            cancellationToken).ConfigureAwait(false);
 
         while (attempts <= retries)
         {
@@ -180,7 +185,7 @@ public sealed class StageMacroRunner
                 if (!teamLoaded)
                 {
                     Report("Team", 14, $"Prestart recognized. Loading Team {teamSlot}.");
-                    RequirePrestartForTeamLoad(StageScreenDetector.Detect(CaptureClient(window, detector)));
+                    StageNavigationPolicy.RequirePrestartForTeamLoad(StageScreenDetector.Detect(CaptureClient(window, detector)));
                     await _teams.SelectAsync(window, teamSlot, unitMenuKey!.Value, progress, cancellationToken).ConfigureAwait(false);
                     await WaitForStateAsync(
                         window,
@@ -217,10 +222,10 @@ public sealed class StageMacroRunner
                 {
                     throw new InvalidOperationException($"The {Label(mode)} Start Game button disappeared before it could be clicked.");
                 }
+                Stopwatch matchRuntime = Stopwatch.StartNew();
                 await ClickAsync(window, prestartMatch.ActionX.Value, prestartMatch.ActionY.Value, cancellationToken).ConfigureAwait(false);
                 await Task.Delay(1800, cancellationToken).ConfigureAwait(false);
 
-                Stopwatch matchRuntime = Stopwatch.StartNew();
                 TerminalObservation terminal = await RunMatchAsync(window, models.DelayedPlacement, story, raid, detector, matchRuntime, stableDetections, cancellationToken).ConfigureAwait(false);
                 StageRunOutcome outcome = terminal.State == StageScreenState.Victory ? StageRunOutcome.Victory : StageRunOutcome.Defeat;
                 matchCompleted = true;
@@ -229,7 +234,16 @@ public sealed class StageMacroRunner
                 else defeats++;
                 last = new StageRunResult(outcome, matchRuntimeTotal, attempts, victories, defeats, terminal.Frame);
                 Write($"{RouteLabel(mode, story, raid)} ended in {outcome}.", outcome == StageRunOutcome.Victory ? MacroEventLevel.Success : MacroEventLevel.Warning, outcome.ToString().ToLowerInvariant());
-                await TryNotifyAsync(webhookUrl, mode, story, raid, outcome, terminal.Frame, totalRuntime.Elapsed, victories, defeats, Write, cancellationToken).ConfigureAwait(false);
+                await reporter.SendAsync(
+                    outcome == StageRunOutcome.Victory ? "victory" : "defeat",
+                    $"{route} ended in {outcome}.",
+                    terminal.Frame,
+                    totalRuntime.Elapsed,
+                    victories,
+                    defeats,
+                    reportTarget,
+                    cancellationToken,
+                    matchRuntime.Elapsed).ConfigureAwait(false);
 
                 if (continueScheduledRoute is not null)
                 {
@@ -326,7 +340,15 @@ public sealed class StageMacroRunner
                 string detail = $"{RouteLabel(mode, story, raid)} was interrupted by {RecoveryLabel(recovery.State)}. Returning through automatic recovery.";
                 Write(detail, MacroEventLevel.Warning, recovery.State, null);
                 Report("Recovery", 0, detail, recovery.State, null);
-                await TryNotifyRecoveryAsync(webhookUrl, mode, story, raid, detail, TryCaptureClient(window, detector), totalRuntime.Elapsed, Write, cancellationToken).ConfigureAwait(false);
+                await reporter.SendAsync(
+                    "recovery",
+                    detail,
+                    TryCaptureClient(window, detector),
+                    totalRuntime.Elapsed,
+                    victories,
+                    defeats,
+                    reportTarget,
+                    cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -401,8 +423,8 @@ public sealed class StageMacroRunner
         }
         await ClickAsync(window, detailMatch.ActionX.Value, detailMatch.ActionY.Value, cancellationToken).ConfigureAwait(false);
         StageScreenMatch preview = await WaitForStateAsync(window, StageScreenState.PreviewReady, NavigationTimeout, detector, stableDetections, cancellationToken).ConfigureAwait(false);
-        (int previewX, int previewY) = StageScreenDetector.PreviewStartAction(CaptureClient(window, detector));
-        await ClickAsync(window, preview.ActionX ?? previewX, preview.ActionY ?? previewY, cancellationToken).ConfigureAwait(false);
+        if (preview.ActionX is not int previewX || preview.ActionY is not int previewY) throw new InvalidOperationException($"The {Label(mode)} preview Start button could not be located.");
+        await ClickAsync(window, previewX, previewY, cancellationToken).ConfigureAwait(false);
         await WaitForStateAsync(window, StageScreenState.Prestart, TimeSpan.FromSeconds(45), detector, stableDetections, cancellationToken).ConfigureAwait(false);
     }
 
@@ -553,7 +575,7 @@ public sealed class StageMacroRunner
             }
 
             (int X, int Y)? changeMode = StageScreenDetector.PostMatchChangeModeAction(frame);
-            switch (SelectGameModeHandoffCommand(current.State, changeMode is not null))
+            switch (StageNavigationPolicy.SelectGameModeHandoffCommand(current.State, changeMode is not null))
             {
                 case GameModeHandoffCommand.Complete:
                     return recovered;
@@ -601,18 +623,6 @@ public sealed class StageMacroRunner
         throw new TimeoutException($"Timed out opening the Play menu. Last detected state: {last.State} ({last.Confidence:P0}).");
     }
 
-    internal static GameModeHandoffCommand SelectGameModeHandoffCommand(
-        StageScreenState state,
-        bool hasStageChangeModeAction) => state switch
-        {
-            StageScreenState.GameModeSelector => GameModeHandoffCommand.Complete,
-            StageScreenState.Victory or StageScreenState.Defeat => GameModeHandoffCommand.PressPlayKey,
-            StageScreenState.PostMatchPreview when hasStageChangeModeAction => GameModeHandoffCommand.ChangeGamemode,
-            StageScreenState.PostMatchPreview or StageScreenState.PostMatchHud => GameModeHandoffCommand.PressPlayKey,
-            StageScreenState.StorySelector or StageScreenState.RaidSelector or StageScreenState.PreviewReady => GameModeHandoffCommand.Back,
-            _ => GameModeHandoffCommand.PressPlayKey,
-        };
-
     private async Task<GameModeHandoffCommand?> TryWaitForPlayKeyTransitionAsync(
         RobloxWindow window,
         IDetectorPack detector,
@@ -628,7 +638,7 @@ public sealed class StageMacroRunner
             ImageFrame frame = CaptureClient(window, detector);
             StageScreenMatch current = StageScreenDetector.Detect(frame);
             bool hasChangeMode = StageScreenDetector.PostMatchChangeModeAction(frame) is not null;
-            GameModeHandoffCommand command = SelectGameModeHandoffCommand(current.State, hasChangeMode);
+            GameModeHandoffCommand command = StageNavigationPolicy.SelectGameModeHandoffCommand(current.State, hasChangeMode);
             string? candidate = command is GameModeHandoffCommand.Complete or GameModeHandoffCommand.ChangeGamemode
                 ? command.ToString()
                 : null;
@@ -658,8 +668,14 @@ public sealed class StageMacroRunner
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = CaptureClient(window, detector);
             last = StageScreenDetector.Detect(frame);
-            string? candidate = last.State == expected ? expected.ToString() : null;
-            if (expectedTracker.Update(candidate) is not null) return last;
+            (int X, int Y)? previewStart = expected == StageScreenState.PreviewReady ? StageScreenDetector.PreviewStartAction(frame) : null;
+            string? candidate = StageNavigationPolicy.MatchesExpectedState(expected, last.State, previewStart is not null) ? expected.ToString() : null;
+            if (expectedTracker.Update(candidate) is not null)
+            {
+                return previewStart is { } action
+                    ? new StageScreenMatch(StageScreenState.PreviewReady, last.Confidence, action.X, action.Y)
+                    : last;
+            }
             string? recovery = detector.RecoveryState(frame);
             if (recoveryTracker.Update(IsRootRecovery(recovery) ? recovery : null) is string stableRecovery)
             {
@@ -752,88 +768,6 @@ public sealed class StageMacroRunner
         }
     }
 
-    private async Task TryNotifyAsync(
-        string webhookUrl,
-        StageMode mode,
-        StoryPreset? story,
-        RaidPreset? raid,
-        StageRunOutcome outcome,
-        ImageFrame frame,
-        TimeSpan runtime,
-        int victories,
-        int defeats,
-        Action<string, MacroEventLevel, string?, double?> log,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(webhookUrl)) return;
-        try
-        {
-            await _discord.SendAsync(new DiscordNotification
-            {
-                WebhookUrl = webhookUrl,
-                Event = outcome == StageRunOutcome.Victory ? "victory" : "defeat",
-                Runtime = runtime,
-                Victories = victories,
-                Defeats = defeats,
-                MapNumber = 0,
-                Difficulty = 0,
-                MacroName = $"{Label(mode)} Macro",
-                Route = RouteLabel(mode, story, raid),
-                Detail = $"{RouteLabel(mode, story, raid)} ended in {outcome}.",
-                AttachmentPrefix = mode.ToString().ToLowerInvariant(),
-                Screenshot = frame,
-            }, cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception error)
-        {
-            log($"Discord result notification failed: {error.Message}", MacroEventLevel.Warning, "discord", null);
-        }
-    }
-
-    private async Task TryNotifyRecoveryAsync(
-        string webhookUrl,
-        StageMode mode,
-        StoryPreset? story,
-        RaidPreset? raid,
-        string detail,
-        ImageFrame? frame,
-        TimeSpan runtime,
-        Action<string, MacroEventLevel, string?, double?> log,
-        CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(webhookUrl)) return;
-        try
-        {
-            await _discord.SendAsync(new DiscordNotification
-            {
-                WebhookUrl = webhookUrl,
-                Event = "recovery",
-                Runtime = runtime,
-                Victories = 0,
-                Defeats = 0,
-                MapNumber = 0,
-                Difficulty = 0,
-                MacroName = $"{Label(mode)} Macro",
-                Route = RouteLabel(mode, story, raid),
-                Detail = detail,
-                AttachmentPrefix = mode.ToString().ToLowerInvariant(),
-                Screenshot = frame,
-            }, cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception error)
-        {
-            log($"Discord recovery notification failed: {error.Message}", MacroEventLevel.Warning, "discord", null);
-        }
-    }
-
     private void Focus(RobloxWindow window)
     {
         if (!_automation.Focus(window)) throw new InvalidOperationException("Windows could not focus Roblox.");
@@ -851,15 +785,6 @@ public sealed class StageMacroRunner
         "play" => "the Play menu",
         _ => state,
     };
-
-    internal static void RequirePrestartForTeamLoad(StageScreenMatch current)
-    {
-        if (current.State != StageScreenState.Prestart)
-        {
-            throw new InvalidOperationException(
-                $"Team loading requires a confirmed prestart screen. Current state: {current.State} ({current.Confidence:P0}).");
-        }
-    }
 
     private static string RouteLabel(StageMode mode, StoryPreset? story, RaidPreset? raid)
     {

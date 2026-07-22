@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using ExpeditionsMacro.Automation.Camera;
+using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Automation.Teams;
@@ -36,8 +37,6 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
     private readonly PlacementService _placements;
     private readonly TeamSelectionService _teams;
     private readonly IDiscordNotifier _discord;
-    private readonly object _notificationGate = new();
-    private readonly HashSet<Task> _pendingNotifications = [];
 
     public ExpeditionMacroRunner(
         IRobloxAutomation automation,
@@ -84,7 +83,6 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         RobloxWindow window = _automation.FindWindow() ?? throw new InvalidOperationException("No visible Roblox window was found.");
         DateTimeOffset startedAt = DateTimeOffset.UtcNow;
         Stopwatch runtime = Stopwatch.StartNew();
-        TimeSpan recordedRuntime = TimeSpan.Zero;
         int repeats = 0;
         int victories = 0;
         int defeats = 0;
@@ -97,6 +95,8 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         void PublishSummary() => summaryChanged?.Invoke(new ExpeditionRunSummary(startedAt, runtime.Elapsed, repeats, victories, defeats, recoveries, bossesSeen));
         void Report(string phase, int percent, string message, string? state = null, double? confidence = null) =>
             progress?.Report(new MacroProgress(phase, percent, message, state, confidence));
+        DiscordRunTarget reportTarget = new(preset.MapNumber, preset.Difficulty, string.Empty);
+        DiscordRunReporter reporter = new(_discord, webhookUrl, "Expeditions Macro", "expeditions", Write);
 
         Write($"Using Roblox window '{window.Title}' ({window.ProcessDescription}).");
         PublishSummary();
@@ -115,8 +115,16 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                     recoveries++;
                     PublishSummary();
                 }
-                await RecoverToPrestartAsync(window, initial, preset, detector, webhookUrl, unexpected, runtime, victories, defeats, playMenuKey, Report, Write, cancellationToken).ConfigureAwait(false);
+                await RecoverToPrestartAsync(window, initial, preset, detector, reporter, unexpected, runtime, victories, defeats, playMenuKey, Report, Write, cancellationToken).ConfigureAwait(false);
             }
+            reporter.Queue(
+                "started",
+                $"Map {preset.MapNumber}, Difficulty {preset.Difficulty} is starting.",
+                TryCaptureClient(window, detector),
+                runtime.Elapsed,
+                victories,
+                defeats,
+                reportTarget);
 
             while (true)
             {
@@ -170,6 +178,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                     }
 
                     Report("Starting node", 0, "Starting the Expedition node.");
+                    Stopwatch matchRuntime = Stopwatch.StartNew();
                     await ClickActionAsync(window, detector, "start", cancellationToken).ConfigureAwait(false);
                     await Task.Delay(2600, cancellationToken).ConfigureAwait(false);
                     RunTerminal terminal = await MonitorUntilRunEndAsync(
@@ -187,16 +196,21 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                     repeats++;
                     PublishSummary();
                     string detail = terminal.State == "victory" ? "The run reached the Victory screen." : "The run reached the Defeat screen.";
-                    QueueNotification(webhookUrl, terminal.State, detail, terminal.Frame, runtime.Elapsed, victories, defeats, preset, Write);
+                    reporter.Queue(
+                        terminal.State,
+                        detail,
+                        terminal.Frame,
+                        runtime.Elapsed,
+                        victories,
+                        defeats,
+                        reportTarget,
+                        matchRuntime.Elapsed);
                     if (continueScheduledRoute is not null)
                     {
-                        TimeSpan currentRuntime = runtime.Elapsed;
-                        TimeSpan matchRuntime = currentRuntime - recordedRuntime;
-                        recordedRuntime = currentRuntime;
                         bool repeatSameRoute = await continueScheduledRoute(
                             terminal.State == "victory" ? 1 : 0,
                             terminal.State == "defeat" ? 1 : 0,
-                            matchRuntime,
+                            matchRuntime.Elapsed,
                             cancellationToken).ConfigureAwait(false);
                         if (repeatSameRoute)
                         {
@@ -257,7 +271,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                             Write($"Recoverable-failure diagnostics could not finish: {diagnosticsError.Message}", MacroEventLevel.Warning, "camera_alignment_skipped", alignment.BestConfidence);
                         }
                     }
-                    QueueNotification(webhookUrl, "skipped", detail, TryCaptureClient(window, detector), runtime.Elapsed, victories, defeats, preset, Write);
+                    reporter.Queue("skipped", detail, TryCaptureClient(window, detector), runtime.Elapsed, victories, defeats, reportTarget);
                     await OpenPlayMenuAfterAlignmentFailureAsync(window, detector, preset, playMenuKey, Report, Write, cancellationToken).ConfigureAwait(false);
                     Write(stopAfterCurrentRunUtc is null
                         ? "Expeditions stopped safely at the party preview after the alignment circuit breaker opened."
@@ -272,7 +286,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                     if (!preset.AutoRecover) throw new InvalidOperationException($"{Label(recovery.State)} was recognized, but automatic recovery is disabled.", recovery);
                     recoveries++;
                     PublishSummary();
-                    await RecoverToPrestartAsync(window, recovery.State, preset, detector, webhookUrl, notify: true, runtime, victories, defeats, playMenuKey, Report, Write, cancellationToken).ConfigureAwait(false);
+                    await RecoverToPrestartAsync(window, recovery.State, preset, detector, reporter, notify: true, runtime, victories, defeats, playMenuKey, Report, Write, cancellationToken).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
@@ -285,13 +299,13 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                     recoveries++;
                     PublishSummary();
                     Write("An action failed while a recovery screen was visible; switching to automatic recovery.", MacroEventLevel.Warning);
-                    await RecoverToPrestartAsync(window, recovery, preset, detector, webhookUrl, notify: true, runtime, victories, defeats, playMenuKey, Report, Write, cancellationToken).ConfigureAwait(false);
+                    await RecoverToPrestartAsync(window, recovery, preset, detector, reporter, notify: true, runtime, victories, defeats, playMenuKey, Report, Write, cancellationToken).ConfigureAwait(false);
                 }
             }
         }
         finally
         {
-            await FlushNotificationsAsync(Write).ConfigureAwait(false);
+            await reporter.FlushAsync().ConfigureAwait(false);
         }
     }
 
@@ -716,7 +730,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         string initialState,
         ExpeditionPreset preset,
         IDetectorPack detector,
-        string webhookUrl,
+        DiscordRunReporter reporter,
         bool notify,
         Stopwatch runtime,
         int victories,
@@ -731,7 +745,14 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         if (notify)
         {
             ImageFrame? screenshot = TryCaptureClient(window, detector);
-            QueueNotification(webhookUrl, "recovery", $"Automatic rejoin was needed after {Label(initialState)} was recognized.", screenshot, runtime.Elapsed, victories, defeats, preset, log);
+            reporter.Queue(
+                "recovery",
+                $"Automatic rejoin was needed after {Label(initialState)} was recognized.",
+                screenshot,
+                runtime.Elapsed,
+                victories,
+                defeats,
+                new DiscordRunTarget(preset.MapNumber, preset.Difficulty, string.Empty));
         }
         while (true)
         {
@@ -1221,70 +1242,6 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         {
             throw new InvalidOperationException($"Roblox did not accept the required {width} × {height} client size (actual: {actual.Width} × {actual.Height}).");
         }
-    }
-
-    private void QueueNotification(
-        string webhookUrl,
-        string eventName,
-        string detail,
-        ImageFrame? screenshot,
-        TimeSpan runtime,
-        int victories,
-        int defeats,
-        ExpeditionPreset preset,
-        Action<string, MacroEventLevel, string?, double?> log)
-    {
-        if (string.IsNullOrWhiteSpace(webhookUrl)) return;
-        log($"Queued Discord {eventName} notification.", MacroEventLevel.Information, null, null);
-        DiscordNotification notification = new()
-        {
-            WebhookUrl = webhookUrl,
-            Event = eventName,
-            Runtime = runtime,
-            Victories = victories,
-            Defeats = defeats,
-            MapNumber = preset.MapNumber,
-            Difficulty = preset.Difficulty,
-            Detail = detail,
-            Screenshot = screenshot?.Clone(),
-        };
-        Task sendTask = Task.Run(async () =>
-        {
-            try
-            {
-                await _discord.SendAsync(notification, CancellationToken.None).ConfigureAwait(false);
-                log($"Discord {eventName} notification sent.", MacroEventLevel.Success, null, null);
-            }
-            catch (Exception error)
-            {
-                log($"Discord {eventName} notification failed: {error.Message}", MacroEventLevel.Warning, null, null);
-            }
-        });
-        lock (_notificationGate) _pendingNotifications.Add(sendTask);
-        _ = sendTask.ContinueWith(
-            completed =>
-            {
-                lock (_notificationGate) _pendingNotifications.Remove(completed);
-            },
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
-    }
-
-    private async Task FlushNotificationsAsync(Action<string, MacroEventLevel, string?, double?> log)
-    {
-        Task[] pending;
-        lock (_notificationGate) pending = _pendingNotifications.ToArray();
-        if (pending.Length == 0) return;
-
-        Task all = Task.WhenAll(pending);
-        Task completed = await Task.WhenAny(all, Task.Delay(TimeSpan.FromSeconds(3))).ConfigureAwait(false);
-        if (completed != all)
-        {
-            log($"Stopped with {pending.Count(task => !task.IsCompleted)} Discord notification(s) still in flight.", MacroEventLevel.Warning, null, null);
-            return;
-        }
-        await all.ConfigureAwait(false);
     }
 
     private static string Label(string value) => value.Equals("afk", StringComparison.OrdinalIgnoreCase)

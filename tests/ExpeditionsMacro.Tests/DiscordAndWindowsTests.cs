@@ -43,16 +43,20 @@ public sealed class DiscordAndWindowsTests
     [Fact]
     public void ComponentsPayload_UsesDiscordComponentsV2AndRuntimeTotals()
     {
+        DateTimeOffset occurredAt = new(2026, 7, 22, 19, 49, 19, TimeSpan.Zero);
         DiscordNotification notification = new()
         {
             WebhookUrl = "https://canary.discord.com/api/webhooks/123/token",
             Event = "victory",
             Runtime = TimeSpan.FromHours(1) + TimeSpan.FromMinutes(2) + TimeSpan.FromSeconds(3),
+            MatchRuntime = TimeSpan.FromMinutes(4) + TimeSpan.FromSeconds(15),
             Victories = 7,
             Defeats = 2,
             MapNumber = 3,
             Difficulty = 2,
             Detail = "Route completed.",
+            OccurredAtUtc = occurredAt,
+            AppVersion = "1.3.0-beta.8",
         };
 
         Dictionary<string, object?> payload = DiscordWebhookClient.BuildComponentsPayload(notification, "victory.png");
@@ -60,14 +64,19 @@ public sealed class DiscordAndWindowsTests
 
         using JsonDocument document = JsonDocument.Parse(json);
         Assert.Equal(1 << 15, document.RootElement.GetProperty("flags").GetInt32());
-        Assert.Contains("1h 02m 03s", json);
-        Assert.Contains("Victories:** 7", json);
+        Assert.Contains("- **Match runtime:** 4m 15s", json);
+        Assert.Contains("- **Macro runtime:** 1h 02m 03s", json);
+        Assert.Contains("- **Victories:** 7", json);
+        Assert.Contains("- **Defeats:** 2", json);
         Assert.Contains("Map 3, Difficulty 2", json);
         Assert.Contains("attachment://victory.png", json);
         Assert.Empty(document.RootElement.GetProperty("allowed_mentions").GetProperty("parse").EnumerateArray());
         JsonElement container = document.RootElement.GetProperty("components")[0];
         Assert.Equal(17, container.GetProperty("type").GetInt32());
-        Assert.False(container.TryGetProperty("accent_color", out _));
+        Assert.Equal(DiscordWebhookClient.VictoryAccentColor, container.GetProperty("accent_color").GetInt32());
+        Assert.Equal(
+            $"-# Expeditions Macro v1.3.0-beta.8 • <t:{occurredAt.ToUnixTimeSeconds()}:F>",
+            container.GetProperty("components").EnumerateArray().Last().GetProperty("content").GetString());
     }
 
     [Fact]
@@ -88,7 +97,7 @@ public sealed class DiscordAndWindowsTests
             AttachmentPrefix = "challenge",
         };
 
-        string json = JsonSerializer.Serialize(DiscordWebhookClient.BuildComponentsPayload(notification, null));
+        string json = JsonSerializer.Serialize(DiscordWebhookClient.BuildComponentsPayload(notification, "challenge_started.png"));
         using JsonDocument document = JsonDocument.Parse(json);
         string content = string.Join(
             '\n',
@@ -100,6 +109,38 @@ public sealed class DiscordAndWindowsTests
         Assert.Contains("Challenge Macro: Challenge started", content);
         Assert.Contains("Sprite · Fairy King Forest", content);
         Assert.DoesNotContain("Difficulty 0", content);
+        Assert.Contains("attachment://challenge_started.png", json, StringComparison.Ordinal);
+        Assert.Equal(
+            DiscordWebhookClient.StartAccentColor,
+            document.RootElement.GetProperty("components")[0].GetProperty("accent_color").GetInt32());
+    }
+
+    [Theory]
+    [InlineData("started", DiscordWebhookClient.StartAccentColor)]
+    [InlineData("attempt", DiscordWebhookClient.StartAccentColor)]
+    [InlineData("victory", DiscordWebhookClient.VictoryAccentColor)]
+    [InlineData("defeat", DiscordWebhookClient.DefeatAccentColor)]
+    [InlineData("error", DiscordWebhookClient.ErrorAccentColor)]
+    public void ComponentsPayload_UsesTheSemanticEventAccent(string eventName, int expectedAccent)
+    {
+        DiscordNotification notification = new()
+        {
+            WebhookUrl = "https://discord.com/api/webhooks/123/token",
+            Event = eventName,
+            Runtime = TimeSpan.Zero,
+            Victories = 0,
+            Defeats = 0,
+            MapNumber = 1,
+            Difficulty = 1,
+            Detail = "State detail.",
+        };
+
+        using JsonDocument document = JsonDocument.Parse(JsonSerializer.Serialize(
+            DiscordWebhookClient.BuildComponentsPayload(notification, null)));
+
+        Assert.Equal(
+            expectedAccent,
+            document.RootElement.GetProperty("components")[0].GetProperty("accent_color").GetInt32());
     }
 
     [Fact]
@@ -127,7 +168,7 @@ public sealed class DiscordAndWindowsTests
     }
 
     [Fact]
-    public void ErrorPingPayload_AllowsOnlyTheConfiguredUserAndHasNoAccent()
+    public void ErrorPingPayload_AllowsOnlyTheConfiguredUserAndUsesBlackAccent()
     {
         const string userId = "1528248119425368074";
         Dictionary<string, object?> payload = DiscordWebhookClient.BuildErrorPingPayload(
@@ -144,11 +185,14 @@ public sealed class DiscordAndWindowsTests
         Assert.Equal(userId, mentions.GetProperty("users")[0].GetString());
         JsonElement container = document.RootElement.GetProperty("components")[0];
         Assert.Equal(17, container.GetProperty("type").GetInt32());
-        Assert.False(container.TryGetProperty("accent_color", out _));
+        Assert.Equal(DiscordWebhookClient.ErrorAccentColor, container.GetProperty("accent_color").GetInt32());
         string content = container.GetProperty("components")[0].GetProperty("content").GetString()!;
         Assert.Contains($"<@{userId}>", content, StringComparison.Ordinal);
         Assert.Contains("Error alert 3 of 5", content, StringComparison.Ordinal);
         Assert.DoesNotContain("@everyone", content, StringComparison.Ordinal);
+        string footer = container.GetProperty("components")[1].GetProperty("content").GetString()!;
+        Assert.StartsWith("-# Expeditions Macro v", footer, StringComparison.Ordinal);
+        Assert.EndsWith(":F>", footer, StringComparison.Ordinal);
     }
 
     [Fact]

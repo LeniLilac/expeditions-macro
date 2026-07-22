@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using ExpeditionsMacro.Core.Abstractions;
+using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Infrastructure;
 
 namespace ExpeditionsMacro.Automation.Discord;
@@ -10,6 +11,10 @@ namespace ExpeditionsMacro.Automation.Discord;
 public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
 {
     private const int ComponentsV2Flag = 1 << 15;
+    public const int StartAccentColor = 0x5865F2;
+    public const int VictoryAccentColor = 0x57F287;
+    public const int DefeatAccentColor = 0xED4245;
+    public const int ErrorAccentColor = 0x000000;
     public const int ErrorPingCount = 5;
     private readonly HttpClient _httpClient;
     private readonly bool _ownsClient;
@@ -169,6 +174,7 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
             "attempt" => "Challenge started",
             "victory" => "Victory",
             "defeat" => "Defeat",
+            "error" => "Error",
             "recovery" => "Rejoin needed",
             "waiting" => "Waiting",
             "skipped" => "Task skipped",
@@ -177,6 +183,15 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
         string route = string.IsNullOrWhiteSpace(notification.Route)
             ? $"Map {notification.MapNumber}, Difficulty {notification.Difficulty}"
             : notification.Route;
+        List<string> statistics = [];
+        if (notification.MatchRuntime is TimeSpan matchRuntime)
+        {
+            statistics.Add($"- **Match runtime:** {FormatRuntime(matchRuntime)}");
+        }
+        statistics.Add($"- **Macro runtime:** {FormatRuntime(notification.Runtime)}");
+        statistics.Add($"- **Victories:** {notification.Victories}");
+        statistics.Add($"- **Defeats:** {notification.Defeats}");
+        statistics.Add($"- **Route:** {route}");
         List<object> components =
         [
             new Dictionary<string, object?> { ["type"] = 10, ["content"] = $"## {notification.MacroName}: {title}\n{notification.Detail}" },
@@ -184,7 +199,7 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
             new Dictionary<string, object?>
             {
                 ["type"] = 10,
-                ["content"] = $"**Runtime:** {FormatRuntime(notification.Runtime)}\n**Victories:** {notification.Victories}    **Defeats:** {notification.Defeats}\n**Route:** {route}",
+                ["content"] = string.Join('\n', statistics),
             },
         ];
         if (filename is not null)
@@ -197,7 +212,7 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
                     new Dictionary<string, object?>
                     {
                         ["media"] = new Dictionary<string, object?> { ["url"] = $"attachment://{filename}" },
-                        ["description"] = $"Roblox {title.ToLowerInvariant()} screen",
+                        ["description"] = ScreenshotDescription(eventName, title),
                     },
                 },
             });
@@ -205,20 +220,19 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
         components.Add(new Dictionary<string, object?>
         {
             ["type"] = 10,
-            ["content"] = $"-# Captured {DateTimeOffset.UtcNow.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture)}",
+            ["content"] = Footer(notification.AppVersion, notification.OccurredAtUtc),
         });
+        Dictionary<string, object?> container = new()
+        {
+            ["type"] = 17,
+            ["components"] = components,
+        };
+        if (AccentColor(eventName) is int accentColor) container["accent_color"] = accentColor;
         Dictionary<string, object?> payload = new()
         {
             ["flags"] = ComponentsV2Flag,
             ["allowed_mentions"] = new Dictionary<string, object?> { ["parse"] = Array.Empty<string>() },
-            ["components"] = new[]
-            {
-                new Dictionary<string, object?>
-                {
-                    ["type"] = 17,
-                    ["components"] = components,
-                },
-            },
+            ["components"] = new[] { container },
         };
         if (filename is not null)
         {
@@ -228,7 +242,7 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
                 {
                     ["id"] = 0,
                     ["filename"] = filename,
-                    ["description"] = $"Roblox {title.ToLowerInvariant()} screen",
+                    ["description"] = ScreenshotDescription(eventName, title),
                 },
             };
         }
@@ -266,12 +280,18 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
                 new Dictionary<string, object?>
                 {
                     ["type"] = 17,
-                    ["components"] = new[]
+                    ["accent_color"] = ErrorAccentColor,
+                    ["components"] = new object[]
                     {
                         new Dictionary<string, object?>
                         {
                             ["type"] = 10,
-                            ["content"] = $"<@{userId.Trim()}>\n## {safeMacroName}: stopped unexpectedly\n{safeDetail}\n-# Error alert {alertIndex} of {ErrorPingCount}",
+                            ["content"] = $"<@{userId.Trim()}>\n## {safeMacroName}: stopped unexpectedly\n{safeDetail}\n- Error alert {alertIndex} of {ErrorPingCount}",
+                        },
+                        new Dictionary<string, object?>
+                        {
+                            ["type"] = 10,
+                            ["content"] = Footer(ProductVersion.Current, DateTimeOffset.UtcNow),
                         },
                     },
                 },
@@ -294,6 +314,11 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
                     {
                         ["type"] = 10,
                         ["content"] = "## Expeditions Macro: Webhook test\nTest message received. Discord reporting is configured correctly.",
+                    },
+                    new Dictionary<string, object?>
+                    {
+                        ["type"] = 10,
+                        ["content"] = Footer(ProductVersion.Current, DateTimeOffset.UtcNow),
                     },
                 },
             },
@@ -319,6 +344,23 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
     }
 
     private static string Redact(string value) => value.Length <= 500 ? value : value[..500];
+
+    private static int? AccentColor(string eventName) => eventName switch
+    {
+        "started" or "attempt" => StartAccentColor,
+        "victory" => VictoryAccentColor,
+        "defeat" => DefeatAccentColor,
+        "error" => ErrorAccentColor,
+        _ => null,
+    };
+
+    private static string Footer(string appVersion, DateTimeOffset occurredAtUtc) =>
+        $"-# Expeditions Macro v{appVersion} • <t:{occurredAtUtc.ToUnixTimeSeconds()}:F>";
+
+    private static string ScreenshotDescription(string eventName, string title) =>
+        eventName is "started" or "attempt"
+            ? "Roblox screen when automation started"
+            : $"Roblox {title.ToLowerInvariant()} screen";
 
     private static string CleanDiscordText(string value, int maximumLength)
     {

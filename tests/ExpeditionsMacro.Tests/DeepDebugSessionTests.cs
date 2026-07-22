@@ -32,6 +32,7 @@ public sealed class DeepDebugSessionTests
             DiscordErrorUserId = userId,
             PlayMenuKey = "P",
             UnitMenuKey = "U",
+            ShiftLockVirtualKey = KeyboardKey.RightControl,
         };
         DeepDebugSessionService service = CreateService(paths, () => settings, () => log);
 
@@ -59,6 +60,8 @@ public sealed class DeepDebugSessionTests
         Assert.NotNull(archive.GetEntry("configuration/start/settings-sanitized.json"));
         Assert.NotNull(archive.GetEntry("models/start/camera/camera-one/manifest.json"));
         Assert.NotNull(archive.GetEntry("models/start/placement/placement-one/placement.json"));
+        using JsonDocument sanitized = JsonDocument.Parse(await ReadEntryAsync(archive, "configuration/start/settings-sanitized.json"));
+        Assert.Equal(KeyboardKey.RightControl, sanitized.RootElement.GetProperty("shift_lock_virtual_key").GetInt32());
 
         using JsonDocument manifest = JsonDocument.Parse(await ReadEntryAsync(archive, "manifest.json"));
         Assert.Equal("success", manifest.RootElement.GetProperty("outcome").GetString());

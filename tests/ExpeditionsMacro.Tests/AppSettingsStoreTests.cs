@@ -17,6 +17,7 @@ public sealed class AppSettingsStoreTests
                 SelectedMacroPlanId = "daily-plan",
                 EncryptedWebhook = "dpapi-protected-test-value",
                 DiscordErrorUserId = "123456789012345678",
+                ShiftLockVirtualKey = KeyboardKey.RightShift,
             });
 
             AppSettingsStore restartedProcess = new(new AppPaths(root));
@@ -25,6 +26,7 @@ public sealed class AppSettingsStoreTests
             Assert.Equal("daily-plan", loaded.SelectedMacroPlanId);
             Assert.Equal("dpapi-protected-test-value", loaded.EncryptedWebhook);
             Assert.Equal("123456789012345678", loaded.DiscordErrorUserId);
+            Assert.Equal(KeyboardKey.RightShift, loaded.ShiftLockVirtualKey);
         }
         finally
         {
