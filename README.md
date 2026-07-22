@@ -132,6 +132,8 @@ The Challenges loop navigates the fixed three-entry selector, recognizes the rot
 
 Story and Raid runners navigate from Play to their configured route, optionally load a saved Team, align the camera, run the two placement phases, select reward cards, and return to Play after Victory or the final Defeat. The Macro scheduler consumes one result at a time and then selects the highest-priority eligible task.
 
+Leave shift lock off before starting a camera workflow. Camera preparation centers the pointer, enables shift lock before any pitch or fine-yaw mouse drag, and disables it during cleanup after success, cancellation, or failure.
+
 Stopping is cooperative. The app releases right mouse and shift-lock state where applicable, cancels pending work, and leaves Roblox at the standardized client size used for detection.
 
 Roblox discovery verifies the owning player process instead of trusting a window title alone, so unrelated windows such as a Notepad document containing “Roblox” are ignored. If Roblox recreates its window during a teleport, the app refreshes the verified handle and retries focus. Standard sizing first keeps the normal window frame; when Windows or Roblox clamps that frame above 808 by 611, the app temporarily uses a verified borderless window so the exact client geometry can still be applied. The original frame style is restored when the app exits or an explicit bounds restore is requested.
@@ -189,6 +191,8 @@ Build release artifacts:
 The release script publishes the self-contained app, creates the portable ZIP, creates the detector-pack ZIP, optionally invokes Inno Setup, and writes SHA-256 checksums plus a dependency inventory.
 
 Pushing a stable `vX.Y.Z` tag runs the normal release workflow. After GitHub publishes the verified assets, the workflow normally sends a Components V2 announcement to the public Discord `#releases` channel using the encrypted `DISCORD_RELEASE_WEBHOOK_URL` repository secret. Maintainers can include `[skip discord]` in the tagged commit message to suppress that announcement. Prerelease tags such as `vX.Y.Z-beta.N`, `vX.Y.Z-alpha.N`, and `vX.Y.Z-rc.N` instead use the silent prerelease workflow, are marked as GitHub prereleases, do not become the latest stable release, and never send a Discord announcement.
+
+CI runs fast tests, golden-image regressions, and dark/light UI snapshots as independent parallel jobs. Silent prerelease packaging also runs independently, so a beta can become downloadable before validation finishes. Any failing validation remains visible on the tagged commit and must be fixed before promoting the build to stable.
 
 ## Project layout
 

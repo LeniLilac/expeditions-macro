@@ -4,6 +4,22 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.2] - 2026-07-22
+
+### Changed
+
+- Camera preparation now enables shift lock before every pitch or yaw mouse drag and restores it afterward; it no longer probes the unsafe unlocked state by dragging the visible pointer across the HUD.
+- Split fast tests, golden-image regressions, and UI snapshots into parallel GitHub Actions jobs. Silent prerelease packaging now runs independently of validation so beta artifacts can be tested sooner while failures remain visible on the tagged commit.
+
+### Fixed
+
+- Moved the Story game-mode click from the reward-icon strip to the stable map-copy area so item tooltip controls cannot absorb navigation.
+- Recognized the current three-action Story/Raid party preview and mapped its live Start button without broadening Challenge preview detection into ordinary Expedition screens.
+
+### Tests
+
+- Added a privacy-reviewed three-action Raid party-preview fixture and cross-state regression coverage for its Start action.
+
 ## [1.3.0-beta.1] - 2026-07-22
 
 ### Added
@@ -406,7 +422,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.1...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.2...HEAD
+[1.3.0-beta.2]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.1...v1.3.0-beta.2
 [1.3.0-beta.1]: https://github.com/LeniLilac/expeditions-macro/compare/v1.2.1...v1.3.0-beta.1
 [1.2.1]: https://github.com/LeniLilac/expeditions-macro/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/LeniLilac/expeditions-macro/compare/v1.1.6...v1.2.0

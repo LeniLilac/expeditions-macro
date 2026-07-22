@@ -23,6 +23,7 @@ public sealed class StageScreenDetectorTests
     [InlineData("StoryDetail_01.png", StageScreenState.StoryDetail)]
     [InlineData("RaidSelector_01.png", StageScreenState.RaidSelector)]
     [InlineData("RaidDetail_01.png", StageScreenState.RaidDetail)]
+    [InlineData("RaidPartyPreview_01.png", StageScreenState.PreviewReady)]
     [InlineData("StoryVictory_Act_01.png", StageScreenState.Victory)]
     [InlineData("StoryVictory_Mastery_01.png", StageScreenState.Victory)]
     [InlineData("StoryDefeat_Act_01.png", StageScreenState.Defeat)]
@@ -49,6 +50,22 @@ public sealed class StageScreenDetectorTests
         Assert.Equal(expected, match.State);
         Assert.InRange(match.ActionX!.Value, 245, 270);
         Assert.InRange(match.ActionY!.Value, 440, 458);
+    }
+
+    [Fact]
+    public void StoryModeTileAction_UsesTheMapCopyInsteadOfRewardIcons()
+    {
+        Assert.Equal((420, 105), StageScreenDetector.ModeTileAction(StageMode.Story));
+    }
+
+    [Fact]
+    public void ThreeActionPartyPreview_MapsTheLiveStartButton()
+    {
+        StageScreenMatch match = StageScreenDetector.Detect(Load("RaidPartyPreview_01.png"));
+
+        Assert.Equal(StageScreenState.PreviewReady, match.State);
+        Assert.InRange(match.ActionX!.Value, 475, 485);
+        Assert.InRange(match.ActionY!.Value, 415, 425);
     }
 
     [Theory]

@@ -294,13 +294,14 @@ public sealed class CameraAlignmentTests
         Assert.Contains(CameraYawDirection.Left, automation.ArrowPulses);
         Assert.NotEmpty(automation.Drags);
         Assert.Equal(0, automation.YawStep);
-        Assert.Equal(3, automation.MoveToCenterCount);
+        Assert.Equal(2, automation.MoveToCenterCount);
         Assert.Equal(2, automation.LeftControlTapCount);
+        Assert.All(automation.DragShiftLockStates, state => Assert.True(state));
         Assert.Contains(updates, update => update.Message.Contains("Final verification:", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task Align_TestsBothShiftLockStatesAndRestoresTheOriginalState()
+    public async Task Align_EnablesShiftLockBeforeEveryCameraDragAndRestoresIt()
     {
         ImageFrame goal = VisionScorerTests.Pattern(RobloxClientProfile.Width, RobloxClientProfile.Height);
         ImageFrame wrong = Blank(goal.Width, goal.Height);
@@ -316,28 +317,28 @@ public sealed class CameraAlignmentTests
 
         Assert.True(score > 0.90, $"Alignment score was {score:P1}.");
         Assert.Equal(2, automation.LeftControlTapCount);
+        Assert.NotEmpty(automation.DragShiftLockStates);
+        Assert.All(automation.DragShiftLockStates, state => Assert.True(state));
         Assert.False(automation.ShiftLockState);
     }
 
     [Fact]
-    public async Task Align_WhenPoseRankingChoosesWrongShiftState_RetriesTheAlternateState()
+    public async Task Align_WhenPitchDragFails_RestoresShiftLock()
     {
         ImageFrame goal = VisionScorerTests.Pattern(RobloxClientProfile.Width, RobloxClientProfile.Height);
-        ImageFrame decoy = Shift(goal, 80);
-        CameraModel model = CreateModel(goal, [decoy, goal, goal, goal, goal, goal, goal]);
-        FakeAutomation automation = new(decoy)
+        CameraModel model = CreateModel(goal, Enumerable.Repeat(goal, 7).ToArray());
+        FakeAutomation automation = new(goal)
         {
-            FullYawSteps = 6,
-            CaptureAtCameraState = (_, _, shiftLock) => shiftLock ? goal : decoy,
+            DragFailure = new InvalidOperationException("Synthetic pitch failure."),
         };
-        List<MacroProgress> updates = [];
         CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
 
-        double score = await engine.AlignAsync(model, progress: new InlineProgress<MacroProgress>(updates.Add));
+        InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() => engine.AlignAsync(model));
 
-        Assert.True(score > 0.90, $"Alternate-state alignment score was {score:P1}.");
-        Assert.Contains(updates, update => update.Message.Contains("Retrying in the alternate state", StringComparison.Ordinal));
-        Assert.Equal(4, automation.LeftControlTapCount);
+        Assert.Equal("Synthetic pitch failure.", error.Message);
+        Assert.Equal(2, automation.LeftControlTapCount);
+        Assert.Single(automation.DragShiftLockStates);
+        Assert.True(automation.DragShiftLockStates[0]);
         Assert.False(automation.ShiftLockState);
     }
 
@@ -494,10 +495,11 @@ public sealed class CameraAlignmentTests
         CameraAlignmentException error = await Assert.ThrowsAsync<CameraAlignmentException>(() => engine.AlignAsync(model));
 
         Assert.Contains("Unit placement was not started", error.Message, StringComparison.Ordinal);
-        Assert.Equal(6, error.Attempts);
+        Assert.Equal(3, error.Attempts);
         Assert.True(automation.ArrowPulses.Count(pulse => pulse == CameraYawDirection.Right) >= 12);
         Assert.True(automation.ArrowPulses.Count(pulse => pulse == CameraYawDirection.Left) >= 12);
-        Assert.Equal(4, automation.LeftControlTapCount);
+        Assert.Equal(2, automation.LeftControlTapCount);
+        Assert.All(automation.DragShiftLockStates, state => Assert.True(state));
     }
 
     private static CameraModel CreateModel(ImageFrame goal, IReadOnlyList<ImageFrame> yawFrames)
@@ -613,11 +615,13 @@ public sealed class CameraAlignmentTests
         public WindowBounds? RestoredBounds { get; private set; }
         public List<ScreenRegion> CapturedRegions { get; } = [];
         public List<(int X, int Y)> Drags { get; } = [];
+        public List<bool> DragShiftLockStates { get; } = [];
         public List<CameraYawDirection> ArrowPulses { get; } = [];
         public int MoveToCenterCount { get; private set; }
         public int LeftControlTapCount { get; private set; }
         public int ZoomTicks { get; private set; }
         public Exception? CaptureFailure { get; init; }
+        public Exception? DragFailure { get; init; }
         public Func<int, int, ImageFrame>? CaptureAtYaw { get; init; }
         public Func<int, int, bool, ImageFrame>? CaptureAtCameraState { get; init; }
         public int FullYawSteps { get; init; } = 12;
@@ -661,6 +665,8 @@ public sealed class CameraAlignmentTests
         public Task DragCameraAsync(RobloxWindow window, int deltaX, int deltaY, int chunkPixels, CancellationToken cancellationToken)
         {
             Drags.Add((deltaX, deltaY));
+            DragShiftLockStates.Add(ShiftLockState);
+            if (DragFailure is not null) throw DragFailure;
             MouseOffset += deltaX;
             return Task.CompletedTask;
         }

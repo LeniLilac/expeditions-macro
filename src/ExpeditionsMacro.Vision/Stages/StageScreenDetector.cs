@@ -69,6 +69,19 @@ public static class StageScreenDetector
         };
         if (terminal is not null) return Trace(terminal);
 
+        double stagePartyStart = ActionButtonDetector.Score(image, "stage_party_start");
+        double stagePartyChangeMap = ActionButtonDetector.Score(image, "stage_party_change_map");
+        double stagePartyDisband = ActionButtonDetector.Score(image, "stage_party_disband");
+        if (stagePartyStart > 0 && stagePartyChangeMap > 0 && stagePartyDisband > 0)
+        {
+            (int X, int Y)? action = ActionButtonDetector.ActionFor(image, "stage_party_start");
+            double confidence = Math.Clamp(
+                0.40 * stagePartyStart + 0.30 * stagePartyChangeMap + 0.30 * stagePartyDisband,
+                0,
+                1);
+            return Trace(new StageScreenMatch(StageScreenState.PreviewReady, confidence, action?.X, action?.Y));
+        }
+
         double selectStage = ActionButtonDetector.Score(image, "stage_select_stage");
         double matchmaking = ActionButtonDetector.Score(image, "stage_enter_matchmaking");
         double cyanDetail = DetailPanelScore(image, IsCyan);
@@ -95,7 +108,9 @@ public static class StageScreenDetector
 
     public static (int X, int Y) ModeTileAction(StageMode mode) => mode switch
     {
-        StageMode.Story => (480, 105),
+        // The reward icons on the right side of the Story card consume clicks to
+        // show item tooltips. Use the stable map-copy area on the left instead.
+        StageMode.Story => (420, 105),
         StageMode.Raid => (680, 105),
         _ => throw new ArgumentOutOfRangeException(nameof(mode)),
     };
@@ -137,7 +152,8 @@ public static class StageScreenDetector
         ?? (256, 449);
 
     public static (int X, int Y) PreviewStartAction(ImageFrame image) =>
-        ActionButtonDetector.ActionFor(image, "challenge_party_start")
+        ActionButtonDetector.ActionFor(image, "stage_party_start")
+        ?? ActionButtonDetector.ActionFor(image, "challenge_party_start")
         ?? ActionButtonDetector.ActionFor(image, "challenge_preview_start")
         ?? (480, 418);
 
