@@ -35,12 +35,15 @@ public partial class PlacementModelsPage : UserControl, IAppPage
         await RefreshModelsAsync(_selectedModel?.Id);
     }
 
-    private async Task RefreshModelsAsync(string? selectedId = null)
+    internal async Task RefreshModelsAsync(string? selectedId = null)
     {
-        IReadOnlyList<PlacementModel> models = await _services.PlacementModels.ListAsync();
-        _models.Clear();
-        foreach (PlacementModel model in models) _models.Add(model);
-        if (selectedId is not null) ModelsList.SelectedItem = _models.FirstOrDefault(model => model.Id == selectedId);
+        IReadOnlyList<PlacementModel> models = await _services.PlacementModels.ListAsync().ConfigureAwait(false);
+        await Dispatcher.InvokeAsync(() =>
+        {
+            _models.Clear();
+            foreach (PlacementModel model in models) _models.Add(model);
+            if (selectedId is not null) ModelsList.SelectedItem = _models.FirstOrDefault(model => model.Id == selectedId);
+        });
     }
 
     private void ModelsList_SelectionChanged(object sender, SelectionChangedEventArgs e)

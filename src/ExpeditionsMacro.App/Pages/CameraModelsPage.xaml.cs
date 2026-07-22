@@ -31,12 +31,15 @@ public partial class CameraModelsPage : UserControl, IAppPage
 
     public async Task OnShownAsync() => await RefreshModelsAsync(_selectedModel?.Manifest.Id);
 
-    private async Task RefreshModelsAsync(string? selectedId = null)
+    internal async Task RefreshModelsAsync(string? selectedId = null)
     {
-        IReadOnlyList<CameraModelManifest> models = await _services.CameraModels.ListAsync();
-        _models.Clear();
-        foreach (CameraModelManifest model in models) _models.Add(model);
-        if (selectedId is not null) ModelsList.SelectedItem = _models.FirstOrDefault(model => model.Id == selectedId);
+        IReadOnlyList<CameraModelManifest> models = await _services.CameraModels.ListAsync().ConfigureAwait(false);
+        await Dispatcher.InvokeAsync(() =>
+        {
+            _models.Clear();
+            foreach (CameraModelManifest model in models) _models.Add(model);
+            if (selectedId is not null) ModelsList.SelectedItem = _models.FirstOrDefault(model => model.Id == selectedId);
+        });
     }
 
     private async void ModelsList_SelectionChanged(object sender, SelectionChangedEventArgs e)

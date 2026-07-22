@@ -97,6 +97,15 @@ public partial class MainWindow : Window
         if (_pages[key] is ChallengesPage challenges) challenges.SetSnapshotScroll(showPageEnd);
     }
 
+    internal async Task VerifyBackgroundModelRefreshAsync()
+    {
+        // Setup operations complete through a diagnostic wrapper that deliberately
+        // does not retain the WPF synchronization context. Exercise that exact
+        // boundary in the repeatable UI snapshot check.
+        await Task.Run(() => ((CameraModelsPage)_pages["Camera Models"]).RefreshModelsAsync());
+        await Task.Run(() => ((PlacementModelsPage)_pages["Placement Models"]).RefreshModelsAsync());
+    }
+
     private void Coordinator_StateChanged(object? sender, EventArgs e)
     {
         Dispatcher.BeginInvoke(() =>

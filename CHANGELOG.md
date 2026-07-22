@@ -15,10 +15,12 @@ All notable changes to Expeditions Macro are documented here.
 
 - Moved the Story game-mode click from the reward-icon strip to the stable map-copy area so item tooltip controls cannot absorb navigation.
 - Recognized the current three-action Story/Raid party preview and mapped its live Start button without broadening Challenge preview detection into ordinary Expedition screens.
+- Marshaled Camera and Placement model-list refreshes onto the WPF Dispatcher after background setup completes, preventing a successfully saved model from ending with a false CollectionView thread error.
 
 ### Tests
 
 - Added a privacy-reviewed three-action Raid party-preview fixture and cross-state regression coverage for its Start action.
+- Extended UI snapshot validation to refresh Camera and Placement model collections from a worker-thread completion context before rendering every page.
 
 ## [1.3.0-beta.1] - 2026-07-22
 
