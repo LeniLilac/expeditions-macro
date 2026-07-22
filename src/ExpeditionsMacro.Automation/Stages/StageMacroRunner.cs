@@ -222,6 +222,44 @@ public sealed class StageMacroRunner
                 if (outcome == StageRunOutcome.Victory || attempts > retries) return last;
                 Write($"Retrying after defeat ({attempts}/{retries + 1}).", MacroEventLevel.Warning);
             }
+            catch (CameraAlignmentException alignment)
+            {
+                Report(
+                    "Handoff",
+                    100,
+                    $"Camera alignment failed. Returning to shared navigation before {Label(mode)} is skipped.",
+                    "camera_alignment_skipped",
+                    alignment.BestConfidence);
+                try
+                {
+                    await EnsureGameModeSelectorAsync(
+                        window,
+                        mode,
+                        playMenuKey,
+                        detector,
+                        autoRecover,
+                        stableDetections,
+                        Report,
+                        Write,
+                        cancellationToken).ConfigureAwait(false);
+                    Write(
+                        $"{Label(mode)} returned to the game-mode selector after camera alignment failed.",
+                        MacroEventLevel.Success,
+                        "game_mode_selector",
+                        null);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception handoffError)
+                {
+                    throw new InvalidOperationException(
+                        $"{Label(mode)} camera alignment failed and shared navigation could not be restored, so the task scheduler was stopped.",
+                        new AggregateException(alignment, handoffError));
+                }
+                throw;
+            }
             catch (StageRecoveryException recovery)
             {
                 if (!autoRecover)

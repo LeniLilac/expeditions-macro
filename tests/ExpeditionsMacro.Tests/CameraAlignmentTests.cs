@@ -115,6 +115,69 @@ public sealed class CameraAlignmentTests
     }
 
     [Fact]
+    public void RegisteredCameraScore_RecoversRuntimeProjectionDriftOutsideThumbnailWindow()
+    {
+        ImageFrame source = VisionScorerTests.Pattern(304, 192);
+        ImageFrame goal = VisionScorer.PrepareGray(source);
+        ImageFrame shifted = VisionScorer.PrepareGray(Transform(source, 1.0, 4, -10), goal.Width, goal.Height);
+
+        CameraRegisteredMatch thumbnailBound = CameraRegisteredScorer.Score(goal, shifted);
+        CameraRegisteredMatch fullComposite = CameraRegisteredScorer.ScoreComposite(goal, shifted);
+
+        Assert.True(thumbnailBound.Score < 0.72, $"Tight registration unexpectedly scored {thumbnailBound.Score:P1}.");
+        Assert.True(fullComposite.Score > 0.80, $"Full-composite registration scored only {fullComposite.Score:P1}.");
+        Assert.InRange(Math.Abs(fullComposite.OffsetX), 3, 5);
+        Assert.InRange(Math.Abs(fullComposite.OffsetY), 9, 11);
+    }
+
+    [Fact]
+    public void RegisteredCameraScore_RealRuntimeProjectionDriftPassesWithoutAcceptingWrongYaw()
+    {
+        const double modelThreshold = 0.7158913260242528;
+        string directory = Path.Combine(TestPaths.CameraRotations, "RuntimeProjectionDrift");
+        ImageFrame reference = ImageCodec.Load(Path.Combine(directory, "reference.png"), PixelFormat.Gray8);
+        ImageFrame matching = ImageCodec.Load(Path.Combine(directory, "matching-projection-shift.png"), PixelFormat.Gray8);
+        ImageFrame wrongYaw = ImageCodec.Load(Path.Combine(directory, "wrong-yaw.png"), PixelFormat.Gray8);
+
+        CameraRegisteredMatch tight = CameraRegisteredScorer.Score(reference, matching);
+        CameraRegisteredMatch registered = CameraRegisteredScorer.ScoreComposite(reference, matching);
+        CameraRegisteredMatch wrong = CameraRegisteredScorer.ScoreComposite(reference, wrongYaw);
+        CameraRegisteredMatch[] tiles = Enumerable.Range(0, 4)
+            .Select(index =>
+            {
+                ScreenRegion tile = new(
+                    index % 2 * CameraRegionAnalyzer.CompositeTileWidth,
+                    index / 2 * CameraRegionAnalyzer.CompositeTileHeight,
+                    CameraRegionAnalyzer.CompositeTileWidth,
+                    CameraRegionAnalyzer.CompositeTileHeight);
+                return CameraRegisteredScorer.Score(
+                    reference.Crop(tile),
+                    matching.Crop(tile),
+                    CameraRegisteredScorer.FullCompositeMaximumHorizontalTranslation,
+                    CameraRegisteredScorer.FullCompositeMaximumVerticalTranslation);
+            })
+            .ToArray();
+        string tileDetails = string.Join(", ", tiles.Select(match => $"{match.Score:P1}@({match.OffsetX},{match.OffsetY})"));
+
+        Assert.True(tight.Score < modelThreshold, $"The legacy bound unexpectedly scored {tight.Score:P1}.");
+        Assert.True(registered.Score >= modelThreshold, $"Projection-drift score was {registered.Score:P1} at ({registered.OffsetX}, {registered.OffsetY}); tiles: {tileDetails}.");
+        Assert.True(wrong.Score < modelThreshold, $"Wrong-yaw score was {wrong.Score:P1} at ({wrong.OffsetX}, {wrong.OffsetY}).");
+    }
+
+    [Fact]
+    public void RegisteredCameraScore_ExpandedVerticalProjectionDoesNotAcceptNearbyYaw()
+    {
+        ImageFrame goalClient = VisionScorerTests.Pattern(RobloxClientProfile.Width, RobloxClientProfile.Height);
+        ImageFrame nearbyYawClient = Shift(goalClient, 24);
+        ImageFrame reference = CameraRegionAnalyzer.BuildComposite(goalClient, TestRegions);
+        ImageFrame nearbyYaw = CameraRegionAnalyzer.BuildComposite(nearbyYawClient, TestRegions);
+
+        CameraRegisteredMatch match = CameraRegisteredScorer.ScoreComposite(reference, nearbyYaw);
+
+        Assert.True(match.Score < 0.80, $"Nearby-yaw score was {match.Score:P1} at ({match.OffsetX}, {match.OffsetY}).");
+    }
+
+    [Fact]
     public void RegisteredCameraScore_HandlesIdenticalClientThumbnail()
     {
         ImageFrame full = VisionScorerTests.Pattern(RobloxClientProfile.Width, RobloxClientProfile.Height);
@@ -157,7 +220,7 @@ public sealed class CameraAlignmentTests
         ImageFrame wrong = CameraRegionAnalyzer.BuildComposite(wrongYaw, regions);
         double wrongScore = VisionScorer.RobustSimilarity(reference, wrong);
         double registeredGoal = CameraRegisteredScorer.Score(reference, reference).Score;
-        double registeredWrong = CameraRegisteredScorer.Score(reference, wrong).Score;
+        double registeredWrong = CameraRegisteredScorer.ScoreComposite(reference, wrong).Score;
 
         Assert.Equal(4, regions.Count);
         Assert.Equal(3, regions.Select(region => Math.Clamp((int)(3 * (region.X + region.Width / 2d) / goal.Width), 0, 2)).Distinct().Count());
@@ -558,8 +621,11 @@ public sealed class CameraAlignmentTests
             CaptureAtYaw = (_, _) => wrong,
         };
         CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
+        List<MacroProgress> updates = [];
 
-        CameraAlignmentException error = await Assert.ThrowsAsync<CameraAlignmentException>(() => engine.AlignAsync(model));
+        CameraAlignmentException error = await Assert.ThrowsAsync<CameraAlignmentException>(() => engine.AlignAsync(
+            model,
+            progress: new InlineProgress<MacroProgress>(updates.Add)));
 
         Assert.Contains("Unit placement was not started", error.Message, StringComparison.Ordinal);
         Assert.Equal(3, error.Attempts);
@@ -567,6 +633,7 @@ public sealed class CameraAlignmentTests
         Assert.True(automation.ArrowPulses.Count(pulse => pulse == CameraYawDirection.Left) >= 12);
         Assert.Equal(2, automation.LeftControlTapCount);
         Assert.All(automation.DragShiftLockStates, state => Assert.True(state));
+        Assert.Contains(updates, update => update.Message.Contains("Re-observed the returned full-turn candidate", StringComparison.Ordinal));
     }
 
     private static CameraModel CreateModel(ImageFrame goal, IReadOnlyList<ImageFrame> yawFrames)
@@ -646,14 +713,14 @@ public sealed class CameraAlignmentTests
         return new ImageFrame(source.Width, source.Height, source.Format, output, takeOwnership: true);
     }
 
-    private static ImageFrame Transform(ImageFrame source, double scale, int dx)
+    private static ImageFrame Transform(ImageFrame source, double scale, int dx, int dy = 0)
     {
         byte[] output = new byte[source.Pixels.Length];
         double centerX = (source.Width - 1) / 2d;
         double centerY = (source.Height - 1) / 2d;
         for (int y = 0; y < source.Height; y++)
         {
-            int sourceY = Math.Clamp((int)Math.Round((y - centerY) / scale + centerY), 0, source.Height - 1);
+            int sourceY = Math.Clamp((int)Math.Round((y - centerY) / scale + centerY + dy), 0, source.Height - 1);
             for (int x = 0; x < source.Width; x++)
             {
                 int sourceX = Math.Clamp((int)Math.Round((x - centerX) / scale + centerX + dx), 0, source.Width - 1);

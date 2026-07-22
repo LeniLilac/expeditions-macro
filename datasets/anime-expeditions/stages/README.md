@@ -1,6 +1,6 @@
 # Story, Raid, and team fixtures
 
-This directory contains 22 reviewed 808 by 611 Roblox client-area frames used by the Story, Raid, and saved-team detectors. The retained PNGs contain no account names, chat, notifications, desktop chrome, or secrets. Captured UI pixels remain unscaled and unmodified except for the documented account-name redaction; the three Story wide-button fixtures use documented black padding outside their supplied panel crops.
+This directory contains 24 reviewed 808 by 611 Roblox client-area frames used by the Story, Raid, and saved-team detectors. The retained PNGs contain no account names, chat, notifications, desktop chrome, or secrets. Captured UI pixels remain unscaled and unmodified except for the documented account-name redactions; the three Story wide-button fixtures use documented black padding outside their supplied panel crops.
 
 Sources:
 
@@ -12,5 +12,7 @@ Sources:
 - `deep-debug-macro-plan-20260722-104319-c1bb43687b4f441cae9ef2a5b6863960.zip`: a reported King's Tomb Mastery detail screen whose purple mode accent must still retain the Story Select Stage action.
 - `deep-debug-macro-plan-20260722-104413-7308040c92b046c0a490665eda2abd07.zip`: a reported compact Include Equipment dialog positioned 33 pixels above the original team-switch reference.
 - `Screenshot 2026-07-22 105224.png`, `105218.png`, and `105220.png`: privacy-reviewed panel crops showing the full-width Select Stage layout for Act/cyan, Infinite/green, and Mastery/purple. Each crop was placed without scaling on a black 808 by 611 canvas by aligning its red Close control to client coordinate `(673, 155)`. The resulting offsets are `(99, 90)`, `(120, 105)`, and `(106, 98)` respectively; no captured UI pixels were recolored.
+- `deep-debug-macro-plan-20260722-120245-c537a052fc414b20bdc3740f4cde6c8b.zip`: a settled King's Tomb Mastery party preview positioned 27 pixels above the original Raid rail. The display-name strip at client coordinates `(465, 292)` through `(590, 334)` was replaced with an opaque rectangle; the three preview buttons and all detector regions are unchanged.
+- `deep-debug-macro-plan-20260722-115310-40ec764b9eda41c483c407789764c1a1.zip`: the current compact Raid Victory layout with separate Next Stage, Repeat Stage, and View Party actions. The retained frame contains no account names or other private information and is otherwise unmodified.
 
 The full bursts remain local diagnostic artifacts. Only structurally distinct frames needed for detector and cross-state regression are retained here.

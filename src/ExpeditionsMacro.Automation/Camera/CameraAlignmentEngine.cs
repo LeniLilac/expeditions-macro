@@ -763,10 +763,9 @@ public sealed class CameraAlignmentEngine
     {
         int fullTurn = model.Manifest.FullYawSteps;
         int bestOffset = 0;
-        double bestScore = startingScore;
         double bestEvidence = startingScore;
-        FineYawMatch bestFineMatch = new(0, double.NegativeInfinity);
         double earlyExitThreshold = Math.Max(model.Manifest.SuccessThreshold, model.Manifest.BaselineScore - 0.025);
+        double neighborhoodTestThreshold = Math.Clamp(model.Manifest.SuccessThreshold + 0.08, 0.80, 0.92);
 
         if (plan.ScanPhasePixels != 0)
         {
@@ -781,9 +780,7 @@ public sealed class CameraAlignmentEngine
         double originEvidence = Math.Max(origin.DirectScore, origin.FineMatch.Score);
         if (originEvidence > bestEvidence)
         {
-            bestScore = origin.DirectScore;
             bestEvidence = originEvidence;
-            bestFineMatch = origin.FineMatch;
         }
 
         for (int travelled = 1; travelled <= fullTurn; travelled++)
@@ -796,10 +793,8 @@ public sealed class CameraAlignmentEngine
             int normalizedOffset = travelled == fullTurn ? 0 : travelled;
             if (evidence > bestEvidence)
             {
-                bestScore = score;
                 bestEvidence = evidence;
                 bestOffset = normalizedOffset;
-                bestFineMatch = observation.FineMatch;
             }
 
             progress?.Report(new MacroProgress(
@@ -820,9 +815,11 @@ public sealed class CameraAlignmentEngine
 
             // A fine-atlas hit is a candidate, not a success score: registered
             // matching can confuse a different coarse yaw with a nearby goal view.
-            // Require near-baseline evidence, apply its saved correction, and then
-            // verify the corrected pose against the unchanged direct goal target.
-            if (allowNeighborhoodShortcut && observation.FineMatch.Score >= earlyExitThreshold)
+            // Testing one strong fine-atlas candidate is safe even when session
+            // rendering lowers it below the calibration baseline: the corrected
+            // pose must still pass the unchanged direct goal threshold. A false
+            // candidate consumes this shortcut and restarts one complete scan.
+            if (allowNeighborhoodShortcut && observation.FineMatch.Score >= neighborhoodTestThreshold)
             {
                 progress?.Report(new MacroProgress(
                     "Camera alignment",
@@ -878,10 +875,16 @@ public sealed class CameraAlignmentEngine
         {
             await PulseYawAsync(window, direction, correction, model.Manifest.ArrowHoldMilliseconds, model.Manifest.SettleMilliseconds, cancellationToken).ConfigureAwait(false);
         }
+        AlignmentObservation returnedCandidate = await StableObservationAsync(model, window, 2, cancellationToken).ConfigureAwait(false);
+        progress?.Report(new MacroProgress(
+            "Camera alignment",
+            95,
+            $"Re-observed the returned full-turn candidate: goal {returnedCandidate.DirectScore:P0}; fine neighborhood {returnedCandidate.FineMatch.Score:P0} at {returnedCandidate.FineMatch.Offset:+#;-#;0} px.",
+            Confidence: Math.Max(returnedCandidate.DirectScore, returnedCandidate.FineMatch.Score)));
         return await RefineSavedNeighborhoodCandidateAsync(
             window,
             model,
-            bestFineMatch,
+            returnedCandidate.FineMatch,
             96,
             "Refining the best full-turn candidate with micro mouse drags.",
             progress,
@@ -934,7 +937,7 @@ public sealed class CameraAlignmentEngine
         ImageFrame stable = VisionScorer.Median(frames);
         ImageFrame thumbnail = VisionScorer.MakeThumbnail(stable, model.FineYawAtlas[0].Width);
         return new AlignmentObservation(
-            CameraRegisteredScorer.Score(model.Reference, stable).Score,
+            CameraRegisteredScorer.ScoreComposite(model.Reference, stable).Score,
             BestFineYawMatch(model, thumbnail));
     }
 
@@ -1244,7 +1247,7 @@ public sealed class CameraAlignmentEngine
     private static double GoalEvidence(CameraModel model, ImageFrame fullClient)
     {
         ImageFrame gray = CameraRegionAnalyzer.BuildComposite(fullClient, model.Manifest.Regions);
-        double registered = CameraRegisteredScorer.Score(model.Reference, gray).Score;
+        double registered = CameraRegisteredScorer.ScoreComposite(model.Reference, gray).Score;
         ImageFrame goalColor = CameraRegionAnalyzer.BuildColorComposite(model.GoalOverlay, model.Manifest.Regions, inset: 4);
         ImageFrame currentColor = CameraRegionAnalyzer.BuildColorComposite(fullClient, model.Manifest.Regions, inset: 4);
         double hue = CameraRegisteredScorer.HueSimilarity(goalColor, currentColor);

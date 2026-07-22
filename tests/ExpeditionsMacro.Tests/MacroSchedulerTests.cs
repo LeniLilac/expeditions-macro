@@ -28,6 +28,35 @@ public sealed class MacroSchedulerTests
     }
 
     [Fact]
+    public void ChallengeRemainsTheOwnerBetweenMatches_ButCooldownHandsOffToTheNextMode()
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        MacroTaskDefinition challenge = Task("challenge", MacroTaskKind.Challenge, priority: 1);
+        MacroTaskDefinition expedition = Task("expedition", MacroTaskKind.Expedition, priority: 2);
+        MacroPlan plan = Plan(challenge, expedition);
+
+        MacroTaskProgress afterMatch = MacroScheduler.Advance(
+            challenge,
+            plan.ProgressFor(challenge.Id),
+            new ScheduledTaskResult(1, 0, TimeSpan.FromMinutes(4)),
+            now);
+        MacroPlan betweenMatches = plan with { Progress = [afterMatch, plan.ProgressFor(expedition.Id)] };
+
+        Assert.Equal(challenge, MacroScheduler.SelectNext(betweenMatches, now));
+
+        DateTimeOffset nextReset = now.AddMinutes(20);
+        MacroTaskProgress onCooldown = MacroScheduler.Advance(
+            challenge,
+            afterMatch,
+            new ScheduledTaskResult(0, 0, TimeSpan.FromSeconds(2), nextReset, Skipped: true),
+            now.AddSeconds(2));
+        MacroPlan readyForHandoff = plan with { Progress = [onCooldown, plan.ProgressFor(expedition.Id)] };
+
+        Assert.Equal(expedition, MacroScheduler.SelectNext(readyForHandoff, now.AddSeconds(3)));
+        Assert.Equal(challenge, MacroScheduler.SelectNext(readyForHandoff, nextReset));
+    }
+
+    [Fact]
     public void Selection_SkipsCompletedAndDisabledFiniteTasks_ButChallengeRemainsRecurring()
     {
         MacroTaskDefinition challenge = Task("challenge", MacroTaskKind.Challenge, priority: 3);

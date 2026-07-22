@@ -69,6 +69,16 @@ internal static class ActionButtonDetector
         ["stage_party_start"] = new(new ScreenRegion(400, 390, 145, 60), ButtonColor.Green, 480, 421, 45, 25, 90, 120, 20, 38, 0.42),
         ["stage_party_change_map"] = new(new ScreenRegion(520, 390, 135, 60), ButtonColor.Purple, 588, 421, 45, 25, 90, 125, 20, 38, 0.25),
         ["stage_party_disband"] = new(new ScreenRegion(630, 390, 150, 60), ButtonColor.Red, 696, 421, 45, 25, 90, 125, 20, 38, 0.42),
+        // The Story party panel settles 27 pixels above the Raid layout after its
+        // entrance animation. Keep a second exact three-button rail instead of
+        // making each individual action broadly position-tolerant.
+        ["stage_party_start_upper"] = new(new ScreenRegion(400, 360, 145, 65), ButtonColor.Green, 480, 394, 45, 22, 90, 120, 20, 38, 0.42),
+        ["stage_party_change_map_upper"] = new(new ScreenRegion(520, 360, 135, 65), ButtonColor.Purple, 588, 394, 45, 22, 90, 125, 20, 38, 0.25),
+        ["stage_party_disband_upper"] = new(new ScreenRegion(630, 360, 150, 65), ButtonColor.Red, 696, 394, 45, 22, 90, 125, 20, 38, 0.42),
+        // The current Story/Raid Victory panel uses a compact yellow Repeat Stage
+        // action beside Next Stage and View Party. It is narrower and farther
+        // right than the legacy terminal action used by Expeditions.
+        ["stage_victory_repeat"] = new(new ScreenRegion(225, 390, 165, 90), ButtonColor.Yellow, 304, 437, 65, 42, 80, 135, 18, 48, 0.36),
         ["challenge_victory_party"] = new(new ScreenRegion(125, 395, 365, 80), ButtonColor.Purple, 304, 437, 100, 35, 250, 350, 16, 42, 0.25),
         ["challenge_victory_close"] = new(new ScreenRegion(625, 125, 90, 80), ButtonColor.Red, 670, 155, 48, 35, 14, 34, 14, 34, 0.35, 0.40),
         ["challenge_post_match_play"] = new(new ScreenRegion(152, 570, 28, 28), ButtonColor.Cyan, 164, 584, 16, 16, 8, 28, 8, 28, 0.08, 0.30, 40),

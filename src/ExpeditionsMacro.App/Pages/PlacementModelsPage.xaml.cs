@@ -97,13 +97,14 @@ public partial class PlacementModelsPage : UserControl, IAppPage
             StatusText.Text = "Default delay must be a non-negative whole number.";
             return;
         }
+        bool useRecordedTiming = RecordedTimingCheck.IsChecked == true;
         _steps.Clear();
         _services.Coordinator.Arm("Placement recording", async token =>
         {
             PlacementModel model = await _services.Placement.RecordAsync(
                 name,
                 delay,
-                RecordedTimingCheck.IsChecked == true,
+                useRecordedTiming,
                 captured: capture =>
                 {
                     _services.DeepDebug.RecordEvent("placement", "capture_recorded", capture);
@@ -136,7 +137,7 @@ public partial class PlacementModelsPage : UserControl, IAppPage
             {
                 Name = name,
                 DefaultDelayMilliseconds = delay,
-                UseRecordedTiming = RecordedTimingCheck.IsChecked == true,
+                UseRecordedTiming = useRecordedTiming,
             },
             RefreshReferencedModelsAfterOperation = true,
         });
@@ -161,11 +162,12 @@ public partial class PlacementModelsPage : UserControl, IAppPage
             return;
         }
         if (!int.TryParse(DefaultDelayText.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int delay) || delay < 0) delay = 900;
+        bool overridePlaybackTiming = PlaybackOverrideCheck.IsChecked == true;
         _services.Coordinator.Arm("Placement playback", async token =>
         {
             await _services.Placement.PlayAsync(
                 model,
-                PlaybackOverrideCheck.IsChecked == true,
+                overridePlaybackTiming,
                 delay,
                 stepSent: (index, total, step) =>
                 {
@@ -184,7 +186,7 @@ public partial class PlacementModelsPage : UserControl, IAppPage
             OperationSettings = new
             {
                 Model = model.Id,
-                UseDefaultInterval = PlaybackOverrideCheck.IsChecked == true,
+                UseDefaultInterval = overridePlaybackTiming,
                 DefaultDelayMilliseconds = delay,
             },
         });

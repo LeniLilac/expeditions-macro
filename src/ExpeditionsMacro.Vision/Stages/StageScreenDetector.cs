@@ -69,17 +69,24 @@ public static class StageScreenDetector
         };
         if (terminal is not null) return Trace(terminal);
 
-        double stagePartyStart = ActionButtonDetector.Score(image, "stage_party_start");
-        double stagePartyChangeMap = ActionButtonDetector.Score(image, "stage_party_change_map");
-        double stagePartyDisband = ActionButtonDetector.Score(image, "stage_party_disband");
-        if (stagePartyStart > 0 && stagePartyChangeMap > 0 && stagePartyDisband > 0)
+        double lowerStageParty = StagePartyScore(
+            image,
+            "stage_party_start",
+            "stage_party_change_map",
+            "stage_party_disband");
+        double upperStageParty = StagePartyScore(
+            image,
+            "stage_party_start_upper",
+            "stage_party_change_map_upper",
+            "stage_party_disband_upper");
+        double stageParty = Math.Max(lowerStageParty, upperStageParty);
+        if (stageParty > 0)
         {
-            (int X, int Y)? action = ActionButtonDetector.ActionFor(image, "stage_party_start");
-            double confidence = Math.Clamp(
-                0.40 * stagePartyStart + 0.30 * stagePartyChangeMap + 0.30 * stagePartyDisband,
-                0,
-                1);
-            return Trace(new StageScreenMatch(StageScreenState.PreviewReady, confidence, action?.X, action?.Y));
+            string startProfile = upperStageParty > lowerStageParty
+                ? "stage_party_start_upper"
+                : "stage_party_start";
+            (int X, int Y)? action = ActionButtonDetector.ActionFor(image, startProfile);
+            return Trace(new StageScreenMatch(StageScreenState.PreviewReady, stageParty, action?.X, action?.Y));
         }
 
         double narrowSelectStage = ActionButtonDetector.Score(image, "stage_select_stage");
@@ -159,7 +166,8 @@ public static class StageScreenDetector
         ?? (256, 449);
 
     public static (int X, int Y) PreviewStartAction(ImageFrame image) =>
-        ActionButtonDetector.ActionFor(image, "stage_party_start")
+        ActionButtonDetector.ActionFor(image, "stage_party_start_upper")
+        ?? ActionButtonDetector.ActionFor(image, "stage_party_start")
         ?? ActionButtonDetector.ActionFor(image, "challenge_party_start")
         ?? ActionButtonDetector.ActionFor(image, "challenge_preview_start")
         ?? (480, 418);
@@ -212,7 +220,9 @@ public static class StageScreenDetector
         double header = ColorFraction(image, StageVictoryHeader, IsCyan);
         double top = BestHorizontalLineFraction(image, StageVictoryTopEdge, IsCyan);
         double close = ActionButtonDetector.Score(image, "challenge_victory_close");
-        double repeatStage = ActionButtonDetector.Score(image, "victory");
+        double repeatStage = Math.Max(
+            ActionButtonDetector.Score(image, "victory"),
+            ActionButtonDetector.Score(image, "stage_victory_repeat"));
         if (header < 0.018 || top < 0.45 || close == 0 || repeatStage == 0) return 0;
         return Math.Clamp(
             0.40 * Ramp(header, 0.018, 0.11) +
@@ -221,6 +231,20 @@ public static class StageScreenDetector
             0.20 * repeatStage,
             0,
             1);
+    }
+
+    private static double StagePartyScore(
+        ImageFrame image,
+        string startProfile,
+        string changeMapProfile,
+        string disbandProfile)
+    {
+        double start = ActionButtonDetector.Score(image, startProfile);
+        double changeMap = ActionButtonDetector.Score(image, changeMapProfile);
+        double disband = ActionButtonDetector.Score(image, disbandProfile);
+        return start == 0 || changeMap == 0 || disband == 0
+            ? 0
+            : Math.Clamp(0.40 * start + 0.30 * changeMap + 0.30 * disband, 0, 1);
     }
 
     private static double ColorFraction(ImageFrame image, ScreenRegion region, Func<byte, byte, byte, bool> predicate)

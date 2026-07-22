@@ -14,12 +14,23 @@ public readonly record struct CameraRegisteredMatch(
 /// </summary>
 public static class CameraRegisteredScorer
 {
+    public const int ThumbnailMaximumTranslation = 5;
+    public const int FullCompositeMaximumHorizontalTranslation = 6;
+    public const int FullCompositeMaximumVerticalTranslation = 12;
+
     private static readonly double[] ScaleCandidates = [0.975, 1.0, 1.025];
 
     public static CameraRegisteredMatch Score(
         ImageFrame reference,
         ImageFrame current,
-        int maximumTranslation = 5)
+        int maximumTranslation = ThumbnailMaximumTranslation) =>
+        Score(reference, current, maximumTranslation, maximumTranslation);
+
+    public static CameraRegisteredMatch Score(
+        ImageFrame reference,
+        ImageFrame current,
+        int maximumHorizontalTranslation,
+        int maximumVerticalTranslation)
     {
         if (reference.Format != PixelFormat.Gray8 || current.Format != PixelFormat.Gray8)
         {
@@ -29,27 +40,19 @@ public static class CameraRegisteredScorer
         {
             throw new ArgumentException("Registered camera inputs must have identical dimensions.");
         }
-        if (maximumTranslation is < 0 or > 16) throw new ArgumentOutOfRangeException(nameof(maximumTranslation));
+        if (maximumHorizontalTranslation is < 0 or > 16) throw new ArgumentOutOfRangeException(nameof(maximumHorizontalTranslation));
+        if (maximumVerticalTranslation is < 0 or > 16) throw new ArgumentOutOfRangeException(nameof(maximumVerticalTranslation));
 
         CameraRegisteredMatch best = new(double.NegativeInfinity, 1, 0, 0);
         ImageFrame? bestAligned = null;
         foreach (double scale in ScaleCandidates)
         {
             ImageFrame scaled = ScaleGray(current, scale);
-            int bestX = 0;
-            int bestY = 0;
-            double bestCorrelation = double.NegativeInfinity;
-            for (int y = -maximumTranslation; y <= maximumTranslation; y++)
-            {
-                for (int x = -maximumTranslation; x <= maximumTranslation; x++)
-                {
-                    double correlation = CorrelationAt(reference, scaled, x, y);
-                    if (correlation <= bestCorrelation) continue;
-                    bestCorrelation = correlation;
-                    bestX = x;
-                    bestY = y;
-                }
-            }
+            (int bestX, int bestY) = FindBestTranslation(
+                reference,
+                scaled,
+                maximumHorizontalTranslation,
+                maximumVerticalTranslation);
             ImageFrame alignedFrame = TranslateGray(scaled, bestX, bestY);
             double score = ManagedStructuralSimilarity(reference, alignedFrame);
             if (score <= best.Score) continue;
@@ -64,6 +67,112 @@ public static class CameraRegisteredScorer
         double consensus = RegionConsensus(reference, bestAligned);
         double combined = Math.Max(best.Score, 0.88 * best.Score + 0.12 * consensus);
         return best with { Score = Math.Clamp(combined, 0, 1) };
+    }
+
+    public static CameraRegisteredMatch ScoreComposite(ImageFrame reference, ImageFrame current)
+    {
+        if (reference.Width != current.Width || reference.Height != current.Height)
+        {
+            throw new ArgumentException("Registered camera composites must have identical dimensions.");
+        }
+        if (reference.Width % CameraRegionAnalyzer.CompositeTileWidth != 0
+            || reference.Height % CameraRegionAnalyzer.CompositeTileHeight != 0)
+        {
+            throw new ArgumentException("Registered camera composites do not use the expected tile geometry.");
+        }
+
+        int columns = reference.Width / CameraRegionAnalyzer.CompositeTileWidth;
+        int rows = reference.Height / CameraRegionAnalyzer.CompositeTileHeight;
+        int tileCount = columns * rows;
+        if (columns != 2 || tileCount is < 2 or > 8)
+        {
+            throw new ArgumentException("Registered camera composites must contain two through eight tiles in two columns.");
+        }
+
+        CameraRegisteredMatch tight = Score(reference, current);
+        List<CameraRegisteredMatch> matches = [];
+        for (int index = 0; index < tileCount; index++)
+        {
+            var tile = new Core.Geometry.ScreenRegion(
+                index % columns * CameraRegionAnalyzer.CompositeTileWidth,
+                index / columns * CameraRegionAnalyzer.CompositeTileHeight,
+                CameraRegionAnalyzer.CompositeTileWidth,
+                CameraRegionAnalyzer.CompositeTileHeight);
+            matches.Add(Score(
+                reference.Crop(tile),
+                current.Crop(tile),
+                FullCompositeMaximumHorizontalTranslation,
+                FullCompositeMaximumVerticalTranslation));
+        }
+
+        double medianX = Median(matches.Select(match => (double)match.OffsetX));
+        double medianY = Median(matches.Select(match => (double)match.OffsetY));
+        if (Math.Abs(medianY) <= ThumbnailMaximumTranslation) return tight;
+
+        CameraRegisteredMatch[] inliers = matches
+            .Where(match => Math.Abs(match.OffsetX - medianX) <= 2.5 && Math.Abs(match.OffsetY - medianY) <= 2.5)
+            .ToArray();
+        int requiredInliers = (int)Math.Ceiling(tileCount * 0.75);
+        if (inliers.Length < requiredInliers) return tight;
+
+        double registeredTiles = Median(inliers.Select(match => match.Score));
+        double score = Math.Max(tight.Score, 0.75 * registeredTiles + 0.25 * tight.Score);
+        return new CameraRegisteredMatch(
+            Math.Clamp(score, 0, 1),
+            Median(inliers.Select(match => match.Scale)),
+            (int)Math.Round(medianX),
+            (int)Math.Round(medianY));
+    }
+
+    private static (int X, int Y) FindBestTranslation(
+        ImageFrame reference,
+        ImageFrame current,
+        int maximumHorizontalTranslation,
+        int maximumVerticalTranslation)
+    {
+        int searchStep = Math.Max(maximumHorizontalTranslation, maximumVerticalTranslation) > ThumbnailMaximumTranslation ? 2 : 1;
+        int sampleStride = searchStep == 1 ? 2 : 4;
+        int bestX = 0;
+        int bestY = 0;
+        double bestCorrelation = double.NegativeInfinity;
+        for (int y = -maximumVerticalTranslation; y <= maximumVerticalTranslation; y += searchStep)
+        {
+            for (int x = -maximumHorizontalTranslation; x <= maximumHorizontalTranslation; x += searchStep)
+            {
+                double correlation = CorrelationAt(reference, current, x, y, sampleStride);
+                if (correlation <= bestCorrelation) continue;
+                bestCorrelation = correlation;
+                bestX = x;
+                bestY = y;
+            }
+        }
+
+        if (searchStep == 1) return (bestX, bestY);
+
+        int coarseX = bestX;
+        int coarseY = bestY;
+        bestCorrelation = double.NegativeInfinity;
+        for (int y = Math.Max(-maximumVerticalTranslation, coarseY - searchStep); y <= Math.Min(maximumVerticalTranslation, coarseY + searchStep); y++)
+        {
+            for (int x = Math.Max(-maximumHorizontalTranslation, coarseX - searchStep); x <= Math.Min(maximumHorizontalTranslation, coarseX + searchStep); x++)
+            {
+                double correlation = CorrelationAt(reference, current, x, y, sampleStride: 2);
+                if (correlation <= bestCorrelation) continue;
+                bestCorrelation = correlation;
+                bestX = x;
+                bestY = y;
+            }
+        }
+        return (bestX, bestY);
+    }
+
+    private static double Median(IEnumerable<double> values)
+    {
+        double[] sorted = values.Order().ToArray();
+        if (sorted.Length == 0) throw new ArgumentException("Median input is empty.", nameof(values));
+        return sorted.Length % 2 == 1
+            ? sorted[sorted.Length / 2]
+            : (sorted[sorted.Length / 2 - 1] + sorted[sorted.Length / 2]) / 2;
     }
 
     public static double HueSimilarity(ImageFrame reference, ImageFrame current)
@@ -132,7 +241,12 @@ public static class CameraRegisteredScorer
         return new ImageFrame(source.Width, source.Height, PixelFormat.Gray8, output, takeOwnership: true);
     }
 
-    private static double CorrelationAt(ImageFrame reference, ImageFrame current, int offsetX, int offsetY)
+    private static double CorrelationAt(
+        ImageFrame reference,
+        ImageFrame current,
+        int offsetX,
+        int offsetY,
+        int sampleStride)
     {
         int left = Math.Max(0, -offsetX);
         int right = Math.Min(reference.Width, current.Width - offsetX);
@@ -144,12 +258,11 @@ public static class CameraRegisteredScorer
         double sumCurrentSquared = 0;
         double sumProduct = 0;
         int count = 0;
-        const int stride = 2;
-        for (int y = top; y < bottom; y += stride)
+        for (int y = top; y < bottom; y += sampleStride)
         {
             int referenceRow = y * reference.Width;
             int currentRow = (y + offsetY) * current.Width;
-            for (int x = left; x < right; x += stride)
+            for (int x = left; x < right; x += sampleStride)
             {
                 double a = reference.Pixels[referenceRow + x];
                 double b = current.Pixels[currentRow + x + offsetX];
