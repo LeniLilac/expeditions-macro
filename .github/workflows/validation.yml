@@ -33,6 +33,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           sparse-checkout: |
+            assets
             datasets
             detector-packs
             docs
@@ -47,6 +48,7 @@ jobs:
           cache-dependency-path: |
             src/**/packages.lock.json
             tests/**/packages.lock.json
+            tools/**/packages.lock.json
       - name: Restore tests
         run: dotnet restore tests/ExpeditionsMacro.Tests/ExpeditionsMacro.Tests.csproj --locked-mode
       - name: Build tests
