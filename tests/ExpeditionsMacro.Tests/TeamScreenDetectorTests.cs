@@ -11,6 +11,7 @@ public sealed class TeamScreenDetectorTests
     [InlineData("TeamList_01.png", TeamScreenState.Teams)]
     [InlineData("TeamLoadConfirm_01.png", TeamScreenState.LoadConfirm)]
     [InlineData("TeamEquipmentConfirm_01.png", TeamScreenState.EquipmentConfirm)]
+    [InlineData("TeamEquipmentConfirm_Compact_01.png", TeamScreenState.EquipmentConfirm)]
     public void ReviewedTeamFixtures_MatchTheirExpectedState(string fileName, TeamScreenState expected)
     {
         TeamScreenMatch match = TeamScreenDetector.Detect(Load(fileName));
@@ -23,6 +24,10 @@ public sealed class TeamScreenDetectorTests
     [InlineData("GameModeNegative_01.png")]
     [InlineData("StorySelector_01.png")]
     [InlineData("StoryDetail_01.png")]
+    [InlineData("StoryDetail_Mastery_01.png")]
+    [InlineData("StoryDetail_Act_Wide_01.png")]
+    [InlineData("StoryDetail_Infinite_Wide_01.png")]
+    [InlineData("StoryDetail_Mastery_Wide_01.png")]
     [InlineData("RaidSelector_01.png")]
     [InlineData("RaidDetail_01.png")]
     [InlineData("StoryVictory_Act_01.png")]
@@ -43,6 +48,23 @@ public sealed class TeamScreenDetectorTests
         Assert.Equal((580, 447), TeamScreenDetector.LoadTeamAction(3));
         Assert.Equal((345, 331), TeamScreenDetector.LoadConfirmAction);
         Assert.Equal((319, 376), TeamScreenDetector.IncludeEquipmentAction);
+    }
+
+    [Theory]
+    [InlineData("TeamEquipmentConfirm_01.png", 310, 330, 365, 385)]
+    [InlineData("TeamEquipmentConfirm_Compact_01.png", 315, 335, 335, 350)]
+    public void EquipmentConfirmation_MapsTheLiveIncludeButton(
+        string fileName,
+        int minimumX,
+        int maximumX,
+        int minimumY,
+        int maximumY)
+    {
+        TeamScreenMatch match = TeamScreenDetector.Detect(Load(fileName));
+
+        Assert.Equal(TeamScreenState.EquipmentConfirm, match.State);
+        Assert.InRange(match.ActionX!.Value, minimumX, maximumX);
+        Assert.InRange(match.ActionY!.Value, minimumY, maximumY);
     }
 
     [Fact]

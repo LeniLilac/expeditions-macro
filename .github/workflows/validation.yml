@@ -1,0 +1,110 @@
+name: Validation
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: Tests (${{ matrix.name }})
+    runs-on: windows-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: fast
+            filter: Category!=Golden
+          - name: golden corpus thresholds
+            filter: Category=Golden&FullyQualifiedName~EveryCapturedUiDataset_MeetsItsCompiledStateThreshold
+          - name: golden AFK negatives
+            filter: Category=Golden&FullyQualifiedName~AfkChamberDetector_DoesNotMatchOtherCapturedUiStates
+          - name: golden corpus classification
+            filter: Category=Golden&FullyQualifiedName~EveryCapturedUiDataset_ClassifiesAsItsExpectedState
+          - name: golden pause negatives
+            filter: Category=Golden&FullyQualifiedName~PauseButtonDetectors_DoNotMatchOtherCapturedUiStates
+          - name: golden start negatives
+            filter: Category=Golden&FullyQualifiedName~StartDetector_DoesNotMatchOtherCapturedUiStates
+          - name: golden remaining
+            filter: Category=Golden&FullyQualifiedName!~EveryCapturedUiDataset_MeetsItsCompiledStateThreshold&FullyQualifiedName!~AfkChamberDetector_DoesNotMatchOtherCapturedUiStates&FullyQualifiedName!~EveryCapturedUiDataset_ClassifiesAsItsExpectedState&FullyQualifiedName!~PauseButtonDetectors_DoNotMatchOtherCapturedUiStates&FullyQualifiedName!~StartDetector_DoesNotMatchOtherCapturedUiStates
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: |
+            assets
+            datasets
+            detector-packs
+            docs
+            scripts
+            src
+            tests
+            tools
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.302
+          cache: true
+          cache-dependency-path: |
+            src/**/packages.lock.json
+            tests/**/packages.lock.json
+            tools/**/packages.lock.json
+      - name: Restore tests
+        run: dotnet restore tests/ExpeditionsMacro.Tests/ExpeditionsMacro.Tests.csproj --locked-mode
+      - name: Build tests
+        run: dotnet build tests/ExpeditionsMacro.Tests/ExpeditionsMacro.Tests.csproj -c Release --no-restore
+      - name: Run ${{ matrix.name }} tests
+        shell: pwsh
+        run: |
+          $resultName = '${{ matrix.name }}'.Replace(' ', '-')
+          dotnet test tests/ExpeditionsMacro.Tests/ExpeditionsMacro.Tests.csproj `
+            -c Release `
+            --no-build `
+            --filter '${{ matrix.filter }}' `
+            --results-directory "artifacts/test-results/$resultName" `
+            --logger "trx;LogFileName=$resultName.trx"
+      - name: Run Deep Debug Viewer tests
+        if: matrix.name == 'fast'
+        shell: pwsh
+        run: |
+          dotnet test tools/ExpeditionsMacro.DeepDebugViewer.Tests/ExpeditionsMacro.DeepDebugViewer.Tests.csproj `
+            -c Release `
+            --results-directory "artifacts/test-results/deep-debug-viewer" `
+            --logger "trx;LogFileName=deep-debug-viewer.trx"
+      - name: Upload ${{ matrix.name }} results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results-${{ strategy.job-index }}
+          path: artifacts/test-results/**/*.trx
+          if-no-files-found: ignore
+
+  ui-snapshots:
+    name: UI snapshots
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: |
+            assets
+            detector-packs
+            scripts
+            src
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.302
+          cache: true
+          cache-dependency-path: 'src/**/packages.lock.json'
+      - name: Restore app
+        run: dotnet restore src/ExpeditionsMacro.App/ExpeditionsMacro.App.csproj --locked-mode
+      - name: Build app
+        run: dotnet build src/ExpeditionsMacro.App/ExpeditionsMacro.App.csproj -c Release --no-restore
+      - name: Render dark and light UI snapshots
+        shell: pwsh
+        run: ./scripts/Render-UiSnapshots.ps1 -Configuration Release
+      - name: Upload UI snapshots
+        uses: actions/upload-artifact@v7
+        with:
+          name: ui-snapshots
+          path: artifacts/ui-snapshots/*.png

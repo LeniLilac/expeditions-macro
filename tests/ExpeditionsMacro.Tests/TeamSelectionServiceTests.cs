@@ -9,10 +9,12 @@ namespace ExpeditionsMacro.Tests;
 
 public sealed class TeamSelectionServiceTests
 {
-    [Fact]
-    public async Task Select_LoadsTheRequestedTeamAndClosesBothUnitLayers()
+    [Theory]
+    [InlineData("TeamEquipmentConfirm_01.png")]
+    [InlineData("TeamEquipmentConfirm_Compact_01.png")]
+    public async Task Select_LoadsTheRequestedTeamAndClosesBothUnitLayers(string equipmentFixture)
     {
-        FakeAutomation automation = new();
+        FakeAutomation automation = new(equipmentFixture);
         TeamSelectionService service = new(automation);
 
         await service.SelectAsync(automation.Window, teamSlot: 3, unitMenuKey: 'u');
@@ -23,8 +25,8 @@ public sealed class TeamSelectionServiceTests
                 $"click:{TeamScreenDetector.TeamsTabAction.X},{TeamScreenDetector.TeamsTabAction.Y}",
                 $"scroll:{TeamScreenDetector.ScrollNotchesForTeam(3)}",
                 $"click:{TeamScreenDetector.LoadTeamAction(3).X},{TeamScreenDetector.LoadTeamAction(3).Y}",
-                $"click:{TeamScreenDetector.LoadConfirmAction.X},{TeamScreenDetector.LoadConfirmAction.Y}",
-                $"click:{TeamScreenDetector.IncludeEquipmentAction.X},{TeamScreenDetector.IncludeEquipmentAction.Y}",
+                $"click:{automation.LoadConfirmAction.X},{automation.LoadConfirmAction.Y}",
+                $"click:{automation.EquipmentAction.X},{automation.EquipmentAction.Y}",
                 "park",
                 "key:U",
                 "key:U",
@@ -37,7 +39,7 @@ public sealed class TeamSelectionServiceTests
     [Fact]
     public async Task Select_StopsBeforeInputWhenTheClientSizeChanged()
     {
-        FakeAutomation automation = new() { Client = new ClientBounds(0, 0, 800, 600) };
+        FakeAutomation automation = new("TeamEquipmentConfirm_01.png") { Client = new ClientBounds(0, 0, 800, 600) };
         TeamSelectionService service = new(automation);
 
         InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -49,22 +51,35 @@ public sealed class TeamSelectionServiceTests
 
     private sealed class FakeAutomation : IRobloxAutomation
     {
-        private readonly IReadOnlyDictionary<TeamScreenState, ImageFrame> _frames = new Dictionary<TeamScreenState, ImageFrame>
-        {
-            [TeamScreenState.None] = Load("GameModeNegative_01.png"),
-            [TeamScreenState.Units] = Load("TeamUnits_01.png"),
-            [TeamScreenState.Teams] = Load("TeamList_01.png"),
-            [TeamScreenState.LoadConfirm] = Load("TeamLoadConfirm_01.png"),
-            [TeamScreenState.EquipmentConfirm] = Load("TeamEquipmentConfirm_01.png"),
-        };
+        private readonly IReadOnlyDictionary<TeamScreenState, ImageFrame> _frames;
 
         private int _unitKeyTaps;
+
+        public FakeAutomation(string equipmentFixture)
+        {
+            _frames = new Dictionary<TeamScreenState, ImageFrame>
+            {
+                [TeamScreenState.None] = Load("GameModeNegative_01.png"),
+                [TeamScreenState.Units] = Load("TeamUnits_01.png"),
+                [TeamScreenState.Teams] = Load("TeamList_01.png"),
+                [TeamScreenState.LoadConfirm] = Load("TeamLoadConfirm_01.png"),
+                [TeamScreenState.EquipmentConfirm] = Load(equipmentFixture),
+            };
+            TeamScreenMatch match = TeamScreenDetector.Detect(_frames[TeamScreenState.EquipmentConfirm]);
+            EquipmentAction = (match.ActionX!.Value, match.ActionY!.Value);
+            match = TeamScreenDetector.Detect(_frames[TeamScreenState.LoadConfirm]);
+            LoadConfirmAction = (match.ActionX!.Value, match.ActionY!.Value);
+        }
 
         public RobloxWindow Window { get; } = new((nint)42, "Roblox");
 
         public ClientBounds Client { get; set; } = new(0, 0, TeamScreenDetector.ClientWidth, TeamScreenDetector.ClientHeight);
 
         public TeamScreenState State { get; private set; }
+
+        public (int X, int Y) EquipmentAction { get; }
+
+        public (int X, int Y) LoadConfirmAction { get; }
 
         public List<string> Actions { get; } = [];
 
@@ -108,8 +123,8 @@ public sealed class TeamSelectionServiceTests
             {
                 TeamScreenState.Units when (x, y) == TeamScreenDetector.TeamsTabAction => TeamScreenState.Teams,
                 TeamScreenState.Teams when (x, y) == TeamScreenDetector.LoadTeamAction(3) => TeamScreenState.LoadConfirm,
-                TeamScreenState.LoadConfirm when (x, y) == TeamScreenDetector.LoadConfirmAction => TeamScreenState.EquipmentConfirm,
-                TeamScreenState.EquipmentConfirm when (x, y) == TeamScreenDetector.IncludeEquipmentAction => TeamScreenState.Teams,
+                TeamScreenState.LoadConfirm when (x, y) == LoadConfirmAction => TeamScreenState.EquipmentConfirm,
+                TeamScreenState.EquipmentConfirm when (x, y) == EquipmentAction => TeamScreenState.Teams,
                 _ => throw new InvalidOperationException($"Unexpected click ({x}, {y}) from {State}."),
             };
             return Task.CompletedTask;

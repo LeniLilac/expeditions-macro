@@ -30,6 +30,9 @@ if ($LASTEXITCODE -ne 0) { throw 'dotnet restore failed.' }
 if (-not $SkipTests) {
     & $DotNetPath test (Join-Path $repository 'tests\ExpeditionsMacro.Tests\ExpeditionsMacro.Tests.csproj') -c Release --no-restore --filter 'Category!=Golden' --logger 'trx;LogFileName=release-tests.trx'
     if ($LASTEXITCODE -ne 0) { throw 'Automated tests failed.' }
+
+    & $DotNetPath test (Join-Path $repository 'tools\ExpeditionsMacro.DeepDebugViewer.Tests\ExpeditionsMacro.DeepDebugViewer.Tests.csproj') -c Release --no-restore --logger 'trx;LogFileName=deep-debug-viewer-tests.trx'
+    if ($LASTEXITCODE -ne 0) { throw 'Deep Debug Viewer tests failed.' }
 }
 
 & $DotNetPath publish (Join-Path $repository 'src\ExpeditionsMacro.App\ExpeditionsMacro.App.csproj') `

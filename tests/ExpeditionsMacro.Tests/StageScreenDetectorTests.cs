@@ -21,8 +21,13 @@ public sealed class StageScreenDetectorTests
     [Theory]
     [InlineData("StorySelector_01.png", StageScreenState.StorySelector)]
     [InlineData("StoryDetail_01.png", StageScreenState.StoryDetail)]
+    [InlineData("StoryDetail_Mastery_01.png", StageScreenState.StoryDetail)]
+    [InlineData("StoryDetail_Act_Wide_01.png", StageScreenState.StoryDetail)]
+    [InlineData("StoryDetail_Infinite_Wide_01.png", StageScreenState.StoryDetail)]
+    [InlineData("StoryDetail_Mastery_Wide_01.png", StageScreenState.StoryDetail)]
     [InlineData("RaidSelector_01.png", StageScreenState.RaidSelector)]
     [InlineData("RaidDetail_01.png", StageScreenState.RaidDetail)]
+    [InlineData("RaidPartyPreview_01.png", StageScreenState.PreviewReady)]
     [InlineData("StoryVictory_Act_01.png", StageScreenState.Victory)]
     [InlineData("StoryVictory_Mastery_01.png", StageScreenState.Victory)]
     [InlineData("StoryDefeat_Act_01.png", StageScreenState.Defeat)]
@@ -41,6 +46,7 @@ public sealed class StageScreenDetectorTests
 
     [Theory]
     [InlineData("StoryDetail_01.png", StageScreenState.StoryDetail)]
+    [InlineData("StoryDetail_Mastery_01.png", StageScreenState.StoryDetail)]
     [InlineData("RaidDetail_01.png", StageScreenState.RaidDetail)]
     public void DetailScreens_MapTheLiveSelectStageButton(string fileName, StageScreenState expected)
     {
@@ -48,7 +54,36 @@ public sealed class StageScreenDetectorTests
 
         Assert.Equal(expected, match.State);
         Assert.InRange(match.ActionX!.Value, 245, 270);
-        Assert.InRange(match.ActionY!.Value, 440, 458);
+        Assert.InRange(match.ActionY!.Value, 430, 458);
+    }
+
+    [Theory]
+    [InlineData("StoryDetail_Act_Wide_01.png")]
+    [InlineData("StoryDetail_Infinite_Wide_01.png")]
+    [InlineData("StoryDetail_Mastery_Wide_01.png")]
+    public void WideStoryDetailScreens_MapTheLiveSelectStageButton(string fileName)
+    {
+        StageScreenMatch match = StageScreenDetector.Detect(Load(fileName));
+
+        Assert.Equal(StageScreenState.StoryDetail, match.State);
+        Assert.InRange(match.ActionX!.Value, 340, 380);
+        Assert.InRange(match.ActionY!.Value, 410, 455);
+    }
+
+    [Fact]
+    public void StoryModeTileAction_UsesTheMapCopyInsteadOfRewardIcons()
+    {
+        Assert.Equal((420, 105), StageScreenDetector.ModeTileAction(StageMode.Story));
+    }
+
+    [Fact]
+    public void ThreeActionPartyPreview_MapsTheLiveStartButton()
+    {
+        StageScreenMatch match = StageScreenDetector.Detect(Load("RaidPartyPreview_01.png"));
+
+        Assert.Equal(StageScreenState.PreviewReady, match.State);
+        Assert.InRange(match.ActionX!.Value, 475, 485);
+        Assert.InRange(match.ActionY!.Value, 415, 425);
     }
 
     [Theory]
@@ -69,6 +104,7 @@ public sealed class StageScreenDetectorTests
     [InlineData("TeamList_01.png")]
     [InlineData("TeamLoadConfirm_01.png")]
     [InlineData("TeamEquipmentConfirm_01.png")]
+    [InlineData("TeamEquipmentConfirm_Compact_01.png")]
     public void TeamInterfaces_DoNotStealStageNavigation(string fileName)
     {
         Assert.Equal(StageScreenState.None, StageScreenDetector.Detect(Load(fileName)).State);

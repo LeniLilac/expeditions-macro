@@ -44,6 +44,7 @@ internal static class UiSnapshotRenderer
         try
         {
             await Dispatcher.Yield(DispatcherPriority.Loaded);
+            await window.VerifyBackgroundModelRefreshAsync();
             foreach (AppTheme theme in new[] { AppTheme.Dark, AppTheme.Light })
             {
                 ThemeService.Apply(theme);

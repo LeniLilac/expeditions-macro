@@ -69,16 +69,35 @@ public static class StageScreenDetector
         };
         if (terminal is not null) return Trace(terminal);
 
-        double selectStage = ActionButtonDetector.Score(image, "stage_select_stage");
+        double stagePartyStart = ActionButtonDetector.Score(image, "stage_party_start");
+        double stagePartyChangeMap = ActionButtonDetector.Score(image, "stage_party_change_map");
+        double stagePartyDisband = ActionButtonDetector.Score(image, "stage_party_disband");
+        if (stagePartyStart > 0 && stagePartyChangeMap > 0 && stagePartyDisband > 0)
+        {
+            (int X, int Y)? action = ActionButtonDetector.ActionFor(image, "stage_party_start");
+            double confidence = Math.Clamp(
+                0.40 * stagePartyStart + 0.30 * stagePartyChangeMap + 0.30 * stagePartyDisband,
+                0,
+                1);
+            return Trace(new StageScreenMatch(StageScreenState.PreviewReady, confidence, action?.X, action?.Y));
+        }
+
+        double narrowSelectStage = ActionButtonDetector.Score(image, "stage_select_stage");
+        double wideSelectStage = ActionButtonDetector.Score(image, "stage_select_stage_wide");
+        double selectStage = Math.Max(narrowSelectStage, wideSelectStage);
         double matchmaking = ActionButtonDetector.Score(image, "stage_enter_matchmaking");
         double cyanDetail = DetailPanelScore(image, IsCyan);
+        double greenDetail = DetailPanelScore(image, IsStoryGreen);
+        double purpleDetail = DetailPanelScore(image, IsStoryPurple);
         double redDetail = DetailPanelScore(image, IsRaidRed);
-        if (selectStage >= 0.65 && matchmaking >= 0.65 && cyanDetail >= 0.68)
+        double storyDetail = Math.Max(cyanDetail, Math.Max(greenDetail, purpleDetail));
+        double storyActionSupport = Math.Max(matchmaking, wideSelectStage);
+        if (selectStage >= 0.65 && storyActionSupport >= 0.65 && storyDetail >= 0.68)
         {
             (int X, int Y)? action = SelectStageAction(image);
-            return Trace(new StageScreenMatch(StageScreenState.StoryDetail, Math.Clamp(0.35 * selectStage + 0.25 * matchmaking + 0.40 * cyanDetail, 0, 1), action?.X, action?.Y));
+            return Trace(new StageScreenMatch(StageScreenState.StoryDetail, Math.Clamp(0.35 * selectStage + 0.25 * storyActionSupport + 0.40 * storyDetail, 0, 1), action?.X, action?.Y));
         }
-        if (selectStage >= 0.65 && matchmaking >= 0.65 && redDetail >= 0.68)
+        if (narrowSelectStage >= 0.65 && matchmaking >= 0.65 && redDetail >= 0.68)
         {
             (int X, int Y)? action = SelectStageAction(image);
             return Trace(new StageScreenMatch(StageScreenState.RaidDetail, Math.Clamp(0.35 * selectStage + 0.25 * matchmaking + 0.40 * redDetail, 0, 1), action?.X, action?.Y));
@@ -90,12 +109,14 @@ public static class StageScreenDetector
         double storySelector = StorySelectorScore(image);
         return Trace(storySelector >= 0.72
             ? new StageScreenMatch(StageScreenState.StorySelector, storySelector)
-            : new StageScreenMatch(StageScreenState.None, Math.Max(Math.Max(storySelector, raidSelector), Math.Max(cyanDetail, redDetail))));
+            : new StageScreenMatch(StageScreenState.None, Math.Max(Math.Max(storySelector, raidSelector), Math.Max(storyDetail, redDetail))));
     }
 
     public static (int X, int Y) ModeTileAction(StageMode mode) => mode switch
     {
-        StageMode.Story => (480, 105),
+        // The reward icons on the right side of the Story card consume clicks to
+        // show item tooltips. Use the stable map-copy area on the left instead.
+        StageMode.Story => (420, 105),
         StageMode.Raid => (680, 105),
         _ => throw new ArgumentOutOfRangeException(nameof(mode)),
     };
@@ -133,11 +154,13 @@ public static class StageScreenDetector
     };
 
     public static (int X, int Y)? SelectStageAction(ImageFrame image) =>
-        ActionButtonDetector.ActionFor(image, "stage_select_stage")
+        ActionButtonDetector.ActionFor(image, "stage_select_stage_wide")
+        ?? ActionButtonDetector.ActionFor(image, "stage_select_stage")
         ?? (256, 449);
 
     public static (int X, int Y) PreviewStartAction(ImageFrame image) =>
-        ActionButtonDetector.ActionFor(image, "challenge_party_start")
+        ActionButtonDetector.ActionFor(image, "stage_party_start")
+        ?? ActionButtonDetector.ActionFor(image, "challenge_party_start")
         ?? ActionButtonDetector.ActionFor(image, "challenge_preview_start")
         ?? (480, 418);
 
@@ -247,6 +270,8 @@ public static class StageScreenDetector
     }
 
     private static bool IsCyan(byte red, byte green, byte blue) => green >= 75 && blue >= 85 && green - red >= 20 && blue - red >= 28;
+    private static bool IsStoryGreen(byte red, byte green, byte blue) => green >= 75 && green - red >= 28 && green - blue >= 20;
+    private static bool IsStoryPurple(byte red, byte green, byte blue) => red >= 65 && blue >= 85 && red - green >= 20 && blue - green >= 28;
     private static bool IsRaidRed(byte red, byte green, byte blue) => red >= 105 && red - green >= 35 && red - blue >= 25;
     private static bool IsRaidSky(byte red, byte green, byte blue) => red >= 35 && red <= 115 && red - green >= 24 && red - blue >= 18;
     private static bool IsStoryOcean(byte red, byte green, byte blue) => blue >= 105 && blue - red >= 35 && blue - green >= 5;

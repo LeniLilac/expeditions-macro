@@ -298,12 +298,15 @@ public sealed class CameraAlignmentEngine
             progress,
             cancellationToken).ConfigureAwait(false);
 
-        // Roblox exposes shift lock only as a toggle. Compare both states and
-        // use an even number of toggles so the caller's original state is
-        // restored after alignment, regardless of which state wins.
-        bool toggledFromInitialState = false;
+        // Camera models are captured with shift lock enabled, and the setup flow
+        // requires users to begin with it disabled. Enable it before any right-drag
+        // so Roblox captures relative motion instead of moving the visible pointer
+        // across the hotbar. Always return to the documented disabled state.
+        bool shiftLockEnabled = false;
         try
         {
+            await EnableShiftLockAsync(window, "Camera preparation", 6, progress, cancellationToken).ConfigureAwait(false);
+            shiftLockEnabled = true;
             await ClampPitchAsync(
                 window,
                 pitchDragPixels,
@@ -313,99 +316,16 @@ public sealed class CameraAlignmentEngine
                 7,
                 progress,
                 cancellationToken).ConfigureAwait(false);
-            double stateA = await BestYawAtlasScoreAsync(model, window, cancellationToken).ConfigureAwait(false);
-
-            progress?.Report(new MacroProgress("Camera preparation", 10, "Testing the alternate shift-lock state against the saved yaw atlas."));
-            await ToggleShiftStateAsync(window, cancellationToken).ConfigureAwait(false);
-            toggledFromInitialState = true;
-            await ClampPitchAsync(
+            return await AlignAsync(
+                model,
                 window,
-                pitchDragPixels,
-                model.Manifest.SettleMilliseconds,
-                model.Manifest.Regions,
-                "Camera preparation",
-                12,
+                manageShiftLock: false,
                 progress,
                 cancellationToken).ConfigureAwait(false);
-            double stateB = await BestYawAtlasScoreAsync(model, window, cancellationToken).ConfigureAwait(false);
-            if (stateA >= stateB)
-            {
-                await ToggleShiftStateAsync(window, cancellationToken).ConfigureAwait(false);
-                toggledFromInitialState = false;
-            }
-
-            progress?.Report(new MacroProgress(
-                "Camera preparation",
-                15,
-                $"Selected the better camera-lock state (A {stateA:P0}, B {stateB:P0}). Verifying the top-down pitch clamp.",
-                Confidence: Math.Max(stateA, stateB)));
-            await ClampPitchAsync(
-                window,
-                pitchDragPixels,
-                model.Manifest.SettleMilliseconds,
-                model.Manifest.Regions,
-                "Camera preparation",
-                16,
-                progress,
-                cancellationToken).ConfigureAwait(false);
-
-            try
-            {
-                return await AlignAsync(
-                    model,
-                    window,
-                    manageShiftLock: false,
-                    progress,
-                    cancellationToken).ConfigureAwait(false);
-            }
-            catch (CameraAlignmentException firstStateFailure)
-            {
-                // The atlas comparison is deliberately tolerant of lighting and
-                // translation. In a heavily animated scene that ranking can still
-                // choose the wrong camera-lock pose. Do not spend the whole run in
-                // that pose: test the alternate state with a fresh pitch clamp and
-                // a complete alignment search before declaring the model unusable.
-                progress?.Report(new MacroProgress(
-                    "Camera preparation",
-                    15,
-                    $"The preferred camera-lock state reached only {firstStateFailure.BestConfidence:P0}. Retrying in the alternate state.",
-                    Confidence: firstStateFailure.BestConfidence));
-                await ToggleShiftStateAsync(window, cancellationToken).ConfigureAwait(false);
-                toggledFromInitialState = !toggledFromInitialState;
-                await ClampPitchAsync(
-                    window,
-                    pitchDragPixels,
-                    model.Manifest.SettleMilliseconds,
-                    model.Manifest.Regions,
-                    "Camera preparation",
-                    16,
-                    progress,
-                    cancellationToken).ConfigureAwait(false);
-                try
-                {
-                    return await AlignAsync(
-                        model,
-                        window,
-                        manageShiftLock: false,
-                        progress,
-                        cancellationToken).ConfigureAwait(false);
-                }
-                catch (CameraAlignmentException alternateStateFailure)
-                {
-                    double best = Math.Max(firstStateFailure.BestConfidence, alternateStateFailure.BestConfidence);
-                    int attempts = firstStateFailure.Attempts + alternateStateFailure.Attempts;
-                    string failure = $"Camera alignment failed in both camera-lock states after {attempts} attempts. Best confidence was {best:P0}; the model requires {model.Manifest.SuccessThreshold:P0}. Unit placement was not started.";
-                    progress?.Report(new MacroProgress("Camera alignment", 100, failure, Confidence: best));
-                    throw new CameraAlignmentException(failure, best, attempts);
-                }
-            }
         }
         finally
         {
-            if (toggledFromInitialState)
-            {
-                await ToggleShiftStateAsync(window, CancellationToken.None).ConfigureAwait(false);
-            }
+            if (shiftLockEnabled) await DisableShiftLockAsync(window).ConfigureAwait(false);
         }
     }
 
@@ -838,7 +758,8 @@ public sealed class CameraAlignmentEngine
         AlignmentAttemptPlan plan,
         int attempt,
         IProgress<MacroProgress>? progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool allowNeighborhoodShortcut = true)
     {
         int fullTurn = model.Manifest.FullYawSteps;
         int bestOffset = 0;
@@ -896,6 +817,54 @@ public sealed class CameraAlignmentEngine
                     return await RefineWithMouseAsync(window, model, verified, 96, "Refining the full-turn match with micro mouse drags.", progress, cancellationToken).ConfigureAwait(false);
                 }
             }
+
+            // A fine-atlas hit is a candidate, not a success score: registered
+            // matching can confuse a different coarse yaw with a nearby goal view.
+            // Require near-baseline evidence, apply its saved correction, and then
+            // verify the corrected pose against the unchanged direct goal target.
+            if (allowNeighborhoodShortcut && observation.FineMatch.Score >= earlyExitThreshold)
+            {
+                progress?.Report(new MacroProgress(
+                    "Camera alignment",
+                    94,
+                    $"Strong saved fine-yaw neighborhood found after {travelled} {DirectionLabel(plan.ScanDirection)} steps ({observation.FineMatch.Score:P0}). Testing it before continuing the full turn.",
+                    Confidence: observation.FineMatch.Score));
+                double neighborhood = await RefineSavedNeighborhoodCandidateAsync(
+                    window,
+                    model,
+                    observation.FineMatch,
+                    96,
+                    "Refining the saved fine-yaw neighborhood before continuing the full-turn scan.",
+                    progress,
+                    cancellationToken).ConfigureAwait(false);
+                if (neighborhood >= model.Manifest.SuccessThreshold)
+                {
+                    progress?.Report(new MacroProgress(
+                        "Camera alignment",
+                        97,
+                        $"Saved fine-yaw neighborhood resolved the goal at {neighborhood:P0}; skipped the remaining full-turn scan.",
+                        Confidence: neighborhood));
+                    return neighborhood;
+                }
+
+                progress?.Report(new MacroProgress(
+                    "Camera alignment",
+                    76,
+                    $"Saved fine-yaw neighborhood reached only {neighborhood:P0}; restarting a complete scan from the current pose.",
+                    Confidence: neighborhood));
+                // Candidate refinement already consumed this attempt's sampling
+                // phase. A restarted turn begins at the resulting pose and must
+                // not apply that mouse offset a second time.
+                return await ScanFullTurnAsync(
+                    window,
+                    model,
+                    neighborhood,
+                    plan with { ScanPhasePixels = 0 },
+                    attempt,
+                    progress,
+                    cancellationToken,
+                    allowNeighborhoodShortcut: false).ConfigureAwait(false);
+            }
         }
 
         CameraYawDirection direction = bestOffset <= fullTurn / 2 ? plan.ScanDirection : Opposite(plan.ScanDirection);
@@ -909,18 +878,44 @@ public sealed class CameraAlignmentEngine
         {
             await PulseYawAsync(window, direction, correction, model.Manifest.ArrowHoldMilliseconds, model.Manifest.SettleMilliseconds, cancellationToken).ConfigureAwait(false);
         }
-        if (bestFineMatch.Score >= 0.52 && bestFineMatch.Offset != 0)
+        return await RefineSavedNeighborhoodCandidateAsync(
+            window,
+            model,
+            bestFineMatch,
+            96,
+            "Refining the best full-turn candidate with micro mouse drags.",
+            progress,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<double> RefineSavedNeighborhoodCandidateAsync(
+        RobloxWindow window,
+        CameraModel model,
+        FineYawMatch fineMatch,
+        int progressPercent,
+        string progressMessage,
+        IProgress<MacroProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        if (fineMatch.Score >= 0.52 && fineMatch.Offset != 0)
         {
             await MoveMouseAsync(
                 window,
-                -bestFineMatch.Offset,
+                -fineMatch.Offset,
                 model.Manifest.SettleMilliseconds,
                 model.Manifest.FineStepPixels,
                 cancellationToken).ConfigureAwait(false);
         }
         double candidate = await StableScoreAsync(model, window, 3, cancellationToken).ConfigureAwait(false);
         candidate = await RefineWithArrowsAsync(window, model, candidate, cancellationToken).ConfigureAwait(false);
-        return await RefineWithMouseAsync(window, model, candidate, 96, "Refining the best full-turn candidate with micro mouse drags.", progress, cancellationToken).ConfigureAwait(false);
+        return await RefineWithMouseAsync(
+            window,
+            model,
+            candidate,
+            progressPercent,
+            progressMessage,
+            progress,
+            cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<AlignmentObservation> StableObservationAsync(
@@ -1225,25 +1220,6 @@ public sealed class CameraAlignmentEngine
         ImageFrame frame = _automation.CaptureClient(window);
         if (regions is null) return VisionScorer.PrepareGray(frame, 160, 101);
         return VisionScorer.MakeThumbnail(CameraRegionAnalyzer.BuildComposite(frame, regions), 160);
-    }
-
-    private async Task ToggleShiftStateAsync(RobloxWindow window, CancellationToken cancellationToken)
-    {
-        Focus(window);
-        await _automation.MoveCursorToClientCenterAsync(window, cancellationToken).ConfigureAwait(false);
-        await Task.Delay(100, cancellationToken).ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
-        await _automation.TapLeftControlAsync(window, CancellationToken.None).ConfigureAwait(false);
-        await Task.Delay(250, CancellationToken.None).ConfigureAwait(false);
-    }
-
-    private async Task<double> BestYawAtlasScoreAsync(
-        CameraModel model,
-        RobloxWindow window,
-        CancellationToken cancellationToken)
-    {
-        ImageFrame current = await CurrentThumbnailAsync(model, window, model.YawAtlas[0].Width, 3, cancellationToken).ConfigureAwait(false);
-        return BestAtlasMatch(model.YawAtlas, current).Score;
     }
 
     private static AtlasMatch BestAtlasMatch(IReadOnlyList<ImageFrame> atlas, ImageFrame current)
