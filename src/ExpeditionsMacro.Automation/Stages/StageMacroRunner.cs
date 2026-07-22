@@ -58,7 +58,8 @@ public sealed class StageMacroRunner
         char? unitMenuKey,
         IProgress<MacroProgress>? progress = null,
         Action<MacroEvent>? log = null,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken = default,
+        Func<int, int, TimeSpan, CancellationToken, Task<bool>>? continueScheduledRoute = null) =>
         RunAsync(
             StageMode.Story,
             preset,
@@ -69,7 +70,8 @@ public sealed class StageMacroRunner
             unitMenuKey,
             progress,
             log,
-            cancellationToken);
+            cancellationToken,
+            continueScheduledRoute);
 
     public Task<StageRunResult> RunRaidAsync(
         RaidPreset preset,
@@ -80,7 +82,8 @@ public sealed class StageMacroRunner
         char? unitMenuKey,
         IProgress<MacroProgress>? progress = null,
         Action<MacroEvent>? log = null,
-        CancellationToken cancellationToken = default) =>
+        CancellationToken cancellationToken = default,
+        Func<int, int, TimeSpan, CancellationToken, Task<bool>>? continueScheduledRoute = null) =>
         RunAsync(
             StageMode.Raid,
             preset,
@@ -91,7 +94,8 @@ public sealed class StageMacroRunner
             unitMenuKey,
             progress,
             log,
-            cancellationToken);
+            cancellationToken,
+            continueScheduledRoute);
 
     private async Task<StageRunResult> RunAsync(
         StageMode mode,
@@ -103,7 +107,8 @@ public sealed class StageMacroRunner
         char? unitMenuKey,
         IProgress<MacroProgress>? progress,
         Action<MacroEvent>? log,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<int, int, TimeSpan, CancellationToken, Task<bool>>? continueScheduledRoute)
     {
         StoryPreset? story = preset as StoryPreset;
         RaidPreset? raid = preset as RaidPreset;
@@ -137,6 +142,7 @@ public sealed class StageMacroRunner
         TimeSpan matchRuntimeTotal = TimeSpan.Zero;
         StageRunResult? last = null;
         bool teamLoaded = teamSlot == 0;
+        bool repeatedPrestartReady = false;
 
         Write($"Using Roblox window '{window.Title}' ({window.ProcessDescription}).");
         Focus(window);
@@ -148,21 +154,30 @@ public sealed class StageMacroRunner
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                bool recoveredBeforeNavigation = await EnsureGameModeSelectorAsync(
-                    window,
-                    mode,
-                    playMenuKey,
-                    detector,
-                    autoRecover,
-                    stableDetections,
-                    Report,
-                    Write,
-                    cancellationToken).ConfigureAwait(false);
-                if (recoveredBeforeNavigation) teamLoaded = teamSlot == 0;
+                if (repeatedPrestartReady)
+                {
+                    repeatedPrestartReady = false;
+                    attempts = 1;
+                    Report("Navigation", 8, $"Repeat Stage returned to {RouteLabel(mode, story, raid)} prestart.");
+                }
+                else
+                {
+                    bool recoveredBeforeNavigation = await EnsureGameModeSelectorAsync(
+                        window,
+                        mode,
+                        playMenuKey,
+                        detector,
+                        autoRecover,
+                        stableDetections,
+                        Report,
+                        Write,
+                        cancellationToken).ConfigureAwait(false);
+                    if (recoveredBeforeNavigation) teamLoaded = teamSlot == 0;
 
-                attempts++;
-                Report("Navigation", 8, $"Opening {RouteLabel(mode, story, raid)} (attempt {attempts}/{retries + 1}).");
-                await NavigateToPrestartAsync(window, mode, story, raid, playMenuKey, detector, stableDetections, cancellationToken).ConfigureAwait(false);
+                    attempts++;
+                    Report("Navigation", 8, $"Opening {RouteLabel(mode, story, raid)} (attempt {attempts}/{retries + 1}).");
+                    await NavigateToPrestartAsync(window, mode, story, raid, playMenuKey, detector, stableDetections, cancellationToken).ConfigureAwait(false);
+                }
 
                 if (!teamLoaded)
                 {
@@ -218,6 +233,36 @@ public sealed class StageMacroRunner
                 Write($"{RouteLabel(mode, story, raid)} ended in {outcome}.", outcome == StageRunOutcome.Victory ? MacroEventLevel.Success : MacroEventLevel.Warning, outcome.ToString().ToLowerInvariant());
                 await TryNotifyAsync(webhookUrl, mode, story, raid, outcome, terminal.Frame, totalRuntime.Elapsed, victories, defeats, Write, cancellationToken).ConfigureAwait(false);
 
+                if (continueScheduledRoute is not null)
+                {
+                    bool repeatSameRoute = await continueScheduledRoute(
+                        outcome == StageRunOutcome.Victory ? 1 : 0,
+                        outcome == StageRunOutcome.Defeat ? 1 : 0,
+                        matchRuntime.Elapsed,
+                        cancellationToken).ConfigureAwait(false);
+                    if (repeatSameRoute)
+                    {
+                        (int X, int Y)? repeat = StageScreenDetector.RepeatStageAction(terminal.Frame, terminal.State);
+                        if (repeat is null)
+                        {
+                            throw new InvalidOperationException($"The {Label(mode)} Repeat Stage button could not be located.");
+                        }
+                        Report("Handoff", 100, $"The same {Label(mode)} preset is next. Repeating the stage.", "repeat_stage", terminal.Confidence);
+                        Write($"The scheduler kept the same {Label(mode)} route; using Repeat Stage instead of reopening Play.", MacroEventLevel.Success, "repeat_stage", terminal.Confidence);
+                        await ClickAsync(window, repeat.Value.X, repeat.Value.Y, cancellationToken).ConfigureAwait(false);
+                        await WaitForStateAsync(
+                            window,
+                            StageScreenState.Prestart,
+                            TimeSpan.FromSeconds(45),
+                            detector,
+                            stableDetections,
+                            cancellationToken).ConfigureAwait(false);
+                        repeatedPrestartReady = true;
+                        attempts = 0;
+                        continue;
+                    }
+                }
+
                 bool recoveredAfterResult = await EnsureGameModeSelectorAsync(
                     window,
                     mode,
@@ -229,6 +274,7 @@ public sealed class StageMacroRunner
                     Write,
                     cancellationToken).ConfigureAwait(false);
                 if (recoveredAfterResult) teamLoaded = teamSlot == 0;
+                if (continueScheduledRoute is not null) return last;
                 if (outcome == StageRunOutcome.Victory || attempts > retries) return last;
                 Write($"Retrying after defeat ({attempts}/{retries + 1}).", MacroEventLevel.Warning);
             }
@@ -393,6 +439,7 @@ public sealed class StageMacroRunner
             {
                 return new TerminalObservation(
                     terminal == "victory" ? StageScreenState.Victory : StageScreenState.Defeat,
+                    state.Confidence,
                     frame.Clone());
             }
 
@@ -814,7 +861,7 @@ public sealed class StageMacroRunner
         _ => map.ToString(),
     };
 
-    private sealed record TerminalObservation(StageScreenState State, ImageFrame Frame);
+    private sealed record TerminalObservation(StageScreenState State, double Confidence, ImageFrame Frame);
 
     private sealed class StageRecoveryException : Exception
     {

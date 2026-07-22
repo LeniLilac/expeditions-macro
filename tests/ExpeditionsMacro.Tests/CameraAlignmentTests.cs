@@ -574,6 +574,35 @@ public sealed class CameraAlignmentTests
     }
 
     [Fact]
+    public async Task Align_WhenFineNeighborhoodAlreadyPasses_DoesNotRiskCoarseArrowProbeDrift()
+    {
+        ImageFrame goal = VisionScorerTests.Pattern(RobloxClientProfile.Width, RobloxClientProfile.Height);
+        ImageFrame wrong = Blank(goal.Width, goal.Height);
+        ImageFrame nearby = Shift(goal, 24);
+        CameraModel model = WithFineNeighborhoodReference(
+            CreateModel(goal, Enumerable.Repeat(wrong, 13).ToArray()),
+            offset: -4,
+            nearby);
+        FakeAutomation automation = new(wrong)
+        {
+            FullYawSteps = 12,
+            CaptureAtYaw = (yaw, mouse) => yaw == 4
+                ? mouse == 4 ? goal : nearby
+                : wrong,
+            CorruptOnYawPulseAfterMouseMovement = true,
+            CorruptedFrame = wrong,
+        };
+        CameraAlignmentEngine engine = new(automation, new NullCameraRepository());
+
+        double score = await engine.AlignAsync(model, manageShiftLock: false);
+
+        Assert.True(score > 0.90, $"Neighborhood alignment score was {score:P1}.");
+        Assert.False(automation.CameraCorrupted);
+        Assert.Equal(4, automation.YawStep);
+        Assert.Equal(4, automation.MouseOffset);
+    }
+
+    [Fact]
     public async Task Align_WhenStrongFineNeighborhoodDoesNotVerify_RestartsCompleteScan()
     {
         ImageFrame goal = VisionScorerTests.Pattern(RobloxClientProfile.Width, RobloxClientProfile.Height);
@@ -765,12 +794,15 @@ public sealed class CameraAlignmentTests
         public int ZoomTicks { get; private set; }
         public Exception? CaptureFailure { get; init; }
         public Exception? DragFailure { get; init; }
+        public bool CorruptOnYawPulseAfterMouseMovement { get; init; }
+        public ImageFrame? CorruptedFrame { get; init; }
         public Func<int, int, ImageFrame>? CaptureAtYaw { get; init; }
         public Func<int, int, bool, ImageFrame>? CaptureAtCameraState { get; init; }
         public int FullYawSteps { get; init; } = 12;
         public int YawStep { get; set; }
         public int MouseOffset { get; private set; }
         public bool ShiftLockState { get; private set; }
+        public bool CameraCorrupted { get; private set; }
 
         public RobloxWindow? FindWindow(string titleFragment = "Roblox") => _window;
         public RobloxWindow? ForegroundWindow() => _window;
@@ -793,6 +825,7 @@ public sealed class CameraAlignmentTests
         public ImageFrame CaptureClient(RobloxWindow window)
         {
             if (CaptureFailure is not null) throw CaptureFailure;
+            if (CameraCorrupted && CorruptedFrame is not null) return CorruptedFrame.Clone();
             return (CaptureAtCameraState?.Invoke(YawStep, MouseOffset, ShiftLockState)
                 ?? CaptureAtYaw?.Invoke(YawStep, MouseOffset)
                 ?? screenCapture).Clone();
@@ -816,6 +849,7 @@ public sealed class CameraAlignmentTests
         public Task PulseCameraYawAsync(RobloxWindow window, CameraYawDirection direction, int holdMilliseconds, CancellationToken cancellationToken)
         {
             ArrowPulses.Add(direction);
+            if (CorruptOnYawPulseAfterMouseMovement && MouseOffset != 0) CameraCorrupted = true;
             int delta = direction == CameraYawDirection.Right ? 1 : -1;
             YawStep = ((YawStep + delta) % FullYawSteps + FullYawSteps) % FullYawSteps;
             return Task.CompletedTask;

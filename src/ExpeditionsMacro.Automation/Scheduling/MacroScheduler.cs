@@ -11,6 +11,12 @@ public sealed record ScheduledTaskResult(
     DateTimeOffset? NextEligibleAtUtc = null,
     bool Skipped = false);
 
+public enum ScheduledTaskContinuation
+{
+    Handoff,
+    RepeatStage,
+}
+
 public sealed class MacroScheduler
 {
     private readonly MacroPlanRepository _plans;
@@ -19,7 +25,11 @@ public sealed class MacroScheduler
 
     public async Task RunAsync(
         MacroPlan initialPlan,
-        Func<MacroTaskDefinition, CancellationToken, Task<ScheduledTaskResult>> execute,
+        Func<
+            MacroTaskDefinition,
+            Func<ScheduledTaskResult, CancellationToken, Task<ScheduledTaskContinuation>>,
+            CancellationToken,
+            Task<ScheduledTaskResult>> execute,
         IProgress<MacroProgress>? progress = null,
         Action<MacroPlan>? planChanged = null,
         Action<MacroEvent>? log = null,
@@ -49,28 +59,45 @@ public sealed class MacroScheduler
                 continue;
             }
 
-            MacroTaskProgress before = plan.ProgressFor(next.Id);
             progress?.Report(new MacroProgress("Task", 0, $"Starting priority {next.Priority}: {DisplayName(next)}.", "scheduler_task"));
             log?.Invoke(new MacroEvent(DateTimeOffset.Now, MacroEventLevel.Information, $"Scheduler selected priority {next.Priority}: {DisplayName(next)}.", "scheduler_task"));
-            ScheduledTaskResult result = await execute(next, cancellationToken).ConfigureAwait(false);
-            DateTimeOffset completedAt = DateTimeOffset.UtcNow;
-            MacroTaskProgress after = Advance(next, before, result, completedAt);
-            plan = plan with
+            MacroTaskDefinition activeTask = next;
+            bool resultRecorded = false;
+
+            async Task<ScheduledTaskContinuation> RecordResultAsync(
+                ScheduledTaskResult result,
+                CancellationToken recordCancellationToken)
             {
-                Progress = plan.Tasks.Select(task => string.Equals(task.Id, next.Id, StringComparison.OrdinalIgnoreCase)
-                    ? after
-                    : plan.ProgressFor(task.Id)).ToArray(),
-                UpdatedAt = completedAt,
-            };
-            await SaveAsync(plan, planChanged, cancellationToken).ConfigureAwait(false);
-            string outcome = result.Skipped
-                ? "skipped"
-                : result.Victories > 0
-                    ? $"recorded {result.Victories} victory"
-                    : result.Defeats > 0
-                        ? $"recorded {result.Defeats} defeat"
-                        : "updated eligibility";
-            log?.Invoke(new MacroEvent(DateTimeOffset.Now, MacroEventLevel.Information, $"{DisplayName(next)} {outcome}.", "scheduler_progress"));
+                resultRecorded = true;
+                DateTimeOffset completedAt = DateTimeOffset.UtcNow;
+                MacroTaskProgress before = plan.ProgressFor(activeTask.Id);
+                MacroTaskProgress after = Advance(activeTask, before, result, completedAt);
+                plan = plan with
+                {
+                    Progress = plan.Tasks.Select(task => string.Equals(task.Id, activeTask.Id, StringComparison.OrdinalIgnoreCase)
+                        ? after
+                        : plan.ProgressFor(task.Id)).ToArray(),
+                    UpdatedAt = completedAt,
+                };
+                await SaveAsync(plan, planChanged, recordCancellationToken).ConfigureAwait(false);
+                LogResult(activeTask, result, log);
+
+                MacroTaskDefinition? following = SelectNext(plan, DateTimeOffset.UtcNow);
+                if (!CanRepeatStage(activeTask, following, result)) return ScheduledTaskContinuation.Handoff;
+                log?.Invoke(new MacroEvent(
+                    DateTimeOffset.Now,
+                    MacroEventLevel.Information,
+                    $"Scheduler kept {DisplayName(following!)} on the same route; using Repeat Stage.",
+                    "scheduler_repeat_stage"));
+                activeTask = following!;
+                return ScheduledTaskContinuation.RepeatStage;
+            }
+
+            ScheduledTaskResult returned = await execute(next, RecordResultAsync, cancellationToken).ConfigureAwait(false);
+            if (!resultRecorded)
+            {
+                await RecordResultAsync(returned, cancellationToken).ConfigureAwait(false);
+            }
         }
     }
 
@@ -124,6 +151,16 @@ public sealed class MacroScheduler
         };
     }
 
+    internal static bool CanRepeatStage(
+        MacroTaskDefinition current,
+        MacroTaskDefinition? following,
+        ScheduledTaskResult result) =>
+        !result.Skipped &&
+        following is not null &&
+        current.Kind is MacroTaskKind.Expedition or MacroTaskKind.Story or MacroTaskKind.Raid &&
+        following.Kind == current.Kind &&
+        string.Equals(following.PresetId, current.PresetId, StringComparison.OrdinalIgnoreCase);
+
     private static MacroPlan NormalizeProgress(MacroPlan plan) => plan with
     {
         Progress = plan.Tasks.Select(task => plan.ProgressFor(task.Id)).ToArray(),
@@ -141,6 +178,21 @@ public sealed class MacroScheduler
     {
         await _plans.SaveAsync(plan, cancellationToken).ConfigureAwait(false);
         changed?.Invoke(plan);
+    }
+
+    private static void LogResult(
+        MacroTaskDefinition task,
+        ScheduledTaskResult result,
+        Action<MacroEvent>? log)
+    {
+        string outcome = result.Skipped
+            ? "skipped"
+            : result.Victories > 0
+                ? $"recorded {result.Victories} victory"
+                : result.Defeats > 0
+                    ? $"recorded {result.Defeats} defeat"
+                    : "updated eligibility";
+        log?.Invoke(new MacroEvent(DateTimeOffset.Now, MacroEventLevel.Information, $"{DisplayName(task)} {outcome}.", "scheduler_progress"));
     }
 
     private static string DisplayName(MacroTaskDefinition task) =>

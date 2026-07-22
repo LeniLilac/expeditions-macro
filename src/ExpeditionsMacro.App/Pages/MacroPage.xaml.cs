@@ -217,7 +217,7 @@ public partial class MacroPage : UserControl, IAppPage
         {
             await _services.Scheduler.RunAsync(
                 plan,
-                (task, token) => ExecuteTaskAsync(task, webhook, discordUserId, playMenuKey, unitMenuKey, progress, token),
+                (task, recordResult, token) => ExecuteTaskAsync(task, recordResult, webhook, discordUserId, playMenuKey, unitMenuKey, progress, token),
                 progress,
                 changed => Dispatcher.BeginInvoke(() => ApplyPlanProgress(changed)),
                 entry => DispatchLog(entry),
@@ -255,6 +255,7 @@ public partial class MacroPage : UserControl, IAppPage
 
     private Task<ScheduledTaskResult> ExecuteTaskAsync(
         MacroTaskDefinition task,
+        Func<ScheduledTaskResult, CancellationToken, Task<ScheduledTaskContinuation>> recordResult,
         string webhook,
         string discordUserId,
         char playMenuKey,
@@ -266,9 +267,9 @@ public partial class MacroPage : UserControl, IAppPage
         return task.Kind switch
         {
             MacroTaskKind.Challenge => ExecuteChallengeAsync(task, webhook, discordUserId, playMenuKey, unitMenuKey, progress, cancellationToken),
-            MacroTaskKind.Expedition => ExecuteExpeditionAsync(task, webhook, discordUserId, playMenuKey, unitMenuKey, progress, cancellationToken),
-            MacroTaskKind.Story => ExecuteStoryAsync(task, webhook, discordUserId, playMenuKey, unitMenuKey, progress, cancellationToken),
-            MacroTaskKind.Raid => ExecuteRaidAsync(task, webhook, discordUserId, playMenuKey, unitMenuKey, progress, cancellationToken),
+            MacroTaskKind.Expedition => ExecuteExpeditionAsync(task, recordResult, webhook, discordUserId, playMenuKey, unitMenuKey, progress, cancellationToken),
+            MacroTaskKind.Story => ExecuteStoryAsync(task, recordResult, webhook, discordUserId, playMenuKey, unitMenuKey, progress, cancellationToken),
+            MacroTaskKind.Raid => ExecuteRaidAsync(task, recordResult, webhook, discordUserId, playMenuKey, unitMenuKey, progress, cancellationToken),
             _ => throw new ArgumentOutOfRangeException(nameof(task), task.Kind, "Unknown macro task type."),
         };
     }
@@ -312,6 +313,7 @@ public partial class MacroPage : UserControl, IAppPage
 
     private async Task<ScheduledTaskResult> ExecuteExpeditionAsync(
         MacroTaskDefinition task,
+        Func<ScheduledTaskResult, CancellationToken, Task<ScheduledTaskContinuation>> recordResult,
         string webhook,
         string discordUserId,
         char playMenuKey,
@@ -340,8 +342,10 @@ public partial class MacroPage : UserControl, IAppPage
             cancellationToken,
             stopAfterCurrentRunUtc: null,
             recoverableFailure: (error, token) => HandleRecoverableFailureAsync("Expeditions Macro", webhook, discordUserId, error, token),
-            maximumRuns: 1,
-            unitMenuKey).ConfigureAwait(false);
+            maximumRuns: null,
+            unitMenuKey,
+            continueScheduledRoute: async (victories, defeats, runtime, token) =>
+                await recordResult(new ScheduledTaskResult(victories, defeats, runtime), token).ConfigureAwait(false) == ScheduledTaskContinuation.RepeatStage).ConfigureAwait(false);
 
         ExpeditionRunSummary result = summary ?? throw new InvalidOperationException("Expedition task returned without a run summary.");
         return result.Repeats > 0
@@ -351,6 +355,7 @@ public partial class MacroPage : UserControl, IAppPage
 
     private async Task<ScheduledTaskResult> ExecuteStoryAsync(
         MacroTaskDefinition task,
+        Func<ScheduledTaskResult, CancellationToken, Task<ScheduledTaskContinuation>> recordResult,
         string webhook,
         string discordUserId,
         char playMenuKey,
@@ -377,7 +382,9 @@ public partial class MacroPage : UserControl, IAppPage
                 unitMenuKey,
                 progress,
                 entry => DispatchLog(entry),
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                continueScheduledRoute: async (victories, defeats, runtime, token) =>
+                    await recordResult(new ScheduledTaskResult(victories, defeats, runtime), token).ConfigureAwait(false) == ScheduledTaskContinuation.RepeatStage).ConfigureAwait(false);
             return ToScheduledResult(result);
         }
         catch (CameraAlignmentException error)
@@ -390,6 +397,7 @@ public partial class MacroPage : UserControl, IAppPage
 
     private async Task<ScheduledTaskResult> ExecuteRaidAsync(
         MacroTaskDefinition task,
+        Func<ScheduledTaskResult, CancellationToken, Task<ScheduledTaskContinuation>> recordResult,
         string webhook,
         string discordUserId,
         char playMenuKey,
@@ -416,7 +424,9 @@ public partial class MacroPage : UserControl, IAppPage
                 unitMenuKey,
                 progress,
                 entry => DispatchLog(entry),
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                continueScheduledRoute: async (victories, defeats, runtime, token) =>
+                    await recordResult(new ScheduledTaskResult(victories, defeats, runtime), token).ConfigureAwait(false) == ScheduledTaskContinuation.RepeatStage).ConfigureAwait(false);
             return ToScheduledResult(result);
         }
         catch (CameraAlignmentException error)

@@ -455,7 +455,10 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
             }
 
             defeats++;
-            bool willRetry = retry < preset.DefeatRetries;
+            bool willRetry = ChallengeRunPolicy.TerminalContinuation(
+                victory: false,
+                retry,
+                preset.DefeatRetries) == ChallengeTerminalContinuation.RepeatStage;
             string defeatDetail = willRetry
                 ? $"{Label(type)} on {Label(map)} ended in Defeat. Retry {retry + 1} of {preset.DefeatRetries} will start."
                 : $"{Label(type)} on {Label(map)} ended in Defeat. The retry limit was reached.";

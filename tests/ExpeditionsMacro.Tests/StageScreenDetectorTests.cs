@@ -142,6 +142,26 @@ public sealed class StageScreenDetectorTests
     }
 
     [Theory]
+    [InlineData("StoryVictory_Mastery_Current_02.png", StageScreenState.Victory, 210, 240, 420, 452)]
+    [InlineData("RaidVictory_CompactActions_01.png", StageScreenState.Victory, 290, 320, 420, 452)]
+    [InlineData("StoryDefeat_Mastery_01.png", StageScreenState.Defeat, 190, 225, 420, 455)]
+    [InlineData("RaidDefeat_01.png", StageScreenState.Defeat, 190, 225, 420, 455)]
+    public void TerminalScreens_MapTheLiveRepeatStageControl(
+        string fileName,
+        StageScreenState state,
+        int minimumX,
+        int maximumX,
+        int minimumY,
+        int maximumY)
+    {
+        (int X, int Y)? action = StageScreenDetector.RepeatStageAction(Load(fileName), state);
+
+        Assert.NotNull(action);
+        Assert.InRange(action!.Value.X, minimumX, maximumX);
+        Assert.InRange(action.Value.Y, minimumY, maximumY);
+    }
+
+    [Theory]
     [InlineData("TeamUnits_01.png")]
     [InlineData("TeamList_01.png")]
     [InlineData("TeamLoadConfirm_01.png")]
