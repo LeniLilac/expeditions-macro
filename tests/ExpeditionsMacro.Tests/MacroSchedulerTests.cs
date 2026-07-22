@@ -134,6 +134,73 @@ public sealed class MacroSchedulerTests
         Assert.Equal(retry, after.NextEligibleAtUtc);
     }
 
+    [Theory]
+    [InlineData(MacroTaskKind.Expedition, true)]
+    [InlineData(MacroTaskKind.Story, true)]
+    [InlineData(MacroTaskKind.Raid, true)]
+    [InlineData(MacroTaskKind.Challenge, false)]
+    public void RepeatStage_RequiresTheSameFiniteRoute(MacroTaskKind kind, bool expected)
+    {
+        MacroTaskDefinition current = Task("current", kind, 1) with { PresetId = "same-route" };
+        MacroTaskDefinition following = Task("following", kind, 2) with { PresetId = "same-route" };
+
+        Assert.Equal(expected, MacroScheduler.CanRepeatStage(
+            current,
+            following,
+            new ScheduledTaskResult(1, 0, TimeSpan.FromMinutes(2))));
+        Assert.False(MacroScheduler.CanRepeatStage(
+            current,
+            following with { PresetId = "different-route" },
+            new ScheduledTaskResult(1, 0, TimeSpan.FromMinutes(2))));
+        Assert.False(MacroScheduler.CanRepeatStage(
+            current,
+            following,
+            new ScheduledTaskResult(0, 0, TimeSpan.Zero, Skipped: true)));
+    }
+
+    [Fact]
+    public async Task MatchCallback_PersistsEachRepeatedStageBeforeTheRunnerContinues()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            AppPaths paths = new(root);
+            MacroPlanRepository repository = new(paths);
+            MacroScheduler scheduler = new(repository);
+            MacroTaskDefinition expedition = Task("expedition", MacroTaskKind.Expedition, 1) with { TargetVictories = 2 };
+            MacroPlan plan = Plan(expedition);
+            using CancellationTokenSource stopped = new();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => scheduler.RunAsync(
+                plan,
+                async (_, record, token) =>
+                {
+                    ScheduledTaskContinuation first = await record(
+                        new ScheduledTaskResult(1, 0, TimeSpan.FromMinutes(3)),
+                        token);
+                    Assert.Equal(ScheduledTaskContinuation.RepeatStage, first);
+                    MacroPlan afterFirst = Assert.IsType<MacroPlan>(await repository.LoadAsync(plan.Id, token));
+                    Assert.Equal(1, afterFirst.ProgressFor(expedition.Id).Victories);
+
+                    ScheduledTaskContinuation second = await record(
+                        new ScheduledTaskResult(1, 0, TimeSpan.FromMinutes(3)),
+                        token);
+                    Assert.Equal(ScheduledTaskContinuation.Handoff, second);
+                    stopped.Cancel();
+                    return new ScheduledTaskResult(2, 0, TimeSpan.FromMinutes(6));
+                },
+                cancellationToken: stopped.Token));
+
+            MacroPlan completed = Assert.IsType<MacroPlan>(await repository.LoadAsync(plan.Id));
+            Assert.Equal(2, completed.ProgressFor(expedition.Id).Victories);
+            Assert.True(completed.ProgressFor(expedition.Id).Completed);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
     [Fact]
     public async Task ResetProgress_PersistsAnEmptyRecordForEveryTask()
     {

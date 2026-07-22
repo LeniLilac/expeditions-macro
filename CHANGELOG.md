@@ -4,6 +4,22 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.6] - 2026-07-22
+
+### Changed
+
+- Exact same-preset Expedition, Story, and Raid tasks now use Repeat Stage between scheduled matches; different presets and modes complete a verified handoff through the shared Play selector. Challenge victories still return through Play, while only configured Challenge defeat retries use Repeat Stage.
+
+### Fixed
+
+- Continuously drains Windows Graphics Capture into the latest FP16 compositor texture, preventing every detector and deep-debug frame from remaining frozen on the first image after startup.
+- Falls back to the software WARP Direct3D device when no hardware capture device is available; integrated graphics continues to use the normal hardware path.
+- Re-observes the actual camera after coarse and fine probe round trips, and avoids coarse arrow probes once a pose already passes, preventing variable Roblox key timing from discarding a correct yaw and forcing another full-turn attempt.
+
+### Tests
+
+- Added scheduler continuation, terminal-action mapping, and Challenge retry-policy regressions, plus a live changing-frame capture smoke check.
+
 ## [1.3.0-beta.5] - 2026-07-22
 
 ### Added
@@ -483,7 +499,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.5...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.6...HEAD
+[1.3.0-beta.6]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.5...v1.3.0-beta.6
 [1.3.0-beta.5]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.4...v1.3.0-beta.5
 [1.3.0-beta.4]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.3...v1.3.0-beta.4
 [1.3.0-beta.3]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.2...v1.3.0-beta.3

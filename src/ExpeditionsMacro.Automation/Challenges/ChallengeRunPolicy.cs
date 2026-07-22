@@ -3,8 +3,26 @@ using ExpeditionsMacro.Core.Models;
 
 namespace ExpeditionsMacro.Automation.Challenges;
 
+internal enum ChallengeTerminalContinuation
+{
+    PlayMenu,
+    RepeatStage,
+}
+
 public static class ChallengeRunPolicy
 {
+    internal static ChallengeTerminalContinuation TerminalContinuation(
+        bool victory,
+        int retriesUsed,
+        int configuredRetries)
+    {
+        if (retriesUsed < 0) throw new ArgumentOutOfRangeException(nameof(retriesUsed));
+        if (configuredRetries < 0) throw new ArgumentOutOfRangeException(nameof(configuredRetries));
+        return !victory && retriesUsed < configuredRetries
+            ? ChallengeTerminalContinuation.RepeatStage
+            : ChallengeTerminalContinuation.PlayMenu;
+    }
+
     public static ChallengePlacementPartition PartitionPrestartPlacements(
         IReadOnlyList<PlacementStep> steps,
         ScreenRegion dialogOcclusion)

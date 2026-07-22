@@ -2,6 +2,7 @@ using ExpeditionsMacro.Automation.Expeditions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
+using ExpeditionsMacro.Vision.Challenges;
 
 namespace ExpeditionsMacro.Tests;
 
@@ -185,6 +186,21 @@ public sealed class ExpeditionRunPolicyTests
         Assert.True(ExpeditionRunPolicy.IsEarlyDefeat(preset, 1));
         Assert.True(ExpeditionRunPolicy.ShouldExtract(preset, 2));
         Assert.False(ExpeditionRunPolicy.IsEarlyDefeat(preset, 2));
+    }
+
+    [Theory]
+    [InlineData(ChallengeScreenState.GameModeSelector, "Complete")]
+    [InlineData(ChallengeScreenState.Victory, "CloseTerminal")]
+    [InlineData(ChallengeScreenState.Defeat, "CloseTerminal")]
+    [InlineData(ChallengeScreenState.PostMatchPreview, "ChangeGamemode")]
+    [InlineData(ChallengeScreenState.PostMatchHud, "OpenPostMatchPlay")]
+    [InlineData(ChallengeScreenState.Teleporting, "Wait")]
+    [InlineData(ChallengeScreenState.None, "Wait")]
+    public void CompletedRunHandoff_UsesOnlyStateOwnedActions(
+        ChallengeScreenState state,
+        string expected)
+    {
+        Assert.Equal(expected, ExpeditionMacroRunner.SelectGameModeHandoffCommand(state).ToString());
     }
 
     private static ExpeditionPreset Preset(bool extract, int target) => new()

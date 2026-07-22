@@ -197,6 +197,15 @@ public static class StageScreenDetector
         ActionButtonDetector.ActionFor(image, "stage_party_change_mode_upper")
         ?? ActionButtonDetector.ActionFor(image, "stage_party_change_mode");
 
+    public static (int X, int Y)? RepeatStageAction(ImageFrame image, StageScreenState terminalState) => terminalState switch
+    {
+        StageScreenState.Victory =>
+            ActionButtonDetector.ActionFor(image, "stage_victory_repeat")
+            ?? ActionButtonDetector.ActionFor(image, "victory"),
+        StageScreenState.Defeat => ActionButtonDetector.ActionFor(image, "defeat"),
+        _ => null,
+    };
+
     public static (int X, int Y) SelectorBackAction => (62, 588);
 
     private static double StorySelectorScore(ImageFrame image)

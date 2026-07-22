@@ -16,6 +16,16 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
 {
     private static readonly TimeSpan ExtractionTransitionTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ConfirmationDismissalTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan GameModeHandoffTimeout = TimeSpan.FromSeconds(90);
+
+    internal enum GameModeHandoffCommand
+    {
+        Complete,
+        CloseTerminal,
+        ChangeGamemode,
+        OpenPostMatchPlay,
+        Wait,
+    }
 
     private static readonly HashSet<string> RecoveryStates = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -62,7 +72,8 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         DateTimeOffset? stopAfterCurrentRunUtc = null,
         Func<Exception, CancellationToken, Task>? recoverableFailure = null,
         int? maximumRuns = null,
-        char? unitMenuKey = null)
+        char? unitMenuKey = null,
+        Func<int, int, TimeSpan, CancellationToken, Task<bool>>? continueScheduledRoute = null)
     {
         if (maximumRuns is < 1) throw new ArgumentOutOfRangeException(nameof(maximumRuns));
         preset.Validate();
@@ -74,6 +85,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         RobloxWindow window = _automation.FindWindow() ?? throw new InvalidOperationException("No visible Roblox window was found.");
         DateTimeOffset startedAt = DateTimeOffset.UtcNow;
         Stopwatch runtime = Stopwatch.StartNew();
+        TimeSpan recordedRuntime = TimeSpan.Zero;
         int repeats = 0;
         int victories = 0;
         int defeats = 0;
@@ -177,6 +189,30 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                     PublishSummary();
                     string detail = terminal.State == "victory" ? "The run reached the Victory screen." : "The run reached the Defeat screen.";
                     QueueNotification(webhookUrl, terminal.State, detail, terminal.Frame, runtime.Elapsed, victories, defeats, preset, Write);
+                    if (continueScheduledRoute is not null)
+                    {
+                        TimeSpan currentRuntime = runtime.Elapsed;
+                        TimeSpan matchRuntime = currentRuntime - recordedRuntime;
+                        recordedRuntime = currentRuntime;
+                        bool repeatSameRoute = await continueScheduledRoute(
+                            terminal.State == "victory" ? 1 : 0,
+                            terminal.State == "defeat" ? 1 : 0,
+                            matchRuntime,
+                            cancellationToken).ConfigureAwait(false);
+                        if (repeatSameRoute)
+                        {
+                            Report("Completed", 100, "The same Expedition preset is next. Repeating the stage.", terminal.State, null);
+                            Write("The scheduler kept the same Expedition route; using Repeat Stage instead of reopening Play.", MacroEventLevel.Success, "repeat_stage", null);
+                            await ClickActionAsync(window, detector, terminal.State, terminal.Frame, cancellationToken).ConfigureAwait(false);
+                            await Task.Delay(4500, cancellationToken).ConfigureAwait(false);
+                            continue;
+                        }
+
+                        Report("Completed", 100, "Scheduled Expedition match finished. Returning to shared navigation.", terminal.State, null);
+                        Write("The next scheduled route is different. Leaving the completed Expedition through the Play selector.", MacroEventLevel.Information);
+                        await OpenPlayMenuForModeSwitchAsync(window, detector, terminal, preset, playMenuKey, Report, Write, cancellationToken).ConfigureAwait(false);
+                        return;
+                    }
                     if (maximumRuns is int maximum && repeats >= maximum)
                     {
                         Report("Completed", 100, "Scheduled Expedition match finished. Returning to the task list.", terminal.State, null);
@@ -427,17 +463,84 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         Action<string, MacroEventLevel, string?, double?> log,
         CancellationToken cancellationToken)
     {
-        await OpenPlayMenuAsync(
-            window,
-            detector,
-            preset,
-            playMenuKey,
-            "Transition",
-            terminal.State,
-            report,
-            log,
-            cancellationToken).ConfigureAwait(false);
+        _ = playMenuKey;
+        report("Handoff", 100, "Closing the completed Expedition before selecting the next mode.", terminal.State, null);
+        (int closeX, int closeY) = ChallengeScreenDetector.TerminalCloseAction(terminal.Frame);
+        Focus(window);
+        await _automation.ClickClientAsync(window, closeX, closeY, cancellationToken).ConfigureAwait(false);
+        await Task.Delay(700, cancellationToken).ConfigureAwait(false);
+
+        DateTimeOffset deadline = DateTimeOffset.UtcNow + GameModeHandoffTimeout;
+        StableStateTracker<ChallengeScreenState> tracker = new(Math.Max(1, preset.StableDetections));
+        ChallengeScreenMatch last = new(ChallengeScreenState.None, 0);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ImageFrame frame = CaptureClient(window, detector);
+            last = ChallengeScreenDetector.Detect(frame);
+            ChallengeScreenState? stable = tracker.Update(last.State);
+            if (stable is null)
+            {
+                await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+
+            switch (SelectGameModeHandoffCommand(stable.Value))
+            {
+                case GameModeHandoffCommand.Complete:
+                    log("Expedition handoff reached the shared game-mode selector.", MacroEventLevel.Success, "game_mode_selector", last.Confidence);
+                    return;
+                case GameModeHandoffCommand.CloseTerminal:
+                    (closeX, closeY) = ChallengeScreenDetector.TerminalCloseAction(frame);
+                    Focus(window);
+                    await _automation.ClickClientAsync(window, closeX, closeY, cancellationToken).ConfigureAwait(false);
+                    break;
+                case GameModeHandoffCommand.ChangeGamemode:
+                {
+                    (int X, int Y)? changeMode = ChallengeScreenDetector.ActionFor(ChallengeScreenState.PostMatchPreview, frame);
+                    if (changeMode is null)
+                    {
+                        await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
+                        continue;
+                    }
+                    report("Handoff", 100, "Leaving the Expedition party through Change Gamemode.", "expedition_change_gamemode", last.Confidence);
+                    Focus(window);
+                    await _automation.ClickClientAsync(window, changeMode.Value.X, changeMode.Value.Y, cancellationToken).ConfigureAwait(false);
+                    break;
+                }
+                case GameModeHandoffCommand.OpenPostMatchPlay:
+                {
+                    (int X, int Y)? play = ChallengeScreenDetector.ActionFor(ChallengeScreenState.PostMatchHud, frame);
+                    if (play is null)
+                    {
+                        await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
+                        continue;
+                    }
+                    Focus(window);
+                    await _automation.ClickClientAsync(window, play.Value.X, play.Value.Y, cancellationToken).ConfigureAwait(false);
+                    break;
+                }
+                case GameModeHandoffCommand.Wait:
+                    await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
+                    continue;
+                default:
+                    throw new InvalidOperationException("The Expedition handoff policy returned an unknown command.");
+            }
+            tracker.Reset();
+            await Task.Delay(700, cancellationToken).ConfigureAwait(false);
+        }
+
+        throw new TimeoutException($"Timed out leaving the completed Expedition. Last state: {last.State} ({last.Confidence:P0}).");
     }
+
+    internal static GameModeHandoffCommand SelectGameModeHandoffCommand(ChallengeScreenState state) => state switch
+    {
+        ChallengeScreenState.GameModeSelector => GameModeHandoffCommand.Complete,
+        ChallengeScreenState.Victory or ChallengeScreenState.Defeat => GameModeHandoffCommand.CloseTerminal,
+        ChallengeScreenState.PostMatchPreview => GameModeHandoffCommand.ChangeGamemode,
+        ChallengeScreenState.PostMatchHud => GameModeHandoffCommand.OpenPostMatchPlay,
+        _ => GameModeHandoffCommand.Wait,
+    };
 
     private Task<ImageFrame> OpenPlayMenuAsync(
         RobloxWindow window,

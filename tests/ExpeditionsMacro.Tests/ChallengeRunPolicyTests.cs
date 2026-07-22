@@ -87,6 +87,20 @@ public sealed class ChallengeRunPolicyTests
         Assert.Null(state.DailyLimitUntilUtc);
     }
 
+    [Theory]
+    [InlineData(true, 0, 3, "PlayMenu")]
+    [InlineData(false, 0, 0, "PlayMenu")]
+    [InlineData(false, 0, 1, "RepeatStage")]
+    [InlineData(false, 1, 1, "PlayMenu")]
+    public void TerminalContinuation_OnlyRepeatsDefeatsWithRetriesRemaining(
+        bool victory,
+        int retriesUsed,
+        int configuredRetries,
+        string expected)
+    {
+        Assert.Equal(expected, ChallengeRunPolicy.TerminalContinuation(victory, retriesUsed, configuredRetries).ToString());
+    }
+
     private static ChallengePreset Preset() => new()
     {
         Id = "challenge-test",

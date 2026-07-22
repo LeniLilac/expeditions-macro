@@ -364,7 +364,10 @@ public sealed class CameraAlignmentEngine
         }
 
         double coarse = await StableScoreAsync(model, window, 3, cancellationToken).ConfigureAwait(false);
-        coarse = await RefineWithArrowsAsync(window, model, coarse, cancellationToken).ConfigureAwait(false);
+        if (coarse < model.Manifest.SuccessThreshold)
+        {
+            coarse = await RefineWithArrowsAsync(window, model, coarse, cancellationToken).ConfigureAwait(false);
+        }
         double refined = await RefineWithMouseAsync(window, model, coarse, 66, "Refining with the saved fine-yaw neighborhood and micro mouse drags.", progress, cancellationToken).ConfigureAwait(false);
         if (refined >= model.Manifest.SuccessThreshold) return refined;
 
@@ -910,7 +913,10 @@ public sealed class CameraAlignmentEngine
                 cancellationToken).ConfigureAwait(false);
         }
         double candidate = await StableScoreAsync(model, window, 3, cancellationToken).ConfigureAwait(false);
-        candidate = await RefineWithArrowsAsync(window, model, candidate, cancellationToken).ConfigureAwait(false);
+        if (candidate < model.Manifest.SuccessThreshold)
+        {
+            candidate = await RefineWithArrowsAsync(window, model, candidate, cancellationToken).ConfigureAwait(false);
+        }
         return await RefineWithMouseAsync(
             window,
             model,
@@ -955,6 +961,12 @@ public sealed class CameraAlignmentEngine
         double right = await StableScoreAsync(model, window, 2, cancellationToken).ConfigureAwait(false);
         await PulseYawAsync(window, CameraYawDirection.Left, 1, model.Manifest.ArrowHoldMilliseconds, model.Manifest.SettleMilliseconds, cancellationToken).ConfigureAwait(false);
 
+        // Keyboard pulse duration is calibrated, but the number of Roblox render
+        // frames that consume a pulse can still vary. Re-observe the actual pose
+        // after the nominal Left/Right round trip instead of trusting the score
+        // cached before those probes.
+        best = await StableScoreAsync(model, window, 2, cancellationToken).ConfigureAwait(false);
+
         CameraYawDirection? direction = null;
         double neighbor = best;
         if (left > neighbor + 0.006) { direction = CameraYawDirection.Left; neighbor = left; }
@@ -962,7 +974,13 @@ public sealed class CameraAlignmentEngine
         if (direction is null) return best;
 
         await PulseYawAsync(window, direction.Value, 1, model.Manifest.ArrowHoldMilliseconds, model.Manifest.SettleMilliseconds, cancellationToken).ConfigureAwait(false);
-        best = neighbor;
+        double placed = await StableScoreAsync(model, window, 2, cancellationToken).ConfigureAwait(false);
+        if (placed <= best + 0.003)
+        {
+            await PulseYawAsync(window, Opposite(direction.Value), 1, model.Manifest.ArrowHoldMilliseconds, model.Manifest.SettleMilliseconds, cancellationToken).ConfigureAwait(false);
+            return await StableScoreAsync(model, window, 2, cancellationToken).ConfigureAwait(false);
+        }
+        best = placed;
         for (int index = 0; index < 3; index++)
         {
             await PulseYawAsync(window, direction.Value, 1, model.Manifest.ArrowHoldMilliseconds, model.Manifest.SettleMilliseconds, cancellationToken).ConfigureAwait(false);
@@ -970,7 +988,7 @@ public sealed class CameraAlignmentEngine
             if (score <= best + 0.003)
             {
                 await PulseYawAsync(window, Opposite(direction.Value), 1, model.Manifest.ArrowHoldMilliseconds, model.Manifest.SettleMilliseconds, cancellationToken).ConfigureAwait(false);
-                break;
+                return await StableScoreAsync(model, window, 2, cancellationToken).ConfigureAwait(false);
             }
             best = score;
         }
@@ -1001,13 +1019,20 @@ public sealed class CameraAlignmentEngine
         await MoveMouseAsync(window, fine, model.Manifest.SettleMilliseconds, fine, cancellationToken).ConfigureAwait(false);
         double right = Score(model, window);
         await MoveMouseAsync(window, -fine, model.Manifest.SettleMilliseconds, fine, cancellationToken).ConfigureAwait(false);
+        best = await StableScoreAsync(model, window, 2, cancellationToken).ConfigureAwait(false);
         int direction = 0;
         double neighbor = best;
         if (left > neighbor + 0.003) { direction = -1; neighbor = left; }
         if (right > neighbor + 0.003) { direction = 1; neighbor = right; }
         if (direction == 0) return best;
         await MoveMouseAsync(window, direction * fine, model.Manifest.SettleMilliseconds, fine, cancellationToken).ConfigureAwait(false);
-        best = neighbor;
+        double placed = await StableScoreAsync(model, window, 2, cancellationToken).ConfigureAwait(false);
+        if (placed <= best + 0.003)
+        {
+            await MoveMouseAsync(window, -direction * fine, model.Manifest.SettleMilliseconds, fine, cancellationToken).ConfigureAwait(false);
+            return await StableScoreAsync(model, window, 2, cancellationToken).ConfigureAwait(false);
+        }
+        best = placed;
         int maximum = Math.Max(8, model.Manifest.FineSearchPixels / fine);
         for (int index = 0; index < maximum; index++)
         {
@@ -1016,7 +1041,7 @@ public sealed class CameraAlignmentEngine
             if (score <= best + 0.0015)
             {
                 await MoveMouseAsync(window, -direction * fine, model.Manifest.SettleMilliseconds, fine, cancellationToken).ConfigureAwait(false);
-                break;
+                return await StableScoreAsync(model, window, 2, cancellationToken).ConfigureAwait(false);
             }
             best = score;
         }

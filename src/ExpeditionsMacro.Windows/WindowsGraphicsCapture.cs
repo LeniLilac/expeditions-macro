@@ -223,6 +223,44 @@ internal sealed class WindowsGraphicsCapture : IDisposable
         }
     }
 
+    private static (ID3D11Device Device, ID3D11DeviceContext Context) CreateCaptureDevice()
+    {
+        FeatureLevel[] featureLevels =
+        [
+            FeatureLevel.Level_11_1,
+            FeatureLevel.Level_11_0,
+            FeatureLevel.Level_10_1,
+            FeatureLevel.Level_10_0,
+        ];
+        try
+        {
+            var hardwareResult = D3D11.D3D11CreateDevice(
+                adapter: null,
+                DriverType.Hardware,
+                DeviceCreationFlags.BgraSupport,
+                featureLevels,
+                out ID3D11Device hardwareDevice,
+                out ID3D11DeviceContext hardwareContext);
+            hardwareResult.CheckError();
+            return (hardwareDevice, hardwareContext);
+        }
+        catch
+        {
+            // Integrated graphics is a hardware device and normally takes the path
+            // above. WARP keeps capture available on CPU-only VMs and remote systems
+            // that expose Windows Graphics Capture without a usable D3D11 adapter.
+            var warpResult = D3D11.D3D11CreateDevice(
+                adapter: null,
+                DriverType.Warp,
+                DeviceCreationFlags.BgraSupport,
+                featureLevels,
+                out ID3D11Device warpDevice,
+                out ID3D11DeviceContext warpContext);
+            warpResult.CheckError();
+            return (warpDevice, warpContext);
+        }
+    }
+
     private static ID3D11Texture2D GetTexture(IDirect3DSurface surface)
     {
         IDirect3DDxgiInterfaceAccess access = surface.As<IDirect3DDxgiInterfaceAccess>();
@@ -236,6 +274,7 @@ internal sealed class WindowsGraphicsCapture : IDisposable
         private const int InitialFrameTimeoutMilliseconds = 3000;
         private const int FreshFrameTimeoutMilliseconds = 350;
         private readonly object _frameGate = new();
+        private readonly object _lifecycleGate = new();
         private readonly AutoResetEvent _frameReady = new(false);
         private readonly nint _window;
         private readonly ClientBounds _client;
@@ -244,14 +283,13 @@ internal sealed class WindowsGraphicsCapture : IDisposable
         private readonly ScreenRegion _clientCrop;
         private readonly ID3D11Device _device;
         private readonly ID3D11DeviceContext _context;
+        private readonly ID3D11Texture2D _latestTexture;
         private readonly IDirect3DDevice _winRtDevice;
         private readonly GraphicsCaptureItem _item;
         private readonly Direct3D11CaptureFramePool _framePool;
         private readonly GraphicsCaptureSession _captureSession;
-        private ImageFrame? _latest;
         private Exception? _captureError;
-        private long _requestedGeneration = 1;
-        private long _completedGeneration;
+        private long _latestGeneration;
         private int _processing;
         private bool _disposed;
 
@@ -262,6 +300,7 @@ internal sealed class WindowsGraphicsCapture : IDisposable
             WindowBounds extendedFrameBounds,
             ID3D11Device device,
             ID3D11DeviceContext context,
+            ID3D11Texture2D latestTexture,
             IDirect3DDevice winRtDevice,
             GraphicsCaptureItem item,
             ScreenRegion clientCrop,
@@ -274,6 +313,7 @@ internal sealed class WindowsGraphicsCapture : IDisposable
             _extendedFrameBounds = extendedFrameBounds;
             _device = device;
             _context = context;
+            _latestTexture = latestTexture;
             _winRtDevice = winRtDevice;
             _item = item;
             _clientCrop = clientCrop;
@@ -294,17 +334,23 @@ internal sealed class WindowsGraphicsCapture : IDisposable
                 throw new PlatformNotSupportedException("Windows Graphics Capture is unavailable. Expeditions Macro requires Windows 10 version 1903 or later for reliable Roblox capture.");
             }
 
-            var deviceResult = D3D11.D3D11CreateDevice(
-                adapter: null,
-                DriverType.Hardware,
-                DeviceCreationFlags.BgraSupport,
-                [FeatureLevel.Level_11_1, FeatureLevel.Level_11_0, FeatureLevel.Level_10_1, FeatureLevel.Level_10_0],
-                out ID3D11Device device,
-                out ID3D11DeviceContext context);
-            deviceResult.CheckError();
+            (ID3D11Device device, ID3D11DeviceContext context) = CreateCaptureDevice();
             IDirect3DDevice winRtDevice = CreateWinRtDevice(device);
             GraphicsCaptureItem item = CreateItem(window);
             ScreenRegion clientCrop = ResolveClientCrop(item.Size.Width, item.Size.Height, client, windowBounds, extendedFrameBounds);
+            Texture2DDescription latestDescription = new(
+                Format.R16G16B16A16_Float,
+                checked((uint)item.Size.Width),
+                checked((uint)item.Size.Height),
+                1,
+                1,
+                BindFlags.None,
+                ResourceUsage.Default,
+                CpuAccessFlags.None,
+                1,
+                0,
+                ResourceOptionFlags.None);
+            ID3D11Texture2D latestTexture = device.CreateTexture2D(latestDescription);
             Direct3D11CaptureFramePool framePool = Direct3D11CaptureFramePool.CreateFreeThreaded(
                 winRtDevice,
                 DirectXPixelFormat.R16G16B16A16Float,
@@ -319,6 +365,7 @@ internal sealed class WindowsGraphicsCapture : IDisposable
                 extendedFrameBounds,
                 device,
                 context,
+                latestTexture,
                 winRtDevice,
                 item,
                 clientCrop,
@@ -345,30 +392,38 @@ internal sealed class WindowsGraphicsCapture : IDisposable
         public ImageFrame Capture()
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            long requested = Interlocked.Increment(ref _requestedGeneration);
-            int timeout = Volatile.Read(ref _completedGeneration) == 0
-                ? InitialFrameTimeoutMilliseconds
-                : FreshFrameTimeoutMilliseconds;
+            long initialGeneration = Volatile.Read(ref _latestGeneration);
+            int timeout = initialGeneration == 0 ? InitialFrameTimeoutMilliseconds : FreshFrameTimeoutMilliseconds;
             DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeout);
-            while (Volatile.Read(ref _completedGeneration) < requested && DateTime.UtcNow < deadline)
+            long targetGeneration = initialGeneration == 0 ? 1 : initialGeneration + 1;
+            while (Volatile.Read(ref _latestGeneration) < targetGeneration && DateTime.UtcNow < deadline)
             {
                 _frameReady.WaitOne(Math.Max(1, (int)(deadline - DateTime.UtcNow).TotalMilliseconds));
             }
 
+            byte[] surfacePixels;
             lock (_frameGate)
             {
                 if (_captureError is CaptureSurfaceChangedException surfaceChanged) throw surfaceChanged;
                 if (_captureError is not null) throw new InvalidOperationException("Windows could not capture the Roblox window.", _captureError);
-                if (_latest is null) throw new TimeoutException("Windows did not provide a Roblox window frame within three seconds.");
-                return _latest.Clone();
+                if (Volatile.Read(ref _latestGeneration) == 0) throw new TimeoutException("Windows did not provide a Roblox window frame within three seconds.");
+                surfacePixels = ReadTexturePixels(_latestTexture, _item.Size.Width, _item.Size.Height);
             }
+            return ConvertScRgbRgba16ToRgb(
+                surfacePixels,
+                _item.Size.Width,
+                _item.Size.Height,
+                _clientCrop);
         }
 
         public void Dispose()
         {
-            if (_disposed) return;
-            _disposed = true;
-            _framePool.FrameArrived -= FrameArrived;
+            lock (_lifecycleGate)
+            {
+                if (_disposed) return;
+                _disposed = true;
+                _framePool.FrameArrived -= FrameArrived;
+            }
             _captureSession.Dispose();
             _framePool.Dispose();
             _frameReady.Set();
@@ -392,14 +447,18 @@ internal sealed class WindowsGraphicsCapture : IDisposable
         {
             _frameReady.Dispose();
             (_winRtDevice as IDisposable)?.Dispose();
+            _latestTexture.Dispose();
             _context.Dispose();
             _device.Dispose();
         }
 
         private void FrameArrived(Direct3D11CaptureFramePool sender, object args)
         {
-            if (_disposed || Volatile.Read(ref _completedGeneration) >= Volatile.Read(ref _requestedGeneration)) return;
-            if (Interlocked.Exchange(ref _processing, 1) != 0) return;
+            lock (_lifecycleGate)
+            {
+                if (_disposed) return;
+                Interlocked.Increment(ref _processing);
+            }
             try
             {
                 using Direct3D11CaptureFrame? frame = sender.TryGetNextFrame();
@@ -409,17 +468,20 @@ internal sealed class WindowsGraphicsCapture : IDisposable
                     throw new CaptureSurfaceChangedException();
                 }
 
-                byte[] surfacePixels = ReadSurfacePixels(frame.Surface, frame.ContentSize.Width, frame.ContentSize.Height);
-                ImageFrame captured = ConvertScRgbRgba16ToRgb(
-                    surfacePixels,
-                    frame.ContentSize.Width,
-                    frame.ContentSize.Height,
-                    _clientCrop);
+                using ID3D11Texture2D source = GetTexture(frame.Surface);
+                Texture2DDescription sourceDescription = source.Description;
+                if (sourceDescription.Format != Format.R16G16B16A16_Float ||
+                    sourceDescription.Width != frame.ContentSize.Width ||
+                    sourceDescription.Height != frame.ContentSize.Height)
+                {
+                    throw new InvalidOperationException(
+                        $"Windows returned an unexpected capture texture ({sourceDescription.Format}, {sourceDescription.Width} by {sourceDescription.Height}).");
+                }
                 lock (_frameGate)
                 {
-                    _latest = captured;
+                    _context.CopyResource(_latestTexture, source);
                     _captureError = null;
-                    Volatile.Write(ref _completedGeneration, Volatile.Read(ref _requestedGeneration));
+                    Interlocked.Increment(ref _latestGeneration);
                 }
             }
             catch (Exception error)
@@ -427,19 +489,17 @@ internal sealed class WindowsGraphicsCapture : IDisposable
                 lock (_frameGate)
                 {
                     _captureError = error;
-                    Volatile.Write(ref _completedGeneration, Volatile.Read(ref _requestedGeneration));
                 }
             }
             finally
             {
-                Volatile.Write(ref _processing, 0);
                 _frameReady.Set();
+                Interlocked.Decrement(ref _processing);
             }
         }
 
-        private byte[] ReadSurfacePixels(IDirect3DSurface surface, int width, int height)
+        private byte[] ReadTexturePixels(ID3D11Texture2D source, int width, int height)
         {
-            using ID3D11Texture2D source = GetTexture(surface);
             Texture2DDescription sourceDescription = source.Description;
             if (sourceDescription.Format != Format.R16G16B16A16_Float ||
                 sourceDescription.Width != width ||
