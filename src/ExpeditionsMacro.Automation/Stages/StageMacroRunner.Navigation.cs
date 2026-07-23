@@ -25,6 +25,7 @@ public sealed partial class StageMacroRunner
         int playMenuAttempts = 0;
         string? lastRecovery = null;
         bool recovered = false;
+        bool recoveryTransitionPending = false;
         while (DateTimeOffset.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -113,6 +114,7 @@ public sealed partial class StageMacroRunner
                     x,
                     y,
                     cancellationToken).ConfigureAwait(false);
+                recoveryTransitionPending = true;
                 await Task.Delay(
                     stableRecovery == "disconnect" ? 5000 : 2200,
                     cancellationToken).ConfigureAwait(false);
@@ -125,7 +127,8 @@ public sealed partial class StageMacroRunner
             GameModeHandoffCommand command =
                 StageNavigationPolicy.SelectGameModeHandoffCommand(
                     current.State,
-                    changeMode is not null);
+                    changeMode is not null,
+                    recoveryTransitionPending);
             switch (command)
             {
                 case GameModeHandoffCommand.Complete:
@@ -217,6 +220,9 @@ public sealed partial class StageMacroRunner
                     {
                         playMenuAttempts = 0;
                     }
+                    continue;
+                case GameModeHandoffCommand.Wait:
+                    await Task.Delay(180, cancellationToken).ConfigureAwait(false);
                     continue;
                 default:
                     throw new InvalidOperationException(

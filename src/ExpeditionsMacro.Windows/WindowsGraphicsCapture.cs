@@ -325,7 +325,7 @@ internal sealed class WindowsGraphicsCapture : IDisposable
                 int remaining = Math.Max(0, (int)(deadline - DateTime.UtcNow).TotalMilliseconds);
                 if (!_frameArrival.WaitForGeneration(targetGeneration, remaining)) break;
                 long availableGeneration = _frameArrival.Generation;
-                Direct3D11CaptureFrame? frame = _framePool.TryGetNextFrame();
+                Direct3D11CaptureFrame? frame = CaptureFrameQueue.TakeLatest(_framePool.TryGetNextFrame);
                 if (frame is null)
                 {
                     _lastConsumedGeneration = availableGeneration;

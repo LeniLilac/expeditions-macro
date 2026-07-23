@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using ExpeditionsMacro.Automation.Activity;
 using ExpeditionsMacro.Automation.Camera;
 using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Expeditions;
@@ -518,6 +519,8 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         StableStateTracker<ChallengeScreenState> terminalTracker = new(preset.StableDetections);
         StableStateTracker<string> recoveryTracker = new(Math.Max(2, preset.StableDetections));
         StableStateTracker<string> rewardTracker = new(preset.StableDetections);
+        InactivityKeepAlive keepAlive = new();
+
         report("Gameplay", 55, delayedPlaced ? "Match active. Watching for Victory or Defeat." : "Match active. Waiting for delayed placement.", null, null);
         while (true)
         {
@@ -556,6 +559,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
                 await Task.Delay(4300, cancellationToken).ConfigureAwait(false);
                 rewardTracker.Reset();
             }
+            await keepAlive.TryPulseAsync((key, token) => _automation.TapLetterKeyAsync(window, key, token), cancellationToken).ConfigureAwait(false);
             await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
         }
     }
@@ -583,40 +587,6 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         (int X, int Y)? challenge = ChallengeScreenDetector.ActionFor(ChallengeScreenState.GameModeSelector, modes);
         await ClickAsync(window, challenge!.Value.X, challenge.Value.Y, cancellationToken).ConfigureAwait(false);
         await WaitForChallengeSelectorAsync(window, preset, detector, TimeSpan.FromSeconds(12), report, cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task WaitUntilAsync(
-        RobloxWindow window,
-        ChallengePreset preset,
-        IDetectorPack detector,
-        char playMenuKey,
-        DateTimeOffset untilUtc,
-        bool dailyLimit,
-        Func<DateTimeOffset, CancellationToken, Task>? idleWorkflow,
-        Action<string, MacroEventLevel, string?, double?> log,
-        Action<string, int, string, string?, double?> report,
-        CancellationToken cancellationToken)
-    {
-        if (preset.IdleBehavior == ChallengeIdleBehavior.RunExpeditions && idleWorkflow is not null)
-        {
-            report("Waiting", 0, dailyLimit ? "Daily Challenge limits reached. Running Expeditions until midnight UTC." : "Challenges complete. Running Expeditions until the next reset.", null, null);
-            await PrepareSchedulerHandoffAsync(window, preset, detector, log, report, cancellationToken).ConfigureAwait(false);
-            await idleWorkflow(untilUtc, cancellationToken).ConfigureAwait(false);
-            await ReturnFromIdleModeAsync(window, preset, detector, playMenuKey, log, report, cancellationToken).ConfigureAwait(false);
-            return;
-        }
-
-        while (DateTimeOffset.UtcNow < untilUtc)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            TimeSpan remaining = untilUtc - DateTimeOffset.UtcNow;
-            string message = dailyLimit
-                ? $"Daily limit reached. Checking again after midnight UTC in {FormatRemaining(remaining)}."
-                : $"Waiting for the next Challenge reset in {FormatRemaining(remaining)}.";
-            report("Waiting", 0, message, dailyLimit ? "daily_limit" : "cooldown", null);
-            await Task.Delay(remaining < TimeSpan.FromSeconds(10) ? remaining : TimeSpan.FromSeconds(10), cancellationToken).ConfigureAwait(false);
-        }
-        log("Challenge wait finished. Rechecking the selector.", MacroEventLevel.Information, null, null);
     }
 
     private async Task PrepareSchedulerHandoffAsync(

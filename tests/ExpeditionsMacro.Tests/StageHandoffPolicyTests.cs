@@ -65,4 +65,20 @@ public sealed class StageHandoffPolicyTests
                 StageNavigationPolicy.SelectGameModeHandoffCommand(state, hasChangeMode).ToString());
         }
     }
+
+    [Theory]
+    [InlineData(StageScreenState.None)]
+    [InlineData(StageScreenState.Prestart)]
+    [InlineData(StageScreenState.Victory)]
+    public void AfkReturnTransition_WaitsInsteadOfTestingPlayKey(
+        StageScreenState transientState)
+    {
+        GameModeHandoffCommand actual =
+            StageNavigationPolicy.SelectGameModeHandoffCommand(
+                transientState,
+                hasStageChangeModeAction: false,
+                recoveryTransitionPending: true);
+
+        Assert.Equal(GameModeHandoffCommand.Wait, actual);
+    }
 }

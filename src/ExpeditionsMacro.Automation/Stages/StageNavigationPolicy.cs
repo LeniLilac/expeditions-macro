@@ -8,13 +8,18 @@ internal enum GameModeHandoffCommand
     ChangeGamemode,
     Back,
     PressPlayKey,
+    Wait,
 }
 
 internal static class StageNavigationPolicy
 {
     public static GameModeHandoffCommand SelectGameModeHandoffCommand(
         StageScreenState state,
-        bool hasStageChangeModeAction) => state switch
+        bool hasStageChangeModeAction,
+        bool recoveryTransitionPending = false) =>
+        recoveryTransitionPending && state != StageScreenState.GameModeSelector
+            ? GameModeHandoffCommand.Wait
+            : state switch
         {
             StageScreenState.GameModeSelector => GameModeHandoffCommand.Complete,
             StageScreenState.Victory or StageScreenState.Defeat => GameModeHandoffCommand.PressPlayKey,

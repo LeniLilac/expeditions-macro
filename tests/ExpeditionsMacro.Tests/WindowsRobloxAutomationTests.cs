@@ -190,6 +190,24 @@ public sealed class WindowsRobloxAutomationTests
     }
 
     [Fact]
+    public void WindowCapture_DrainsQueuedFramesAndKeepsOnlyTheNewest()
+    {
+        var first = new DisposableCaptureFrame();
+        var second = new DisposableCaptureFrame();
+        var newest = new DisposableCaptureFrame();
+        var queued = new Queue<DisposableCaptureFrame>([first, second, newest]);
+
+        using DisposableCaptureFrame? captured = CaptureFrameQueue.TakeLatest(
+            () => queued.TryDequeue(out DisposableCaptureFrame? frame) ? frame : null);
+
+        Assert.Same(newest, captured);
+        Assert.True(first.Disposed);
+        Assert.True(second.Disposed);
+        Assert.False(newest.Disposed);
+        Assert.Empty(queued);
+    }
+
+    [Fact]
     public void WindowCapture_SurfaceRecoveryRereadsGeometryUntilCaptureStabilizes()
     {
         int captures = 0;
@@ -245,5 +263,12 @@ public sealed class WindowsRobloxAutomationTests
         ushort bits = BitConverter.HalfToUInt16Bits((Half)value);
         target[offset] = (byte)bits;
         target[offset + 1] = (byte)(bits >> 8);
+    }
+
+    private sealed class DisposableCaptureFrame : IDisposable
+    {
+        public bool Disposed { get; private set; }
+
+        public void Dispose() => Disposed = true;
     }
 }

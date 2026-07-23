@@ -25,6 +25,7 @@ It uses screen capture and ordinary Windows input. It does not inject into Roblo
 - Extracts at the first real checkpoint or after a configured number of boss nodes. The spawn is not counted because it has no Extract action.
 - Handles an early defeat even when extraction was planned later.
 - Rejoins after a Roblox disconnect, an unexpected lobby teleport, or an inactivity teleport to the AFK Chamber. From the AFK Chamber it chooses **Return to Lobby**, then navigates back to the configured map and difficulty.
+- Sends a safe `O` pulse every eight minutes during long-running gameplay and Challenge waits so normal inactivity does not reach the AFK Chamber.
 - Detects the rare blue-void stage load before camera movement or placement, returns through Play, and retries the same task.
 - Can optionally close only the verified Roblox player process and reopen a saved private server when bounded in-client recovery cannot restore the run.
 - Confirms recovery screens across consecutive captures before rejoining, so one animation frame cannot reset an active run or its checkpoint-extraction progress.

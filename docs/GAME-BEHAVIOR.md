@@ -69,16 +69,16 @@ This ledger records Anime Expeditions behavior that has been established from re
 
 ### GB-005: Prevent an intentional long idle from reaching the AFK Chamber
 
-- Status: **User confirmed** that Anime Expeditions teleports an inactive player to the AFK Chamber after an extended idle period to avoid Roblox's ordinary inactivity disconnect. The exact game-side timeout was not measured.
+- Status: **Field confirmed** in a beta.8 Deep Debug run: an inactive Infinite match entered the AFK Chamber roughly every 18 minutes. The exact game-side timeout remains account/server dependent.
 - Existing recovery: the app already detects the AFK Chamber, chooses **Return to Lobby**, verifies the lobby, and navigates back to the configured route.
 - Product rule: when a task intentionally waits longer than ten minutes, perform a keepalive before ten minutes elapse and repeat it while the wait continues. Use an eight-minute cadence so timing jitter cannot cross the ten-minute safety boundary.
 - Preferred action: focus and revalidate Roblox, verify a known non-text idle state, then send one ordinary `O` key pulse through the shared keyboard-input path.
 - Why `O`: Roblox uses `O` for Zoom Out, and this app already uses that binding during camera preparation. At the fully zoomed-out limit it is effectively idempotent, while an arbitrary click could activate a UI control.
 - Preconditions: do not send the pulse while a text field may own keyboard focus, during a transition, or while another workflow owns input. Camera-dependent workflows must still perform their normal zoom/pitch preparation afterward rather than assuming the keepalive established camera state.
 - Do not: use a blind mouse click as the default keepalive, wait until the ten-minute boundary, or send only one pulse for a multi-hour wait.
-- Failure rule for the future implementation: if Roblox cannot be focused or the idle-safe state cannot be verified, skip the input and retain normal AFK-Chamber recovery rather than interacting blindly.
-- Evidence: current application input behavior and documentation establish `O` as the primary zoom-out key; AFK-Chamber fixtures and recovery tests establish the recovery destination. The exact inactivity-trigger duration remains unverified.
-- Protected by: documentation only. Before scheduled keepalive is enabled, add tests for waits below ten minutes, repeated eight-minute pulses, cancellation, focus/state rejection, input ownership, and fallback to AFK recovery.
+- Failure rule: if Roblox cannot be focused or the pulse cannot be sent, defer it for one minute without stopping the active workflow; retain normal AFK-Chamber recovery as the final fallback.
+- Evidence: a 2h17m beta.8 Deep Debug archive contained four AFK-Chamber transfers and zero `O` events, proving the prior policy had not been wired into runtime. The final 200 frames also show that Play-key attempts during Return-to-Lobby loading can consume all retries before lobby appears.
+- Protected by: `InactivityKeepAliveTests`, active-match integration in every mode runner, Challenge cooldown waiting, and the Stage handoff policy that suppresses Play-key input until an AFK return reaches a verified navigation destination.
 
 ### GB-006: Enter a Story route from the shared game-mode selector
 
