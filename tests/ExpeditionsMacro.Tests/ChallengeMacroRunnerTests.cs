@@ -337,4 +337,45 @@ public sealed class ChallengeMacroRunnerTests
         Assert.Contains("control was not returned to the task scheduler", error.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ChallengeDetailBack_WaitsThroughStaleFramesBeforeAnotherClick()
+    {
+        ImageFrame detailFrame = ImageCodec.Load(Path.Combine(
+            TestPaths.ChallengeDatasets,
+            "ChallengeAvailable",
+            "ChallengeAvailable_01.png"));
+        ImageFrame selectorFrame = ImageCodec.Load(Path.Combine(
+            TestPaths.ChallengeDatasets,
+            "ChallengeList",
+            "ChallengeList_01.png"));
+        ChallengeScreenMatch detail = ChallengeScreenDetector.Detect(detailFrame);
+        ChallengeScreenMatch selector = ChallengeScreenDetector.Detect(selectorFrame);
+        Queue<ChallengeScreenMatch> observations = new([detail, detail, selector, selector]);
+        List<int> attempts = [];
+        List<int> misses = [];
+        int clicks = 0;
+
+        ChallengeScreenMatch result = await ChallengeMacroRunner.ReturnToChallengeSelectorWithVerificationAsync(
+            stableDetections: 2,
+            clickBack: _ =>
+            {
+                clicks++;
+                return Task.CompletedTask;
+            },
+            observe: observations.Dequeue,
+            pollMilliseconds: 0,
+            verificationTimeout: TimeSpan.FromSeconds(1),
+            maximumAttempts: ChallengeMacroRunner.SelectorBackMaximumAttempts,
+            attemptStarted: attempts.Add,
+            attemptMissed: (attempt, _) => misses.Add(attempt),
+            CancellationToken.None);
+
+        Assert.Equal(ChallengeScreenState.ChallengeAvailable, detail.State);
+        Assert.Equal(ChallengeScreenState.ChallengeList, result.State);
+        Assert.Equal(1, clicks);
+        Assert.Equal([1], attempts);
+        Assert.Empty(misses);
+        Assert.Empty(observations);
+    }
+
 }

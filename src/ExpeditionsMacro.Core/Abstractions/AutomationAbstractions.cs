@@ -100,6 +100,13 @@ public interface ISecretProtector
     string Unprotect(string protectedValue);
 }
 
+public interface IRobloxProcessController
+{
+    Task CloseAsync(RobloxWindow? window, CancellationToken cancellationToken);
+
+    Task LaunchAsync(Uri launchUri, CancellationToken cancellationToken);
+}
+
 public interface IDiscordNotifier
 {
     Task SendAsync(DiscordNotification notification, CancellationToken cancellationToken);

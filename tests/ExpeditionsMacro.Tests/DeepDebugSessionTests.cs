@@ -24,11 +24,18 @@ public sealed class DeepDebugSessionTests
         string log = Path.Combine(paths.Logs, "macro-run.log");
         const string webhook = "https://canary.discord.com/api/webhooks/123456789012345678/secret-token";
         const string userId = "123456789012345678";
-        await File.WriteAllTextAsync(log, $"before {webhook} after {userId}");
+        const string privateServer =
+            "https://www.roblox.com/share?code=PrivateServerCode&type=Server";
+        await File.WriteAllTextAsync(
+            log,
+            $"before {webhook} after {userId} launch {privateServer}");
         AppSettings settings = new()
         {
             DeepDebugEnabled = true,
             EncryptedWebhook = "protected-secret-value",
+            EncryptedPrivateServerLink =
+                "protected-private-server-value",
+            RestartRobloxWithPrivateServer = true,
             DiscordErrorUserId = userId,
             PlayMenuKey = "P",
             UnitMenuKey = "U",
@@ -62,6 +69,10 @@ public sealed class DeepDebugSessionTests
         Assert.NotNull(archive.GetEntry("models/start/placement/placement-one/placement.json"));
         using JsonDocument sanitized = JsonDocument.Parse(await ReadEntryAsync(archive, "configuration/start/settings-sanitized.json"));
         Assert.Equal(KeyboardKey.RightControl, sanitized.RootElement.GetProperty("shift_lock_virtual_key").GetInt32());
+        Assert.True(
+            sanitized.RootElement
+                .GetProperty("private_server_link_configured")
+                .GetBoolean());
 
         using JsonDocument manifest = JsonDocument.Parse(await ReadEntryAsync(archive, "manifest.json"));
         Assert.Equal("success", manifest.RootElement.GetProperty("outcome").GetString());
@@ -78,8 +89,17 @@ public sealed class DeepDebugSessionTests
         Assert.DoesNotContain(webhook, allText, StringComparison.Ordinal);
         Assert.DoesNotContain(userId, allText, StringComparison.Ordinal);
         Assert.DoesNotContain("protected-secret-value", allText, StringComparison.Ordinal);
+        Assert.DoesNotContain(privateServer, allText, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "protected-private-server-value",
+            allText,
+            StringComparison.Ordinal);
         Assert.Contains("[REDACTED DISCORD WEBHOOK]", allText, StringComparison.Ordinal);
         Assert.Contains("[REDACTED DISCORD USER ID]", allText, StringComparison.Ordinal);
+        Assert.Contains(
+            "[REDACTED ROBLOX PRIVATE SERVER LINK]",
+            allText,
+            StringComparison.Ordinal);
     }
 
     [Theory]

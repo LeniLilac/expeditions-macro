@@ -1,6 +1,6 @@
 # Detector image dataset
 
-This repository includes 397 Roblox client-area captures used to build and regression-test the bundled Anime Expeditions detector pack, specialized UI detectors, and automatic camera-region selection: 273 Expeditions fixtures, 75 selective Challenge fixtures, 27 Story/Raid/team fixtures, 8 cross-mode navigation variants, and 14 camera-yaw fixtures. It also includes three privacy-safe 304 by 192 grayscale camera composites derived from a reported runtime-alignment failure. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
+This repository includes 402 image fixtures used to build and regression-test the bundled Anime Expeditions detector pack, specialized UI detectors, and automatic camera-region selection. Of these, 399 are 808 by 611 Roblox client captures: 274 Expeditions fixtures, 75 selective Challenge fixtures, 27 Story/Raid/team fixtures, 8 cross-mode navigation variants, and 15 camera fixtures. The remaining three are privacy-safe 304 by 192 grayscale camera composites derived from a reported runtime-alignment failure. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
 
 Captures are 808 by 611 PNG files organized under:
 
@@ -12,7 +12,7 @@ Story, Raid, and saved-team fixtures are organized under `datasets/anime-expedit
 
 Lobby-entry and post-match Story, Raid, Challenge, and Expedition detail variants are organized under `datasets/anime-expeditions/navigation-variants/`. These fixtures prove that **Enter Matchmaking** is optional and that navigation must use the live **Select Stage** action in either party context.
 
-Camera-alignment fixtures are organized under `datasets/anime-expeditions/camera-rotations/`. Each of the three Expedition and four Story/Challenge maps contributes a goal frame plus a clearly incorrect yaw from a continuous right-arrow rotation. These fixtures verify that automatic setup selects four textured regions spanning the left, center, and right of the client and keeps an incorrect yaw well below the alignment threshold. The `RuntimeProjectionDrift` composites additionally verify that final alignment accepts a coherent cross-session vertical projection shift without broadening the thumbnail atlas or accepting a nearby wrong yaw.
+Camera-alignment fixtures are organized under `datasets/anime-expeditions/camera-rotations/`. Each of the three Expedition and four Story/Challenge maps contributes a goal frame plus a clearly incorrect yaw from a continuous right-arrow rotation. These fixtures verify that automatic setup selects four textured regions spanning the left, center, and right of the client and keeps an incorrect yaw well below the alignment threshold. The `RuntimeProjectionDrift` composites additionally verify that final alignment accepts a coherent cross-session vertical projection shift without broadening the thumbnail atlas or accepting a nearby wrong yaw. `UnrenderedWorld` preserves the textureless blue load failure that must be rejected before the macro moves the camera or places units.
 
 The current builder recognizes these dataset names:
 
@@ -37,6 +37,6 @@ The three `Difficultly*_LayoutShift` folders and `AFK_Chamber` are golden-test f
 
 `Play_UI` includes different avatars, current maps, reward icons, and Roblox UI scale/layout variants. Play-screen detection must use the stable Expedition tile structure rather than those changing details.
 
-`Expedition_Map_Select_Selection_Regression` contains English and French selector screens that reproduced false "map could not be selected" errors. Map selection must use the cyan active-row marker rather than localized map-name text.
+`Expedition_Map_Select_Selection_Regression` contains English and French selector screens that reproduced false "map could not be selected" errors. The beta.9 Map 1 fixture also preserves a bright selected-row preview that made the former all-rows-dark structural gate reject an otherwise unambiguous active marker. Map selection must use the cyan active-row marker rather than localized map-name text, and must not score the selected row's changing artwork as an inactive dark panel.
 
 When extending the dataset, use several captures per state across lighting and moving-object variations. Crop to the Roblox client area and do not include desktop chrome, other applications, notifications, account names, webhook tokens, or chat content.

@@ -40,6 +40,10 @@ public sealed record AppSettings
 
     public string EncryptedWebhook { get; init; } = string.Empty;
 
+    public string EncryptedPrivateServerLink { get; init; } = string.Empty;
+
+    public bool RestartRobloxWithPrivateServer { get; init; }
+
     public string DiscordErrorUserId { get; init; } = string.Empty;
 
     public bool AutoCaptureOnMacroError { get; init; } = true;

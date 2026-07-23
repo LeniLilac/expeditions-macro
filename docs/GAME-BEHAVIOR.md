@@ -131,8 +131,9 @@ This ledger records Anime Expeditions behavior that has been established from re
   4. Click the detected **Select Stage** action and verify a launch-ready Challenge party preview as described in GB-011.
   5. Click the detected **Start** action and wait through teleport/loading until the Challenge prestart screen is verified.
 - Unavailable rule: when all configured Challenge types are on cooldown or exhausted, leave the selector through its verified close action before returning control to the scheduler or waiting.
-- Evidence: a 16-frame passive diagnostic capture reviewed on 2026-07-22 using v1.3.0-beta.6. Physical clicks are user reported; the capture shows type availability checks, an eligible challenge detail, party preview, teleport, and prestart.
-- Protected by: Challenge selector, cooldown, preview, handoff, and scheduler tests.
+- Detail-return rule: after clicking **Back** from an available or cooldown detail, wait for a stable Challenge selector before clicking again. The detail can remain visible while the first click is transitioning; a second immediate Back can land on the restored list and reopen a challenge.
+- Evidence: a 16-frame passive diagnostic capture reviewed on 2026-07-22 using v1.3.0-beta.6 shows the successful route. A 61-frame beta.9 deep-debug run reviewed on 2026-07-23 records the delayed detail-to-selector transition and the second Back click reopening the detail.
+- Protected by: Challenge selector, cooldown, preview, handoff, and scheduler tests, including `ChallengeMacroRunnerTests.ChallengeDetailBack_WaitsThroughStaleFramesBeforeAnotherClick`.
 
 ### GB-010: Mode details differ between lobby and post-match party contexts
 
@@ -157,6 +158,18 @@ This ledger records Anime Expeditions behavior that has been established from re
 - Do not: require **Disband** before starting, click the `PostMatchPreview` state's Change Gamemode action when the current workflow is waiting to launch, or use a fixed Start coordinate without detecting the live button.
 - Evidence: one failing beta.7 deep-debug Story run and two passive beta.7 diagnostic captures reviewed on 2026-07-22. The deep log records Select Stage followed by repeated 94% `PostMatchPreview` recognition with no Start click; the passive captures cover all six listed route variants in both contexts.
 - Protected by: `StageHandoffPolicyTests.PreviewWait_AcceptsEitherPartyFamilyOnlyWithADetectedStartAction` and `StageScreenDetectorTests.BothPartyPreviewFamilies_MapTheLiveStartButton`. Challenge and Expedition retain their existing preview/action regression suites.
+
+### GB-012: A prestart UI can load without stage geometry
+
+- Status: **Field confirmed**.
+- Entry: an Expedition prestart screen after the route has loaded.
+- Visible failure: the Start Game dialog, hotbar, and HUD are present, but the world behind them remains a nearly uniform blue field rather than rendering map geometry.
+- Action: do not rotate the camera, place units, or click Start. Open Play with the configured binding, return through the existing party flow, and select the same configured route again.
+- Exit: retry camera preparation only after the saved world regions contain stable rendered geometry.
+- Escalation: if bounded in-client recovery fails and private-server restart is configured, close only the verified Roblox player process, relaunch the saved server through the registered Roblox protocol, reload the saved plan, and retry the same incomplete task.
+- Do not: report this as ordinary low camera confidence, consume camera-alignment attempts, increment task progress, or continue placement over the missing world.
+- Evidence: a six-hour beta.8 Deep Debug run reviewed on 2026-07-23. The blue void began around frame 27,092; the same run eventually returned through Play, re-entered the route, and loaded normally.
+- Protected by: `CameraWorldReadinessTests.BlueVoid_IsRejectedWhileRenderedMapRemainsReady`, `RobloxRuntimeRecoveryPolicyTests`, and `RecoveringMacroSchedulerTests.RuntimeFailure_RestartsRobloxAndRetriesTheIncompleteTask`.
 
 ## Reusable evidence workflow
 

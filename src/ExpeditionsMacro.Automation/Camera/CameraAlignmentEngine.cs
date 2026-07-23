@@ -9,12 +9,13 @@ using ExpeditionsMacro.Vision.Camera;
 
 namespace ExpeditionsMacro.Automation.Camera;
 
-public sealed class CameraAlignmentEngine
+public sealed partial class CameraAlignmentEngine
 {
     private const int MaximumRuntimeAlignmentAttempts = 3;
     private const double PoseClampSimilarity = 0.975;
     private const int MaximumPoseClampProbes = 4;
     private const int FinalVerificationFrames = 3;
+    private const double FineInputConsistencyThreshold = 0.80;
 
     private readonly IRobloxAutomation _automation;
     private readonly ICameraModelRepository _models;
@@ -587,83 +588,6 @@ public sealed class CameraAlignmentEngine
         throw new InvalidOperationException("Could not recognize a full yaw turn. Reduce Arrow hold, increase maximum arrow samples, or increase settle time, then retry.");
     }
 
-    private async Task<IReadOnlyList<FineYawReference>> LearnFineYawNeighborhoodAsync(
-        RobloxWindow window,
-        IReadOnlyList<ScreenRegion> regions,
-        ImageFrame reference,
-        CameraCalibrationSettings settings,
-        IProgress<MacroProgress>? progress,
-        CancellationToken cancellationToken)
-    {
-        int fineStep = settings.FineStepPixels;
-        int sampleStride = fineStep;
-        int radius = Math.Max(fineStep * 2, settings.FineSearchPixels);
-        radius = (int)Math.Ceiling((double)radius / sampleStride) * sampleStride;
-        int sampleCount = radius * 2 / sampleStride + 1;
-        Dictionary<int, FineYawReference> references = new()
-        {
-            [0] = new FineYawReference(0, VisionScorer.MakeThumbnail(reference)),
-        };
-        int currentOffset = 0;
-        progress?.Report(new MacroProgress(
-            "Camera setup",
-            22,
-            $"Learning a fine goal neighborhood from {-radius} to +{radius} mouse pixels."));
-
-        try
-        {
-            await MoveMouseAsync(window, -radius, settings.SettleMilliseconds, fineStep, cancellationToken).ConfigureAwait(false);
-            currentOffset = -radius;
-            for (int index = 0; index < sampleCount; index++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (index > 0)
-                {
-                    await MoveMouseAsync(window, sampleStride, settings.SettleMilliseconds, fineStep, cancellationToken).ConfigureAwait(false);
-                    currentOffset += sampleStride;
-                }
-                (ImageFrame frame, double score) = await StablePreparedScoreAsync(reference, window, regions, 1, cancellationToken).ConfigureAwait(false);
-                if (currentOffset != 0)
-                {
-                    references[currentOffset] = new FineYawReference(currentOffset, VisionScorer.MakeThumbnail(frame));
-                }
-                progress?.Report(new MacroProgress(
-                    "Camera setup",
-                    22 + (int)Math.Round(7d * (index + 1) / sampleCount),
-                    $"Fine goal view {currentOffset:+#;-#;0} px. Confidence: {score:P0}",
-                    Confidence: score));
-            }
-        }
-        finally
-        {
-            if (currentOffset != 0)
-            {
-                await MoveMouseAsync(window, -currentOffset, settings.SettleMilliseconds, fineStep, CancellationToken.None).ConfigureAwait(false);
-            }
-        }
-
-        FineYawReference[] result = references.Values.OrderBy(item => item.Offset).ToArray();
-        progress?.Report(new MacroProgress(
-            "Camera setup",
-            30,
-            $"Fine goal neighborhood ready with {result.Length} distinct yaw views; starting the coarse turn."));
-        return result;
-    }
-
-    private static FineYawMatch BestFineYawMatch(IReadOnlyList<FineYawReference> references, ImageFrame currentThumbnail)
-    {
-        FineYawReference best = references[0];
-        double bestScore = double.NegativeInfinity;
-        foreach (FineYawReference candidate in references)
-        {
-            double score = VisionScorer.RobustSimilarity(candidate.Thumbnail, currentThumbnail);
-            if (score <= bestScore) continue;
-            best = candidate;
-            bestScore = score;
-        }
-        return new FineYawMatch(best.Offset, bestScore);
-    }
-
     private async Task<FullTurnRefinement> RefineFullTurnReturnAsync(
         RobloxWindow window,
         IReadOnlyList<ScreenRegion> regions,
@@ -751,8 +675,7 @@ public sealed class CameraAlignmentEngine
         AlignmentAttemptPlan plan,
         int attempt,
         IProgress<MacroProgress>? progress,
-        CancellationToken cancellationToken,
-        bool allowNeighborhoodShortcut = true)
+        CancellationToken cancellationToken)
     {
         int fullTurn = model.Manifest.FullYawSteps;
         int bestOffset = 0;
@@ -806,20 +729,19 @@ public sealed class CameraAlignmentEngine
                 }
             }
 
-            // A fine-atlas hit is a candidate, not a success score: registered
-            // matching can confuse a different coarse yaw with a nearby goal view.
-            // Testing one strong fine-atlas candidate is safe even when session
-            // rendering lowers it below the calibration baseline: the corrected
-            // pose must still pass the unchanged direct goal threshold. A false
-            // candidate consumes this shortcut and restarts one complete scan.
-            if (allowNeighborhoodShortcut && observation.FineMatch.Score >= neighborhoodTestThreshold)
+            // A fine-atlas hit is only a reversible candidate. Apply its saved
+            // atomic correction, require the unchanged direct goal threshold,
+            // and restore the scan pose when it does not verify.
+            if (observation.FineMatch.Score >=
+                neighborhoodTestThreshold)
             {
                 progress?.Report(new MacroProgress(
                     "Camera alignment",
                     94,
                     $"Strong saved fine-yaw neighborhood found after {travelled} {DirectionLabel(plan.ScanDirection)} steps ({observation.FineMatch.Score:P0}). Testing it before continuing the full turn.",
                     Confidence: observation.FineMatch.Score));
-                double neighborhood = await RefineSavedNeighborhoodCandidateAsync(
+                double? neighborhood =
+                    await TryFineNeighborhoodShortcutAsync(
                     window,
                     model,
                     observation.FineMatch,
@@ -827,33 +749,22 @@ public sealed class CameraAlignmentEngine
                     "Refining the saved fine-yaw neighborhood before continuing the full-turn scan.",
                     progress,
                     cancellationToken).ConfigureAwait(false);
-                if (neighborhood >= model.Manifest.SuccessThreshold)
+                if (neighborhood is double resolved)
                 {
                     progress?.Report(new MacroProgress(
                         "Camera alignment",
                         97,
-                        $"Saved fine-yaw neighborhood resolved the goal at {neighborhood:P0}; skipped the remaining full-turn scan.",
-                        Confidence: neighborhood));
-                    return neighborhood;
+                        $"Saved fine-yaw neighborhood resolved the goal at {resolved:P0}; skipped the remaining full-turn scan.",
+                        Confidence: resolved));
+                    return resolved;
                 }
 
                 progress?.Report(new MacroProgress(
                     "Camera alignment",
-                    76,
-                    $"Saved fine-yaw neighborhood reached only {neighborhood:P0}; restarting a complete scan from the current pose.",
-                    Confidence: neighborhood));
-                // Candidate refinement already consumed this attempt's sampling
-                // phase. A restarted turn begins at the resulting pose and must
-                // not apply that mouse offset a second time.
-                return await ScanFullTurnAsync(
-                    window,
-                    model,
-                    neighborhood,
-                    plan with { ScanPhasePixels = 0 },
-                    attempt,
-                    progress,
-                    cancellationToken,
-                    allowNeighborhoodShortcut: false).ConfigureAwait(false);
+                    76 + (int)Math.Round(
+                        16d * travelled / fullTurn),
+                    "Saved fine-yaw neighborhood did not pass the direct goal threshold; restored the scan pose and continued the current turn.",
+                    Confidence: observation.FineMatch.Score));
             }
         }
 
@@ -915,6 +826,49 @@ public sealed class CameraAlignmentEngine
             progressMessage,
             progress,
             cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<double?> TryFineNeighborhoodShortcutAsync(
+        RobloxWindow window,
+        CameraModel model,
+        FineYawMatch fineMatch,
+        int progressPercent,
+        string progressMessage,
+        IProgress<MacroProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        if (fineMatch.Offset == 0) return null;
+        int correction = -fineMatch.Offset;
+        await MoveMouseAsync(
+            window,
+            correction,
+            model.Manifest.SettleMilliseconds,
+            model.Manifest.FineStepPixels,
+            cancellationToken).ConfigureAwait(false);
+        double direct = await StableScoreAsync(
+            model,
+            window,
+            3,
+            cancellationToken).ConfigureAwait(false);
+        if (direct >= model.Manifest.SuccessThreshold)
+        {
+            return await RefineWithMouseAsync(
+                window,
+                model,
+                direct,
+                progressPercent,
+                progressMessage,
+                progress,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        await MoveMouseAsync(
+            window,
+            -correction,
+            model.Manifest.SettleMilliseconds,
+            model.Manifest.FineStepPixels,
+            cancellationToken).ConfigureAwait(false);
+        return null;
     }
 
     private async Task<AlignmentObservation> StableObservationAsync(
@@ -1324,7 +1278,17 @@ public sealed class CameraAlignmentEngine
         int chunkPixels,
         CancellationToken cancellationToken)
     {
-        await _automation.DragCameraAsync(window, horizontalPixels, 0, chunkPixels, cancellationToken).ConfigureAwait(false);
+        await CameraFineMovement.MoveAsync(
+            horizontalPixels,
+            Math.Max(1, Math.Abs(chunkPixels)),
+            (delta, token) =>
+                _automation.DragCameraAsync(
+                    window,
+                    delta,
+                    0,
+                    Math.Max(1, Math.Abs(chunkPixels)),
+                    token),
+            cancellationToken).ConfigureAwait(false);
         await Task.Delay(settleMilliseconds, cancellationToken).ConfigureAwait(false);
     }
 

@@ -3,7 +3,6 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Text.RegularExpressions;
 using System.Threading.Channels;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
@@ -18,11 +17,6 @@ namespace ExpeditionsMacro.Automation.Diagnostics;
 public sealed class DeepDebugSessionService
 {
     private static readonly JsonSerializerOptions CompactJson = CreateCompactJson();
-    private static readonly Regex DiscordWebhookPattern = new(
-        "https://(?:[a-z0-9-]+\\.)?(?:discord(?:app)?\\.com)/api(?:/v\\d+)?/webhooks/[^\\s\\\"'<>]+",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled,
-        TimeSpan.FromSeconds(1));
-
     private readonly AppPaths _paths;
     private readonly Func<AppSettings> _getSettings;
     private readonly Func<string?> _getLogFilePath;
@@ -567,20 +561,8 @@ public sealed class DeepDebugSessionService
         }
     }
 
-    private string RedactText(string text)
-    {
-        string redacted = DiscordWebhookPattern.Replace(text, "[REDACTED DISCORD WEBHOOK]");
-        AppSettings settings = _getSettings();
-        if (!string.IsNullOrWhiteSpace(settings.DiscordErrorUserId))
-        {
-            redacted = redacted.Replace(settings.DiscordErrorUserId, "[REDACTED DISCORD USER ID]", StringComparison.Ordinal);
-        }
-        if (!string.IsNullOrWhiteSpace(settings.EncryptedWebhook))
-        {
-            redacted = redacted.Replace(settings.EncryptedWebhook, "[REDACTED PROTECTED WEBHOOK]", StringComparison.Ordinal);
-        }
-        return redacted;
-    }
+    private string RedactText(string text) =>
+        DeepDebugSecretRedactor.Redact(text, _getSettings());
 
     private DeepDebugSession? ActiveSession()
     {
@@ -743,6 +725,8 @@ public sealed class DeepDebugSessionService
         bool CheckDetectorUpdates,
         DateTimeOffset? LastDetectorUpdateCheck,
         bool MinimizeDuringAutomation,
+        bool RestartRobloxWithPrivateServer,
+        bool PrivateServerLinkConfigured,
         int MacroHotkeyVirtualKey,
         int ShiftLockVirtualKey,
         string PlayMenuKey,
@@ -762,6 +746,9 @@ public sealed class DeepDebugSessionService
             settings.CheckDetectorUpdates,
             settings.LastDetectorUpdateCheck,
             settings.MinimizeDuringAutomation,
+            settings.RestartRobloxWithPrivateServer,
+            !string.IsNullOrWhiteSpace(
+                settings.EncryptedPrivateServerLink),
             settings.MacroHotkeyVirtualKey,
             settings.ShiftLockVirtualKey,
             settings.PlayMenuKey,

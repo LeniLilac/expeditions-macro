@@ -16,6 +16,9 @@ public sealed class AppSettingsStoreTests
             {
                 SelectedMacroPlanId = "daily-plan",
                 EncryptedWebhook = "dpapi-protected-test-value",
+                EncryptedPrivateServerLink =
+                    "dpapi-protected-private-server",
+                RestartRobloxWithPrivateServer = true,
                 DiscordErrorUserId = "123456789012345678",
                 ShiftLockVirtualKey = KeyboardKey.RightShift,
             });
@@ -25,6 +28,10 @@ public sealed class AppSettingsStoreTests
 
             Assert.Equal("daily-plan", loaded.SelectedMacroPlanId);
             Assert.Equal("dpapi-protected-test-value", loaded.EncryptedWebhook);
+            Assert.Equal(
+                "dpapi-protected-private-server",
+                loaded.EncryptedPrivateServerLink);
+            Assert.True(loaded.RestartRobloxWithPrivateServer);
             Assert.Equal("123456789012345678", loaded.DiscordErrorUserId);
             Assert.Equal(KeyboardKey.RightShift, loaded.ShiftLockVirtualKey);
         }

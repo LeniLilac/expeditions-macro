@@ -25,6 +25,8 @@ It uses screen capture and ordinary Windows input. It does not inject into Roblo
 - Extracts at the first real checkpoint or after a configured number of boss nodes. The spawn is not counted because it has no Extract action.
 - Handles an early defeat even when extraction was planned later.
 - Rejoins after a Roblox disconnect, an unexpected lobby teleport, or an inactivity teleport to the AFK Chamber. From the AFK Chamber it chooses **Return to Lobby**, then navigates back to the configured map and difficulty.
+- Detects the rare blue-void stage load before camera movement or placement, returns through Play, and retries the same task.
+- Can optionally close only the verified Roblox player process and reopen a saved private server when bounded in-client recovery cannot restore the run.
 - Confirms recovery screens across consecutive captures before rejoining, so one animation frame cannot reset an active run or its checkpoint-extraction progress.
 - Optionally sends Discord Components V2 reports with a Roblox screenshot when each mode starts, per-match and total runtime on results, victory/defeat totals, recovery notices, semantic state accents, and localized Discord timestamps. A configured Discord user ID receives five restricted mentions when a macro stops unexpectedly.
 - Records an unlimited timed Roblox screenshot sequence from Settings and packages the frames plus a manifest into one diagnostic ZIP. Automatic failure diagnostics keep the latest 10 action-state frames and add 10 frames at half-second intervals after an unexpected macro error.
@@ -119,6 +121,20 @@ Story and Raid pages edit presets. Add the saved preset to a Macro plan to run i
 
 The scheduler never interrupts a live match. It updates saved task progress only after the current runner returns control, then reevaluates priority. **Reset progress** clears victories, defeats, runtime, completion, and Challenge eligibility for the plan.
 
+### Optional Roblox restart recovery
+
+Under **Macro > Roblox reconnect**, paste either a modern Roblox private-server share link or a legacy `privateServerLinkCode` link, then enable restart recovery. The link is global to the app rather than part of an individual plan.
+
+Normal lobby, disconnect, AFK, party, and blue-void recovery remains the first path. If that bounded recovery errors or times out, the app:
+
+1. verifies the visible Roblox window belongs to a supported Roblox player process;
+2. closes only that process;
+3. launches the private server through Windows' registered `roblox://` protocol;
+4. waits for a new verified Roblox PID; and
+5. reloads the saved plan and retries the same incomplete task.
+
+This launch does not use a browser, stored account credentials, cookies, or process injection. The current Windows user must already be signed into the installed Roblox client. To prevent a restart loop, automatic process recovery stops after three restarts within ten minutes. The private-server link grants access to that server, so it is protected with Windows DPAPI and excluded from logs and diagnostics.
+
 ## Runtime behavior
 
 The Expeditions loop prepares the camera, places units, starts the node, and watches for:
@@ -136,6 +152,8 @@ The Challenges loop navigates the fixed three-entry selector, recognizes the rot
 Story and Raid runners navigate from Play to their configured route, optionally load a saved Team, align the camera, run the two placement phases, select reward cards, and return to Play after Victory or the final Defeat. The Macro scheduler consumes one result at a time and then selects the highest-priority eligible task.
 
 Leave shift lock off before starting a camera workflow. Camera preparation centers the pointer, uses the configured Shift Lock key before any pitch or fine-yaw mouse drag, and uses that same key during cleanup after success, cancellation, or failure.
+
+Before yaw alignment, the app waits for stable rendered geometry in the saved camera regions. A prestart UI over a textureless blue world is treated as an incomplete stage load: no camera input or placement is sent, and automatic recovery returns through Play to retry the same route. Fine-yaw calibration uses the same atomic one-step right-drag gestures in both directions and verifies that the real zero pose survives a round trip before saving a model. A failed saved-neighborhood shortcut restores its pose and continues the current full-turn scan instead of recursively starting another rotation.
 
 Stopping is cooperative. The app releases right mouse and shift-lock state where applicable, cancels pending work, and leaves Roblox at the standardized client size used for detection.
 

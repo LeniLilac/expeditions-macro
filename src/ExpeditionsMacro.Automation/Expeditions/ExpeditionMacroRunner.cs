@@ -13,7 +13,7 @@ using ExpeditionsMacro.Vision.Challenges;
 
 namespace ExpeditionsMacro.Automation.Expeditions;
 
-public sealed class ExpeditionMacroRunner : IGameModeWorkflow
+public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
 {
     private static readonly TimeSpan ExtractionTransitionTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ConfirmationDismissalTimeout = TimeSpan.FromSeconds(5);
@@ -30,6 +30,7 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
     private static readonly HashSet<string> RecoveryStates = new(StringComparer.OrdinalIgnoreCase)
     {
         "afk", "disconnect", "lobby", "play", "map_select", "map_preview",
+        "post_match_party",
     };
 
     private readonly IRobloxAutomation _automation;
@@ -80,7 +81,9 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         placementModel.Validate();
         ValidateCompatibility(preset, cameraModel, placementModel, detector.Manifest);
         ValidateTeamKey(preset.TeamSlot > 0, unitMenuKey);
-        RobloxWindow window = _automation.FindWindow() ?? throw new InvalidOperationException("No visible Roblox window was found.");
+        RobloxWindow window = _automation.FindWindow() ??
+            throw new RobloxSessionUnavailableException(
+                "No visible Roblox window was found.");
         DateTimeOffset startedAt = DateTimeOffset.UtcNow;
         Stopwatch runtime = Stopwatch.StartNew();
         int repeats = 0;
@@ -250,6 +253,57 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                     else Report("Completed", 100, "Defeat recognized. Repeating the stage.");
                     await ClickActionAsync(window, detector, terminal.State, cancellationToken).ConfigureAwait(false);
                     await Task.Delay(4500, cancellationToken).ConfigureAwait(false);
+                }
+                catch (CameraWorldNotRenderedException world)
+                    when (preset.AutoRecover)
+                {
+                    recoveries++;
+                    PublishSummary();
+                    string detail =
+                        $"Map {preset.MapNumber}, Difficulty {preset.Difficulty} loaded without world geometry. Returning through Play and retrying the same Expedition without placement.";
+                    Write(
+                        detail,
+                        MacroEventLevel.Warning,
+                        "camera_world_missing",
+                        world.BestConfidence);
+                    Report(
+                        "Recovery",
+                        0,
+                        detail,
+                        "camera_world_missing",
+                        world.BestConfidence);
+                    reporter.Queue(
+                        "recovery",
+                        detail,
+                        TryCaptureClient(window, detector),
+                        runtime.Elapsed,
+                        victories,
+                        defeats,
+                        reportTarget);
+                    await CompleteGameModeHandoffAsync(
+                        window,
+                        detector,
+                        preset,
+                        playMenuKey,
+                        "camera_world_missing",
+                        pressPlayFirst: true,
+                        Report,
+                        Write,
+                        cancellationToken).ConfigureAwait(false);
+                    await RecoverToPrestartAsync(
+                        window,
+                        "play",
+                        preset,
+                        detector,
+                        reporter,
+                        notify: false,
+                        runtime,
+                        victories,
+                        defeats,
+                        playMenuKey,
+                        Report,
+                        Write,
+                        cancellationToken).ConfigureAwait(false);
                 }
                 catch (CameraAlignmentException alignment)
                 {
@@ -466,151 +520,6 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         log("Extraction confirmed. Waiting for Victory or an early Defeat screen.", MacroEventLevel.Success, "extract_confirm", null);
     }
 
-    private async Task OpenPlayMenuForModeSwitchAsync(
-        RobloxWindow window,
-        IDetectorPack detector,
-        RunTerminal terminal,
-        ExpeditionPreset preset,
-        char playMenuKey,
-        Action<string, int, string, string?, double?> report,
-        Action<string, MacroEventLevel, string?, double?> log,
-        CancellationToken cancellationToken)
-    {
-        report("Handoff", 100, $"Opening Play with {playMenuKey} from the completed Expedition.", terminal.State, null);
-        // Keep the terminal open: the Play binding owns this transition and opens the
-        // post-match party where Change Gamemode can be detected safely.
-        await OpenPlayMenuAsync(
-            window,
-            detector,
-            preset,
-            playMenuKey,
-            "Handoff",
-            terminal.State,
-            report,
-            log,
-            cancellationToken).ConfigureAwait(false);
-
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + GameModeHandoffTimeout;
-        StableStateTracker<ChallengeScreenState> tracker = new(Math.Max(1, preset.StableDetections));
-        ChallengeScreenMatch last = new(ChallengeScreenState.None, 0);
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            ImageFrame frame = CaptureClient(window, detector);
-            last = ChallengeScreenDetector.Detect(frame);
-            ChallengeScreenState? stable = tracker.Update(last.State);
-            if (stable is null)
-            {
-                await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
-                continue;
-            }
-
-            switch (SelectGameModeHandoffCommand(stable.Value))
-            {
-                case GameModeHandoffCommand.Complete:
-                    log("Expedition handoff reached the shared game-mode selector.", MacroEventLevel.Success, "game_mode_selector", last.Confidence);
-                    return;
-                case GameModeHandoffCommand.ChangeGamemode:
-                {
-                    (int X, int Y)? changeMode = ChallengeScreenDetector.ActionFor(ChallengeScreenState.PostMatchPreview, frame);
-                    if (changeMode is null)
-                    {
-                        await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
-                        continue;
-                    }
-                    report("Handoff", 100, "Leaving the Expedition party through Change Gamemode.", "expedition_change_gamemode", last.Confidence);
-                    Focus(window);
-                    await _automation.ClickClientAsync(window, changeMode.Value.X, changeMode.Value.Y, cancellationToken).ConfigureAwait(false);
-                    break;
-                }
-                case GameModeHandoffCommand.PressPlayKey:
-                    await OpenPlayMenuAsync(
-                        window,
-                        detector,
-                        preset,
-                        playMenuKey,
-                        "Handoff",
-                        last.State.ToString(),
-                        report,
-                        log,
-                        cancellationToken).ConfigureAwait(false);
-                    break;
-                case GameModeHandoffCommand.Wait:
-                    await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
-                    continue;
-                default:
-                    throw new InvalidOperationException("The Expedition handoff policy returned an unknown command.");
-            }
-            tracker.Reset();
-            await Task.Delay(700, cancellationToken).ConfigureAwait(false);
-        }
-
-        throw new TimeoutException($"Timed out leaving the completed Expedition. Last state: {last.State} ({last.Confidence:P0}).");
-    }
-
-    internal static GameModeHandoffCommand SelectGameModeHandoffCommand(ChallengeScreenState state) => state switch
-        {
-            ChallengeScreenState.GameModeSelector => GameModeHandoffCommand.Complete,
-            ChallengeScreenState.Victory or ChallengeScreenState.Defeat => GameModeHandoffCommand.PressPlayKey,
-            ChallengeScreenState.PostMatchPreview => GameModeHandoffCommand.ChangeGamemode,
-            ChallengeScreenState.PostMatchHud => GameModeHandoffCommand.PressPlayKey,
-            _ => GameModeHandoffCommand.Wait,
-        };
-
-    private Task<ImageFrame> OpenPlayMenuAsync(
-        RobloxWindow window,
-        IDetectorPack detector,
-        ExpeditionPreset preset,
-        char playMenuKey,
-        string phase,
-        string state,
-        Action<string, int, string, string?, double?> report,
-        Action<string, MacroEventLevel, string?, double?> log,
-        CancellationToken cancellationToken) =>
-        PlayMenuNavigator.OpenWithRetriesAsync(
-            playMenuKey,
-            () => CaptureClient(window, detector),
-            (key, token) => _automation.TapLetterKeyAsync(window, key, token),
-            (timeout, token) => TryWaitForPlayMenuAsync(window, detector, preset, timeout, token),
-            attempt => report(
-                phase,
-                100,
-                attempt == 1
-                    ? $"Opening the Play menu with {playMenuKey}."
-                    : $"Retrying the {playMenuKey} Play-menu key ({attempt}/{PlayMenuNavigator.MaximumAttempts}).",
-                state,
-                null),
-            attempt => log(
-                $"The {playMenuKey} Play-menu key did not open navigation (attempt {attempt}/{PlayMenuNavigator.MaximumAttempts}).",
-                MacroEventLevel.Warning,
-                state,
-                null),
-            cancellationToken);
-
-    private async Task<ImageFrame?> TryWaitForPlayMenuAsync(
-        RobloxWindow window,
-        IDetectorPack detector,
-        ExpeditionPreset preset,
-        TimeSpan timeout,
-        CancellationToken cancellationToken)
-    {
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
-        StableStateTracker<ChallengeScreenState> tracker = new(Math.Max(1, preset.StableDetections));
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            ImageFrame current = CaptureClient(window, detector);
-            ChallengeScreenMatch match = ChallengeScreenDetector.Detect(current);
-            ChallengeScreenState? stable = tracker.Update(match.State == ChallengeScreenState.PostMatchPreview
-                ? ChallengeScreenState.PostMatchPreview
-                : ChallengeScreenState.None);
-            if (stable == ChallengeScreenState.PostMatchPreview) return current;
-            await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
-        }
-
-        return null;
-    }
-
     private async Task ConfirmExtractionAsync(
         RobloxWindow window,
         IDetectorPack detector,
@@ -790,6 +699,25 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
                     if (!await TryClickRecoveryAsync(window, detector, "play", log, cancellationToken).ConfigureAwait(false)) break;
                     state = await WaitForRecoveryChangeAsync(window, detector, "play", TimeSpan.FromSeconds(15), preset, report, log, cancellationToken).ConfigureAwait(false) ?? state;
                     break;
+                case "post_match_party":
+                    report(
+                        "Recovery",
+                        0,
+                        "A previous party is still open. Returning to the shared game-mode selector.",
+                        state,
+                        null);
+                    await CompleteGameModeHandoffAsync(
+                        window,
+                        detector,
+                        preset,
+                        playMenuKey,
+                        state,
+                        pressPlayFirst: false,
+                        report,
+                        log,
+                        cancellationToken).ConfigureAwait(false);
+                    state = "play";
+                    break;
                 case "map_select":
                     await ConfigureMapAndDifficultyAsync(window, preset, detector, report, log, cancellationToken).ConfigureAwait(false);
                     report("Recovery", 0, "Map and difficulty verified. Selecting the stage.", state, null);
@@ -959,9 +887,11 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         DateTimeOffset? stopAfterCurrentRunUtc,
         CancellationToken cancellationToken)
     {
+        DateTimeOffset deadline =
+            DateTimeOffset.UtcNow + GameModeHandoffTimeout;
         StableStateTracker<string> tracker = new(preset.StableDetections);
         StableStateTracker<string> recoveryTracker = new(ExpeditionRunPolicy.RecoveryStableDetections(preset));
-        while (true)
+        while (DateTimeOffset.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (ExpeditionRunPolicy.StopDeadlineReached(DateTimeOffset.UtcNow, stopAfterCurrentRunUtc)) return false;
@@ -977,6 +907,8 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
             }
             await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
         }
+        throw new TimeoutException(
+            $"Timed out waiting for {Label(desired)}.");
     }
 
     private async Task<bool> WaitForStateWithTimeoutAsync(
@@ -1211,7 +1143,22 @@ public sealed class ExpeditionMacroRunner : IGameModeWorkflow
         IReadOnlyDictionary<string, double> scores = detector.ScoreStates(frame);
         if (ExpeditionRunPolicy.IsStateDetected(detector.Manifest, scores, "start")) return null;
         string? state = detector.RecoveryState(frame);
-        return allowNavigationEntry || ExpeditionRunPolicy.CanEnterRecoveryDuringRun(state) ? state : null;
+        if (state is not null &&
+            (allowNavigationEntry ||
+                ExpeditionRunPolicy.CanEnterRecoveryDuringRun(state)))
+        {
+            return state;
+        }
+        if (!allowNavigationEntry) return null;
+        ChallengeScreenState navigation =
+            ChallengeScreenDetector.Detect(frame).State;
+        return navigation is
+            ChallengeScreenState.Victory or
+            ChallengeScreenState.Defeat or
+            ChallengeScreenState.PostMatchPreview or
+            ChallengeScreenState.PostMatchHud
+            ? "post_match_party"
+            : null;
     }
 
     private static void ThrowForStableRecovery(StableStateTracker<string> tracker, string? state, bool activeRunOnly = false)

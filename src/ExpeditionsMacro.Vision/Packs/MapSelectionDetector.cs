@@ -32,9 +32,9 @@ internal static class MapSelectionDetector
     {
         if (clientImage.Format != PixelFormat.Rgb24) return null;
         // Cyan scenery can cross the same left gutter during active gameplay.
-        // Require both the three aligned dark selector panels and the live Select
-        // Stage control before interpreting any marker geometry as a map choice.
-        if (!HasSelectorPanels(clientImage) || ActionButtonDetector.Score(clientImage, "map_select") <= 0) return null;
+        // Require the live Select Stage control before interpreting any marker
+        // geometry as a map choice.
+        if (ActionButtonDetector.Score(clientImage, "map_select") <= 0) return null;
 
         using Mat rgb = ImageCodec.ToMat(clientImage);
         using Mat hsv = new();
@@ -51,13 +51,20 @@ internal static class MapSelectionDetector
             return null;
         }
 
+        // The selected row can brighten substantially because its map artwork is
+        // no longer dimmed. Exclude that mutable artwork from the structural gate
+        // and require the two inactive selector rows to retain their dark panels.
+        if (!HasInactiveSelectorPanels(clientImage, ranked[0].Map)) return null;
+
         return ranked[0].Map;
     }
 
-    private static bool HasSelectorPanels(ImageFrame image)
+    private static bool HasInactiveSelectorPanels(ImageFrame image, int selectedMap)
     {
-        foreach (ScreenRegion region in PanelRegions)
+        for (int index = 0; index < PanelRegions.Length; index++)
         {
+            if (index + 1 == selectedMap) continue;
+            ScreenRegion region = PanelRegions[index];
             if (!region.FitsWithin(image.Width, image.Height)) return false;
             int darkPixels = 0;
             for (int y = region.Y; y < region.Bottom; y++)

@@ -6,6 +6,7 @@ using ExpeditionsMacro.Automation.Diagnostics;
 using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Expeditions;
 using ExpeditionsMacro.Automation.Placement;
+using ExpeditionsMacro.Automation.Recovery;
 using ExpeditionsMacro.Automation.Scheduling;
 using ExpeditionsMacro.Automation.Stages;
 using ExpeditionsMacro.Automation.Teams;
@@ -77,10 +78,17 @@ public sealed class AppServices : IDisposable
                 Settings.MacroHotkeyVirtualKey,
                 Settings.PlayMenuKey,
                 Settings.UnitMenuKey));
+        RobloxRecovery = new RobloxPrivateServerRecoveryService(
+            Automation,
+            new WindowsRobloxProcessController());
         _discord = new DiscordWebhookClient();
         Teams = new TeamSelectionService(Automation);
         Stages = new StageMacroRunner(Automation, Camera, Placement, Teams, _discord);
         Scheduler = new MacroScheduler(MacroPlans);
+        RecoveringScheduler = new RecoveringMacroScheduler(
+            Scheduler,
+            MacroPlans,
+            RobloxRecovery);
         Challenges = new ChallengeMacroRunner(Automation, Camera, Placement, Teams, _discord);
         Expeditions = new ExpeditionMacroRunner(Automation, Camera, Placement, Teams, _discord);
         DetectorUpdates = new DetectorPackUpdateService(DetectorPacks);
@@ -114,9 +122,11 @@ public sealed class AppServices : IDisposable
     public IPlacementCaptureService PlacementCapture { get; }
     public PlacementService Placement { get; }
     public CameraAlignmentEngine Camera { get; }
+    public RobloxPrivateServerRecoveryService RobloxRecovery { get; }
     public TeamSelectionService Teams { get; }
     public StageMacroRunner Stages { get; }
     public MacroScheduler Scheduler { get; }
+    public RecoveringMacroScheduler RecoveringScheduler { get; }
     public ChallengeMacroRunner Challenges { get; }
     public ExpeditionMacroRunner Expeditions { get; }
     public DetectorPackUpdateService DetectorUpdates { get; }

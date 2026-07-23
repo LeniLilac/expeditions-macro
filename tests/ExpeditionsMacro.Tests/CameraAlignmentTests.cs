@@ -603,7 +603,7 @@ public sealed class CameraAlignmentTests
     }
 
     [Fact]
-    public async Task Align_WhenStrongFineNeighborhoodDoesNotVerify_RestartsCompleteScan()
+    public async Task Align_WhenStrongFineNeighborhoodDoesNotVerify_ContinuesCurrentScan()
     {
         ImageFrame goal = VisionScorerTests.Pattern(RobloxClientProfile.Width, RobloxClientProfile.Height);
         ImageFrame wrong = Blank(goal.Width, goal.Height);
@@ -631,7 +631,7 @@ public sealed class CameraAlignmentTests
             progress: new InlineProgress<MacroProgress>(updates.Add));
 
         Assert.True(score > 0.90, $"Fallback alignment score was {score:P1}.");
-        Assert.Contains(updates, update => update.Message.Contains("restarting a complete scan", StringComparison.Ordinal));
+        Assert.Contains(updates, update => update.Message.Contains("continued the current turn", StringComparison.Ordinal));
         Assert.Contains(updates, update => update.Message.Contains("Stable goal found during full-turn scan", StringComparison.Ordinal));
         Assert.DoesNotContain(updates, update => update.Message.Contains("skipped the remaining full-turn scan", StringComparison.Ordinal));
         Assert.Equal(8, automation.YawStep);
@@ -724,7 +724,7 @@ public sealed class CameraAlignmentTests
     };
 
     private static ImageFrame Blank(int width, int height) =>
-        new(width, height, PixelFormat.Rgb24, new byte[width * height * 3], takeOwnership: true);
+        new(width, height, PixelFormat.Rgb24, Enumerable.Range(0, width * height * 3).Select(index => (byte)((((index / 3 % width) / 16) + ((index / 3 / width) / 16)) % 2 == 0 ? 0 : 255)).ToArray(), takeOwnership: true);
 
     private static ImageFrame Shift(ImageFrame source, int dx)
     {

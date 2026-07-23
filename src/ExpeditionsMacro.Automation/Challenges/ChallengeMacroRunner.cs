@@ -15,7 +15,7 @@ using ExpeditionsMacro.Vision.Packs;
 
 namespace ExpeditionsMacro.Automation.Challenges;
 
-public sealed class ChallengeMacroRunner : IGameModeWorkflow
+public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
 {
     internal static readonly TimeSpan InitialPrestartTimeout = TimeSpan.FromSeconds(35);
     internal static readonly TimeSpan TeleportingPrestartTimeout = TimeSpan.FromMinutes(3);
@@ -70,7 +70,9 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         }
         ValidateRuntimeModels(preset, mapModels, detector.Manifest);
         ValidateTeamKey(preset.Maps.Any(profile => profile.TeamSlot > 0), unitMenuKey);
-        RobloxWindow window = _automation.FindWindow() ?? throw new InvalidOperationException("No visible Roblox window was found.");
+        RobloxWindow window = _automation.FindWindow() ??
+            throw new RobloxSessionUnavailableException(
+                "No visible Roblox window was found.");
         DateTimeOffset startedAt = DateTimeOffset.UtcNow;
         Stopwatch runtime = Stopwatch.StartNew();
         ChallengeRotationState rotation = new();
@@ -200,6 +202,34 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
                             Write,
                             Report,
                             cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (CameraWorldNotRenderedException world)
+                        when (preset.AutoRecover)
+                    {
+                        recoveries++;
+                        PublishSummary();
+                        string retryDetail =
+                            $"{Label(type)} on {Label(map)} loaded without world geometry. Returning through Play and retrying the same Challenge without placement.";
+                        Write(
+                            retryDetail,
+                            MacroEventLevel.Warning,
+                            "camera_world_missing",
+                            world.BestConfidence);
+                        Report(
+                            "Recovery",
+                            0,
+                            retryDetail,
+                            "camera_world_missing",
+                            world.BestConfidence);
+                        await ReturnFromPrestartAfterAlignmentFailureAsync(
+                            window,
+                            preset,
+                            detector,
+                            playMenuKey,
+                            Report,
+                            cancellationToken).ConfigureAwait(false);
+                        ranChallenge = true;
+                        break;
                     }
                     catch (CameraAlignmentException alignment)
                     {
@@ -738,158 +768,6 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
             cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task ReturnFromPrestartAfterAlignmentFailureAsync(
-        RobloxWindow window,
-        ChallengePreset preset,
-        IDetectorPack detector,
-        char playMenuKey,
-        Action<string, int, string, string?, double?> report,
-        CancellationToken cancellationToken)
-    {
-        report("Task skipped", 100, "Leaving the unstarted match and returning to the Challenge selector.", "camera_alignment_skipped", null);
-        ImageFrame party = await OpenPlayMenuAsync(window, preset, detector, playMenuKey, log: null, report, cancellationToken).ConfigureAwait(false);
-        (int X, int Y)? changeMode = ChallengeScreenDetector.ActionFor(ChallengeScreenState.PostMatchPreview, party);
-        if (changeMode is null) throw new InvalidOperationException("Camera alignment was skipped, but Change Gamemode could not be located in the party preview.");
-        await ClickAsync(window, changeMode.Value.X, changeMode.Value.Y, cancellationToken).ConfigureAwait(false);
-        ImageFrame modes = await WaitForScreenAsync(window, preset, detector, ChallengeScreenState.GameModeSelector, TimeSpan.FromSeconds(12), report, cancellationToken).ConfigureAwait(false);
-        (int X, int Y)? challenge = ChallengeScreenDetector.ActionFor(ChallengeScreenState.GameModeSelector, modes);
-        if (challenge is null) throw new InvalidOperationException("Camera alignment was skipped, but Challenges could not be located in the game-mode selector.");
-        await ClickAsync(window, challenge.Value.X, challenge.Value.Y, cancellationToken).ConfigureAwait(false);
-        await WaitForChallengeSelectorAsync(window, preset, detector, TimeSpan.FromSeconds(12), report, cancellationToken).ConfigureAwait(false);
-    }
-
-    private Task<ImageFrame> OpenPlayMenuAsync(
-        RobloxWindow window,
-        ChallengePreset preset,
-        IDetectorPack detector,
-        char playMenuKey,
-        Action<string, MacroEventLevel, string?, double?>? log,
-        Action<string, int, string, string?, double?> report,
-        CancellationToken cancellationToken) =>
-        PlayMenuNavigator.OpenWithRetriesAsync(
-            playMenuKey,
-            () => CaptureClient(window, detector),
-            (key, token) => _automation.TapLetterKeyAsync(window, key, token),
-            (timeout, token) => TryWaitForScreenAsync(
-                window,
-                preset,
-                detector,
-                ChallengeScreenState.PostMatchPreview,
-                timeout,
-                report,
-                token),
-            attempt => report(
-                "Return",
-                85,
-                attempt == 1
-                    ? $"Opening the Play menu with {playMenuKey}."
-                    : $"Retrying the {playMenuKey} Play-menu key ({attempt}/{PlayMenuNavigator.MaximumAttempts}).",
-                "play_menu_key",
-                null),
-            attempt => log?.Invoke(
-                $"The {playMenuKey} Play-menu key did not open navigation (attempt {attempt}/{PlayMenuNavigator.MaximumAttempts}).",
-                MacroEventLevel.Warning,
-                "play_menu_key",
-                null),
-            cancellationToken);
-
-    private async Task EnsureChallengeListAsync(
-        RobloxWindow window,
-        ChallengePreset preset,
-        IDetectorPack detector,
-        char playMenuKey,
-        Action<string, MacroEventLevel, string?, double?> log,
-        Action<string, int, string, string?, double?> report,
-        Action recovered,
-        CancellationToken cancellationToken)
-    {
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(90);
-        string? lastRecovery = null;
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            ImageFrame frame = CaptureClient(window, detector);
-            ChallengeScreenMatch match = ChallengeScreenDetector.Detect(frame);
-            if (match.State is ChallengeScreenState.ChallengeList or ChallengeScreenState.ChallengeListUnavailable) return;
-            if (match.State is ChallengeScreenState.ChallengeAvailable or ChallengeScreenState.ChallengeCooldown)
-            {
-                await ClickAsync(window, 308, 437, cancellationToken).ConfigureAwait(false);
-                await Task.Delay(500, cancellationToken).ConfigureAwait(false);
-                continue;
-            }
-            if (match.State == ChallengeScreenState.GameModeSelector)
-            {
-                report("Navigation", 0, "Opening Challenges from the game-mode selector.", "game_mode_selector", match.Confidence);
-                await ClickAsync(window, match.ActionX!.Value, match.ActionY!.Value, cancellationToken).ConfigureAwait(false);
-                await Task.Delay(850, cancellationToken).ConfigureAwait(false);
-                continue;
-            }
-            if (match.State == ChallengeScreenState.PostMatchPreview)
-            {
-                await ClickAsync(window, match.ActionX!.Value, match.ActionY!.Value, cancellationToken).ConfigureAwait(false);
-                await Task.Delay(850, cancellationToken).ConfigureAwait(false);
-                continue;
-            }
-            if (match.State is ChallengeScreenState.Victory or ChallengeScreenState.Defeat)
-            {
-                await OpenPlayMenuAsync(window, preset, detector, playMenuKey, log, report, cancellationToken).ConfigureAwait(false);
-                continue;
-            }
-
-            string? recovery = detector.RecoveryState(frame);
-            if (recovery is "afk" or "disconnect" or "lobby")
-            {
-                if (!preset.AutoRecover) throw new InvalidOperationException($"{Label(recovery)} was recognized, but automatic recovery is disabled.");
-                if (!string.Equals(lastRecovery, recovery, StringComparison.OrdinalIgnoreCase))
-                {
-                    recovered();
-                    lastRecovery = recovery;
-                    log($"Automatic Challenge recovery started from {Label(recovery)}.", MacroEventLevel.Warning, recovery, null);
-                }
-                if (recovery == "lobby")
-                {
-                    await LobbyPlayNavigator.OpenWithVerificationAsync(
-                        playMenuKey,
-                        () => CaptureClient(window, detector),
-                        candidate => string.Equals(detector.RecoveryState(candidate), "lobby", StringComparison.OrdinalIgnoreCase),
-                        candidate => ChallengeScreenDetector.Detect(candidate).State == ChallengeScreenState.GameModeSelector,
-                        (key, token) => _automation.TapLetterKeyAsync(window, key, token),
-                        async (timeout, token) => await TryWaitForScreenAsync(
-                            window,
-                            preset,
-                            detector,
-                            ChallengeScreenState.GameModeSelector,
-                            timeout,
-                            report,
-                            token).ConfigureAwait(false) is not null,
-                        attempt => report("Navigation", 0, $"Lobby recognized. Opening Play with {playMenuKey} (attempt {attempt}/{LobbyPlayNavigator.MaximumAttempts}).", recovery, null),
-                        attempt => log($"The {playMenuKey} Play-menu key did not open navigation from the lobby (attempt {attempt}/{LobbyPlayNavigator.MaximumAttempts}).", MacroEventLevel.Warning, recovery, null),
-                        cancellationToken).ConfigureAwait(false);
-                }
-                else
-                {
-                    (int x, int y) = detector.ActionFor(recovery, frame);
-                    await ClickAsync(window, x, y, cancellationToken).ConfigureAwait(false);
-                    await Task.Delay(recovery == "disconnect" ? 5000 : 2200, cancellationToken).ConfigureAwait(false);
-                }
-                continue;
-            }
-            if (recovery == "play")
-            {
-                // The shared Play detector identifies the game-mode selector. The
-                // Expeditions action attached to that detector is intentionally not
-                // used here; Challenge has its own fixed tile.
-                await ClickAsync(window, 480, 205, cancellationToken).ConfigureAwait(false);
-                await Task.Delay(900, cancellationToken).ConfigureAwait(false);
-                continue;
-            }
-
-            report("Navigation", 0, "Waiting for a Challenge navigation screen.", null, null);
-            await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
-        }
-        throw new InvalidOperationException("Challenge navigation did not reach the selector within 90 seconds.");
-    }
-
     private async Task<ChallengeScreenMatch> OpenChallengeTypeAsync(
         RobloxWindow window,
         ChallengePreset preset,
@@ -1116,35 +994,6 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
         return null;
     }
 
-    private async Task<ChallengeSelectorObservation> WaitForChallengeSelectorAsync(
-        RobloxWindow window,
-        ChallengePreset preset,
-        IDetectorPack detector,
-        TimeSpan timeout,
-        Action<string, int, string, string?, double?> report,
-        CancellationToken cancellationToken)
-    {
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
-        StableStateTracker<ChallengeScreenState> tracker = new(preset.StableDetections);
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            ImageFrame frame = CaptureClient(window, detector);
-            ChallengeScreenMatch match = ChallengeScreenDetector.Detect(frame);
-            ChallengeScreenState candidate = match.State is ChallengeScreenState.ChallengeList or ChallengeScreenState.ChallengeListUnavailable
-                ? match.State
-                : ChallengeScreenState.None;
-            ChallengeScreenState? stable = tracker.Update(candidate);
-            if (stable is ChallengeScreenState.ChallengeList or ChallengeScreenState.ChallengeListUnavailable)
-            {
-                return new ChallengeSelectorObservation(frame, match with { State = stable.Value });
-            }
-            if (match.State != ChallengeScreenState.None) report("Waiting", 0, $"Detected {Label(match.State)}.", match.State.ToString(), match.Confidence);
-            await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
-        }
-        throw new InvalidOperationException("Timed out waiting for the Challenge selector.");
-    }
-
     private async Task PrepareCameraAsync(
         RobloxWindow window,
         ChallengePreset preset,
@@ -1307,8 +1156,6 @@ public sealed class ChallengeMacroRunner : IGameModeWorkflow
     private sealed record MatchTerminal(ChallengeScreenState State, double Confidence, ImageFrame Frame);
 
     private sealed record ChallengeTerminal(int Victories, int Defeats);
-
-    private sealed record ChallengeSelectorObservation(ImageFrame Frame, ChallengeScreenMatch Match);
 
     private sealed class ChallengeRecoveryException : Exception
     {

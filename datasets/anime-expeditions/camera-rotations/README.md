@@ -18,3 +18,9 @@ The complete rotation archives are intentionally not duplicated here. The curate
 - `wrong-yaw.png` applies the same process to runtime frame 564, a nearby incorrect yaw from the same alignment scan.
 
 Only world-region composites are retained; fixed controls, player identity, desktop chrome, and unrelated screen content are excluded. The regression requires at least three of the four regions to agree on the expanded vertical registration and keeps the wrong-yaw composite below the saved model's 71.59% success threshold.
+
+## Unrendered world
+
+`UnrenderedWorld/blue-void.png` is a reviewed 808 by 611 client capture from a reported beta.8 run on July 22, 2026. Roblox loaded the prestart controls and hotbar but never rendered the stage geometry, leaving the camera regions as a nearly uniform blue field.
+
+The readiness regression requires this frame to fail before any yaw input or placement while an ordinary rendered goal remains ready. The fixture contains no desktop chrome, chat, webhook data, or private-server link.

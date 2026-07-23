@@ -74,6 +74,7 @@ public partial class MacroPage : UserControl, IAppPage
             WebhookPassword.Password = webhook;
             WebhookVisible.Text = webhook;
             DiscordUserIdText.Text = _services.Settings.DiscordErrorUserId;
+            LoadPrivateServerRecoverySettings();
             TaskKindCombo.SelectedIndex = 0;
             RefreshVisiblePresets();
             UpdateTaskTargetEditor();
@@ -94,6 +95,7 @@ public partial class MacroPage : UserControl, IAppPage
         WebhookPassword.Password = string.Empty;
         WebhookVisible.Text = string.Empty;
         DiscordUserIdText.Text = string.Empty;
+        ClearPrivateServerRecoverySnapshot();
         PopulateSnapshotTasks();
         UpdateLayout();
         if (showEnd) PageScroll.ScrollToEnd();
@@ -154,6 +156,7 @@ public partial class MacroPage : UserControl, IAppPage
         char? unitMenuKey = null;
         string webhook = CurrentWebhook();
         string discordUserId = DiscordUserIdText.Text.Trim();
+        PrivateServerRecoverySelection privateServerRecovery;
         try
         {
             plan = await SavePlanInternalAsync();
@@ -167,7 +170,9 @@ public partial class MacroPage : UserControl, IAppPage
                     _services.Settings.PlayMenuKey);
             }
             ValidateDiscord(webhook, discordUserId);
+            privateServerRecovery = ReadPrivateServerRecoverySelection();
             await SaveReportingSettingsAsync(webhook, discordUserId);
+            await SavePrivateServerRecoverySettingsAsync(privateServerRecovery);
         }
         catch (Exception error)
         {
@@ -198,59 +203,16 @@ public partial class MacroPage : UserControl, IAppPage
 
         await _services.Coordinator.RunNowAsync(
             "Macro plan",
-            token => RunPlanWithFailureHandlingAsync(plan, webhook, discordUserId, playMenuKey, unitMenuKey, progress, token),
-            new DeepDebugOperationContext { MacroPlanId = plan.Id });
-    }
-
-    private async Task RunPlanWithFailureHandlingAsync(
-        MacroPlan plan,
-        string webhook,
-        string discordUserId,
-        char playMenuKey,
-        char? unitMenuKey,
-        IProgress<MacroProgress> progress,
-        CancellationToken cancellationToken)
-    {
-        bool captureHistory = _services.Settings.AutoCaptureOnMacroError;
-        if (captureHistory) _services.DiagnosticCapture.BeginAutomaticHistory("Macro plan started");
-        try
-        {
-            await _services.Scheduler.RunAsync(
+            token => RunPlanWithFailureHandlingAsync(
                 plan,
-                (task, recordResult, token) => ExecuteTaskAsync(task, recordResult, webhook, discordUserId, playMenuKey, unitMenuKey, progress, token),
+                webhook,
+                discordUserId,
+                playMenuKey,
+                unitMenuKey,
+                privateServerRecovery.Target,
                 progress,
-                changed => Dispatcher.BeginInvoke(() => ApplyPlanProgress(changed)),
-                entry => DispatchLog(entry),
-                cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (PlayMenuBindingException error)
-        {
-            await Dispatcher.InvokeAsync(() =>
-            {
-                PhaseText.Text = "Play menu key setup is required.";
-                AppendLog($"ERROR: {error.Message}");
-            });
-            throw;
-        }
-        catch (Exception error)
-        {
-            await Dispatcher.InvokeAsync(() =>
-            {
-                PhaseText.Text = "Macro failed. Running configured error diagnostics.";
-                AppendLog($"ERROR: {error.Message}");
-            });
-            MacroFailureHandlingResult result = await _services.HandleMacroFailureAsync("Macro Plan", webhook, discordUserId, error).ConfigureAwait(false);
-            await Dispatcher.InvokeAsync(() => AppendFailureHandlingResult(result));
-            throw;
-        }
-        finally
-        {
-            if (captureHistory) _services.DiagnosticCapture.EndAutomaticHistory();
-        }
+                token),
+            new DeepDebugOperationContext { MacroPlanId = plan.Id });
     }
 
     private Task<ScheduledTaskResult> ExecuteTaskAsync(
@@ -504,8 +466,10 @@ public partial class MacroPage : UserControl, IAppPage
             string webhook = CurrentWebhook();
             string discordUserId = DiscordUserIdText.Text.Trim();
             ValidateDiscord(webhook, discordUserId);
+            PrivateServerRecoverySelection privateServerRecovery = ReadPrivateServerRecoverySelection();
             MacroPlan plan = await SavePlanInternalAsync();
             await SaveReportingSettingsAsync(webhook, discordUserId);
+            await SavePrivateServerRecoverySettingsAsync(privateServerRecovery);
             PhaseText.Text = $"Plan '{plan.Name}' saved locally.";
         }
         catch (Exception error)
@@ -801,6 +765,7 @@ public partial class MacroPage : UserControl, IAppPage
         ShowWebhookCheck.IsEnabled = !busy;
         DiscordUserIdText.IsEnabled = !busy;
         TestWebhookButton.IsEnabled = !busy && !_testingWebhook;
+        SetPrivateServerRecoveryControlsEnabled(!busy);
         UpdateTaskTargetEditor();
 
         if (!busy && _macroOwned)

@@ -301,7 +301,7 @@ public sealed partial class WindowsRobloxAutomation : IRobloxAutomation, IDispos
         SendMouse(NativeMethods.MouseeventfRightDown);
         try
         {
-            await Task.Delay(25, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(60, cancellationToken).ConfigureAwait(false);
             int sentX = 0;
             int sentY = 0;
             int chunk = Math.Max(1, chunkPixels);
@@ -317,7 +317,7 @@ public sealed partial class WindowsRobloxAutomation : IRobloxAutomation, IDispos
                 sentY = nextY;
                 if (sentX != deltaX || sentY != deltaY) await Task.Delay(12, cancellationToken).ConfigureAwait(false);
             }
-            await Task.Delay(20, cancellationToken).ConfigureAwait(false);
+            await Task.Delay(60, cancellationToken).ConfigureAwait(false);
         }
         finally
         {

@@ -4,6 +4,35 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.10] - 2026-07-23
+
+### Added
+
+- Added optional process-level Roblox recovery to Macro plans. After bounded in-client recovery fails, the app can close only the verified Roblox player process, reopen a DPAPI-protected private-server link through the registered `roblox://` protocol, reload saved plan progress, and retry the same incomplete task.
+- Added a dedicated rendered-world gate that recognizes the reported blue-void prestart failure before camera input or unit placement and retries the configured route through Play.
+
+### Fixed
+
+- Expedition map verification no longer treats the selected row's bright preview artwork as a missing selector panel, preventing false "Map 1 could not be selected" errors after the game has visibly activated School Grounds.
+- Challenge navigation now sends one Back click from an open detail and waits for a stable selector before retrying, preventing a delayed second click from reopening the challenge and timing out.
+- Camera setup and runtime refinement now use identical atomic fine-drag gestures in both directions. Setup rejects a non-reversible zero pose, and a failed saved-neighborhood shortcut restores the scan pose and continues the existing turn instead of recursively starting another 360-degree scan.
+- Expedition startup recognizes a retained post-match party from a previous task and completes its verified Change Gamemode handoff instead of waiting indefinitely on a screen it does not own.
+- Missing or recaptured Roblox sessions now surface as restart-eligible runtime failures while Play-key configuration errors and ordinary low camera confidence continue to fail without restarting the client.
+
+### Security
+
+- Private-server links are excluded from logs, diagnostics, and Deep Debug configuration snapshots. Automatic relaunch requires a supported Roblox process identity and is limited to three restarts within ten minutes.
+
+### Tests
+
+- Added the reported beta.9 bright Map 1 selector frame to the language-independent active-row regression corpus.
+- Added a delayed Challenge detail-to-selector regression proving stale transition frames cannot trigger a duplicate Back click.
+- Added rendered-map versus blue-void camera fixtures, atomic fine-input, single-turn fallback, private-link validation, secret-redaction, restart-circuit, and same-incomplete-task recovery regressions.
+
+### Engineering
+
+- Split camera fine calibration, stage navigation, Expedition handoff, Challenge navigation, and diagnostic secret redaction into focused modules while lowering the enforced line-debt ceilings.
+
 ## [1.3.0-beta.9] - 2026-07-22
 
 ### Fixed
@@ -550,7 +579,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.9...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.10...HEAD
+[1.3.0-beta.10]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.9...v1.3.0-beta.10
 [1.3.0-beta.9]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.8...v1.3.0-beta.9
 [1.3.0-beta.8]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.7...v1.3.0-beta.8
 [1.3.0-beta.7]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.6...v1.3.0-beta.7

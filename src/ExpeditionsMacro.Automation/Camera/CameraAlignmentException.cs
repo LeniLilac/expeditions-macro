@@ -1,6 +1,6 @@
 namespace ExpeditionsMacro.Automation.Camera;
 
-public sealed class CameraAlignmentException : InvalidOperationException
+public class CameraAlignmentException : InvalidOperationException
 {
     public CameraAlignmentException(string message, double bestConfidence, int attempts)
         : base(message)

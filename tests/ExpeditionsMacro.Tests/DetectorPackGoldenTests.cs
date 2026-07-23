@@ -496,6 +496,7 @@ public sealed class DetectorPackGoldenTests
 
     [Theory]
     [InlineData(1, "Map1_French.png")]
+    [InlineData(1, "Map1_BrightSelectedPanel.png")]
     [InlineData(2, "Map2_Alternate.png")]
     [InlineData(2, "Map2_Current.png")]
     [Trait("Category", "Golden")]

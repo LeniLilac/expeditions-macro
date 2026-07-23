@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
+using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Windows.Interop;
 
 namespace ExpeditionsMacro.Windows;
@@ -13,22 +14,44 @@ public sealed partial class WindowsRobloxAutomation
 
     public ImageFrame CaptureClient(RobloxWindow window)
     {
-        return CaptureWithSurfaceRecovery(
-            () =>
-            {
-                nint handle = ResolveHandle(window);
-                ClientBounds client = GetClientBounds(handle);
-                WindowBounds bounds = GetWindowBounds(handle);
-                WindowBounds extended = GetExtendedFrameBounds(handle) ?? bounds;
-                return _windowCapture.CaptureClient(handle, client, bounds, extended);
-            },
-            (attempt, error) =>
-            {
-                DiagnosticMessage?.Invoke(
-                    $"Windows changed the Roblox capture surface from {error.ExpectedWidth} by {error.ExpectedHeight} to {error.ActualWidth} by {error.ActualHeight}; re-reading the live window geometry (attempt {attempt + 1}/{CaptureSurfaceRecoveryAttempts}).");
-                Thread.Sleep(CaptureSurfaceRecoveryDelayMilliseconds);
-            },
-            CaptureSurfaceRecoveryAttempts);
+        try
+        {
+            return CaptureWithSurfaceRecovery(
+                () =>
+                {
+                    nint handle = ResolveHandle(window);
+                    ClientBounds client = GetClientBounds(handle);
+                    WindowBounds bounds = GetWindowBounds(handle);
+                    WindowBounds extended =
+                        GetExtendedFrameBounds(handle) ?? bounds;
+                    return _windowCapture.CaptureClient(
+                        handle,
+                        client,
+                        bounds,
+                        extended);
+                },
+                (attempt, error) =>
+                {
+                    DiagnosticMessage?.Invoke(
+                        $"Windows changed the Roblox capture surface from {error.ExpectedWidth} by {error.ExpectedHeight} to {error.ActualWidth} by {error.ActualHeight}; re-reading the live window geometry (attempt {attempt + 1}/{CaptureSurfaceRecoveryAttempts}).");
+                    Thread.Sleep(
+                        CaptureSurfaceRecoveryDelayMilliseconds);
+                },
+                CaptureSurfaceRecoveryAttempts);
+        }
+        catch (RobloxSessionUnavailableException)
+        {
+            throw;
+        }
+        catch (Exception error) when (
+            error is InvalidOperationException or
+            TimeoutException or
+            COMException)
+        {
+            throw new RobloxSessionUnavailableException(
+                "Windows could not capture the Roblox window.",
+                error);
+        }
     }
 
     internal static T CaptureWithSurfaceRecovery<T>(
