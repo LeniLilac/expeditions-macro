@@ -4,6 +4,12 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.13] - 2026-07-23
+
+### Fixed
+
+- Windows Graphics Capture now rebuilds one stalled capture session when a Roblox stage teleport pauses fresh-frame delivery beyond the normal one-second deadline, allowing the same launch to continue without repeating navigation input or returning a cached pre-teleport frame.
+
 ## [1.3.0-beta.12] - 2026-07-23
 
 ### Added
@@ -606,7 +612,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.12...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.13...HEAD
+[1.3.0-beta.13]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.12...v1.3.0-beta.13
 [1.3.0-beta.12]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.10...v1.3.0-beta.12
 [1.3.0-beta.10]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.9...v1.3.0-beta.10
 [1.3.0-beta.9]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.8...v1.3.0-beta.9

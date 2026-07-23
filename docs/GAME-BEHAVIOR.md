@@ -171,6 +171,18 @@ This ledger records Anime Expeditions behavior that has been established from re
 - Evidence: a six-hour beta.8 Deep Debug run reviewed on 2026-07-23. The blue void began around frame 27,092; the same run eventually returned through Play, re-entered the route, and loaded normally.
 - Protected by: `CameraWorldReadinessTests.BlueVoid_IsRejectedWhileRenderedMapRemainsReady`, `RobloxRuntimeRecoveryPolicyTests`, and `RecoveringMacroSchedulerTests.RuntimeFailure_RestartsRobloxAndRetriesTheIncompleteTask`.
 
+### GB-013: A stage teleport can briefly pause window capture
+
+- Status: **Field confirmed**.
+- Entry: a launch-ready party has accepted **Start** and Roblox is switching through its experience splash and stage teleport screens.
+- Observed failure: the Roblox window, PID, and canonical 808 by 611 client remain valid, but Windows Graphics Capture can deliver no post-barrier compositor frame for longer than the normal one-second fresh-frame deadline.
+- Action: dispose the stalled capture session, create one replacement against the same verified Roblox window and live client geometry, and wait through its bounded initial-frame allowance.
+- Exit: resume ordinary detector polling from the first fresh replacement-session frame without repeating **Start**, another navigation click, or any camera input.
+- Failure rule: if the replacement session also times out, report the existing session-level capture failure so configured outer recovery can take over.
+- Do not: return a cached pre-teleport frame, weaken the post-input freshness barrier, resend the launch input, or retry capture without a bound.
+- Evidence: a beta.12 automatic error archive reviewed on 2026-07-23 shows successful School Grounds Infinite navigation followed by a capture failure during the experience splash; its post-failure frames reach the correct prestart five seconds later. A Deep Debug retry on the same PID records the complete splash-to-teleport-to-prestart sequence without a navigation change. A separately replicated Spirit City Raid 2 Deep Debug run records one Start click, the same valid Roblox PID and 808 by 611 client, then the exact post-barrier `TimeoutException` while the teleport continued normally in failure-diagnostic frames.
+- Protected by: `WindowsRobloxAutomationTests.WindowCapture_TransientFreshFrameTimeoutRecreatesSessionOnce` and `WindowCapture_RepeatedFreshFrameTimeoutRemainsBounded`.
+
 ## Reusable evidence workflow
 
 1. Capture the complete attempt with deep debug, or pair a passive diagnostic capture with an exact user-described manual input sequence.
