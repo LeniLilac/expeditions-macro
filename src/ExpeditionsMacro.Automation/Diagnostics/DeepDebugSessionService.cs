@@ -19,9 +19,9 @@ public sealed class DeepDebugSessionService
     private static readonly JsonSerializerOptions CompactJson = CreateCompactJson();
     private readonly AppPaths _paths;
     private readonly Func<AppSettings> _getSettings;
-    private readonly Func<string?> _getLogFilePath;
     private readonly Action<string> _info;
     private readonly Action<string> _warning;
+    private readonly DeepDebugArchiveTextWriter _archiveText;
     private readonly object _gate = new();
     private DeepDebugSession? _active;
 
@@ -34,9 +34,11 @@ public sealed class DeepDebugSessionService
     {
         _paths = paths;
         _getSettings = getSettings;
-        _getLogFilePath = getLogFilePath;
         _info = info;
         _warning = warning;
+        _archiveText = new DeepDebugArchiveTextWriter(
+            getSettings,
+            getLogFilePath);
     }
 
     public bool IsActive
@@ -103,8 +105,11 @@ public sealed class DeepDebugSessionService
             catch (Exception finalizationError)
             {
                 string preserved = session.StagingDirectory;
-                TryWriteFinalizationError(preserved, finalizationError);
-                _warning($"Deep debug ZIP creation failed. The uncompressed session was preserved at '{preserved}': {finalizationError.Message}");
+                _archiveText.TryWriteFinalizationError(
+                    preserved,
+                    finalizationError);
+                _warning(RedactText(
+                    $"Deep debug ZIP creation failed. The uncompressed session was preserved at '{preserved}': {finalizationError.Message}"));
             }
         }
     }
@@ -272,7 +277,9 @@ public sealed class DeepDebugSessionService
                 RedactText(snapshotError.ToString()),
                 CancellationToken.None).ConfigureAwait(false);
         }
-        await CopySanitizedRunLogAsync(session.StagingDirectory).ConfigureAwait(false);
+        await _archiveText
+            .CopySanitizedRunLogAsync(session.StagingDirectory)
+            .ConfigureAwait(false);
 
         DateTimeOffset completedAt = DateTimeOffset.UtcNow;
         DeepDebugManifest manifest = new(
@@ -287,7 +294,7 @@ public sealed class DeepDebugSessionService
             Volatile.Read(ref session.InputEventCount),
             session.WriterFailure is null ? null : RedactText(session.WriterFailure.ToString()),
             error is null ? null : RedactText(error.ToString()),
-            "Discord webhook values, protected webhook material, and Discord user IDs are excluded.");
+            "Discord webhook values, protected webhook material, Discord user IDs, and the active Windows username/profile path are excluded.");
         await WriteJsonAsync(Path.Combine(session.StagingDirectory, "manifest.json"), manifest).ConfigureAwait(false);
 
         string safeOperation = SafeName(session.Operation);
@@ -343,13 +350,22 @@ public sealed class DeepDebugSessionService
                 string json;
                 try
                 {
-                    json = JsonSerializer.Serialize(record, CompactJson);
+                    json = RedactText(
+                        JsonSerializer.Serialize(record, CompactJson));
                 }
                 catch (Exception serializationError)
                 {
-                    json = JsonSerializer.Serialize(
-                        record with { Data = new { SerializationError = serializationError.Message } },
-                        CompactJson);
+                    json = RedactText(
+                        JsonSerializer.Serialize(
+                            record with
+                            {
+                                Data = new
+                                {
+                                    SerializationError =
+                                        serializationError.Message,
+                                },
+                            },
+                            CompactJson));
                 }
                 await writer.WriteLineAsync(json).ConfigureAwait(false);
             }
@@ -412,19 +428,19 @@ public sealed class DeepDebugSessionService
         string modelsRoot = Path.Combine(session.StagingDirectory, "models", phase);
         foreach (string id in artifacts.CameraModelIds)
         {
-            CopyDirectoryIfExists(
+            _archiveText.CopyDirectory(
                 Path.Combine(_paths.CameraModels, id),
                 Path.Combine(modelsRoot, "camera", id));
         }
         foreach (string id in artifacts.PlacementModelIds)
         {
-            CopyDirectoryIfExists(
+            _archiveText.CopyDirectory(
                 Path.Combine(_paths.PlacementModels, id),
                 Path.Combine(modelsRoot, "placement", id));
         }
         foreach (string id in artifacts.DetectorPackIds)
         {
-            CopyDirectoryIfExists(
+            _archiveText.CopyDirectory(
                 Path.Combine(_paths.DetectorPacks, id, "current"),
                 Path.Combine(modelsRoot, "detector-packs", id));
         }
@@ -495,10 +511,6 @@ public sealed class DeepDebugSessionService
             AddId(resolved.PlacementModelIds, profile.PrestartPlacementModelId);
             AddId(resolved.PlacementModelIds, profile.DelayedPlacementModelId);
         }
-        if (!string.IsNullOrWhiteSpace(preset.ExpeditionPresetId))
-        {
-            await ResolveExpeditionAsync(preset.ExpeditionPresetId, root, resolved).ConfigureAwait(false);
-        }
     }
 
     private async Task ResolveStoryAsync(string id, string root, ResolvedArtifacts resolved)
@@ -537,32 +549,8 @@ public sealed class DeepDebugSessionService
         return value;
     }
 
-    private async Task CopySanitizedRunLogAsync(string staging)
-    {
-        string? source = _getLogFilePath();
-        if (string.IsNullOrWhiteSpace(source) || !File.Exists(source)) return;
-        try
-        {
-            await using FileStream stream = new(source, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            using StreamReader reader = new(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-            string text = await reader.ReadToEndAsync(CancellationToken.None).ConfigureAwait(false);
-            await File.WriteAllTextAsync(
-                Path.Combine(staging, "macro-run-sanitized.log"),
-                RedactText(text),
-                new UTF8Encoding(false),
-                CancellationToken.None).ConfigureAwait(false);
-        }
-        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
-        {
-            await File.WriteAllTextAsync(
-                Path.Combine(staging, "macro-run-copy-error.txt"),
-                error.Message,
-                CancellationToken.None).ConfigureAwait(false);
-        }
-    }
-
     private string RedactText(string text) =>
-        DeepDebugSecretRedactor.Redact(text, _getSettings());
+        _archiveText.Redact(text);
 
     private DeepDebugSession? ActiveSession()
     {
@@ -590,31 +578,8 @@ public sealed class DeepDebugSessionService
         return safe.Length == 0 ? "operation" : safe[..Math.Min(safe.Length, 48)];
     }
 
-    private static void CopyDirectoryIfExists(string source, string destination)
-    {
-        if (!Directory.Exists(source)) return;
-        Directory.CreateDirectory(destination);
-        foreach (string directory in Directory.EnumerateDirectories(source, "*", SearchOption.AllDirectories))
-        {
-            Directory.CreateDirectory(Path.Combine(destination, Path.GetRelativePath(source, directory)));
-        }
-        foreach (string file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
-        {
-            string target = Path.Combine(destination, Path.GetRelativePath(source, file));
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            File.Copy(file, target, overwrite: true);
-        }
-    }
-
-    private static Task WriteJsonAsync<T>(string path, T value)
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        return File.WriteAllTextAsync(
-            path,
-            JsonSerializer.Serialize(value, JsonFileStore.Options),
-            new UTF8Encoding(false),
-            CancellationToken.None);
-    }
+    private Task WriteJsonAsync<T>(string path, T value)
+        => _archiveText.WriteJsonAsync(path, value);
 
     private static void EnsureChildPath(string root, string path)
     {
@@ -623,19 +588,6 @@ public sealed class DeepDebugSessionService
         if (!fullPath.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("Deep debug output resolved outside the diagnostics folder.");
-        }
-    }
-
-    private static void TryWriteFinalizationError(string directory, Exception error)
-    {
-        try
-        {
-            Directory.CreateDirectory(directory);
-            File.WriteAllText(Path.Combine(directory, "finalization-error.txt"), error.ToString());
-        }
-        catch
-        {
-            // The original path and finalization error are still written to the application log.
         }
     }
 

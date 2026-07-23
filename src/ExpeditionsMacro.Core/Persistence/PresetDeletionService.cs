@@ -49,22 +49,11 @@ public sealed class PresetDeletionService
             .Order(StringComparer.CurrentCultureIgnoreCase)
             .ToArray();
 
-        string[] challengeNames = kind == MacroTaskKind.Expedition
-            ? (await _challenges.ListAsync(cancellationToken).ConfigureAwait(false))
-                .Where(preset =>
-                    preset.IdleBehavior == ChallengeIdleBehavior.RunExpeditions &&
-                    string.Equals(preset.ExpeditionPresetId, presetId, StringComparison.OrdinalIgnoreCase))
-                .Select(preset => preset.Name)
-                .Distinct(StringComparer.CurrentCultureIgnoreCase)
-                .Order(StringComparer.CurrentCultureIgnoreCase)
-                .ToArray()
-            : [];
-
-        if (planNames.Length > 0 || challengeNames.Length > 0)
+        if (planNames.Length > 0)
         {
-            List<string> references = [];
-            references.AddRange(planNames.Select(name => $"Macro plan '{name}'"));
-            references.AddRange(challengeNames.Select(name => $"Challenge preset '{name}'"));
+            string[] references = planNames
+                .Select(name => $"Macro plan '{name}'")
+                .ToArray();
             throw new PresetInUseException(
                 $"This preset is still used by {JoinReferences(references)}. Remove those references before deleting it.");
         }

@@ -45,14 +45,6 @@ public sealed class ChallengePresetTests
     }
 
     [Fact]
-    public void ExpeditionsFallback_RequiresAnExpeditionsPreset()
-    {
-        ChallengePreset preset = Draft() with { IdleBehavior = ChallengeIdleBehavior.RunExpeditions };
-
-        Assert.Throws<InvalidDataException>(preset.Validate);
-    }
-
-    [Fact]
     public void DefeatRetries_DefaultToZeroAndRejectOutOfRangeValues()
     {
         Assert.Equal(0, Draft().DefeatRetries);
@@ -82,6 +74,42 @@ public sealed class ChallengePresetTests
             Assert.Equal(
                 expected.Maps.Select(profile => profile.Map),
                 loaded.Maps.Select(profile => profile.Map));
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task Repository_LoadsPresetWithRetiredCooldownFields()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            AppPaths paths = new(root);
+            paths.EnsureCreated();
+            string json = System.Text.Json.JsonSerializer.Serialize(
+                Draft(),
+                JsonFileStore.Options);
+            json = json.Replace(
+                "{",
+                """
+                {
+                  "idle_behavior": "run_expeditions",
+                  "expedition_preset_id": "legacy-expedition",
+                """,
+                StringComparison.Ordinal);
+            await File.WriteAllTextAsync(
+                Path.Combine(paths.ChallengePresets, "challenge-test.json"),
+                json);
+
+            ChallengePresetRepository repository = new(paths);
+            ChallengePreset loaded = Assert.IsType<ChallengePreset>(
+                await repository.LoadAsync("challenge-test"));
+
+            loaded.Validate();
+            Assert.Equal("challenge-test", loaded.Id);
         }
         finally
         {

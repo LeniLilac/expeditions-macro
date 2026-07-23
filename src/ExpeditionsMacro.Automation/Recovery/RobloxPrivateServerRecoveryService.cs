@@ -6,6 +6,10 @@ namespace ExpeditionsMacro.Automation.Recovery;
 
 public interface IRobloxRuntimeRecoveryService
 {
+    Task LaunchAsync(
+        RobloxPrivateServerLaunchTarget target,
+        CancellationToken cancellationToken = default);
+
     Task<RobloxWindow> RestartAsync(
         RobloxPrivateServerLaunchTarget target,
         IProgress<MacroProgress>? progress = null,
@@ -28,6 +32,14 @@ public sealed class RobloxPrivateServerRecoveryService
     {
         _automation = automation;
         _processes = processes;
+    }
+
+    public Task LaunchAsync(
+        RobloxPrivateServerLaunchTarget target,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        return _processes.LaunchAsync(target.LaunchUri, cancellationToken);
     }
 
     public async Task<RobloxWindow> RestartAsync(

@@ -59,36 +59,20 @@
                     </Border>
 
                     <Grid Margin="0,16,0,0">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="18" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="When all are on cooldown" />
-                            <ComboBox x:Name="IdleBehaviorCombo" Margin="0,7,0,0" SelectedIndex="0" SelectionChanged="IdleBehaviorCombo_SelectionChanged">
-                                <ComboBoxItem Tag="wait" Content="Wait for the next reset" />
-                                <ComboBoxItem Tag="expeditions" Content="Run Expeditions" />
-                            </ComboBox>
-                        </StackPanel>
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Expeditions preset" />
-                            <ComboBox x:Name="ExpeditionPresetCombo" Margin="0,7,0,0" DisplayMemberPath="Name" IsEnabled="False" />
-                        </StackPanel>
-                    </Grid>
-                    <Grid Margin="0,14,0,0">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="140" /><ColumnDefinition Width="110" /><ColumnDefinition Width="24" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                         <TextBlock Style="{StaticResource FieldLabel}" Text="Retries after defeat" />
                         <TextBox x:Name="DefeatRetriesText" Grid.Column="1" Text="0" />
                         <CheckBox x:Name="AutoRecoverCheck" Grid.Column="3" IsChecked="True" Content="Return after lobby, disconnect, or AFK recovery" />
                         <TextBlock x:Name="NextResetText" Grid.Column="4" Margin="20,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{DynamicResource MutedBrush}" Text="Next reset in 30m 00s" />
                     </Grid>
-                    <TextBlock Margin="0,7,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Zero retries moves to the next Challenge after a defeat. That type becomes eligible again at the next global reset." />
                 </StackPanel>
             </Border>
 
             <Border Grid.Row="3" Style="{StaticResource SectionDivider}">
                 <StackPanel>
                     <TextBlock Style="{StaticResource SectionTitle}" Text="Map models and placement" />
-                    <TextBlock Margin="0,6,0,0" Style="{StaticResource Caption}" Text="The detected map chooses one row. Before-start placements run in the lobby countdown; after-start placements run once at the configured elapsed time." />
 
-                    <Border Margin="0,16,0,0" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
+                    <Border Margin="0,12,0,0" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
                         <StackPanel>
                             <Grid Height="38" Background="{DynamicResource RaisedBrush}">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="130" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="96" /><ColumnDefinition Width="110" /></Grid.ColumnDefinitions>
@@ -178,8 +162,8 @@
                 <Grid Margin="0,20,0,0">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                     <StackPanel Margin="0,0,24,0">
-                        <TextBlock x:Name="StatusText" FontWeight="SemiBold" Text="Ready to start." />
-                        <TextBlock x:Name="DetectionText" Margin="0,4,0,0" Style="{StaticResource Caption}" Text="Run this preset from the Macro page." />
+                        <TextBlock x:Name="StatusText" FontWeight="SemiBold" />
+                        <TextBlock x:Name="DetectionText" Margin="0,4,0,0" Style="{StaticResource Caption}" />
                     </StackPanel>
                     <Button Grid.Column="1" icons:Lucide.Icon="CircleCheck" Content="Validate setup" Click="ValidateSetup_Click" />
                     <Button Grid.Column="2" Margin="8,0,0,0" Style="{StaticResource PrimaryButton}" icons:Lucide.Icon="Save" Content="Save changes" Click="SavePreset_Click" />

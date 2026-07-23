@@ -257,7 +257,6 @@ public partial class MacroPage : UserControl, IAppPage
             detector,
             webhook,
             playMenuKey,
-            idleWorkflow: null,
             progress,
             entry => DispatchLog(entry),
             value => summary = value,

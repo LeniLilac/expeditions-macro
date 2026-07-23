@@ -16,12 +16,6 @@ public enum ChallengeMapId
     KingsTomb = 5,
 }
 
-public enum ChallengeIdleBehavior
-{
-    WaitForReset,
-    RunExpeditions,
-}
-
 public sealed record ChallengeMapProfile
 {
     public required ChallengeMapId Map { get; init; }
@@ -84,10 +78,6 @@ public sealed record ChallengePreset
 
     public string DetectorPackId { get; init; } = "anime-expeditions-expeditions";
 
-    public ChallengeIdleBehavior IdleBehavior { get; init; } = ChallengeIdleBehavior.WaitForReset;
-
-    public string ExpeditionPresetId { get; init; } = string.Empty;
-
     public bool AutoRecover { get; init; } = true;
 
     public int DefeatRetries { get; init; }
@@ -128,10 +118,6 @@ public sealed record ChallengePreset
             throw new InvalidDataException("Configure each Challenge map exactly once.");
         }
         foreach (ChallengeMapProfile profile in Maps) profile.Validate();
-        if (IdleBehavior == ChallengeIdleBehavior.RunExpeditions && string.IsNullOrWhiteSpace(ExpeditionPresetId))
-        {
-            throw new InvalidDataException("Choose the Expeditions preset to run while Challenges are on cooldown.");
-        }
         if (ZoomTicks is < 5 or > 80 || PitchDragPixels is < 300 or > 5000) throw new InvalidDataException("Camera preparation settings are out of range.");
         if (PollMilliseconds is < 150 or > 5000 || StableDetections is < 1 or > 5) throw new InvalidDataException("Detection timing is out of range.");
         if (UnitKeyHoldMilliseconds is < 30 or > 1000 || UnitSelectDelayMilliseconds is < 25 or > 5000) throw new InvalidDataException("Placement timing is out of range.");

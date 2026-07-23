@@ -13,7 +13,7 @@ It uses screen capture and ordinary Windows input. It does not inject into Roblo
 - Starts and stops with one configurable global hotkey; **F6** is the default, with letters, digits, punctuation, numpad keys, and supported function keys available.
 - Can begin from the Roblox lobby and navigate to the configured Expeditions map and difficulty.
 - Runs any enabled Trait, Stat, and Sprite Challenges on the global half-hour reset, recognizes five rotating maps, and loads the matching camera and placement models.
-- Supports separate prestart and delayed in-match Challenge placements, configurable defeat retries, and an optional Expeditions handoff while Challenges are on cooldown.
+- Supports separate prestart and delayed in-match Challenge placements and configurable defeat retries; while Challenges are unavailable, the Macro scheduler selects the next eligible task by priority.
 - Navigates Story Acts 1-5, Infinite, and Mastery across five maps, plus Spirit City Raid Acts 1-3.
 - Saves prioritized Macro plans that can rotate Challenge, Expedition, Story, and Raid presets while preserving progress between launches.
 - Optionally opens Units and loads Team 1-8 before a configured run.
@@ -95,10 +95,9 @@ The app waits for the difficulty carousel animation to settle and verifies the a
 1. Open **Challenges** and enable any combination of Trait, Stat, and Sprite Challenges.
 2. For each of the five maps, choose a camera model, a before-start placement model, an optional after-start placement model, and its elapsed-time delay.
 3. Set how many times a Challenge may retry after defeat. The default is zero; a failed entry becomes eligible again at the next global reset.
-4. Choose whether to wait during cooldown or run a saved Expeditions preset until the next reset.
-5. Optionally enter a Discord webhook and numeric user ID for five error alerts, save the Challenge preset, and press the macro hotkey.
+4. Optionally enter a Discord webhook and numeric user ID for five error alerts, save the Challenge preset, and press the macro hotkey.
 
-The selector order is fixed by Challenge type. The macro recognizes the current map, skips entries without **Select Stage**, and resets its per-window attempts at `xx:00` and `xx:30`. If all three entries remain unavailable across a complete global reset, it treats the daily limit as reached and waits until midnight UTC.
+The selector order is fixed by Challenge type. The macro recognizes the current map, skips entries without **Select Stage**, and resets its per-window attempts at `xx:00` and `xx:30`. In a Macro plan, an unavailable Challenge task returns to the shared game-mode selector so the scheduler can run the next highest-priority eligible task. If all three entries remain unavailable across a complete global reset, it treats the daily limit as reached.
 
 Before-start coordinates that fall beneath the centered Start Game dialog cannot reach the map. The Challenge runner automatically places unobstructed rows first, clicks Start deliberately, then immediately plays only the covered rows. A placement point therefore cannot accidentally start the match.
 
@@ -148,7 +147,7 @@ The Expeditions loop prepares the camera, places units, starts the node, and wat
 - victory or defeat, followed by retry;
 - lobby, disconnect, or AFK Chamber recovery.
 
-The Challenges loop navigates the fixed three-entry selector, recognizes the rotating map, runs its map-specific camera and two placement phases, handles Victory or Defeat, opens Play with the configured in-game key, and returns through **Change Gamemode**. The same key-driven path returns from an Expeditions fallback without depending on the small Play icon or hotbar layout. During a completed 30-minute window it either waits or runs the selected Expeditions preset until the current Expedition run finishes cleanly.
+The Challenges loop navigates the fixed three-entry selector, recognizes the rotating map, runs its map-specific camera and two placement phases, handles Victory or Defeat, opens Play with the configured in-game key, and returns through **Change Gamemode**. When no selected Challenge is eligible, it returns through the verified game-mode selector and lets the Macro scheduler choose the next eligible task without depending on the small Play icon or hotbar layout.
 
 Story and Raid runners navigate from Play to their configured route, optionally load a saved Team, align the camera, run the two placement phases, select reward cards, and return to Play after Victory or the final Defeat. The Macro scheduler consumes one result at a time and then selects the highest-priority eligible task.
 
@@ -166,7 +165,7 @@ Open **Settings**, enter a capture name and interval under **Debug capture**, th
 
 Automatic failure capture is enabled by default. It retains the latest 10 action-state frames from the active macro, then captures 10 more Roblox-client frames at 0.5-second intervals after an unexpected Expeditions or Challenge error. These captures use timestamped ZIP names and do not run after a normal completion or manual Stop. The app keeps the 10 newest automatic error ZIPs and removes older ones; manual diagnostic ZIPs are not affected.
 
-**Deep debug logging** is a separate, disabled-by-default option in Settings. Enabling it requires confirming a red storage warning because every operation can produce a multi-gigabyte ZIP. While enabled, every detector capture, detector score/state, high-level action, generated key/mouse event, and placement-recording input is written in sequence. The archive also contains sanitized app settings, the selected plan and presets, the active detector pack, the referenced camera/placement models, and a sanitized run log. A ZIP is finalized after success, cancellation, or failure and is never removed automatically. Discord webhook values, protected webhook material, and Discord user IDs are excluded.
+**Deep debug logging** is a separate, disabled-by-default option in Settings. Enabling it requires confirming a red storage warning because every operation can produce a multi-gigabyte ZIP. While enabled, every detector capture, detector score/state, high-level action, generated key/mouse event, and placement-recording input is written in sequence. The archive also contains sanitized app settings, the selected plan and presets, the active detector pack, the referenced camera/placement models, and a sanitized run log. A ZIP is finalized after success, cancellation, or failure and is never removed automatically. Discord webhook values, protected webhook material, Discord user IDs, and the active Windows username/profile path are excluded.
 
 Developers can replay these archives with the source-only [Deep Debug Viewer](tools/ExpeditionsMacro.DeepDebugViewer/README.md), which synchronizes captured frames with nearby detector, workflow, and input events. The viewer is not included in release artifacts.
 

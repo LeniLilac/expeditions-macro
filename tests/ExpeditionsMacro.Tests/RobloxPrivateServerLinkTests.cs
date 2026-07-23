@@ -1,3 +1,5 @@
+using ExpeditionsMacro.Automation.Recovery;
+using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
 
 namespace ExpeditionsMacro.Tests;
@@ -46,5 +48,45 @@ public sealed class RobloxPrivateServerLinkTests
                 input,
                 out RobloxPrivateServerLaunchTarget? target));
         Assert.Null(target);
+    }
+
+    [Fact]
+    public async Task LaunchAsync_SendsNormalizedUriWithoutClosingRoblox()
+    {
+        RecordingProcessController processes = new();
+        RobloxPrivateServerRecoveryService recovery = new(
+            automation: null!,
+            processes);
+        RobloxPrivateServerLaunchTarget target =
+            RobloxPrivateServerLaunchTarget.Parse(
+                "https://www.roblox.com/share?code=Share_Code-123&type=Server");
+
+        await recovery.LaunchAsync(target);
+
+        Assert.Equal(target.LaunchUri, Assert.Single(processes.Launched));
+        Assert.Equal(0, processes.CloseCount);
+    }
+
+    private sealed class RecordingProcessController : IRobloxProcessController
+    {
+        public List<Uri> Launched { get; } = [];
+
+        public int CloseCount { get; private set; }
+
+        public Task CloseAsync(
+            RobloxWindow? window,
+            CancellationToken cancellationToken)
+        {
+            CloseCount++;
+            return Task.CompletedTask;
+        }
+
+        public Task LaunchAsync(
+            Uri launchUri,
+            CancellationToken cancellationToken)
+        {
+            Launched.Add(launchUri);
+            return Task.CompletedTask;
+        }
     }
 }

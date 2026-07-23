@@ -7,27 +7,22 @@ namespace ExpeditionsMacro.Automation.Challenges;
 
 public sealed partial class ChallengeMacroRunner
 {
+    private static string DescribeUnavailable(
+        string detail,
+        DateTimeOffset nextEligibleUtc,
+        bool returnToScheduler) =>
+        returnToScheduler
+            ? $"{detail} The next eligible time is {nextEligibleUtc:HH:mm} UTC."
+            : $"{detail} Waiting for the next global reset at {nextEligibleUtc:HH:mm} UTC.";
+
     private async Task WaitUntilAsync(
         RobloxWindow window,
-        ChallengePreset preset,
-        IDetectorPack detector,
-        char playMenuKey,
         DateTimeOffset untilUtc,
         bool dailyLimit,
-        Func<DateTimeOffset, CancellationToken, Task>? idleWorkflow,
         Action<string, MacroEventLevel, string?, double?> log,
         Action<string, int, string, string?, double?> report,
         CancellationToken cancellationToken)
     {
-        if (preset.IdleBehavior == ChallengeIdleBehavior.RunExpeditions && idleWorkflow is not null)
-        {
-            report("Waiting", 0, dailyLimit ? "Daily Challenge limits reached. Running Expeditions until midnight UTC." : "Challenges complete. Running Expeditions until the next reset.", null, null);
-            await PrepareSchedulerHandoffAsync(window, preset, detector, log, report, cancellationToken).ConfigureAwait(false);
-            await idleWorkflow(untilUtc, cancellationToken).ConfigureAwait(false);
-            await ReturnFromIdleModeAsync(window, preset, detector, playMenuKey, log, report, cancellationToken).ConfigureAwait(false);
-            return;
-        }
-
         InactivityKeepAlive keepAlive = new();
         while (DateTimeOffset.UtcNow < untilUtc)
         {

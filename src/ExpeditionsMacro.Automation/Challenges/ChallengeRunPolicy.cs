@@ -70,13 +70,6 @@ public static class ChallengeRunPolicy
         return null;
     }
 
-    public static bool ShouldRunExpeditionsWhileWaiting(ChallengePreset preset)
-    {
-        ArgumentNullException.ThrowIfNull(preset);
-        preset.Validate();
-        return preset.IdleBehavior == ChallengeIdleBehavior.RunExpeditions;
-    }
-
     public static bool IsDelayedPlacementDue(ChallengeMapProfile profile, TimeSpan elapsed)
     {
         ArgumentNullException.ThrowIfNull(profile);

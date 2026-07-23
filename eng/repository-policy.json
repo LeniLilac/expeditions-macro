@@ -20,7 +20,7 @@
   "lineDebt": [
     {
       "path": "src/ExpeditionsMacro.Automation/Challenges/ChallengeMacroRunner.cs",
-      "maxLines": 1139,
+      "maxLines": 1078,
       "reason": "Existing mode-runner orchestration debt; extract state-specific workflow services when touched."
     },
     {
@@ -35,7 +35,7 @@
     },
     {
       "path": "src/ExpeditionsMacro.App/Pages/MacroPage.xaml.cs",
-      "maxLines": 951,
+      "maxLines": 950,
       "reason": "Existing page-controller debt; move scheduling, persistence, and operation coordination into focused services."
     },
     {
@@ -50,12 +50,12 @@
     },
     {
       "path": "src/ExpeditionsMacro.Automation/Diagnostics/DeepDebugSessionService.cs",
-      "maxLines": 767,
+      "maxLines": 719,
       "reason": "Existing diagnostic lifecycle debt; split archive writing, manifest capture, and retention."
     },
     {
       "path": "src/ExpeditionsMacro.App/Pages/ChallengesPage.xaml.cs",
-      "maxLines": 726,
+      "maxLines": 647,
       "reason": "Existing page-controller debt; extract preset editing and operation coordination."
     },
     {
@@ -67,11 +67,6 @@
       "path": "src/ExpeditionsMacro.App/Pages/ExpeditionsPage.xaml.cs",
       "maxLines": 556,
       "reason": "Existing page-controller debt; extract preset editing and operation coordination."
-    },
-    {
-      "path": "src/ExpeditionsMacro.Windows/WindowsGraphicsCapture.cs",
-      "maxLines": 543,
-      "reason": "Existing capture-pipeline debt; isolate device/session lifecycle from frame conversion."
     },
     {
       "path": "src/ExpeditionsMacro.Vision/Challenges/ChallengeScreenDetector.cs",

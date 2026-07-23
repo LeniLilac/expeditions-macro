@@ -18,7 +18,21 @@ public sealed class DeepDebugSessionTests
         AppPaths paths = new(directory.Path);
         paths.EnsureCreated();
         Directory.CreateDirectory(Path.Combine(paths.CameraModels, "camera-one"));
-        await File.WriteAllTextAsync(Path.Combine(paths.CameraModels, "camera-one", "manifest.json"), "camera-model");
+        string windowsProfile = Environment.GetFolderPath(
+            Environment.SpecialFolder.UserProfile);
+        string windowsUserName = Environment.UserName;
+        string privateCapturePath = Path.Combine(
+            windowsProfile,
+            "Downloads",
+            "private-capture.zip");
+        await File.WriteAllTextAsync(
+            Path.Combine(paths.CameraModels, "camera-one", "manifest.json"),
+            JsonSerializer.Serialize(new
+            {
+                Model = "camera-model",
+                ImportedFrom = privateCapturePath,
+                CapturedBy = windowsUserName,
+            }));
         Directory.CreateDirectory(Path.Combine(paths.PlacementModels, "placement-one"));
         await File.WriteAllTextAsync(Path.Combine(paths.PlacementModels, "placement-one", "placement.json"), "placement-model");
         string log = Path.Combine(paths.Logs, "macro-run.log");
@@ -28,7 +42,7 @@ public sealed class DeepDebugSessionTests
             "https://www.roblox.com/share?code=PrivateServerCode&type=Server";
         await File.WriteAllTextAsync(
             log,
-            $"before {webhook} after {userId} launch {privateServer}");
+            $"before {webhook} after {userId} launch {privateServer} source {privateCapturePath}");
         AppSettings settings = new()
         {
             DeepDebugEnabled = true,
@@ -54,6 +68,14 @@ public sealed class DeepDebugSessionTests
             {
                 service.RecordFrame(new ImageFrame(2, 2, PixelFormat.Rgb24, new byte[12]), "unit_test");
                 service.RecordEvent("workflow", "next_action", new { State = "ready", Action = "click" });
+                service.RecordEvent(
+                    "workflow",
+                    "local_path",
+                    new
+                    {
+                        Path = privateCapturePath,
+                        UserName = windowsUserName,
+                    });
                 service.RecordWindowsTrace(new WindowsAutomationTrace(DateTimeOffset.UtcNow, "keyboard", "key_down", VirtualKey: 0x50));
                 service.RecordPlacementInput(new PlacementInputTrace(DateTimeOffset.UtcNow, "observed_mouse_move", ScreenX: 10, ScreenY: 20));
                 return Task.CompletedTask;
@@ -91,6 +113,10 @@ public sealed class DeepDebugSessionTests
         Assert.DoesNotContain("protected-secret-value", allText, StringComparison.Ordinal);
         Assert.DoesNotContain(privateServer, allText, StringComparison.Ordinal);
         Assert.DoesNotContain(
+            privateCapturePath,
+            allText,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(
             "protected-private-server-value",
             allText,
             StringComparison.Ordinal);
@@ -98,6 +124,10 @@ public sealed class DeepDebugSessionTests
         Assert.Contains("[REDACTED DISCORD USER ID]", allText, StringComparison.Ordinal);
         Assert.Contains(
             "[REDACTED ROBLOX PRIVATE SERVER LINK]",
+            allText,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "[REDACTED WINDOWS USER]",
             allText,
             StringComparison.Ordinal);
     }

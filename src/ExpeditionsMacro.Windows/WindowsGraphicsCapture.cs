@@ -13,7 +13,7 @@ using WinRT;
 
 namespace ExpeditionsMacro.Windows;
 
-internal sealed class WindowsGraphicsCapture : IDisposable
+internal sealed partial class WindowsGraphicsCapture : IDisposable
 {
     private static readonly Guid GraphicsCaptureItemId = new("79C3F95B-31F7-4EC2-A464-632EF5D30760");
     private static readonly Guid Direct3D11Texture2DId = new("6F15AAF2-D208-4E89-9AB4-489535D34F9C");
@@ -193,10 +193,10 @@ internal sealed class WindowsGraphicsCapture : IDisposable
         return new ID3D11Texture2D(texturePointer);
     }
 
-    private sealed class CaptureSession : IDisposable
+    private sealed partial class CaptureSession : IDisposable
     {
         private const int InitialFrameTimeoutMilliseconds = 3000;
-        private const int FreshFrameTimeoutMilliseconds = 350;
+        private const int FreshFrameTimeoutMilliseconds = 1000;
         private const int SurfaceRecreateAttempts = 4;
         private readonly object _lifecycleGate = new();
         private readonly CaptureFrameArrivalGate _frameArrival = new();
@@ -214,7 +214,6 @@ internal sealed class WindowsGraphicsCapture : IDisposable
         private readonly GraphicsCaptureItem _item;
         private readonly Direct3D11CaptureFramePool _framePool;
         private readonly GraphicsCaptureSession _captureSession;
-        private long _lastConsumedGeneration;
         private int _processing;
         private bool _hasCapturedFrame;
         private bool _disposed;
@@ -311,134 +310,6 @@ internal sealed class WindowsGraphicsCapture : IDisposable
             windowBounds.Height == _windowBounds.Height &&
             extendedFrameBounds.Width == _extendedFrameBounds.Width &&
             extendedFrameBounds.Height == _extendedFrameBounds.Height;
-
-        public ImageFrame Capture()
-        {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            long targetGeneration = _lastConsumedGeneration + 1;
-            int timeout = _hasCapturedFrame ? FreshFrameTimeoutMilliseconds : InitialFrameTimeoutMilliseconds;
-            DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeout);
-            int surfaceRecreates = 0;
-            bool stabilizingSurface = false;
-            while (DateTime.UtcNow < deadline)
-            {
-                int remaining = Math.Max(0, (int)(deadline - DateTime.UtcNow).TotalMilliseconds);
-                if (!_frameArrival.WaitForGeneration(targetGeneration, remaining)) break;
-                long availableGeneration = _frameArrival.Generation;
-                Direct3D11CaptureFrame? frame = CaptureFrameQueue.TakeLatest(_framePool.TryGetNextFrame);
-                if (frame is null)
-                {
-                    _lastConsumedGeneration = availableGeneration;
-                    targetGeneration = availableGeneration + 1;
-                    continue;
-                }
-                _lastConsumedGeneration = availableGeneration;
-
-                int changedWidth = 0;
-                int changedHeight = 0;
-                using (frame)
-                {
-                    if (frame.ContentSize.Width != _surfaceWidth || frame.ContentSize.Height != _surfaceHeight)
-                    {
-                        changedWidth = frame.ContentSize.Width;
-                        changedHeight = frame.ContentSize.Height;
-                    }
-                    else
-                    {
-                        using ID3D11Texture2D source = GetTexture(frame.Surface);
-                        Texture2DDescription sourceDescription = source.Description;
-                        if (sourceDescription.Format != Format.R16G16B16A16_Float ||
-                            sourceDescription.Width != frame.ContentSize.Width ||
-                            sourceDescription.Height != frame.ContentSize.Height)
-                        {
-                            throw new InvalidOperationException(
-                                $"Windows returned an unexpected capture texture ({sourceDescription.Format}, {sourceDescription.Width} by {sourceDescription.Height}).");
-                        }
-
-                        _context.CopyResource(_latestTexture, source);
-                        _hasCapturedFrame = true;
-                    }
-                }
-
-                if (changedWidth > 0 && changedHeight > 0)
-                {
-                    surfaceRecreates++;
-                    if (surfaceRecreates > SurfaceRecreateAttempts)
-                    {
-                        throw new CaptureSurfaceChangedException(
-                            _surfaceWidth,
-                            _surfaceHeight,
-                            changedWidth,
-                            changedHeight);
-                    }
-                    RecreateSurface(changedWidth, changedHeight);
-                    _lastConsumedGeneration = _frameArrival.Generation;
-                    targetGeneration = _lastConsumedGeneration + 1;
-                    if (!stabilizingSurface)
-                    {
-                        deadline = DateTime.UtcNow.AddMilliseconds(InitialFrameTimeoutMilliseconds);
-                        stabilizingSurface = true;
-                    }
-                    continue;
-                }
-
-                break;
-            }
-
-            if (!_hasCapturedFrame) throw new TimeoutException("Windows did not provide a Roblox window frame within three seconds.");
-            byte[] surfacePixels = ReadTexturePixels(_latestTexture, _surfaceWidth, _surfaceHeight);
-            return ConvertScRgbRgba16ToRgb(
-                surfacePixels,
-                _surfaceWidth,
-                _surfaceHeight,
-                _clientCrop);
-        }
-
-        private void RecreateSurface(int surfaceWidth, int surfaceHeight)
-        {
-            ScreenRegion clientCrop;
-            try
-            {
-                clientCrop = ResolveClientCrop(
-                    surfaceWidth,
-                    surfaceHeight,
-                    _client,
-                    _windowBounds,
-                    _extendedFrameBounds);
-            }
-            catch (InvalidOperationException error)
-            {
-                throw new CaptureSurfaceChangedException(
-                    _surfaceWidth,
-                    _surfaceHeight,
-                    surfaceWidth,
-                    surfaceHeight,
-                    error);
-            }
-
-            ID3D11Texture2D latestTexture = CaptureTextureFactory.Create(_device, surfaceWidth, surfaceHeight);
-            try
-            {
-                _framePool.Recreate(
-                    _winRtDevice,
-                    DirectXPixelFormat.R16G16B16A16Float,
-                    2,
-                    new SizeInt32(surfaceWidth, surfaceHeight));
-            }
-            catch
-            {
-                latestTexture.Dispose();
-                throw;
-            }
-
-            ID3D11Texture2D previousTexture = _latestTexture;
-            _latestTexture = latestTexture;
-            _clientCrop = clientCrop;
-            _surfaceWidth = surfaceWidth;
-            _surfaceHeight = surfaceHeight;
-            _hasCapturedFrame = false;
-            previousTexture.Dispose();
-        }
 
         public void Dispose()
         {

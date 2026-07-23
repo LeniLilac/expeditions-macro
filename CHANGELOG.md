@@ -4,13 +4,32 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
-## [1.3.0-beta.11] - 2026-07-23
+## [1.3.0-beta.12] - 2026-07-23
+
+### Added
+
+- Added an inline **Test link** action for the optional Roblox private-server reconnect setting. It validates the saved link and launches the registered `roblox://` protocol without closing an active client.
+
+### Changed
+
+- Removed the Challenge preset's cooldown Expeditions fallback. When a scheduled Challenge rotation becomes unavailable, it returns through the verified game-mode selector and the Macro scheduler immediately chooses the next highest-priority eligible task.
+- Reorganized Expeditions, Story, and Raid preset editors into consistent cards for preset selection, route details, models/team, behavior, and advanced tuning.
+- Consolidated Discord notification, failure-ping, and Roblox reconnect inputs into compact connection cards with inline test and reveal actions.
+- Removed redundant helper descriptions and idle status placeholders from the Macro and preset pages.
 
 ### Fixed
 
-- Windows Graphics Capture now drains queued compositor frames before scoring camera movement, preventing beta.9 and beta.10 camera setup from observing a two-input-old pose and rejecting or endlessly scanning an otherwise stable model.
+- Windows Graphics Capture now discards the queued compositor backlog and waits for a post-barrier frame before scoring camera movement, preventing beta.9 through the first beta.11 build from observing an earlier pose and rejecting or endlessly scanning an otherwise stable model.
 - Long-running Expedition, Challenge, Story, Raid, and Infinite monitoring now sends the documented `O` keep-alive every eight minutes; a transient focus/input failure retries after one minute without stopping the run.
 - Story and Raid recovery now wait through the AFK Chamber's Return-to-Lobby teleport before testing the configured Play key, preventing loading time from being misreported as a bad keybind.
+
+### Security
+
+- Deep Debug archives now redact the active Windows username and profile-directory segment from event data, exception text, copied logs, and copied text model/configuration files.
+
+### Engineering
+
+- Extracted sanitized archive-text ownership from the Deep Debug session lifecycle and reduced existing Challenge runner/page debt after removing the obsolete cooldown fallback.
 
 ## [1.3.0-beta.10] - 2026-07-23
 
@@ -587,8 +606,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.11...HEAD
-[1.3.0-beta.11]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.10...v1.3.0-beta.11
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.12...HEAD
+[1.3.0-beta.12]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.10...v1.3.0-beta.12
 [1.3.0-beta.10]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.9...v1.3.0-beta.10
 [1.3.0-beta.9]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.8...v1.3.0-beta.9
 [1.3.0-beta.8]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.7...v1.3.0-beta.8

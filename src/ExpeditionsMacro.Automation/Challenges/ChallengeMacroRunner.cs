@@ -52,7 +52,6 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         IDetectorPack detector,
         string webhookUrl,
         char playMenuKey,
-        Func<DateTimeOffset, CancellationToken, Task>? idleWorkflow = null,
         IProgress<MacroProgress>? progress = null,
         Action<MacroEvent>? log = null,
         Action<ChallengeRunSummary>? summaryChanged = null,
@@ -131,7 +130,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
                 {
                     waitingUntil = dailyUntil;
                     PublishSummary();
-                    await WaitUntilAsync(window, preset, detector, playMenuKey, dailyUntil, dailyLimit: true, idleWorkflow, Write, Report, cancellationToken).ConfigureAwait(false);
+                    await WaitUntilAsync(window, dailyUntil, dailyLimit: true, Write, Report, cancellationToken).ConfigureAwait(false);
                     waitingUntil = null;
                     PublishSummary();
                     continue;
@@ -318,7 +317,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
                     waitDetail = sawAvailable
                         ? "Every enabled Challenge was already attempted in this reset."
                         : "Every regular Challenge is on cooldown.";
-                    waitDetail = $"{waitDetail} Waiting for the next global reset at {waitUntil:HH:mm} UTC.";
+                    waitDetail = DescribeUnavailable(waitDetail, waitUntil, returnWhenUnavailable);
                     Write(waitDetail);
                 }
 
@@ -339,7 +338,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
                     Write("Challenge handoff is ready. Returning control to the task scheduler.", MacroEventLevel.Success, "game_mode_selector", null);
                     return;
                 }
-                await WaitUntilAsync(window, preset, detector, playMenuKey, waitUntil, dailyLimit, idleWorkflow, Write, Report, cancellationToken).ConfigureAwait(false);
+                await WaitUntilAsync(window, waitUntil, dailyLimit, Write, Report, cancellationToken).ConfigureAwait(false);
                 waitingUntil = null;
                 PublishSummary();
             }
@@ -676,66 +675,6 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
 
         throw new InvalidOperationException(
             $"The Challenge selector remained open after {SchedulerHandoffMaximumAttempts} focused close attempts, so control was not returned to the task scheduler.");
-    }
-
-    private async Task ReturnFromIdleModeAsync(
-        RobloxWindow window,
-        ChallengePreset preset,
-        IDetectorPack detector,
-        char playMenuKey,
-        Action<string, MacroEventLevel, string?, double?> log,
-        Action<string, int, string, string?, double?> report,
-        CancellationToken cancellationToken)
-    {
-        report("Return", 0, "Returning from Expeditions to the Challenge selector.", null, null);
-        ImageFrame current = CaptureClient(window, detector);
-        ChallengeScreenMatch currentMatch = ChallengeScreenDetector.Detect(current);
-        ImageFrame? party = null;
-        if (currentMatch.State == ChallengeScreenState.PostMatchPreview)
-        {
-            party = current;
-        }
-        else if (currentMatch.State is ChallengeScreenState.GameModeSelector
-                 or ChallengeScreenState.ChallengeList
-                 or ChallengeScreenState.ChallengeListUnavailable
-                 or ChallengeScreenState.ChallengeAvailable
-                 or ChallengeScreenState.ChallengeCooldown)
-        {
-            log(
-                $"Expeditions return found {Label(currentMatch.State)} already open; continuing Challenge navigation.",
-                MacroEventLevel.Information,
-                currentMatch.State.ToString(),
-                currentMatch.Confidence);
-        }
-        else
-        {
-            party = await OpenPlayMenuAsync(
-                window,
-                preset,
-                detector,
-                playMenuKey,
-                log,
-                report,
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        if (party is not null)
-        {
-            (int X, int Y)? change = ChallengeScreenDetector.ActionFor(ChallengeScreenState.PostMatchPreview, party);
-            if (change is null) throw new InvalidOperationException("Change Gamemode could not be located after the idle Expeditions run.");
-            await ClickAsync(window, change.Value.X, change.Value.Y, cancellationToken).ConfigureAwait(false);
-            await Task.Delay(900, cancellationToken).ConfigureAwait(false);
-        }
-
-        await EnsureChallengeListAsync(
-            window,
-            preset,
-            detector,
-            playMenuKey,
-            log,
-            report,
-            static () => { },
-            cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<ChallengeScreenMatch> OpenChallengeTypeAsync(

@@ -181,12 +181,17 @@ public sealed class WindowsRobloxAutomationTests
     }
 
     [Fact]
-    public void WindowCapture_ConsumesAFrameThatArrivedBeforeCaptureStartedWaiting()
+    public void WindowCapture_FreshBarrierDoesNotAcceptBacklogGeneration()
     {
         using var gate = new CaptureFrameArrivalGate();
         gate.Notify();
+        long targetGeneration = gate.Generation + 1;
 
-        Assert.True(gate.WaitForGeneration(gate.Generation, 0));
+        Assert.False(gate.WaitForGeneration(targetGeneration, 0));
+
+        gate.Notify();
+
+        Assert.True(gate.WaitForGeneration(targetGeneration, 0));
     }
 
     [Fact]
@@ -204,6 +209,21 @@ public sealed class WindowsRobloxAutomationTests
         Assert.True(first.Disposed);
         Assert.True(second.Disposed);
         Assert.False(newest.Disposed);
+        Assert.Empty(queued);
+    }
+
+    [Fact]
+    public void WindowCapture_DiscardsEveryQueuedFrameBeforeFreshnessBarrier()
+    {
+        var first = new DisposableCaptureFrame();
+        var newest = new DisposableCaptureFrame();
+        var queued = new Queue<DisposableCaptureFrame>([first, newest]);
+
+        CaptureFrameQueue.DiscardAll(
+            () => queued.TryDequeue(out DisposableCaptureFrame? frame) ? frame : null);
+
+        Assert.True(first.Disposed);
+        Assert.True(newest.Disposed);
         Assert.Empty(queued);
     }
 

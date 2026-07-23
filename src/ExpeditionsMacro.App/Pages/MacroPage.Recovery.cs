@@ -9,6 +9,8 @@ namespace ExpeditionsMacro.App.Pages;
 
 public partial class MacroPage
 {
+    private bool _testingPrivateServer;
+
     private sealed record PrivateServerRecoverySelection(
         string Link,
         RobloxPrivateServerLaunchTarget? Target);
@@ -163,6 +165,40 @@ public partial class MacroPage
         PrivateServerLinkVisible.IsEnabled = enabled;
         ShowPrivateServerLinkCheck.IsEnabled = enabled;
         RestartRobloxCheck.IsEnabled = enabled;
+        TestPrivateServerButton.IsEnabled = enabled && !_testingPrivateServer;
+    }
+
+    private async void TestPrivateServer_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_testingPrivateServer || _services.Coordinator.IsBusy) return;
+        try
+        {
+            RobloxPrivateServerLaunchTarget target =
+                RobloxPrivateServerLaunchTarget.Parse(CurrentPrivateServerLink());
+            _testingPrivateServer = true;
+            TestPrivateServerButton.Content = "Opening...";
+            SetPrivateServerRecoveryControlsEnabled(enabled: true);
+            PrivateServerStatusText.Text =
+                "Opening Roblox through its registered roblox:// protocol.";
+            await _services.RobloxRecovery.LaunchAsync(target);
+            await SavePrivateServerRecoverySettingsAsync(
+                ReadPrivateServerRecoverySelection());
+            PrivateServerStatusText.Text =
+                "Roblox private-server launch sent through Windows.";
+        }
+        catch (Exception error)
+        {
+            PrivateServerStatusText.Text = error.Message;
+        }
+        finally
+        {
+            _testingPrivateServer = false;
+            TestPrivateServerButton.Content = "Test link";
+            SetPrivateServerRecoveryControlsEnabled(
+                !_services.Coordinator.IsBusy);
+        }
     }
 
     private string CurrentPrivateServerLink() =>

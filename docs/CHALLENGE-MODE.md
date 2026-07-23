@@ -11,7 +11,7 @@ Challenge mode automates the three regular Anime Expeditions Challenges that res
 - Runs every unobstructed before-start placement, starts the match, immediately runs any rows that were covered by the Start Game dialog, then optionally runs a second placement model after the configured elapsed time.
 - While Victory or Defeat is still visible, presses the configured Anime Expeditions **Toggle Play Menu** key, verifies that navigation opened, and returns through **Change Gamemode**. An ignored key press is retried up to three times. This avoids the small Play control and any hotbar overlap. Defeat retries are configurable and default to zero.
 - Clears per-entry attempts at every global half-hour reset. A no-retry defeat can therefore be attempted again when a new Challenge appears.
-- Either waits during cooldown or runs a configured Expeditions preset until the next reset.
+- When scheduled, closes the Challenge selector, verifies the shared game-mode selector, and returns so the Macro scheduler can choose the next highest-priority eligible task.
 - Treats all three entries remaining unavailable across a complete global reset as daily-limit evidence, then waits until midnight UTC.
 
 The optional Discord webhook reports monitoring start, match attempts, Victory or Defeat, recovery, and reset or daily-limit waiting. Monitoring and attempt starts include a Roblox screenshot, while result reports include the terminal screenshot plus the specific match runtime. A numeric Discord user ID can also receive five restricted mention alerts after an unexpected error. It uses the same DPAPI-protected webhook storage and Components V2 payload path as Expeditions. Manual Stop does not send error alerts or trigger automatic failure capture.

@@ -55,7 +55,6 @@ public partial class CameraModelsPage : UserControl, IAppPage
         _selectedModel = await _services.CameraModels.LoadAsync(manifest.Id);
         if (_selectedModel is null) return;
         ModelNameText.Text = manifest.Name;
-        RegionText.Text = $"Automatic regions: {manifest.Regions.Count} · client {manifest.ClientWidth} × {manifest.ClientHeight}";
         PreviewImage.Source = BitmapSourceFactory.Create(_selectedModel.GoalOverlay);
         PreviewPlaceholder.Visibility = Visibility.Collapsed;
         AlignButton.IsEnabled = !_services.Coordinator.IsBusy;
@@ -70,7 +69,6 @@ public partial class CameraModelsPage : UserControl, IAppPage
         _selectedModel = null;
         ModelNameText.Text = "Camera model";
         SettleText.Text = "200";
-        RegionText.Text = "Automatic regions: chosen during setup";
         PreviewImage.Source = null;
         PreviewPlaceholder.Visibility = Visibility.Visible;
         AlignButton.IsEnabled = false;

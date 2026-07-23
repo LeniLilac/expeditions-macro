@@ -21,7 +21,6 @@ public partial class ChallengesPage : UserControl, IAppPage
 {
     private readonly AppServices _services;
     private readonly ObservableCollection<ChallengePreset> _presets = [];
-    private readonly ObservableCollection<ExpeditionPreset> _expeditionPresets = [];
     private readonly ObservableCollection<DetectorPackManifest> _detectorPacks = [];
     private readonly DispatcherTimer _resetTimer;
     private readonly DispatcherTimer _runtimeTimer;
@@ -37,7 +36,6 @@ public partial class ChallengesPage : UserControl, IAppPage
         InitializeComponent();
         DataContext = this;
         PresetCombo.ItemsSource = _presets;
-        ExpeditionPresetCombo.ItemsSource = _expeditionPresets;
         _resetTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => UpdateResetCountdown(), Dispatcher);
         _resetTimer.Start();
         _runtimeTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => UpdateRuntime(), Dispatcher);
@@ -106,7 +104,6 @@ public partial class ChallengesPage : UserControl, IAppPage
         char playMenuKey;
         string webhook = CurrentWebhook();
         string discordUserId = DiscordErrorUserIdText.Text.Trim();
-        Func<DateTimeOffset, CancellationToken, Task>? idleWorkflow = null;
         try
         {
             playMenuKey = AppSettings.ParsePlayMenuKey(
@@ -121,16 +118,6 @@ public partial class ChallengesPage : UserControl, IAppPage
                 await _services.DetectorPacks.LoadAsync(preset.DetectorPackId)
                 ?? throw new InvalidOperationException("The selected detector pack could not be loaded."));
             mapModels = await LoadMapModelsAsync(preset);
-            if (preset.IdleBehavior == ChallengeIdleBehavior.RunExpeditions)
-            {
-                ExpeditionPreset expedition = await _services.Presets.LoadAsync(preset.ExpeditionPresetId) ?? throw new InvalidOperationException("The selected Expeditions fallback preset could not be loaded.");
-                CameraModel camera = await _services.CameraModels.LoadAsync(expedition.CameraModelId) ?? throw new InvalidOperationException("The fallback Expeditions camera model could not be loaded.");
-                PlacementModel placement = await _services.PlacementModels.LoadAsync(expedition.PlacementModelId) ?? throw new InvalidOperationException("The fallback Expeditions placement model could not be loaded.");
-                IDetectorPack expeditionDetector = _services.TraceDetector(
-                    await _services.DetectorPacks.LoadAsync(expedition.DetectorPackId)
-                    ?? throw new InvalidOperationException("The fallback Expeditions detector pack could not be loaded."));
-                idleWorkflow = (untilUtc, token) => RunExpeditionsUntilAsync(untilUtc, expedition, camera, placement, expeditionDetector, webhook, discordUserId, playMenuKey, token);
-            }
         }
         catch (Exception error)
         {
@@ -179,7 +166,6 @@ public partial class ChallengesPage : UserControl, IAppPage
                 detector,
                 webhook,
                 playMenuKey,
-                idleWorkflow,
                 progress,
                 entry =>
                 {
@@ -246,7 +232,6 @@ public partial class ChallengesPage : UserControl, IAppPage
     {
         DetectorPackManifest detector = CurrentDetectorPack();
         string name = PresetNameText.Text.Trim();
-        ChallengeIdleBehavior idleBehavior = SelectedIdleBehavior();
         return new ChallengePreset
         {
             Id = ModelId.FromName(name),
@@ -256,8 +241,6 @@ public partial class ChallengesPage : UserControl, IAppPage
             RunSpriteChallenge = SpriteCheck.IsChecked == true,
             Maps = MapRows.Select(row => row.ToProfile()).ToArray(),
             DetectorPackId = detector.PackId,
-            IdleBehavior = idleBehavior,
-            ExpeditionPresetId = idleBehavior == ChallengeIdleBehavior.RunExpeditions && ExpeditionPresetCombo.SelectedItem is ExpeditionPreset expedition ? expedition.Id : string.Empty,
             AutoRecover = AutoRecoverCheck.IsChecked == true,
             DefeatRetries = ParseInt(DefeatRetriesText, "Defeat retries"),
             ZoomTicks = ParseInt(ZoomTicksText, "Zoom ticks"),
@@ -323,8 +306,6 @@ public partial class ChallengesPage : UserControl, IAppPage
         TraitCheck.IsChecked = preset.RunTraitChallenge;
         StatCheck.IsChecked = preset.RunStatChallenge;
         SpriteCheck.IsChecked = preset.RunSpriteChallenge;
-        IdleBehaviorCombo.SelectedIndex = preset.IdleBehavior == ChallengeIdleBehavior.RunExpeditions ? 1 : 0;
-        ExpeditionPresetCombo.SelectedItem = _expeditionPresets.FirstOrDefault(value => value.Id == preset.ExpeditionPresetId);
         AutoRecoverCheck.IsChecked = preset.AutoRecover;
         DefeatRetriesText.Text = preset.DefeatRetries.ToString(CultureInfo.InvariantCulture);
         ZoomTicksText.Text = preset.ZoomTicks.ToString(CultureInfo.InvariantCulture);
@@ -338,7 +319,6 @@ public partial class ChallengesPage : UserControl, IAppPage
             ChallengeMapProfile profile = preset.Maps.Single(value => value.Map == row.Map);
             row.Apply(profile);
         }
-        UpdateIdleBehaviorAvailability();
     }
 
     private void NewPreset_Click(object sender, RoutedEventArgs e)
@@ -352,8 +332,6 @@ public partial class ChallengesPage : UserControl, IAppPage
     {
         PresetNameText.Text = "Challenge rotation";
         TraitCheck.IsChecked = StatCheck.IsChecked = SpriteCheck.IsChecked = true;
-        IdleBehaviorCombo.SelectedIndex = 0;
-        ExpeditionPresetCombo.SelectedItem = _expeditionPresets.FirstOrDefault();
         AutoRecoverCheck.IsChecked = true;
         DefeatRetriesText.Text = "0";
         ZoomTicksText.Text = "30";
@@ -363,15 +341,14 @@ public partial class ChallengesPage : UserControl, IAppPage
         KeyHoldText.Text = "110";
         KeyDelayText.Text = "250";
         foreach (ChallengeMapRow row in MapRows) row.Apply(new ChallengeMapProfile { Map = row.Map });
-        UpdateIdleBehaviorAvailability();
-        StatusText.Text = "Configuration can be saved. Complete all five map profiles before starting.";
+        StatusText.Text = string.Empty;
+        DetectionText.Text = string.Empty;
     }
 
     private async Task RefreshCatalogsAsync()
     {
         IReadOnlyList<CameraModelManifest> cameras = await _services.CameraModels.ListAsync();
         IReadOnlyList<PlacementModel> placements = await _services.PlacementModels.ListAsync();
-        IReadOnlyList<ExpeditionPreset> expeditionPresets = await _services.Presets.ListAsync();
         IReadOnlyList<DetectorPackManifest> detectorPacks = await _services.DetectorPacks.ListAsync();
 
         CameraOptions.Clear();
@@ -380,8 +357,6 @@ public partial class ChallengesPage : UserControl, IAppPage
         PlacementOptions.Clear();
         PlacementOptions.Add(new CatalogOption(string.Empty, "None"));
         foreach (PlacementModel placement in placements) PlacementOptions.Add(new CatalogOption(placement.Id, placement.Name));
-        _expeditionPresets.Clear();
-        foreach (ExpeditionPreset preset in expeditionPresets) _expeditionPresets.Add(preset);
         _detectorPacks.Clear();
         foreach (DetectorPackManifest pack in detectorPacks) _detectorPacks.Add(pack);
     }
@@ -392,22 +367,6 @@ public partial class ChallengesPage : UserControl, IAppPage
         _presets.Clear();
         foreach (ChallengePreset preset in presets) _presets.Add(preset);
     }
-
-    private void IdleBehaviorCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        UpdateIdleBehaviorAvailability();
-    }
-
-    private void UpdateIdleBehaviorAvailability()
-    {
-        if (ExpeditionPresetCombo is null || IdleBehaviorCombo is null) return;
-        ExpeditionPresetCombo.IsEnabled = SelectedIdleBehavior() == ChallengeIdleBehavior.RunExpeditions && !_services.Coordinator.IsBusy;
-    }
-
-    private ChallengeIdleBehavior SelectedIdleBehavior() =>
-        IdleBehaviorCombo.SelectedItem is ComboBoxItem item && string.Equals(item.Tag?.ToString(), "expeditions", StringComparison.OrdinalIgnoreCase)
-            ? ChallengeIdleBehavior.RunExpeditions
-            : ChallengeIdleBehavior.WaitForReset;
 
     private DetectorPackManifest CurrentDetectorPack() =>
         _detectorPacks.FirstOrDefault()
@@ -431,7 +390,6 @@ public partial class ChallengesPage : UserControl, IAppPage
         TraitCheck.IsEnabled = enabled;
         StatCheck.IsEnabled = enabled;
         SpriteCheck.IsEnabled = enabled;
-        IdleBehaviorCombo.IsEnabled = enabled;
         AutoRecoverCheck.IsEnabled = enabled;
         DefeatRetriesText.IsEnabled = enabled;
         ZoomTicksText.IsEnabled = enabled;
@@ -448,7 +406,6 @@ public partial class ChallengesPage : UserControl, IAppPage
         MapItems.IsEnabled = enabled;
         StartButton.IsEnabled = enabled;
         UpdateDeleteAvailability();
-        UpdateIdleBehaviorAvailability();
         if (enabled && _macroOwned && _runStarted is not null)
         {
             _macroOwned = false;
@@ -484,42 +441,6 @@ public partial class ChallengesPage : UserControl, IAppPage
             result[profile.Map] = new ChallengeMapRuntimeModels(camera, prestart, delayed);
         }
         return result;
-    }
-
-    private async Task RunExpeditionsUntilAsync(
-        DateTimeOffset untilUtc,
-        ExpeditionPreset preset,
-        CameraModel camera,
-        PlacementModel placement,
-        IDetectorPack detector,
-        string webhookUrl,
-        string discordUserId,
-        char playMenuKey,
-        CancellationToken cancellationToken)
-    {
-        if (untilUtc <= DateTimeOffset.UtcNow) return;
-        AppendLog($"Running Expeditions preset '{preset.Name}' while Challenges are unavailable.");
-        await _services.Expeditions.RunAsync(
-            preset,
-            camera,
-            placement,
-            detector,
-            webhookUrl,
-            playMenuKey,
-            progress: new InlineProgress<MacroProgress>(value =>
-            {
-                TrackActionState($"Expeditions fallback · {value.Phase}", value.Message);
-                DispatchUi(() => StatusText.Text = $"Expeditions fallback: {value.Message}");
-            }),
-            log: entry =>
-            {
-                TrackActionState($"Expeditions fallback · {entry.State ?? entry.Level.ToString()}", entry.Message);
-                AppendLog($"Expeditions: {entry.Message}");
-            },
-            summaryChanged: null,
-            cancellationToken: cancellationToken,
-            stopAfterCurrentRunUtc: untilUtc,
-            recoverableFailure: (error, failureToken) => HandleRecoverableFailureAsync("Challenge Macro", webhookUrl, discordUserId, error, failureToken));
     }
 
     private void ApplySummary(ChallengeRunSummary summary)

@@ -78,35 +78,6 @@ public sealed class PresetDeletionTests
         }
     }
 
-    [Fact]
-    public async Task DeleteAsync_BlocksExpeditionUsedAsChallengeFallback()
-    {
-        string root = TestPaths.NewTemporaryDirectory();
-        try
-        {
-            AppPaths paths = new(root);
-            PresetRepository expeditions = new(paths);
-            ChallengePresetRepository challenges = new(paths);
-            PresetDeletionService deletion = CreateDeletionService(paths);
-            await expeditions.SaveAsync(Expedition());
-            await challenges.SaveAsync(Challenge() with
-            {
-                IdleBehavior = ChallengeIdleBehavior.RunExpeditions,
-                ExpeditionPresetId = "expedition-route",
-            });
-
-            PresetInUseException error = await Assert.ThrowsAsync<PresetInUseException>(
-                () => deletion.DeleteAsync(MacroTaskKind.Expedition, "expedition-route"));
-
-            Assert.Contains("Challenge preset 'Challenge rotation'", error.Message, StringComparison.Ordinal);
-            Assert.NotNull(await expeditions.LoadAsync("expedition-route"));
-        }
-        finally
-        {
-            TestPaths.DeleteTemporaryDirectory(root);
-        }
-    }
-
     private static PresetDeletionService CreateDeletionService(AppPaths paths) => new(
         new PresetRepository(paths),
         new ChallengePresetRepository(paths),

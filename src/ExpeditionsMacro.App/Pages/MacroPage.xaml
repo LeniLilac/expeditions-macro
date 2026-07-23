@@ -19,10 +19,9 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <StackPanel Margin="0,0,24,0">
-                    <TextBlock Style="{StaticResource PageTitle}" Text="Macro" />
-                    <TextBlock Margin="0,5,0,0" Style="{StaticResource Caption}" Text="Run an ordered task list. Priority changes only between matches; a live match is never interrupted." />
-                </StackPanel>
+                <TextBlock Margin="0,0,24,0"
+                           Style="{StaticResource PageTitle}"
+                           Text="Macro" />
                 <StackPanel Grid.Column="1" HorizontalAlignment="Right" Orientation="Horizontal">
                     <Button x:Name="StartButton" Style="{StaticResource PrimaryButton}" icons:Lucide.Icon="Play" Content="Start plan  F6" Click="Start_Click" />
                     <Button x:Name="StopButton" Margin="8,0,0,0" Style="{StaticResource DangerButton}" icons:Lucide.Icon="Square" Content="Stop plan  F6" IsEnabled="False" Click="Stop_Click" />
@@ -50,10 +49,8 @@
             <Border Grid.Row="2" Style="{StaticResource SectionDivider}">
                 <StackPanel>
                     <Grid>
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource SectionTitle}" Text="Priority queue" />
-                            <TextBlock Margin="0,5,0,0" Style="{StaticResource Caption}" Text="The first eligible row runs next. Challenges become eligible again on their global reset." />
-                        </StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}"
+                                   Text="Priority queue" />
                         <Button x:Name="ResetProgressButton" HorizontalAlignment="Right" Height="34" icons:Lucide.Icon="RotateCcw" Content="Reset progress" Click="ResetProgress_Click" />
                     </Grid>
 
@@ -145,55 +142,104 @@
                 </StackPanel>
             </Border>
 
-            <Border Grid.Row="3" Style="{StaticResource SectionDivider}">
+            <Border Grid.Row="3" Style="{StaticResource FormCard}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="28" />
+                        <ColumnDefinition Width="1" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource SectionTitle}" Text="Discord reporting" />
-                        <TextBlock Margin="0,12,0,0" Style="{StaticResource FieldLabel}" Text="Webhook, optional" />
-                        <Grid Margin="0,7,0,0">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="100" /></Grid.ColumnDefinitions>
-                            <PasswordBox x:Name="WebhookPassword" />
-                            <TextBox x:Name="WebhookVisible" Visibility="Collapsed" />
-                            <CheckBox x:Name="ShowWebhookCheck" Grid.Column="1" Margin="10,0,0,0" Content="Show" Checked="ShowWebhook_Changed" Unchecked="ShowWebhook_Changed" />
-                        </Grid>
-                        <Grid Margin="0,8,0,0">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                            <Button x:Name="TestWebhookButton" Height="34" icons:Lucide.Icon="Send" Content="Test webhook" Click="TestWebhook_Click" />
-                            <TextBlock x:Name="WebhookStatusText" Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center" Style="{StaticResource Caption}" TextWrapping="Wrap" />
-                        </Grid>
+                    <StackPanel Margin="0,0,24,0">
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Discord notifications" />
+                        <TextBlock Margin="0,18,0,0" Style="{StaticResource FieldLabel}" Text="Webhook link" />
+                        <Border Margin="0,7,0,0" Style="{StaticResource InputGroup}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="48" />
+                                </Grid.ColumnDefinitions>
+                                <PasswordBox x:Name="WebhookPassword"
+                                             Style="{StaticResource InputGroupPasswordBox}" />
+                                <TextBox x:Name="WebhookVisible"
+                                         Style="{StaticResource InputGroupTextBox}"
+                                         Visibility="Collapsed" />
+                                <Button x:Name="TestWebhookButton"
+                                        Grid.Column="1"
+                                        Height="32"
+                                        Margin="4"
+                                        icons:Lucide.Icon="Send"
+                                        Content="Test webhook"
+                                        Click="TestWebhook_Click" />
+                                <CheckBox x:Name="ShowWebhookCheck"
+                                          Grid.Column="2"
+                                          Margin="4"
+                                          Style="{StaticResource RevealToggle}"
+                                          AutomationProperties.Name="Show webhook link"
+                                          ToolTip="Show or hide webhook link"
+                                          Checked="ShowWebhook_Changed"
+                                          Unchecked="ShowWebhook_Changed" />
+                            </Grid>
+                        </Border>
+                        <TextBlock x:Name="WebhookStatusText"
+                                   Margin="0,8,0,0"
+                                   Style="{StaticResource Caption}" />
                     </StackPanel>
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Style="{StaticResource SectionTitle}" Text="Failure alerts" />
-                        <TextBlock Margin="0,12,0,0" Style="{StaticResource FieldLabel}" Text="Discord user ID, optional" />
+                    <Border Grid.Column="1"
+                            Background="{DynamicResource BorderBrush}" />
+                    <StackPanel Grid.Column="2" Margin="24,0,0,0">
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Failure alert ping" />
+                        <TextBlock Margin="0,18,0,0" Style="{StaticResource FieldLabel}" Text="Discord user ID" />
                         <TextBox x:Name="DiscordUserIdText" Margin="0,7,0,0" />
-                        <TextBlock Margin="0,8,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Unexpected failures can capture diagnostics and ping this user. Manual stop never sends an error alert." />
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <Border Grid.Row="4" Style="{StaticResource SectionDivider}">
+            <Border Grid.Row="4"
+                    Margin="0,14,0,0"
+                    Style="{StaticResource FormCard}">
                 <StackPanel>
                     <TextBlock Style="{StaticResource SectionTitle}" Text="Roblox reconnect" />
-                    <TextBlock Margin="0,5,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="If in-client recovery cannot restore the run, the app can close only the verified Roblox player process and reopen this private server through Windows." />
-                    <TextBlock Margin="0,14,0,0" Style="{StaticResource FieldLabel}" Text="Private server link, optional" />
-                    <Grid Margin="0,7,0,0">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="100" /></Grid.ColumnDefinitions>
-                        <PasswordBox x:Name="PrivateServerLinkPassword" />
-                        <TextBox x:Name="PrivateServerLinkVisible" Visibility="Collapsed" />
-                        <CheckBox x:Name="ShowPrivateServerLinkCheck" Grid.Column="1" Margin="10,0,0,0" Content="Show" Checked="ShowPrivateServerLink_Changed" Unchecked="ShowPrivateServerLink_Changed" />
-                    </Grid>
-                    <CheckBox x:Name="RestartRobloxCheck" Margin="0,12,0,0" Content="Restart Roblox through this private server when recovery fails" />
-                    <TextBlock Margin="0,7,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="The link grants access to its private server. It is protected with Windows DPAPI and excluded from diagnostics, logs, and screenshots." />
+                    <CheckBox x:Name="RestartRobloxCheck"
+                              Margin="0,14,0,0"
+                              Content="Restart Roblox through this private server when recovery fails" />
+                    <TextBlock Margin="0,18,0,0"
+                               Style="{StaticResource FieldLabel}"
+                               Text="Private server link" />
+                    <Border Margin="0,7,0,0" Style="{StaticResource InputGroup}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="48" />
+                            </Grid.ColumnDefinitions>
+                            <PasswordBox x:Name="PrivateServerLinkPassword"
+                                         Style="{StaticResource InputGroupPasswordBox}" />
+                            <TextBox x:Name="PrivateServerLinkVisible"
+                                     Style="{StaticResource InputGroupTextBox}"
+                                     Visibility="Collapsed" />
+                            <Button x:Name="TestPrivateServerButton"
+                                    Grid.Column="1"
+                                    Height="32"
+                                    Margin="4"
+                                    icons:Lucide.Icon="ExternalLink"
+                                    Content="Test link"
+                                    Click="TestPrivateServer_Click" />
+                            <CheckBox x:Name="ShowPrivateServerLinkCheck"
+                                      Grid.Column="2"
+                                      Margin="4"
+                                      Style="{StaticResource RevealToggle}"
+                                      AutomationProperties.Name="Show private server link"
+                                      ToolTip="Show or hide private server link"
+                                      Checked="ShowPrivateServerLink_Changed"
+                                      Unchecked="ShowPrivateServerLink_Changed" />
+                        </Grid>
+                    </Border>
                     <TextBlock x:Name="PrivateServerStatusText" Margin="0,7,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
 
-            <Border Grid.Row="5" Style="{StaticResource SectionDivider}">
+            <Border Grid.Row="5" Margin="0,22,0,0">
                 <StackPanel>
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
@@ -214,7 +260,6 @@
                 </StackPanel>
             </Border>
 
-            <TextBlock Grid.Row="6" Margin="0,10,0,0" Style="{StaticResource Caption}" Text="Story, Raid, Challenge, and Expedition pages edit presets only. This page is the sole owner of long-running macro execution." />
         </Grid>
     </ScrollViewer>
 </UserControl>

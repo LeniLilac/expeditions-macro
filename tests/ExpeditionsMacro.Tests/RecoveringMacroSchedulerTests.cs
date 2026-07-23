@@ -85,6 +85,11 @@ public sealed class RecoveringMacroSchedulerTests
     {
         public int Restarts { get; private set; }
 
+        public Task LaunchAsync(
+            RobloxPrivateServerLaunchTarget target,
+            CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
         public Task<RobloxWindow> RestartAsync(
             RobloxPrivateServerLaunchTarget target,
             IProgress<MacroProgress>? progress = null,
