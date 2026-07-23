@@ -159,6 +159,79 @@ public sealed class WindowsRobloxAutomationTests
         Assert.Equal(frame.Pixels[0], frame.Pixels[2]);
     }
 
+    [Fact]
+    public async Task WindowCapture_FrameArrivalNotificationCrossesThreadsWithoutFrameAccess()
+    {
+        using var gate = new CaptureFrameArrivalGate();
+        long targetGeneration = gate.Generation + 1;
+
+        Task<bool> wait = Task.Run(() => gate.WaitForGeneration(targetGeneration, 1000));
+        await Task.Run(gate.Notify);
+
+        Assert.True(await wait);
+        Assert.Equal(targetGeneration, gate.Generation);
+    }
+
+    [Fact]
+    public void WindowCapture_FrameArrivalNotificationTimesOutWithoutAFrame()
+    {
+        using var gate = new CaptureFrameArrivalGate();
+
+        Assert.False(gate.WaitForGeneration(gate.Generation + 1, 10));
+    }
+
+    [Fact]
+    public void WindowCapture_ConsumesAFrameThatArrivedBeforeCaptureStartedWaiting()
+    {
+        using var gate = new CaptureFrameArrivalGate();
+        gate.Notify();
+
+        Assert.True(gate.WaitForGeneration(gate.Generation, 0));
+    }
+
+    [Fact]
+    public void WindowCapture_SurfaceRecoveryRereadsGeometryUntilCaptureStabilizes()
+    {
+        int captures = 0;
+        List<int> retries = [];
+
+        int result = WindowsRobloxAutomation.CaptureWithSurfaceRecovery(
+            () =>
+            {
+                captures++;
+                if (captures < 3)
+                {
+                    throw new CaptureSurfaceChangedException(824, 650, 808, 611);
+                }
+                return 42;
+            },
+            (attempt, _) => retries.Add(attempt),
+            maximumAttempts: 5);
+
+        Assert.Equal(42, result);
+        Assert.Equal(3, captures);
+        Assert.Equal([1, 2], retries);
+    }
+
+    [Fact]
+    public void WindowCapture_SurfaceRecoveryReturnsFriendlyErrorAfterBoundedAttempts()
+    {
+        int captures = 0;
+
+        InvalidOperationException error = Assert.Throws<InvalidOperationException>(() =>
+            WindowsRobloxAutomation.CaptureWithSurfaceRecovery<int>(
+                () =>
+                {
+                    captures++;
+                    throw new CaptureSurfaceChangedException(824, 650, 808, 611);
+                },
+                maximumAttempts: 3));
+
+        Assert.Equal(3, captures);
+        Assert.Contains("could not stabilize", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.IsType<CaptureSurfaceChangedException>(error.InnerException);
+    }
+
     private static void WriteRgbaHalf(byte[] target, int offset, float red, float green, float blue, float alpha)
     {
         WriteHalf(target, offset, red);

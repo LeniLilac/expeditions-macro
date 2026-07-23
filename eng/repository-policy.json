@@ -40,7 +40,7 @@
     },
     {
       "path": "src/ExpeditionsMacro.Windows/WindowsRobloxAutomation.cs",
-      "maxLines": 883,
+      "maxLines": 866,
       "reason": "Existing Windows adapter debt; separate window, capture, keyboard, pointer, and diagnostics concerns."
     },
     {
@@ -70,7 +70,7 @@
     },
     {
       "path": "src/ExpeditionsMacro.Windows/WindowsGraphicsCapture.cs",
-      "maxLines": 546,
+      "maxLines": 543,
       "reason": "Existing capture-pipeline debt; isolate device/session lifecycle from frame conversion."
     },
     {

@@ -4,6 +4,17 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.9] - 2026-07-22
+
+### Fixed
+
+- Windows 10 capture callbacks now only signal frame availability; WinRT frame access and GPU copying run on the serialized capture path, preventing `RPC_E_WRONG_THREAD` failures before the first screenshot.
+- Recreates the Windows Graphics Capture frame pool from the actual incoming frame size when Roblox's compositor surface changes, then re-reads live window geometry through bounded retries instead of exposing `CaptureSurfaceChangedException`.
+
+### Tests
+
+- Added cross-thread frame notification, pre-arrived frame, surface recovery, and bounded failure regressions; also verified three changing 808 by 611 frames in a live Roblox capture smoke check.
+
 ## [1.3.0-beta.8] - 2026-07-22
 
 ### Added
@@ -539,7 +550,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.8...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.9...HEAD
+[1.3.0-beta.9]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.8...v1.3.0-beta.9
 [1.3.0-beta.8]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.7...v1.3.0-beta.8
 [1.3.0-beta.7]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.6...v1.3.0-beta.7
 [1.3.0-beta.6]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.5...v1.3.0-beta.6

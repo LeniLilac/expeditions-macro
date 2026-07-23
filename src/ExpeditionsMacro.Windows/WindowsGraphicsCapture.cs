@@ -5,6 +5,7 @@ using ExpeditionsMacro.Core.Imaging;
 using Vortice.Direct3D;
 using Vortice.Direct3D11;
 using Vortice.DXGI;
+using Windows.Graphics;
 using Windows.Graphics.Capture;
 using Windows.Graphics.DirectX;
 using Windows.Graphics.DirectX.Direct3D11;
@@ -65,8 +66,8 @@ internal sealed class WindowsGraphicsCapture : IDisposable
             catch (CaptureSurfaceChangedException)
             {
                 _active.Dispose();
-                _active = CaptureSession.Create(window, client, windowBounds, extendedFrameBounds);
-                return _active.Capture();
+                _active = null;
+                throw;
             }
         }
     }
@@ -113,85 +114,8 @@ internal sealed class WindowsGraphicsCapture : IDisposable
         byte[] rgba16,
         int surfaceWidth,
         int surfaceHeight,
-        ScreenRegion crop)
-    {
-        if (rgba16.Length != checked(surfaceWidth * surfaceHeight * 8))
-        {
-            throw new ArgumentException("The FP16 RGBA buffer has an unexpected length.", nameof(rgba16));
-        }
-        if (crop.X < 0 || crop.Y < 0 || crop.Right > surfaceWidth || crop.Bottom > surfaceHeight)
-        {
-            throw new ArgumentOutOfRangeException(nameof(crop), "The client crop must fit inside the captured surface.");
-        }
-
-        byte[] rgb = new byte[checked(crop.Width * crop.Height * 3)];
-        int target = 0;
-        for (int y = crop.Y; y < crop.Bottom; y++)
-        {
-            int source = checked((y * surfaceWidth + crop.X) * 8);
-            for (int x = 0; x < crop.Width; x++, source += 8, target += 3)
-            {
-                float red = ReadFiniteHalf(rgba16, source);
-                float green = ReadFiniteHalf(rgba16, source + 2);
-                float blue = ReadFiniteHalf(rgba16, source + 4);
-                ToneMapScRgb(ref red, ref green, ref blue);
-                rgb[target] = LinearToSrgbByte(red);
-                rgb[target + 1] = LinearToSrgbByte(green);
-                rgb[target + 2] = LinearToSrgbByte(blue);
-            }
-        }
-        return new ImageFrame(crop.Width, crop.Height, PixelFormat.Rgb24, rgb, takeOwnership: true);
-    }
-
-    private static float ReadFiniteHalf(byte[] source, int offset)
-    {
-        ushort bits = (ushort)(source[offset] | source[offset + 1] << 8);
-        float value = (float)BitConverter.UInt16BitsToHalf(bits);
-        return float.IsFinite(value) ? Math.Max(0f, value) : 0f;
-    }
-
-    private static void ToneMapScRgb(ref float red, ref float green, ref float blue)
-    {
-        // Windows Graphics Capture exposes HDR/WCG window pixels as linear scRGB,
-        // where 1.0 is SDR reference white (80 nits) and HDR highlights can exceed 1.0.
-        // Keep ordinary SDR pixels on the standard transfer curve and only
-        // compress values that enter the highlight shoulder. This avoids changing the
-        // detector input on SDR systems while preventing Auto HDR highlights from clipping.
-        const float shoulderStart = 0.8f;
-        const float scRgbAt1000Nits = 12.5f;
-        const float shoulderScale = 2f;
-
-        float luminance = 0.2126f * red + 0.7152f * green + 0.0722f * blue;
-        if (luminance > shoulderStart)
-        {
-            float capped = Math.Min(luminance, scRgbAt1000Nits);
-            float numerator = 1f - MathF.Exp(-(capped - shoulderStart) / shoulderScale);
-            float denominator = 1f - MathF.Exp(-(scRgbAt1000Nits - shoulderStart) / shoulderScale);
-            float mapped = shoulderStart + (1f - shoulderStart) * numerator / denominator;
-            float scale = mapped / luminance;
-            red *= scale;
-            green *= scale;
-            blue *= scale;
-        }
-
-        float maximum = Math.Max(red, Math.Max(green, blue));
-        if (maximum > 1f)
-        {
-            float scale = 1f / maximum;
-            red *= scale;
-            green *= scale;
-            blue *= scale;
-        }
-    }
-
-    private static byte LinearToSrgbByte(float value)
-    {
-        float clamped = Math.Clamp(value, 0f, 1f);
-        float encoded = clamped <= 0.0031308f
-            ? 12.92f * clamped
-            : 1.055f * MathF.Pow(clamped, 1f / 2.4f) - 0.055f;
-        return (byte)Math.Clamp((int)MathF.Round(encoded * 255f), 0, 255);
-    }
+        ScreenRegion crop) =>
+        CaptureSurfaceConverter.ConvertScRgbRgba16ToRgb(rgba16, surfaceWidth, surfaceHeight, crop);
 
     private static GraphicsCaptureItem CreateItem(nint window)
     {
@@ -273,24 +197,26 @@ internal sealed class WindowsGraphicsCapture : IDisposable
     {
         private const int InitialFrameTimeoutMilliseconds = 3000;
         private const int FreshFrameTimeoutMilliseconds = 350;
-        private readonly object _frameGate = new();
+        private const int SurfaceRecreateAttempts = 4;
         private readonly object _lifecycleGate = new();
-        private readonly AutoResetEvent _frameReady = new(false);
+        private readonly CaptureFrameArrivalGate _frameArrival = new();
         private readonly nint _window;
         private readonly ClientBounds _client;
         private readonly WindowBounds _windowBounds;
         private readonly WindowBounds _extendedFrameBounds;
-        private readonly ScreenRegion _clientCrop;
+        private ScreenRegion _clientCrop;
+        private int _surfaceWidth;
+        private int _surfaceHeight;
         private readonly ID3D11Device _device;
         private readonly ID3D11DeviceContext _context;
-        private readonly ID3D11Texture2D _latestTexture;
+        private ID3D11Texture2D _latestTexture;
         private readonly IDirect3DDevice _winRtDevice;
         private readonly GraphicsCaptureItem _item;
         private readonly Direct3D11CaptureFramePool _framePool;
         private readonly GraphicsCaptureSession _captureSession;
-        private Exception? _captureError;
-        private long _latestGeneration;
+        private long _lastConsumedGeneration;
         private int _processing;
+        private bool _hasCapturedFrame;
         private bool _disposed;
 
         private CaptureSession(
@@ -304,6 +230,8 @@ internal sealed class WindowsGraphicsCapture : IDisposable
             IDirect3DDevice winRtDevice,
             GraphicsCaptureItem item,
             ScreenRegion clientCrop,
+            int surfaceWidth,
+            int surfaceHeight,
             Direct3D11CaptureFramePool framePool,
             GraphicsCaptureSession captureSession)
         {
@@ -317,6 +245,8 @@ internal sealed class WindowsGraphicsCapture : IDisposable
             _winRtDevice = winRtDevice;
             _item = item;
             _clientCrop = clientCrop;
+            _surfaceWidth = surfaceWidth;
+            _surfaceHeight = surfaceHeight;
             _framePool = framePool;
             _captureSession = captureSession;
             _framePool.FrameArrived += FrameArrived;
@@ -337,25 +267,16 @@ internal sealed class WindowsGraphicsCapture : IDisposable
             (ID3D11Device device, ID3D11DeviceContext context) = CreateCaptureDevice();
             IDirect3DDevice winRtDevice = CreateWinRtDevice(device);
             GraphicsCaptureItem item = CreateItem(window);
-            ScreenRegion clientCrop = ResolveClientCrop(item.Size.Width, item.Size.Height, client, windowBounds, extendedFrameBounds);
-            Texture2DDescription latestDescription = new(
-                Format.R16G16B16A16_Float,
-                checked((uint)item.Size.Width),
-                checked((uint)item.Size.Height),
-                1,
-                1,
-                BindFlags.None,
-                ResourceUsage.Default,
-                CpuAccessFlags.None,
-                1,
-                0,
-                ResourceOptionFlags.None);
-            ID3D11Texture2D latestTexture = device.CreateTexture2D(latestDescription);
+            var surfaceSize = item.Size;
+            int surfaceWidth = surfaceSize.Width;
+            int surfaceHeight = surfaceSize.Height;
+            ScreenRegion clientCrop = ResolveClientCrop(surfaceWidth, surfaceHeight, client, windowBounds, extendedFrameBounds);
+            ID3D11Texture2D latestTexture = CaptureTextureFactory.Create(device, surfaceWidth, surfaceHeight);
             Direct3D11CaptureFramePool framePool = Direct3D11CaptureFramePool.CreateFreeThreaded(
                 winRtDevice,
                 DirectXPixelFormat.R16G16B16A16Float,
                 2,
-                item.Size);
+                surfaceSize);
             GraphicsCaptureSession session = framePool.CreateCaptureSession(item);
             session.IsCursorCaptureEnabled = false;
             return new CaptureSession(
@@ -369,6 +290,8 @@ internal sealed class WindowsGraphicsCapture : IDisposable
                 winRtDevice,
                 item,
                 clientCrop,
+                surfaceWidth,
+                surfaceHeight,
                 framePool,
                 session);
         }
@@ -392,28 +315,129 @@ internal sealed class WindowsGraphicsCapture : IDisposable
         public ImageFrame Capture()
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            long initialGeneration = Volatile.Read(ref _latestGeneration);
-            int timeout = initialGeneration == 0 ? InitialFrameTimeoutMilliseconds : FreshFrameTimeoutMilliseconds;
+            long targetGeneration = _lastConsumedGeneration + 1;
+            int timeout = _hasCapturedFrame ? FreshFrameTimeoutMilliseconds : InitialFrameTimeoutMilliseconds;
             DateTime deadline = DateTime.UtcNow.AddMilliseconds(timeout);
-            long targetGeneration = initialGeneration == 0 ? 1 : initialGeneration + 1;
-            while (Volatile.Read(ref _latestGeneration) < targetGeneration && DateTime.UtcNow < deadline)
+            int surfaceRecreates = 0;
+            bool stabilizingSurface = false;
+            while (DateTime.UtcNow < deadline)
             {
-                _frameReady.WaitOne(Math.Max(1, (int)(deadline - DateTime.UtcNow).TotalMilliseconds));
+                int remaining = Math.Max(0, (int)(deadline - DateTime.UtcNow).TotalMilliseconds);
+                if (!_frameArrival.WaitForGeneration(targetGeneration, remaining)) break;
+                long availableGeneration = _frameArrival.Generation;
+                Direct3D11CaptureFrame? frame = _framePool.TryGetNextFrame();
+                if (frame is null)
+                {
+                    _lastConsumedGeneration = availableGeneration;
+                    targetGeneration = availableGeneration + 1;
+                    continue;
+                }
+                _lastConsumedGeneration = availableGeneration;
+
+                int changedWidth = 0;
+                int changedHeight = 0;
+                using (frame)
+                {
+                    if (frame.ContentSize.Width != _surfaceWidth || frame.ContentSize.Height != _surfaceHeight)
+                    {
+                        changedWidth = frame.ContentSize.Width;
+                        changedHeight = frame.ContentSize.Height;
+                    }
+                    else
+                    {
+                        using ID3D11Texture2D source = GetTexture(frame.Surface);
+                        Texture2DDescription sourceDescription = source.Description;
+                        if (sourceDescription.Format != Format.R16G16B16A16_Float ||
+                            sourceDescription.Width != frame.ContentSize.Width ||
+                            sourceDescription.Height != frame.ContentSize.Height)
+                        {
+                            throw new InvalidOperationException(
+                                $"Windows returned an unexpected capture texture ({sourceDescription.Format}, {sourceDescription.Width} by {sourceDescription.Height}).");
+                        }
+
+                        _context.CopyResource(_latestTexture, source);
+                        _hasCapturedFrame = true;
+                    }
+                }
+
+                if (changedWidth > 0 && changedHeight > 0)
+                {
+                    surfaceRecreates++;
+                    if (surfaceRecreates > SurfaceRecreateAttempts)
+                    {
+                        throw new CaptureSurfaceChangedException(
+                            _surfaceWidth,
+                            _surfaceHeight,
+                            changedWidth,
+                            changedHeight);
+                    }
+                    RecreateSurface(changedWidth, changedHeight);
+                    _lastConsumedGeneration = _frameArrival.Generation;
+                    targetGeneration = _lastConsumedGeneration + 1;
+                    if (!stabilizingSurface)
+                    {
+                        deadline = DateTime.UtcNow.AddMilliseconds(InitialFrameTimeoutMilliseconds);
+                        stabilizingSurface = true;
+                    }
+                    continue;
+                }
+
+                break;
             }
 
-            byte[] surfacePixels;
-            lock (_frameGate)
-            {
-                if (_captureError is CaptureSurfaceChangedException surfaceChanged) throw surfaceChanged;
-                if (_captureError is not null) throw new InvalidOperationException("Windows could not capture the Roblox window.", _captureError);
-                if (Volatile.Read(ref _latestGeneration) == 0) throw new TimeoutException("Windows did not provide a Roblox window frame within three seconds.");
-                surfacePixels = ReadTexturePixels(_latestTexture, _item.Size.Width, _item.Size.Height);
-            }
+            if (!_hasCapturedFrame) throw new TimeoutException("Windows did not provide a Roblox window frame within three seconds.");
+            byte[] surfacePixels = ReadTexturePixels(_latestTexture, _surfaceWidth, _surfaceHeight);
             return ConvertScRgbRgba16ToRgb(
                 surfacePixels,
-                _item.Size.Width,
-                _item.Size.Height,
+                _surfaceWidth,
+                _surfaceHeight,
                 _clientCrop);
+        }
+
+        private void RecreateSurface(int surfaceWidth, int surfaceHeight)
+        {
+            ScreenRegion clientCrop;
+            try
+            {
+                clientCrop = ResolveClientCrop(
+                    surfaceWidth,
+                    surfaceHeight,
+                    _client,
+                    _windowBounds,
+                    _extendedFrameBounds);
+            }
+            catch (InvalidOperationException error)
+            {
+                throw new CaptureSurfaceChangedException(
+                    _surfaceWidth,
+                    _surfaceHeight,
+                    surfaceWidth,
+                    surfaceHeight,
+                    error);
+            }
+
+            ID3D11Texture2D latestTexture = CaptureTextureFactory.Create(_device, surfaceWidth, surfaceHeight);
+            try
+            {
+                _framePool.Recreate(
+                    _winRtDevice,
+                    DirectXPixelFormat.R16G16B16A16Float,
+                    2,
+                    new SizeInt32(surfaceWidth, surfaceHeight));
+            }
+            catch
+            {
+                latestTexture.Dispose();
+                throw;
+            }
+
+            ID3D11Texture2D previousTexture = _latestTexture;
+            _latestTexture = latestTexture;
+            _clientCrop = clientCrop;
+            _surfaceWidth = surfaceWidth;
+            _surfaceHeight = surfaceHeight;
+            _hasCapturedFrame = false;
+            previousTexture.Dispose();
         }
 
         public void Dispose()
@@ -426,12 +450,12 @@ internal sealed class WindowsGraphicsCapture : IDisposable
             }
             _captureSession.Dispose();
             _framePool.Dispose();
-            _frameReady.Set();
+            _frameArrival.Wake();
             bool drained = SpinWait.SpinUntil(() => Volatile.Read(ref _processing) == 0, TimeSpan.FromSeconds(2));
             if (!drained)
             {
-                // A GPU readback still owns these objects. Finish cleanup after its callback
-                // releases the D3D context instead of racing it during app shutdown.
+                // An already-dispatched frame notification is still leaving the callback.
+                // Finish cleanup after it releases the arrival gate.
                 ThreadPool.QueueUserWorkItem(_ =>
                 {
                     SpinWait.SpinUntil(() => Volatile.Read(ref _processing) == 0);
@@ -445,7 +469,7 @@ internal sealed class WindowsGraphicsCapture : IDisposable
 
         private void DisposeCaptureResources()
         {
-            _frameReady.Dispose();
+            _frameArrival.Dispose();
             (_winRtDevice as IDisposable)?.Dispose();
             _latestTexture.Dispose();
             _context.Dispose();
@@ -461,39 +485,14 @@ internal sealed class WindowsGraphicsCapture : IDisposable
             }
             try
             {
-                using Direct3D11CaptureFrame? frame = sender.TryGetNextFrame();
-                if (frame is null) return;
-                if (frame.ContentSize.Width != _item.Size.Width || frame.ContentSize.Height != _item.Size.Height)
-                {
-                    throw new CaptureSurfaceChangedException();
-                }
-
-                using ID3D11Texture2D source = GetTexture(frame.Surface);
-                Texture2DDescription sourceDescription = source.Description;
-                if (sourceDescription.Format != Format.R16G16B16A16_Float ||
-                    sourceDescription.Width != frame.ContentSize.Width ||
-                    sourceDescription.Height != frame.ContentSize.Height)
-                {
-                    throw new InvalidOperationException(
-                        $"Windows returned an unexpected capture texture ({sourceDescription.Format}, {sourceDescription.Width} by {sourceDescription.Height}).");
-                }
-                lock (_frameGate)
-                {
-                    _context.CopyResource(_latestTexture, source);
-                    _captureError = null;
-                    Interlocked.Increment(ref _latestGeneration);
-                }
-            }
-            catch (Exception error)
-            {
-                lock (_frameGate)
-                {
-                    _captureError = error;
-                }
+                // CreateFreeThreaded raises this event on the frame pool's internal worker.
+                // Some Windows 10 builds reject WinRT surface access there with
+                // RPC_E_WRONG_THREAD. Keep the callback notification-only and consume the
+                // frame on the serialized Capture call instead.
+                _frameArrival.Notify();
             }
             finally
             {
-                _frameReady.Set();
                 Interlocked.Decrement(ref _processing);
             }
         }
@@ -541,6 +540,4 @@ internal sealed class WindowsGraphicsCapture : IDisposable
             }
         }
     }
-
-    private sealed class CaptureSurfaceChangedException : Exception;
 }

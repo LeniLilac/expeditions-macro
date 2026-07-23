@@ -23,7 +23,7 @@ public sealed record WindowsAutomationTrace(
     uint? Data = null,
     bool? Extended = null);
 
-public sealed class WindowsRobloxAutomation : IRobloxAutomation, IDisposable
+public sealed partial class WindowsRobloxAutomation : IRobloxAutomation, IDisposable
 {
     private const long WsCaption = 0x00C00000L;
     private const long WsThickFrame = 0x00040000L;
@@ -42,6 +42,8 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation, IDisposable
     private const int HoverClearPulseCount = 4;
     private const int HoverClearPulseIntervalMilliseconds = 100;
     private const int HoverRenderSettleMilliseconds = 100;
+    private const int CaptureSurfaceRecoveryAttempts = 5;
+    private const int CaptureSurfaceRecoveryDelayMilliseconds = 100;
     internal static (char PrimaryKey, bool PrimaryIsExtended, bool UseWheelFallback) ZoomOutInputPolicy => ('O', false, true);
     private static readonly HashSet<string> SupportedRobloxProcesses = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -226,25 +228,6 @@ public sealed class WindowsRobloxAutomation : IRobloxAutomation, IDisposable
         {
             RestoreForcedStyle(handle, state.OriginalBounds, throwOnFailure: false);
         }
-    }
-
-    public ImageFrame CaptureScreen(ScreenRegion region) => GdiScreenCapture.Capture(region);
-
-    public ImageFrame CaptureClient(RobloxWindow window)
-    {
-        nint handle = ResolveHandle(window);
-        ClientBounds client = GetClientBounds(handle);
-        WindowBounds bounds = GetWindowBounds(handle);
-        WindowBounds extended = GetExtendedFrameBounds(handle) ?? bounds;
-        return _windowCapture.CaptureClient(handle, client, bounds, extended);
-    }
-
-    private static WindowBounds? GetExtendedFrameBounds(nint handle)
-    {
-        uint size = (uint)Marshal.SizeOf<NativeMethods.Rect>();
-        int result = NativeMethods.DwmGetWindowAttribute(handle, NativeMethods.DwmwaExtendedFrameBounds, out NativeMethods.Rect rectangle, size);
-        if (result != 0 || rectangle.Right <= rectangle.Left || rectangle.Bottom <= rectangle.Top) return null;
-        return new WindowBounds(rectangle.Left, rectangle.Top, rectangle.Right - rectangle.Left, rectangle.Bottom - rectangle.Top);
     }
 
     public Task MoveCursorToClientCenterAsync(RobloxWindow window, CancellationToken cancellationToken)
