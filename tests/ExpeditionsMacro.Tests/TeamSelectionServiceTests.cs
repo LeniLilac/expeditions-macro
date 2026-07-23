@@ -10,28 +10,53 @@ namespace ExpeditionsMacro.Tests;
 public sealed class TeamSelectionServiceTests
 {
     [Theory]
-    [InlineData("TeamEquipmentConfirm_01.png")]
-    [InlineData("TeamEquipmentConfirm_Compact_01.png")]
-    public async Task Select_LoadsTheRequestedTeamAndClosesBothUnitLayers(string equipmentFixture)
+    [InlineData(1, "TeamEquipmentConfirm_01.png")]
+    [InlineData(2, "TeamEquipmentConfirm_01.png")]
+    [InlineData(3, "TeamEquipmentConfirm_01.png")]
+    [InlineData(3, "TeamEquipmentConfirm_Compact_01.png")]
+    [InlineData(4, "TeamEquipmentConfirm_01.png")]
+    [InlineData(5, "TeamEquipmentConfirm_01.png")]
+    [InlineData(6, "TeamEquipmentConfirm_01.png")]
+    [InlineData(7, "TeamEquipmentConfirm_01.png")]
+    [InlineData(8, "TeamEquipmentConfirm_01.png")]
+    public async Task Select_AlignsAndLoadsEveryTeamWithoutWheelScrolling(
+        int teamSlot,
+        string equipmentFixture)
     {
-        FakeAutomation automation = new(equipmentFixture);
+        FakeAutomation automation = new(teamSlot, equipmentFixture);
         TeamSelectionService service = new(automation);
 
-        await service.SelectAsync(automation.Window, teamSlot: 3, unitMenuKey: 'u');
+        await service.SelectAsync(automation.Window, teamSlot, unitMenuKey: 'u');
 
-        Assert.Equal(
+        List<string> expected =
+        [
+            "key:U",
+            $"click:{TeamScreenDetector.TeamsTabAction.X},{TeamScreenDetector.TeamsTabAction.Y}",
+        ];
+        TeamScrollbarThumb initialThumb = TeamScreenDetector.FindScrollbarThumb(automation.InitialTeamFrame)!.Value;
+        if (teamSlot != 1)
+        {
+            expected.Add(
+                $"drag:{initialThumb.X},{initialThumb.CenterY}->{initialThumb.X},{TeamScreenDetector.ScrollThumbTargetCenterY(teamSlot, initialThumb.CenterY)}");
+        }
+        int targetCenterY =
+            TeamScreenDetector.ScrollThumbTargetCenterY(teamSlot, initialThumb.CenterY);
+        (int X, int Y) loadAction =
+            TeamScreenDetector.AlignedLoadTeamAction(
+                automation.AlignedTeamFrame,
+                teamSlot,
+                targetCenterY)!.Value;
+        expected.AddRange(
             [
-                "key:U",
-                $"click:{TeamScreenDetector.TeamsTabAction.X},{TeamScreenDetector.TeamsTabAction.Y}",
-                $"scroll:{TeamScreenDetector.ScrollNotchesForTeam(3)}",
-                $"click:{TeamScreenDetector.LoadTeamAction(3).X},{TeamScreenDetector.LoadTeamAction(3).Y}",
+                $"click:{loadAction.X},{loadAction.Y}",
                 $"click:{automation.LoadConfirmAction.X},{automation.LoadConfirmAction.Y}",
                 $"click:{automation.EquipmentAction.X},{automation.EquipmentAction.Y}",
                 "park",
                 "key:U",
                 "key:U",
-            ],
-            automation.Actions);
+            ]);
+
+        Assert.Equal(expected, automation.Actions);
         Assert.Equal(TeamScreenState.None, automation.State);
         Assert.True(automation.FocusCount > automation.Actions.Count);
     }
@@ -39,7 +64,10 @@ public sealed class TeamSelectionServiceTests
     [Fact]
     public async Task Select_StopsBeforeInputWhenTheClientSizeChanged()
     {
-        FakeAutomation automation = new("TeamEquipmentConfirm_01.png") { Client = new ClientBounds(0, 0, 800, 600) };
+        FakeAutomation automation = new(teamSlot: 1, "TeamEquipmentConfirm_01.png")
+        {
+            Client = new ClientBounds(0, 0, 800, 600),
+        };
         TeamSelectionService service = new(automation);
 
         InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -49,19 +77,35 @@ public sealed class TeamSelectionServiceTests
         Assert.Equal(["key:U"], automation.Actions);
     }
 
+    [Fact]
+    public async Task Select_ReopensAtTopAndRealignsTheScrollbarForEveryLoad()
+    {
+        FakeAutomation automation = new(teamSlot: 6, equipmentFixture: "TeamEquipmentConfirm_01.png");
+        TeamSelectionService service = new(automation);
+
+        await service.SelectAsync(automation.Window, teamSlot: 6, unitMenuKey: 'u');
+        await service.SelectAsync(automation.Window, teamSlot: 6, unitMenuKey: 'u');
+
+        Assert.Equal(2, automation.Actions.Count(action => action.StartsWith("drag:", StringComparison.Ordinal)));
+    }
+
     private sealed class FakeAutomation : IRobloxAutomation
     {
         private readonly IReadOnlyDictionary<TeamScreenState, ImageFrame> _frames;
+        private readonly int _teamSlot;
 
-        private int _unitKeyTaps;
+        private ImageFrame _teamFrame;
 
-        public FakeAutomation(string equipmentFixture)
+        public FakeAutomation(int teamSlot, string equipmentFixture)
         {
+            _teamSlot = teamSlot;
+            InitialTeamFrame = Load("TeamList_Aligned_Team1_Current_01.png");
+            AlignedTeamFrame = Load(TeamFixture(teamSlot));
+            _teamFrame = InitialTeamFrame;
             _frames = new Dictionary<TeamScreenState, ImageFrame>
             {
                 [TeamScreenState.None] = Load("GameModeNegative_01.png"),
                 [TeamScreenState.Units] = Load("TeamUnits_01.png"),
-                [TeamScreenState.Teams] = Load("TeamList_01.png"),
                 [TeamScreenState.LoadConfirm] = Load("TeamLoadConfirm_01.png"),
                 [TeamScreenState.EquipmentConfirm] = Load(equipmentFixture),
             };
@@ -76,6 +120,10 @@ public sealed class TeamSelectionServiceTests
         public ClientBounds Client { get; set; } = new(0, 0, TeamScreenDetector.ClientWidth, TeamScreenDetector.ClientHeight);
 
         public TeamScreenState State { get; private set; }
+
+        public ImageFrame InitialTeamFrame { get; }
+
+        public ImageFrame AlignedTeamFrame { get; }
 
         public (int X, int Y) EquipmentAction { get; }
 
@@ -106,7 +154,8 @@ public sealed class TeamSelectionServiceTests
 
         public ImageFrame CaptureScreen(ScreenRegion region) => throw new NotSupportedException();
 
-        public ImageFrame CaptureClient(RobloxWindow window) => _frames[State];
+        public ImageFrame CaptureClient(RobloxWindow window) =>
+            State == TeamScreenState.Teams ? _teamFrame : _frames[State];
 
         public Task MoveCursorToClientCenterAsync(RobloxWindow window, CancellationToken cancellationToken) => Task.CompletedTask;
 
@@ -119,10 +168,23 @@ public sealed class TeamSelectionServiceTests
         public Task ClickClientAsync(RobloxWindow window, int x, int y, CancellationToken cancellationToken)
         {
             Actions.Add($"click:{x},{y}");
+            if (State == TeamScreenState.Units && (x, y) == TeamScreenDetector.TeamsTabAction)
+            {
+                _teamFrame = InitialTeamFrame;
+                State = TeamScreenState.Teams;
+                return Task.CompletedTask;
+            }
+
+            (int X, int Y)? alignedAction =
+                State == TeamScreenState.Teams
+                    ? TeamScreenDetector.AlignedLoadTeamAction(
+                        _teamFrame,
+                        _teamSlot,
+                        TargetCenterY)
+                    : null;
             State = State switch
             {
-                TeamScreenState.Units when (x, y) == TeamScreenDetector.TeamsTabAction => TeamScreenState.Teams,
-                TeamScreenState.Teams when (x, y) == TeamScreenDetector.LoadTeamAction(3) => TeamScreenState.LoadConfirm,
+                TeamScreenState.Teams when alignedAction == (x, y) => TeamScreenState.LoadConfirm,
                 TeamScreenState.LoadConfirm when (x, y) == LoadConfirmAction => TeamScreenState.EquipmentConfirm,
                 TeamScreenState.EquipmentConfirm when (x, y) == EquipmentAction => TeamScreenState.Teams,
                 _ => throw new InvalidOperationException($"Unexpected click ({x}, {y}) from {State}."),
@@ -130,11 +192,25 @@ public sealed class TeamSelectionServiceTests
             return Task.CompletedTask;
         }
 
-        public Task ScrollClientAsync(RobloxWindow window, int notches, CancellationToken cancellationToken)
+        public Task DragClientAsync(
+            RobloxWindow window,
+            int startX,
+            int startY,
+            int endX,
+            int endY,
+            CancellationToken cancellationToken)
         {
-            Actions.Add($"scroll:{notches}");
+            Actions.Add($"drag:{startX},{startY}->{endX},{endY}");
+            TeamScrollbarThumb thumb = TeamScreenDetector.FindScrollbarThumb(_teamFrame)!.Value;
+            Assert.Equal((thumb.X, thumb.CenterY), (startX, startY));
+            Assert.Equal(thumb.X, endX);
+            Assert.Equal(TargetCenterY, endY);
+            _teamFrame = AlignedTeamFrame;
             return Task.CompletedTask;
         }
+
+        public Task ScrollClientAsync(RobloxWindow window, int notches, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Team selection must not wheel-scroll over unit cards.");
 
         public Task DragCameraAsync(RobloxWindow window, int deltaX, int deltaY, int chunkPixels, CancellationToken cancellationToken) => Task.CompletedTask;
 
@@ -146,18 +222,39 @@ public sealed class TeamSelectionServiceTests
 
         public Task TapLetterKeyAsync(RobloxWindow window, char key, CancellationToken cancellationToken)
         {
-            _unitKeyTaps++;
             Actions.Add($"key:{key}");
-            State = _unitKeyTaps switch
+            State = State switch
             {
-                1 => TeamScreenState.Units,
-                2 => TeamScreenState.Units,
-                _ => TeamScreenState.None,
+                TeamScreenState.None => TeamScreenState.Units,
+                TeamScreenState.Teams => TeamScreenState.Units,
+                TeamScreenState.Units => TeamScreenState.None,
+                _ => throw new InvalidOperationException($"Unexpected Unit key from {State}."),
             };
             return Task.CompletedTask;
         }
 
         public Task TapUnitKeyAsync(RobloxWindow window, int unitKey, int holdMilliseconds, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        private int TargetCenterY
+        {
+            get
+            {
+                TeamScrollbarThumb top = TeamScreenDetector.FindScrollbarThumb(InitialTeamFrame)!.Value;
+                return TeamScreenDetector.ScrollThumbTargetCenterY(_teamSlot, top.CenterY);
+            }
+        }
+
+        private static string TeamFixture(int teamSlot) => teamSlot switch
+        {
+            1 => "TeamList_Aligned_Team1_Current_01.png",
+            2 => "TeamList_Aligned_Team2_01.png",
+            3 => "TeamList_Aligned_Team3_01.png",
+            4 => "TeamList_Aligned_Team4_01.png",
+            5 => "TeamList_Aligned_Team5_01.png",
+            6 => "TeamList_Aligned_Team6_01.png",
+            7 or 8 => "TeamList_Aligned_Bottom_01.png",
+            _ => throw new ArgumentOutOfRangeException(nameof(teamSlot)),
+        };
 
         private static ImageFrame Load(string name) => ImageCodec.Load(Path.Combine(TestPaths.StageDatasets, name));
     }

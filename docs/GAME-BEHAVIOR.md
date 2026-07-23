@@ -183,6 +183,29 @@ This ledger records Anime Expeditions behavior that has been established from re
 - Evidence: a beta.12 automatic error archive reviewed on 2026-07-23 shows successful School Grounds Infinite navigation followed by a capture failure during the experience splash; its post-failure frames reach the correct prestart five seconds later. A Deep Debug retry on the same PID records the complete splash-to-teleport-to-prestart sequence without a navigation change. A separately replicated Spirit City Raid 2 Deep Debug run records one Start click, the same valid Roblox PID and 808 by 611 client, then the exact post-barrier `TimeoutException` while the teleport continued normally in failure-diagnostic frames.
 - Protected by: `WindowsRobloxAutomationTests.WindowCapture_TransientFreshFrameTimeoutRecreatesSessionOnce` and `WindowCapture_RepeatedFreshFrameTimeoutRemainsBounded`.
 
+### GB-014: Align saved Unit Teams through the scrollbar thumb
+
+- Status: **Field confirmed** for Teams 1 through 8.
+- Entry: the Unit Teams list is visible at the canonical client size. Reopening this interface resets its scroll position to the top.
+- Action: locate the live gray scrollbar thumb at the right edge, hold the left mouse button on that thumb, and drag it to the requested team's absolute alignment.
+- Alignment: Teams 1 through 6 each align as the first fully visible row and use that row's detected green **Load Team** button. Teams 7 and 8 share the scrollbar's bottom limit and use the second and third fully visible buttons respectively.
+- Exit: require consecutive aligned frames with a full-height Load Team button, click the detected button, and verify the Load Team confirmation before continuing.
+- Do not: wheel-scroll with the cursor over unit cards, click a clipped third row, rely on scroll position persisting after the interface closes, or assume the older and current panel widths place the scrollbar at the same X coordinate.
+- Failure rule: re-detect and realign the thumb once after an ignored Load click, then stop with a team-alignment error rather than clicking another row.
+- Evidence: three beta.13 team-selection runs and two passive manual-navigation captures reviewed on 2026-07-23. Team 3 failed because its fixed `(580, 447)` action landed below a clipped button. The manual drag sequence establishes one aligned position per Team 1–6 and the shared bottom limit for Teams 7–8. Physical manual drags are user reported; the passive captures preserve their resulting positions.
+- Protected by: `TeamSelectionServiceTests.Select_AlignsAndLoadsEveryTeamWithoutWheelScrolling` and the aligned-team cases in `TeamScreenDetectorTests`.
+
+### GB-015: Re-observe grouped coarse camera correction
+
+- Status: **Field confirmed** for the saved 72-step Expedition camera model.
+- Entry: the stabilized runtime view has a registered match in the saved full-turn yaw atlas but does not already match the goal.
+- Action: choose the shortest direction, send no more than six arrow pulses, capture the resulting pose, and recalculate the shortest correction from the newly observed atlas position.
+- Exit: stop grouped correction once the goal atlas is reached, then retain direct scoring, fine-yaw refinement, and three-frame final verification.
+- Do not: send the entire predicted correction as one rapid open-loop arrow sequence or assume its accumulated yaw equals the separately observed calibration samples.
+- Failure rule: stop the feedback loop when atlas evidence becomes ambiguous, the same non-goal position repeats, a position cycle appears, ten observations are consumed, or one full-turn pulse budget is reached. Continue through the existing bounded refinement/full-turn fallback rather than oscillating.
+- Evidence: beta.13 setup and manual Auto Align Deep Debug archives reviewed on 2026-07-23. Setup produced a clean 100% zero pose and 72-step return. The random runtime pose matched atlas position 37 at 88%; a rapid 35-pulse correction landed near position 8 instead of zero, after which the fixed rightward fallback needed 60 of 72 steps to recover the 96% goal.
+- Protected by: `CameraClosedLoopCorrectionTests.Align_WhenRapidArrowBatchOvershoots_ReobservesAndUsesShortestCorrection` and `Align_WhenCoarseObservationDoesNotMove_StopsFeedbackBeforeFallback`.
+
 ## Reusable evidence workflow
 
 1. Capture the complete attempt with deep debug, or pair a passive diagnostic capture with an exact user-described manual input sequence.

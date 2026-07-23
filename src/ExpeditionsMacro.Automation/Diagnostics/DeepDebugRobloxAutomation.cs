@@ -126,6 +126,19 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
             new { Window = WindowData(window), X = x, Y = y },
             () => _inner.ClickClientAsync(window, x, y, cancellationToken));
 
+    public Task DragClientAsync(
+        RobloxWindow window,
+        int startX,
+        int startY,
+        int endX,
+        int endY,
+        CancellationToken cancellationToken) =>
+        TraceAsync(
+            "automation",
+            "drag_client",
+            new { Window = WindowData(window), StartX = startX, StartY = startY, EndX = endX, EndY = endY },
+            () => _inner.DragClientAsync(window, startX, startY, endX, endY, cancellationToken));
+
     public Task ScrollClientAsync(RobloxWindow window, int notches, CancellationToken cancellationToken) =>
         TraceAsync(
             "automation",
