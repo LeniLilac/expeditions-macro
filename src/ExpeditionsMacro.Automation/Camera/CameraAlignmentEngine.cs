@@ -362,30 +362,13 @@ public sealed partial class CameraAlignmentEngine
         CancellationToken cancellationToken)
     {
         ImageFrame currentThumbnail = await CurrentThumbnailAsync(model, window, model.YawAtlas[0].Width, 3, cancellationToken).ConfigureAwait(false);
-        AtlasMatch atlasMatch = BestAtlasMatch(model.YawAtlas, currentThumbnail);
-        int bestIndex = atlasMatch.Index;
-        int fullTurn = model.Manifest.FullYawSteps;
-        CameraYawDirection direction;
-        int coarseSteps;
-        if (bestIndex <= fullTurn / 2)
-        {
-            direction = CameraYawDirection.Left;
-            coarseSteps = bestIndex;
-        }
-        else
-        {
-            direction = CameraYawDirection.Right;
-            coarseSteps = fullTurn - bestIndex;
-        }
-        progress?.Report(new MacroProgress(
-            "Camera alignment",
-            30,
-            $"Attempt {attempt}/{MaximumRuntimeAlignmentAttempts} registered yaw-atlas match: {atlasMatch.Score:P0}. Coarse correction: {coarseSteps} {DirectionLabel(direction)} arrow step{(coarseSteps == 1 ? string.Empty : "s")}.",
-            Confidence: atlasMatch.Score));
-        if (coarseSteps > 0)
-        {
-            await PulseYawAsync(window, direction, coarseSteps, model.Manifest.ArrowHoldMilliseconds, model.Manifest.SettleMilliseconds, cancellationToken).ConfigureAwait(false);
-        }
+        await CorrectCoarseYawClosedLoopAsync(
+            window,
+            model,
+            currentThumbnail,
+            attempt,
+            progress,
+            cancellationToken).ConfigureAwait(false);
 
         double coarse = await StableScoreAsync(model, window, 3, cancellationToken).ConfigureAwait(false);
         if (coarse < model.Manifest.SuccessThreshold)

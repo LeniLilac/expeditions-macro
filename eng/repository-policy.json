@@ -25,7 +25,7 @@
     },
     {
       "path": "src/ExpeditionsMacro.Automation/Camera/CameraAlignmentEngine.cs",
-      "maxLines": 1315,
+      "maxLines": 1298,
       "reason": "Existing calibration/alignment orchestration debt; split observation, search, and verification ownership."
     },
     {
@@ -77,11 +77,6 @@
       "path": "tools/ExpeditionsMacro.DeepDebugViewer/MainWindow.xaml.cs",
       "maxLines": 512,
       "reason": "Existing tool window-controller debt; extract playback and archive navigation controllers."
-    },
-    {
-      "path": "tests/ExpeditionsMacro.Tests/CameraAlignmentTests.cs",
-      "maxLines": 879,
-      "reason": "Existing test-fixture debt; split setup, search, drift, and cancellation scenarios by behavior."
     }
   ],
   "projectDependencies": {

@@ -48,6 +48,14 @@ public interface IRobloxAutomation
 
     Task ClickClientAsync(RobloxWindow window, int x, int y, CancellationToken cancellationToken);
 
+    Task DragClientAsync(
+        RobloxWindow window,
+        int startX,
+        int startY,
+        int endX,
+        int endY,
+        CancellationToken cancellationToken);
+
     Task ScrollClientAsync(RobloxWindow window, int notches, CancellationToken cancellationToken);
 
     Task DragCameraAsync(RobloxWindow window, int deltaX, int deltaY, int chunkPixels, CancellationToken cancellationToken);

@@ -4,6 +4,13 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.14] - 2026-07-23
+
+### Fixed
+
+- Saved-team loading now holds and drags the detected gray scrollbar thumb to a verified absolute position for Teams 1 through 8, keeping the cursor off unit cards and preventing fixed clicks from targeting a clipped lower row.
+- Camera alignment now applies coarse arrow corrections in bounded groups, re-observes the saved yaw atlas after every group, and recalculates the shortest remaining direction instead of allowing rapid key timing to overshoot into a nearly complete fallback turn.
+
 ## [1.3.0-beta.13] - 2026-07-23
 
 ### Fixed
@@ -612,7 +619,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.13...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.14...HEAD
+[1.3.0-beta.14]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.13...v1.3.0-beta.14
 [1.3.0-beta.13]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.12...v1.3.0-beta.13
 [1.3.0-beta.12]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.10...v1.3.0-beta.12
 [1.3.0-beta.10]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.9...v1.3.0-beta.10

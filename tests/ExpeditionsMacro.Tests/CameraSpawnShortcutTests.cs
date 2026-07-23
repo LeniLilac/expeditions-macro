@@ -225,6 +225,7 @@ public sealed class CameraSpawnShortcutTests
         public Task MoveCursorToClientCenterAsync(RobloxWindow window, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task ParkCursorAsync(RobloxWindow window, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task ClickClientAsync(RobloxWindow window, int x, int y, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task DragClientAsync(RobloxWindow window, int startX, int startY, int endX, int endY, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task ScrollClientAsync(RobloxWindow window, int notches, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task DragCameraAsync(RobloxWindow window, int deltaX, int deltaY, int chunkPixels, CancellationToken cancellationToken)
         {
