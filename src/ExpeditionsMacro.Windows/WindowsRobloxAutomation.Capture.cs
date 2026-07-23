@@ -28,7 +28,9 @@ public sealed partial class WindowsRobloxAutomation
                         handle,
                         client,
                         bounds,
-                        extended);
+                        extended,
+                        _ => DiagnosticMessage?.Invoke(
+                            "Windows capture paused during a Roblox transition; rebuilding the capture session and waiting for a new frame."));
                 },
                 (attempt, error) =>
                 {

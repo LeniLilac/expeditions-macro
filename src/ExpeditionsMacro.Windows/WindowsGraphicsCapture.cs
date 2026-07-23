@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
@@ -48,28 +49,72 @@ internal sealed partial class WindowsGraphicsCapture : IDisposable
         nint window,
         ClientBounds client,
         WindowBounds windowBounds,
-        WindowBounds extendedFrameBounds)
+        WindowBounds extendedFrameBounds,
+        Action<TimeoutException>? beforeSessionRecreate = null)
     {
         lock (_gate)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            if (_active is null || !_active.Matches(window, client, windowBounds, extendedFrameBounds))
-            {
-                _active?.Dispose();
-                _active = CaptureSession.Create(window, client, windowBounds, extendedFrameBounds);
-            }
 
             try
             {
-                return _active.Capture();
+                return CaptureWithSessionRecovery(
+                    () =>
+                    {
+                        if (_active is null ||
+                            !_active.Matches(window, client, windowBounds, extendedFrameBounds))
+                        {
+                            _active?.Dispose();
+                            _active = CaptureSession.Create(
+                                window,
+                                client,
+                                windowBounds,
+                                extendedFrameBounds);
+                        }
+
+                        return _active.Capture();
+                    },
+                    error =>
+                    {
+                        _active?.Dispose();
+                        _active = null;
+                        beforeSessionRecreate?.Invoke(error);
+                    });
             }
             catch (CaptureSurfaceChangedException)
             {
-                _active.Dispose();
+                _active?.Dispose();
                 _active = null;
                 throw;
             }
         }
+    }
+
+    internal static T CaptureWithSessionRecovery<T>(
+        Func<T> capture,
+        Action<TimeoutException> recreateSession,
+        int maximumAttempts = 2)
+    {
+        ArgumentNullException.ThrowIfNull(capture);
+        ArgumentNullException.ThrowIfNull(recreateSession);
+        if (maximumAttempts < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maximumAttempts));
+        }
+
+        for (int attempt = 1; attempt <= maximumAttempts; attempt++)
+        {
+            try
+            {
+                return capture();
+            }
+            catch (TimeoutException error) when (attempt < maximumAttempts)
+            {
+                recreateSession(error);
+            }
+        }
+
+        throw new UnreachableException();
     }
 
     public void Dispose()

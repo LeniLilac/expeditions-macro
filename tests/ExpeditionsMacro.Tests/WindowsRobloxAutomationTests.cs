@@ -228,6 +228,55 @@ public sealed class WindowsRobloxAutomationTests
     }
 
     [Fact]
+    public void WindowCapture_TransientFreshFrameTimeoutRecreatesSessionOnce()
+    {
+        int captures = 0;
+        int recreates = 0;
+
+        int result = WindowsGraphicsCapture.CaptureWithSessionRecovery(
+            () =>
+            {
+                captures++;
+                if (captures == 1)
+                {
+                    throw new TimeoutException(
+                        "No post-barrier frame arrived during teleport.");
+                }
+
+                return 42;
+            },
+            _ => recreates++);
+
+        Assert.Equal(42, result);
+        Assert.Equal(2, captures);
+        Assert.Equal(1, recreates);
+    }
+
+    [Fact]
+    public void WindowCapture_RepeatedFreshFrameTimeoutRemainsBounded()
+    {
+        int captures = 0;
+        int recreates = 0;
+
+        TimeoutException error = Assert.Throws<TimeoutException>(() =>
+            WindowsGraphicsCapture.CaptureWithSessionRecovery<int>(
+                () =>
+                {
+                    captures++;
+                    throw new TimeoutException(
+                        "The replacement session also produced no frame.");
+                },
+                _ => recreates++));
+
+        Assert.Contains(
+            "replacement session",
+            error.Message,
+            StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(2, captures);
+        Assert.Equal(1, recreates);
+    }
+
+    [Fact]
     public void WindowCapture_SurfaceRecoveryRereadsGeometryUntilCaptureStabilizes()
     {
         int captures = 0;
