@@ -39,7 +39,7 @@ It uses screen capture and ordinary Windows input. It does not inject into Roblo
 2. Download `ExpeditionsMacro-<version>-win-x64-setup.exe`, or the portable ZIP.
 3. Verify the file against `SHA256SUMS.txt` if desired.
 
-Windows 10 or Windows 11 x64 is required. Release builds are self-contained; a separate .NET installation is not required.
+The portable ZIP contains one `ExpeditionsMacro` folder; run `ExpeditionsMacro.exe` from inside it. Windows 10 or Windows 11 x64 is required. Release builds are self-contained; a separate .NET installation is not required.
 
 Follow the [Expeditions Macro setup guide](https://docs.google.com/document/d/10NeDNa3BNEwPEpZj0oVQiR98_7GN67dmKS-OZwaxALM/edit?usp=sharing) for a visual walkthrough. Join the public [Expeditions Macro Discord](https://discord.gg/wE6XSVyXsN) for setup help, bug reports, model sharing, and release announcements. Both links are available from the app sidebar.
 

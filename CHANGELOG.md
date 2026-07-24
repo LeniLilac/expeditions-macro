@@ -4,6 +4,13 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.19] - 2026-07-24
+
+### Changed
+
+- Updated the experimental Debug refuel route defaults from verified manual tuning: Gold Mine now uses `W 3000 ms`, `A 820 ms`, `W 2600 ms`; Resource Drill uses `W 3000 ms`, `A 750 ms`, `W 1000 ms`, `A 1600 ms`.
+- Portable ZIPs again contain one top-level `ExpeditionsMacro` folder so extraction tools cannot scatter the self-contained application files into an unrelated directory.
+
 ## [1.3.0-beta.18] - 2026-07-24
 
 ### Added
@@ -690,7 +697,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.18...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.19...HEAD
+[1.3.0-beta.19]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.18...v1.3.0-beta.19
 [1.3.0-beta.18]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.17...v1.3.0-beta.18
 [1.3.0-beta.17]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.16...v1.3.0-beta.17
 [1.3.0-beta.16]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.15...v1.3.0-beta.16

@@ -90,7 +90,10 @@ Copy-Item -LiteralPath (Join-Path $repository 'PRIVACY.md') -Destination $publis
 Copy-Item -LiteralPath (Join-Path $repository 'THIRD-PARTY-NOTICES.md') -Destination $publish
 
 $portable = Join-Path $release "ExpeditionsMacro-$Version-win-x64.zip"
-Compress-Archive -Path (Join-Path $publish '*') -DestinationPath $portable -CompressionLevel Optimal
+# Keep one application directory inside the ZIP. Some extraction tools unpack
+# archive-root files directly into the selected directory, which otherwise
+# scatters the self-contained runtime beside unrelated user files.
+Compress-Archive -Path $publish -DestinationPath $portable -CompressionLevel Optimal
 
 $packVersion = '1.0.2'
 $packId = 'anime-expeditions-expeditions'

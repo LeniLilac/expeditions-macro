@@ -237,10 +237,10 @@ public sealed class CoreModelTests
 
         settings.Validate();
         Assert.Equal(
-            [('W', 1200), ('A', 700), ('W', 900)],
+            [('W', 3000), ('A', 820), ('W', 2600)],
             settings.RouteFor(ResourceRefuelTarget.GoldMine));
         Assert.Equal(
-            [('W', 1200), ('A', 700), ('W', 900), ('A', 700)],
+            [('W', 3000), ('A', 750), ('W', 1000), ('A', 1600)],
             settings.RouteFor(ResourceRefuelTarget.ResourceDrill));
         Assert.Throws<InvalidDataException>(
             () => (settings with

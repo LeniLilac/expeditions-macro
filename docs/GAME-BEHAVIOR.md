@@ -250,6 +250,7 @@ This ledger records Anime Expeditions behavior that has been established from re
 - Start A: the player is in the standard lobby pose with Areas closed. Start B: close the verified Roblox process, launch the saved private-server link, then wait for the same stable lobby.
 - Areas route: press the configured **Toggle Areas** letter, select **Expeditions**, and click **Expeditions Hub**.
 - Blind movement: after the Hub click, wait for teleport completion, then perform the user-configured Gold Mine route (`W`, `A`, `W`) or Resource Drill route (`W`, `A`, `W`, `A`). Do not use image/color detection during this movement.
+- Default routes: Gold Mine holds `W` for 3000 ms, `A` for 820 ms, then `W` for 2600 ms. Resource Drill holds `W` for 3000 ms, `A` for 750 ms, `W` for 1000 ms, then `A` for 1600 ms. Saved Debug settings remain user-controlled.
 - Interaction: press `E`, then begin visual verification. Require the expected Gold Mine or Resource Drill panel, click its detected **Add Fuel** action, require the quantity dialog, click detected **Max**, then click the confirmed green action.
 - Retry: if `E` does not expose the expected station panel, reopen Areas, teleport to Expeditions Hub, and replay the complete configured route. Bound retries to the saved Debug value.
 - Between stations/end: use Areas again between Gold Mine and Resource Drill. After the final station, open Play with the configured Play key.

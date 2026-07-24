@@ -19,7 +19,7 @@ Releases are built from committed source on an annotated semantic-version tag. N
 7. Run `scripts/Build-Release.ps1 -Version <version>` and `scripts/Verify-Release.ps1`.
 8. Audit the publish set for datasets, secrets, local paths, logs, personal models, and generated files.
 
-The portable ZIP must expose `ExpeditionsMacro.exe` at its archive root. Do not wrap the published files in another application directory; Windows already creates a folder named after the ZIP during normal extraction.
+The portable ZIP must contain exactly one top-level `ExpeditionsMacro` directory, with `ExpeditionsMacro.exe` directly inside it. Do not place loose application or runtime files at the archive root: extraction tools that do not create a folder automatically would scatter them into the user's selected directory.
 
 ## Publish and verify
 

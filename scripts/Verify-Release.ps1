@@ -18,15 +18,35 @@ if (-not $portable) { throw 'The portable application archive is missing.' }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archive = [System.IO.Compression.ZipFile]::OpenRead($portable.FullName)
 try {
-    $rootExecutable = $archive.Entries |
+    $applicationExecutable = $archive.Entries |
         Where-Object {
             $_.FullName.Replace('\', '/').Equals(
-                'ExpeditionsMacro.exe',
+                'ExpeditionsMacro/ExpeditionsMacro.exe',
                 [System.StringComparison]::OrdinalIgnoreCase)
         } |
         Select-Object -First 1
-    if (-not $rootExecutable) {
-        throw 'Portable archive must place ExpeditionsMacro.exe at its root without an extra application folder.'
+    if (-not $applicationExecutable) {
+        throw 'Portable archive must place ExpeditionsMacro.exe inside its top-level ExpeditionsMacro folder.'
+    }
+
+    $rootEntries = @($archive.Entries | Where-Object {
+        $normalized = $_.FullName.Replace('\', '/').TrimEnd('/')
+        $_.Name -and $normalized -and -not $normalized.Contains('/')
+    })
+    if ($rootEntries.Count -ne 0) {
+        $names = ($rootEntries | ForEach-Object FullName) -join ', '
+        throw "Portable archive contains loose root files outside the ExpeditionsMacro folder: $names"
+    }
+
+    $unexpectedFolders = @($archive.Entries |
+        ForEach-Object {
+            $normalized = $_.FullName.Replace('\', '/').TrimStart('/')
+            if ($normalized.Contains('/')) { $normalized.Split('/', 2)[0] }
+        } |
+        Where-Object { $_ -and -not $_.Equals('ExpeditionsMacro', [System.StringComparison]::OrdinalIgnoreCase) } |
+        Select-Object -Unique)
+    if ($unexpectedFolders.Count -ne 0) {
+        throw "Portable archive contains unexpected top-level folders: $($unexpectedFolders -join ', ')"
     }
 
     $entryNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)

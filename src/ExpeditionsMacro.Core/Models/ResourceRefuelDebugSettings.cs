@@ -13,19 +13,19 @@ public sealed record ResourceRefuelDebugSettings
 {
     public int RetryCount { get; init; } = 2;
 
-    public int GoldForward1Milliseconds { get; init; } = 1200;
+    public int GoldForward1Milliseconds { get; init; } = 3000;
 
-    public int GoldLeftMilliseconds { get; init; } = 700;
+    public int GoldLeftMilliseconds { get; init; } = 820;
 
-    public int GoldForward2Milliseconds { get; init; } = 900;
+    public int GoldForward2Milliseconds { get; init; } = 2600;
 
-    public int DrillForward1Milliseconds { get; init; } = 1200;
+    public int DrillForward1Milliseconds { get; init; } = 3000;
 
-    public int DrillLeft1Milliseconds { get; init; } = 700;
+    public int DrillLeft1Milliseconds { get; init; } = 750;
 
-    public int DrillForward2Milliseconds { get; init; } = 900;
+    public int DrillForward2Milliseconds { get; init; } = 1000;
 
-    public int DrillLeft2Milliseconds { get; init; } = 700;
+    public int DrillLeft2Milliseconds { get; init; } = 1600;
 
     public void Validate()
     {
