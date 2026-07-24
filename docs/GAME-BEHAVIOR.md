@@ -39,9 +39,11 @@ This ledger records Anime Expeditions behavior that has been established from re
 - Entry: terminal screen with the next eligible task resolved to the exact same mode and preset.
 - Action: click the detected **Repeat Stage** control.
 - Exit: the same route's prestart screen.
-- Do not: reopen the Play interface for an identical route.
+- Preparation reuse: after the Repeat Stage transition reaches a verified prestart screen, preserve the already-loaded team and camera pose. Do not reopen Units or repeat camera alignment before the next match.
+- Invalidation: lobby, AFK Chamber, disconnect, rejoin, recovery navigation, a different mode/map/preset, or any route that did not arrive through the verified Repeat Stage transition invalidates camera reuse. Recovery also invalidates the loaded-team assumption.
+- Do not: reopen the Play interface or repeat unchanged preparation for an identical uninterrupted route.
 - Exception: Challenge victories always return through Play because the rotation can advance to a different stage. A Challenge defeat uses Repeat Stage only when a configured retry remains.
-- Protected by: scheduler continuation and Challenge continuation policy tests.
+- Protected by: scheduler continuation, `RepeatedRoutePreparationStateTests`, and Challenge continuation policy tests.
 
 ### GB-003: Load a saved team
 
@@ -187,24 +189,59 @@ This ledger records Anime Expeditions behavior that has been established from re
 
 - Status: **Field confirmed** for Teams 1 through 8.
 - Entry: the Unit Teams list is visible at the canonical client size. Reopening this interface resets its scroll position to the top.
-- Action: locate the live gray scrollbar thumb at the right edge, hold the left mouse button on that thumb, and drag it to the requested team's absolute alignment.
+- Opening transition: the panel and its real scrollbar thumb slide upward from the bottom. The surrounding Roblox scene can expose a much taller neutral-gray strip beside the panel, so gray color alone does not identify the thumb.
+- Action: locate the live gray scrollbar thumb at the right edge, reject candidates outside the field-observed 60–95 pixel height range, and require consecutive matching thumb geometry before acting. If a settled reopening is not at the top, drag the detected thumb to the verified top position and re-verify it. Then hold the left mouse button on that thumb and drag it to the requested team's absolute alignment.
 - Alignment: Teams 1 through 6 each align as the first fully visible row and use that row's detected green **Load Team** button. Teams 7 and 8 share the scrollbar's bottom limit and use the second and third fully visible buttons respectively.
 - Exit: require consecutive aligned frames with a full-height Load Team button, click the detected button, and verify the Load Team confirmation before continuing.
 - Do not: wheel-scroll with the cursor over unit cards, click a clipped third row, rely on scroll position persisting after the interface closes, or assume the older and current panel widths place the scrollbar at the same X coordinate.
 - Failure rule: re-detect and realign the thumb once after an ignored Load click, then stop with a team-alignment error rather than clicking another row.
-- Evidence: three beta.13 team-selection runs and two passive manual-navigation captures reviewed on 2026-07-23. Team 3 failed because its fixed `(580, 447)` action landed below a clipped button. The manual drag sequence establishes one aligned position per Team 1–6 and the shared bottom limit for Teams 7–8. Physical manual drags are user reported; the passive captures preserve their resulting positions.
-- Protected by: `TeamSelectionServiceTests.Select_AlignsAndLoadsEveryTeamWithoutWheelScrolling` and the aligned-team cases in `TeamScreenDetectorTests`.
+- Evidence: three beta.13 team-selection runs and two passive manual-navigation captures reviewed on 2026-07-23. Team 3 failed because its fixed `(580, 447)` action landed below a clipped button. The manual drag sequence establishes one aligned position per Team 1–6 and the shared bottom limit for Teams 7–8. Physical manual drags are user reported; the passive captures preserve their resulting positions. A later macro trace reviewed on 2026-07-24 shows the opening thumb rising to center `240` while an unrelated gray background run at approximately `x=644`, `y=190–435` caused the old longest-run heuristic to report center `312`.
+- Protected by: `TeamSelectionServiceTests.Select_AlignsAndLoadsEveryTeamWithoutWheelScrolling`, `Select_WaitsForTheOpeningAnimationAndUsesTheRealTopThumb`, `Select_NormalizesAReopenedScrolledListBeforeLoading`, and the aligned/opening cases in `TeamScreenDetectorTests`.
 
 ### GB-015: Re-observe grouped coarse camera correction
 
 - Status: **Field confirmed** for the saved 72-step Expedition camera model.
-- Entry: the stabilized runtime view has a registered match in the saved full-turn yaw atlas but does not already match the goal.
+- Entry: the stabilized runtime view has either a registered match or a strong, isolated dense fingerprint match in the saved full-turn yaw atlas but does not already match the goal.
 - Action: choose the shortest direction, send no more than six arrow pulses, capture the resulting pose, and recalculate the shortest correction from the newly observed atlas position.
+- Dense evidence rule: a below-threshold registered match may earn only this bounded feedback path when it retains at least 20% structural evidence, its fingerprint is at least 96%, and that fingerprint is at least six percentage points above every atlas position outside the selected two-neighbor yaw cluster.
 - Exit: stop grouped correction once the goal atlas is reached, then retain direct scoring, fine-yaw refinement, and three-frame final verification.
-- Do not: send the entire predicted correction as one rapid open-loop arrow sequence or assume its accumulated yaw equals the separately observed calibration samples.
+- Do not: send the entire predicted correction as one rapid open-loop arrow sequence, assume its accumulated yaw equals the separately observed calibration samples, or treat a fingerprint match as successful final alignment.
 - Failure rule: stop the feedback loop when atlas evidence becomes ambiguous, the same non-goal position repeats, a position cycle appears, ten observations are consumed, or one full-turn pulse budget is reached. Continue through the existing bounded refinement/full-turn fallback rather than oscillating.
-- Evidence: beta.13 setup and manual Auto Align Deep Debug archives reviewed on 2026-07-23. Setup produced a clean 100% zero pose and 72-step return. The random runtime pose matched atlas position 37 at 88%; a rapid 35-pulse correction landed near position 8 instead of zero, after which the fixed rightward fallback needed 60 of 72 steps to recover the 96% goal.
-- Protected by: `CameraClosedLoopCorrectionTests.Align_WhenRapidArrowBatchOvershoots_ReobservesAndUsesShortestCorrection` and `Align_WhenCoarseObservationDoesNotMove_StopsFeedbackBeforeFallback`.
+- Evidence: beta.13 setup and manual Auto Align Deep Debug archives reviewed on 2026-07-23. Setup produced a clean 100% zero pose and 72-step return. The random runtime pose matched atlas position 37 at 88%; a rapid 35-pulse correction landed near position 8 instead of zero, after which the fixed rightward fallback needed 60 of 72 steps to recover the 96% goal. A later beta.14 dense setup/alignment pair located the runtime yaw at 99% fingerprint confidence with 16% remote separation but only 39% registered structure; its predicted 27 right pulses were within four pulses of the verified 31-pulse goal, while every six-pulse re-observation retained at least 97% fingerprint confidence and 7% remote separation.
+- Protected by: `CameraClosedLoopCorrectionTests.Align_WhenRapidArrowBatchOvershoots_ReobservesAndUsesShortestCorrection`, `Align_WhenCoarseObservationDoesNotMove_StopsFeedbackBeforeFallback`, and `CameraCoarseAtlasEvidencePolicyTests`.
+
+### GB-016: Learn dense yaw without assuming arrow timing
+
+- Status: **Release retained**; the exact continuous-versus-pulsed rate remains device-local.
+- Entry: camera setup has standardized the Roblox client, zoom, pitch, and Shift Lock state and captured a stable goal.
+- Action: capture every signed fine-yaw position and verify its stationary return, then hold Right Arrow once while sampling regional visual fingerprints at up to roughly 60 FPS. Stop on the first turn only when the returning fingerprint also matches a signed fine-yaw reference or the registered structural score independently verifies the exact goal. After releasing the key, locate the stationary pose in the completed atlas, return in bounded arrow groups with a fresh observation after every group, and fine-verify the goal. Use bounded observations after three and six discrete pulses—extending to twelve when needed—to calibrate dense-bin-to-pulse conversion, then perform the same closed-loop atlas return.
+- Exit: save a schema 4 model only after both the sweep release and pulse probe have independently returned to the fine-verified goal. Normal setup targets less than 20 seconds; a stalled operation may continue until the independent 120-second hard timeout.
+- Do not: infer yaw solely from elapsed hold time, assume the camera stops on the callback frame, assume equal opposing pulse counts are visually reversible, require two consecutive goal frames while the camera is still moving, fail a complete fine sweep because one moving zero capture was transient, treat descriptor similarity as final verification, save a partial sweep, or replace bounded runtime goal verification with a fingerprint match.
+- Failure rule: release every held key or mouse button, restore the captured Shift Lock key, leave any existing model untouched, and report the setup failure.
+- Evidence: eleven same-map beta.14 Deep Debug setups reviewed on 2026-07-23. All eight completed turns entered the saved fine neighborhood on their first turn, but only one produced a moving frame above the old near-exact structural gate; three additional attempts returned to a strong stationary zero after one transient moving-zero capture. A later eleven-run, multi-map beta.14 set contained seven successes and four retries: two recognized the loop but landed beyond the ±16-pixel fine window after key release, while two sent 12 right and 12 left calibration pulses yet remained at only 32–33% goal confidence. Successful siblings on the same scenes required 4–8 fine steps after release and as many as 14 after the pulse probe, confirming that both boundaries require atlas feedback rather than input-count reversal.
+- Protected by: `DenseCameraAtlasTests.Calibrate_DenseHybridAtlasCompletesWithinBudget`, `Calibrate_DenseGoalReturnUsesClosedLoopAtlasFeedback`, `DenseLoopPolicy_RequiresExactOrIndependentFineEvidence`, `Align_DenseAtlasConvertsVisualBinsToPulseDistance`, schema compatibility tests, and the existing final-verification camera suite.
+
+### GB-017: Wait for navigation actions to stop moving
+
+- Status: **Release retained** across Play, Challenge, Expedition, Story, Raid, and saved-team navigation.
+- Entry: a detector recognizes an actionable interface while Roblox may still be animating its panel into place.
+- Action: require the expected state across its configured stable-frame count. When the detector owns a live action center, also require at least two consecutive action observations within three client pixels before clicking.
+- Exit: click the action from the latest stable observation, then verify the destination state normally.
+- Do not: accept a single late Play frame, reuse an action coordinate from an earlier animation frame, or let identical state labels alone authorize a moving detector-owned button.
+- Failure rule: if the state or action moves, reset the stability candidate and continue within the existing bounded navigation timeout.
+- Evidence: the Unit Teams opening sequence reviewed on 2026-07-24 retains the `Teams` state while its real scrollbar is still moving. Earlier field captures also establish vertically shifted Story/Raid party and Challenge dialog families whose live action locations differ.
+- Protected by: `StableNavigationActionTrackerTests`, `ChallengeMacroRunnerTests.PlayMenuKey_LateTransitionBeforeRetry_IsAcceptedWithoutAnotherPress`, `LobbyPlayKey_LateKeyTransition_IsAcceptedWithoutAnotherPress`, and the Stage/Challenge/Expedition navigation suites.
+
+### GB-018: Isolated Debug navigation and team tests
+
+- Status: **Product contract** built on the field-confirmed navigation states above.
+- Navigation start: the user explicitly chooses either a verified lobby with Play closed or a verified post-match result/party state. An already-open unrelated selector is rejected instead of being treated as the requested start.
+- Navigation end: enter the chosen Expedition, Challenge, Story, or Raid route and stop at stable prestart. Do not align the camera, load a team, place units, or click Start Game.
+- Team start/end: begin with Units closed, open Units through the configured key, load Team 1–8 through the production scrollbar/action verifier, and close Units before completing.
+- Step semantics: a detection checkpoint may pause after a detector observation; an action checkpoint pauses before input. Previous/Next only review captured history. Step authorizes one pending live boundary, while Run resumes without additional gates.
+- Ownership: every Debug tool uses the exclusive operation coordinator. When Deep Debug is enabled, the archive includes the selected tool/preset, step mode, ordered checkpoints, frames, detector traces, and resulting input events.
+- Do not: interpret rewind as an attempt to reverse already-sent Roblox input, or maintain separate Debug-only click coordinates.
+- Protected by: `DebugCheckpointControllerTests`, the existing mode navigation suites, saved-team tests, Deep Debug archive tests, and both-theme Debug page snapshots.
 
 ## Reusable evidence workflow
 

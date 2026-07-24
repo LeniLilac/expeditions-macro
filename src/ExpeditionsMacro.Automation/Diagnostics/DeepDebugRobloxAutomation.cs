@@ -164,6 +164,75 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
             new { Window = WindowData(window), Direction = direction, HoldMilliseconds = holdMilliseconds },
             () => _inner.PulseCameraYawAsync(window, direction, holdMilliseconds, cancellationToken));
 
+    public Task CaptureCameraYawSweepAsync(
+        RobloxWindow window,
+        CameraYawDirection direction,
+        TimeSpan maximumDuration,
+        int maximumSamples,
+        int sampleIntervalMilliseconds,
+        Func<CameraYawSweepSample, bool> observe,
+        CancellationToken cancellationToken) =>
+        TraceAsync(
+            "automation",
+            "capture_camera_yaw_sweep",
+            new
+            {
+                Window = WindowData(window),
+                Direction = direction,
+                MaximumDurationMilliseconds =
+                    (int)maximumDuration.TotalMilliseconds,
+                MaximumSamples = maximumSamples,
+                SampleIntervalMilliseconds = sampleIntervalMilliseconds,
+            },
+            () => _inner.CaptureCameraYawSweepAsync(
+                window,
+                direction,
+                maximumDuration,
+                maximumSamples,
+                sampleIntervalMilliseconds,
+                sample =>
+                {
+                    _debug.RecordFrame(
+                        sample.Frame,
+                        "camera_yaw_sweep",
+                        new
+                        {
+                            ElapsedMilliseconds =
+                                (int)sample.Elapsed.TotalMilliseconds,
+                        });
+                    return observe(sample);
+                },
+                cancellationToken));
+
+    public Task CaptureCameraFineYawSweepAsync(
+        RobloxWindow window,
+        int radiusPixels,
+        int sampleStridePixels,
+        Action<CameraFineYawSweepSample> observe,
+        CancellationToken cancellationToken) =>
+        TraceAsync(
+            "automation",
+            "capture_camera_fine_yaw_sweep",
+            new
+            {
+                Window = WindowData(window),
+                RadiusPixels = radiusPixels,
+                SampleStridePixels = sampleStridePixels,
+            },
+            () => _inner.CaptureCameraFineYawSweepAsync(
+                window,
+                radiusPixels,
+                sampleStridePixels,
+                sample =>
+                {
+                    _debug.RecordFrame(
+                        sample.Frame,
+                        "camera_fine_yaw_sweep",
+                        new { sample.Offset });
+                    observe(sample);
+                },
+                cancellationToken));
+
     public Task ZoomOutFullyAsync(RobloxWindow window, int ticks, CancellationToken cancellationToken) =>
         TraceAsync(
             "automation",

@@ -18,5 +18,9 @@ public sealed record DeepDebugOperationContext
 
     public object? OperationSettings { get; init; }
 
+    public string? DebugTool { get; init; }
+
+    public string? DebugStepMode { get; init; }
+
     public bool RefreshReferencedModelsAfterOperation { get; init; }
 }

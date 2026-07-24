@@ -70,7 +70,7 @@ internal sealed class CameraSceneStabilizer(IRobloxAutomation automation)
                 12,
                 $"Attempt {attempt}/{maximumAttempts}: rendered map is stable ({similarity:P0}).",
                 Confidence: similarity));
-            return VisionScorer.MakeThumbnail(previous, 160);
+            return ResultThumbnail(window, model, previous);
         }
 
         if (!rendered)
@@ -90,7 +90,7 @@ internal sealed class CameraSceneStabilizer(IRobloxAutomation automation)
             12,
             $"Attempt {attempt}/{maximumAttempts}: the scene remained animated ({similarity:P0}); continuing with median observations.",
             Confidence: similarity));
-        return VisionScorer.MakeThumbnail(previous, 160);
+        return ResultThumbnail(window, model, previous);
     }
 
     private ImageFrame CaptureComposite(
@@ -99,4 +99,15 @@ internal sealed class CameraSceneStabilizer(IRobloxAutomation automation)
         CameraRegionAnalyzer.BuildComposite(
             automation.CaptureClient(window),
             model.Manifest.Regions);
+
+    private ImageFrame ResultThumbnail(
+        RobloxWindow window,
+        CameraModel model,
+        ImageFrame composite) =>
+        model.Manifest.YawAtlasKind ==
+        CameraYawAtlasKind.DenseSweep
+            ? CameraDenseThumbnailBuilder.Build(
+                automation.CaptureClient(window),
+                model.Manifest.Regions)
+            : VisionScorer.MakeThumbnail(composite, 160);
 }

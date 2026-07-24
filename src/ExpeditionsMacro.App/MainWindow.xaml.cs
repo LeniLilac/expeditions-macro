@@ -20,10 +20,12 @@ public partial class MainWindow : Window
     private bool _autoMinimized;
     private bool _closingAfterStop;
     private bool _selectingSnapshotPage;
+    private readonly bool _snapshotMode;
 
     public MainWindow(AppServices services, bool snapshotMode = false)
     {
         _services = services;
+        _snapshotMode = snapshotMode;
         InitializeComponent();
         _pages = new Dictionary<string, IAppPage>(StringComparer.OrdinalIgnoreCase)
         {
@@ -34,11 +36,14 @@ public partial class MainWindow : Window
             ["Raid"] = new RaidPage(services),
             ["Camera Models"] = new CameraModelsPage(services),
             ["Placement Models"] = new PlacementModelsPage(services),
+            ["Debug"] = new DebugPage(services),
             ["Settings"] = new SettingsPage(services),
         };
         _services.Coordinator.StateChanged += Coordinator_StateChanged;
         _services.Coordinator.OperationFailed += Coordinator_OperationFailed;
         _services.Hotkey.BindingChanged += Hotkey_BindingChanged;
+        _services.SettingsChanged += Services_SettingsChanged;
+        UpdateDebugNavigation();
         UpdateProductFooter();
         if (!snapshotMode)
         {
@@ -77,6 +82,7 @@ public partial class MainWindow : Window
             "Raid" => RaidNav,
             "Camera Models" => CameraNav,
             "Placement Models" => PlacementNav,
+            "Debug" => DebugNav,
             "Settings" => SettingsNav,
             _ => throw new ArgumentOutOfRangeException(nameof(key), key, "Unknown snapshot page."),
         };
@@ -95,6 +101,7 @@ public partial class MainWindow : Window
         if (_pages[key] is MacroPage macro) macro.SetSnapshotScroll(showPageEnd);
         if (_pages[key] is SettingsPage settings) settings.SetSnapshotScroll(showPageEnd);
         if (_pages[key] is ChallengesPage challenges) challenges.SetSnapshotScroll(showPageEnd);
+        if (_pages[key] is DebugPage debug) debug.SetSnapshotState();
     }
 
     internal async Task VerifyBackgroundModelRefreshAsync()
@@ -140,6 +147,28 @@ public partial class MainWindow : Window
     }
 
     private void Hotkey_BindingChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(UpdateProductFooter);
+
+    private void Services_SettingsChanged(
+        object? sender,
+        EventArgs e) =>
+        Dispatcher.BeginInvoke(UpdateDebugNavigation);
+
+    private void UpdateDebugNavigation()
+    {
+        bool visible =
+            _snapshotMode ||
+            _services.Settings.DebugModeEnabled;
+        DebugNav.Visibility = visible
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        if (!visible &&
+            ReferenceEquals(
+                PageHost.Content,
+                _pages["Debug"]))
+        {
+            MacroNav.IsChecked = true;
+        }
+    }
 
     private void UpdateProductFooter()
     {

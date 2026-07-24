@@ -19,6 +19,7 @@ public sealed class AppSettingsStoreTests
                 EncryptedPrivateServerLink =
                     "dpapi-protected-private-server",
                 RestartRobloxWithPrivateServer = true,
+                DebugModeEnabled = true,
                 DiscordErrorUserId = "123456789012345678",
                 ShiftLockVirtualKey = KeyboardKey.RightShift,
             });
@@ -32,6 +33,7 @@ public sealed class AppSettingsStoreTests
                 "dpapi-protected-private-server",
                 loaded.EncryptedPrivateServerLink);
             Assert.True(loaded.RestartRobloxWithPrivateServer);
+            Assert.True(loaded.DebugModeEnabled);
             Assert.Equal("123456789012345678", loaded.DiscordErrorUserId);
             Assert.Equal(KeyboardKey.RightShift, loaded.ShiftLockVirtualKey);
         }

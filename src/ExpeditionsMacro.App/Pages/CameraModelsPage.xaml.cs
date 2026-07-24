@@ -198,7 +198,7 @@ public partial class CameraModelsPage : UserControl, IAppPage
             FineStepPixels = ParseInt(FinePixelsText, "Fine drag"),
             FineSearchPixels = 16,
             SettleMilliseconds = ParseInt(SettleText, "Settle time"),
-            MaximumSamples = ParseInt(MaxSamplesText, "Maximum arrow samples"),
+            MaximumSamples = ParseInt(MaxSamplesText, "Maximum dense frames"),
         };
         settings.Validate();
         return settings;

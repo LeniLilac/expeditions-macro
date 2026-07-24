@@ -22,6 +22,14 @@ public enum CameraYawDirection
     Right = 1,
 }
 
+public readonly record struct CameraYawSweepSample(
+    TimeSpan Elapsed,
+    ImageFrame Frame);
+
+public readonly record struct CameraFineYawSweepSample(
+    int Offset,
+    ImageFrame Frame);
+
 public interface IRobloxAutomation
 {
     RobloxWindow? FindWindow(string titleFragment = "Roblox");
@@ -61,6 +69,26 @@ public interface IRobloxAutomation
     Task DragCameraAsync(RobloxWindow window, int deltaX, int deltaY, int chunkPixels, CancellationToken cancellationToken);
 
     Task PulseCameraYawAsync(RobloxWindow window, CameraYawDirection direction, int holdMilliseconds, CancellationToken cancellationToken);
+
+    Task CaptureCameraYawSweepAsync(
+        RobloxWindow window,
+        CameraYawDirection direction,
+        TimeSpan maximumDuration,
+        int maximumSamples,
+        int sampleIntervalMilliseconds,
+        Func<CameraYawSweepSample, bool> observe,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException(
+            "This automation backend does not support dense camera sweeps.");
+
+    Task CaptureCameraFineYawSweepAsync(
+        RobloxWindow window,
+        int radiusPixels,
+        int sampleStridePixels,
+        Action<CameraFineYawSweepSample> observe,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException(
+            "This automation backend does not support dense fine-yaw sweeps.");
 
     Task ZoomOutFullyAsync(RobloxWindow window, int ticks, CancellationToken cancellationToken);
 

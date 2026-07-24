@@ -52,6 +52,8 @@ public sealed record AppSettings
 
     public bool DeepDebugEnabled { get; init; }
 
+    public bool DebugModeEnabled { get; init; }
+
     public bool CheckDetectorUpdates { get; init; } = true;
 
     public DateTimeOffset? LastDetectorUpdateCheck { get; init; }

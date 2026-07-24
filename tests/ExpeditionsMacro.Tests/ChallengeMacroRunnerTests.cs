@@ -172,6 +172,38 @@ public sealed class ChallengeMacroRunnerTests
     }
 
     [Fact]
+    public async Task PlayMenuKey_AlreadyVisiblePreviewStillUsesStableWaiter()
+    {
+        ImageFrame preview = ImageCodec.Load(Path.Combine(
+            TestPaths.ChallengeDatasets,
+            "PostMatchPreview",
+            "PostMatchPreview_03.png"));
+        int waits = 0;
+        int presses = 0;
+
+        ImageFrame result = await PlayMenuNavigator.OpenWithRetriesAsync(
+            playMenuKey: 'P',
+            capture: () => preview,
+            pressKey: (_, _) =>
+            {
+                presses++;
+                return Task.CompletedTask;
+            },
+            waitForPreview: (_, _) =>
+            {
+                waits++;
+                return Task.FromResult<ImageFrame?>(preview);
+            },
+            attemptStarted: null,
+            attemptMissed: null,
+            CancellationToken.None);
+
+        Assert.Same(preview, result);
+        Assert.Equal(1, waits);
+        Assert.Equal(0, presses);
+    }
+
+    [Fact]
     public async Task PlayMenuKey_LateTransitionBeforeRetry_IsAcceptedWithoutAnotherPress()
     {
         ImageFrame hud = ImageCodec.Load(Path.Combine(
@@ -197,7 +229,8 @@ public sealed class ChallengeMacroRunnerTests
             waitForPreview: (_, _) =>
             {
                 waits++;
-                return Task.FromResult<ImageFrame?>(null);
+                return Task.FromResult<ImageFrame?>(
+                    waits == 1 ? null : preview);
             },
             attemptStarted: null,
             attemptMissed: null,
@@ -205,7 +238,7 @@ public sealed class ChallengeMacroRunnerTests
 
         Assert.Equal(ChallengeScreenState.PostMatchPreview, ChallengeScreenDetector.Detect(result).State);
         Assert.Equal(1, presses);
-        Assert.Equal(1, waits);
+        Assert.Equal(2, waits);
         Assert.Empty(captures);
     }
 
@@ -242,6 +275,39 @@ public sealed class ChallengeMacroRunnerTests
     }
 
     [Fact]
+    public async Task LobbyPlayKey_AlreadyVisibleSelectorStillUsesStableWaiter()
+    {
+        ImageFrame modes = ImageCodec.Load(Path.Combine(
+            TestPaths.ChallengeDatasets,
+            "GameModeSelector",
+            "GameModeSelector_01.png"));
+        int waits = 0;
+        int presses = 0;
+
+        await LobbyPlayNavigator.OpenWithVerificationAsync(
+            playMenuKey: 'P',
+            capture: () => modes,
+            isLobby: _ => false,
+            isOpen: frame => ReferenceEquals(frame, modes),
+            pressKey: (_, _) =>
+            {
+                presses++;
+                return Task.CompletedTask;
+            },
+            waitForOpen: (_, _) =>
+            {
+                waits++;
+                return Task.FromResult(true);
+            },
+            keyAttemptStarted: null,
+            keyAttemptMissed: null,
+            CancellationToken.None);
+
+        Assert.Equal(1, waits);
+        Assert.Equal(0, presses);
+    }
+
+    [Fact]
     public async Task LobbyPlayKey_LateKeyTransition_IsAcceptedWithoutAnotherPress()
     {
         ImageFrame lobby = ImageCodec.Load(Path.Combine(
@@ -254,6 +320,7 @@ public sealed class ChallengeMacroRunnerTests
             "GameModeSelector_01.png"));
         bool transitioned = false;
         int presses = 0;
+        int waits = 0;
 
         await LobbyPlayNavigator.OpenWithVerificationAsync(
             playMenuKey: 'P',
@@ -267,14 +334,16 @@ public sealed class ChallengeMacroRunnerTests
             },
             waitForOpen: (_, _) =>
             {
+                waits++;
                 transitioned = true;
-                return Task.FromResult(false);
+                return Task.FromResult(waits >= 2);
             },
             keyAttemptStarted: null,
             keyAttemptMissed: null,
             CancellationToken.None);
 
         Assert.Equal(1, presses);
+        Assert.Equal(2, waits);
     }
 
     [Fact]

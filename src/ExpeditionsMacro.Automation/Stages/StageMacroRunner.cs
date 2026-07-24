@@ -3,6 +3,7 @@ using ExpeditionsMacro.Automation.Camera;
 using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Automation.Placement;
+using ExpeditionsMacro.Automation.Scheduling;
 using ExpeditionsMacro.Automation.Teams;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
@@ -50,7 +51,8 @@ public sealed partial class StageMacroRunner
         IProgress<MacroProgress>? progress = null,
         Action<MacroEvent>? log = null,
         CancellationToken cancellationToken = default,
-        Func<int, int, TimeSpan, CancellationToken, Task<bool>>? continueScheduledRoute = null) =>
+        Func<int, int, TimeSpan, CancellationToken, Task<bool>>? continueScheduledRoute = null,
+        MacroRunTotals? macroTotals = null) =>
         RunAsync(
             StageMode.Story,
             preset,
@@ -62,7 +64,8 @@ public sealed partial class StageMacroRunner
             progress,
             log,
             cancellationToken,
-            continueScheduledRoute);
+            continueScheduledRoute,
+            macroTotals);
 
     public Task<StageRunResult> RunRaidAsync(
         RaidPreset preset,
@@ -74,7 +77,8 @@ public sealed partial class StageMacroRunner
         IProgress<MacroProgress>? progress = null,
         Action<MacroEvent>? log = null,
         CancellationToken cancellationToken = default,
-        Func<int, int, TimeSpan, CancellationToken, Task<bool>>? continueScheduledRoute = null) =>
+        Func<int, int, TimeSpan, CancellationToken, Task<bool>>? continueScheduledRoute = null,
+        MacroRunTotals? macroTotals = null) =>
         RunAsync(
             StageMode.Raid,
             preset,
@@ -86,7 +90,8 @@ public sealed partial class StageMacroRunner
             progress,
             log,
             cancellationToken,
-            continueScheduledRoute);
+            continueScheduledRoute,
+            macroTotals);
 
     private async Task<StageRunResult> RunAsync(
         StageMode mode,
@@ -99,7 +104,8 @@ public sealed partial class StageMacroRunner
         IProgress<MacroProgress>? progress,
         Action<MacroEvent>? log,
         CancellationToken cancellationToken,
-        Func<int, int, TimeSpan, CancellationToken, Task<bool>>? continueScheduledRoute)
+        Func<int, int, TimeSpan, CancellationToken, Task<bool>>? continueScheduledRoute,
+        MacroRunTotals? macroTotals)
     {
         StoryPreset? story = preset as StoryPreset;
         RaidPreset? raid = preset as RaidPreset;
@@ -134,15 +140,14 @@ public sealed partial class StageMacroRunner
         int defeats = 0;
         TimeSpan matchRuntimeTotal = TimeSpan.Zero;
         StageRunResult? last = null;
-        bool teamLoaded = teamSlot == 0;
-        bool repeatedPrestartReady = false;
+        RepeatedRoutePreparationState preparation = new(teamSlot);
 
         Write($"Using Roblox window '{window.Title}' ({window.ProcessDescription}).");
         Focus(window);
         await EnsureClientSizeAsync(window, detector.Manifest.ClientWidth, detector.Manifest.ClientHeight, cancellationToken).ConfigureAwait(false);
         string route = RouteLabel(mode, story, raid);
         DiscordRunTarget reportTarget = new(0, 0, route);
-        DiscordRunReporter reporter = new(_discord, webhookUrl, $"{Label(mode)} Macro", mode.ToString().ToLowerInvariant(), Write);
+        DiscordRunReporter reporter = new(_discord, webhookUrl, $"{Label(mode)} Macro", mode.ToString().ToLowerInvariant(), Write, macroTotals);
         await reporter.SendAsync(
             "started",
             $"{route} is starting.",
@@ -159,9 +164,10 @@ public sealed partial class StageMacroRunner
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
+                bool repeatedPrestartReady =
+                    preparation.ConfirmRepeatStagePrestart();
                 if (repeatedPrestartReady)
                 {
-                    repeatedPrestartReady = false;
                     attempts = 1;
                     Report("Navigation", 8, $"Repeat Stage returned to {RouteLabel(mode, story, raid)} prestart.");
                 }
@@ -177,40 +183,28 @@ public sealed partial class StageMacroRunner
                         Report,
                         Write,
                         cancellationToken).ConfigureAwait(false);
-                    if (recoveredBeforeNavigation) teamLoaded = teamSlot == 0;
+                    if (recoveredBeforeNavigation) preparation.Invalidate();
 
                     attempts++;
                     Report("Navigation", 8, $"Opening {RouteLabel(mode, story, raid)} (attempt {attempts}/{retries + 1}).");
                     await NavigateToPrestartAsync(window, mode, story, raid, playMenuKey, detector, stableDetections, cancellationToken).ConfigureAwait(false);
                 }
 
-                if (!teamLoaded)
-                {
-                    Report("Team", 14, $"Prestart recognized. Loading Team {teamSlot}.");
-                    StageNavigationPolicy.RequirePrestartForTeamLoad(StageScreenDetector.Detect(CaptureClient(window, detector)));
-                    await _teams.SelectAsync(window, teamSlot, unitMenuKey!.Value, progress, cancellationToken).ConfigureAwait(false);
-                    await WaitForStateAsync(
-                        window,
-                        StageScreenState.Prestart,
-                        NavigationTimeout,
-                        detector,
-                        stableDetections,
-                        cancellationToken).ConfigureAwait(false);
-                    teamLoaded = true;
-                    Write($"Team {teamSlot} loaded from the confirmed {Label(mode)} prestart screen.", MacroEventLevel.Success);
-                }
-
-                int zoomTicks = story?.ZoomTicks ?? raid!.ZoomTicks;
-                int pitchDragPixels = story?.PitchDragPixels ?? raid!.PitchDragPixels;
-                Report("Camera", 20, "Preparing and aligning the camera.");
-                double confidence = await _camera.PrepareAndAlignAsync(
-                    models.Camera,
+                await PrepareMatchAsync(
                     window,
-                    zoomTicks,
-                    pitchDragPixels,
+                    mode,
+                    story,
+                    raid,
+                    models,
+                    unitMenuKey,
+                    preparation,
+                    repeatedPrestartReady,
                     progress,
+                    detector,
+                    stableDetections,
+                    Report,
+                    Write,
                     cancellationToken).ConfigureAwait(false);
-                Write($"Camera alignment finished at {confidence:P0} confidence.", MacroEventLevel.Success, "camera", confidence);
 
                 if (models.PrestartPlacement is not null)
                 {
@@ -264,6 +258,7 @@ public sealed partial class StageMacroRunner
                         Report("Handoff", 100, $"The same {Label(mode)} preset is next. Repeating the stage.", "repeat_stage", terminal.Confidence);
                         Write($"The scheduler kept the same {Label(mode)} route; using Repeat Stage instead of reopening Play.", MacroEventLevel.Success, "repeat_stage", terminal.Confidence);
                         await ClickAsync(window, repeat.Value.X, repeat.Value.Y, cancellationToken).ConfigureAwait(false);
+                        preparation.MarkRepeatStageRequested();
                         await WaitForStateAsync(
                             window,
                             StageScreenState.Prestart,
@@ -271,7 +266,6 @@ public sealed partial class StageMacroRunner
                             detector,
                             stableDetections,
                             cancellationToken).ConfigureAwait(false);
-                        repeatedPrestartReady = true;
                         attempts = 0;
                         continue;
                     }
@@ -287,7 +281,7 @@ public sealed partial class StageMacroRunner
                     Report,
                     Write,
                     cancellationToken).ConfigureAwait(false);
-                if (recoveredAfterResult) teamLoaded = teamSlot == 0;
+                if (recoveredAfterResult) preparation.Invalidate();
                 if (continueScheduledRoute is not null) return last;
                 if (outcome == StageRunOutcome.Victory || attempts > retries) return last;
                 Write($"Retrying after defeat ({attempts}/{retries + 1}).", MacroEventLevel.Warning);
@@ -295,6 +289,7 @@ public sealed partial class StageMacroRunner
             catch (CameraWorldNotRenderedException world)
                 when (autoRecover)
             {
+                preparation.Invalidate();
                 attempts = Math.Max(0, attempts - 1);
                 string detail =
                     $"{RouteLabel(mode, story, raid)} loaded without world geometry. Returning through Play and retrying the same stage without placement.";
@@ -309,7 +304,7 @@ public sealed partial class StageMacroRunner
                     detail,
                     "camera_world_missing",
                     world.BestConfidence);
-                bool recovered = await EnsureGameModeSelectorAsync(
+                await EnsureGameModeSelectorAsync(
                     window,
                     mode,
                     playMenuKey,
@@ -319,7 +314,6 @@ public sealed partial class StageMacroRunner
                     Report,
                     Write,
                     cancellationToken).ConfigureAwait(false);
-                if (recovered) teamLoaded = teamSlot == 0;
                 continue;
             }
             catch (CameraAlignmentException alignment)
@@ -368,7 +362,7 @@ public sealed partial class StageMacroRunner
                 }
 
                 if (!matchCompleted) attempts = Math.Max(0, attempts - 1);
-                teamLoaded = teamSlot == 0;
+                preparation.Invalidate();
                 string detail = $"{RouteLabel(mode, story, raid)} was interrupted by {RecoveryLabel(recovery.State)}. Returning through automatic recovery.";
                 Write(detail, MacroEventLevel.Warning, recovery.State, null);
                 Report("Recovery", 0, detail, recovery.State, null);
@@ -446,10 +440,16 @@ public sealed partial class StageMacroRunner
             await ClickAsync(window, actX, actY, cancellationToken).ConfigureAwait(false);
         }
 
-        await Task.Delay(500, cancellationToken).ConfigureAwait(false);
-        ImageFrame detail = CaptureClient(window, detector);
-        StageScreenMatch detailMatch = StageScreenDetector.Detect(detail);
-        if (detailMatch.State is not (StageScreenState.StoryDetail or StageScreenState.RaidDetail) || detailMatch.ActionX is null || detailMatch.ActionY is null)
+        StageScreenMatch detailMatch = await WaitForStateAsync(
+            window,
+            mode == StageMode.Story
+                ? StageScreenState.StoryDetail
+                : StageScreenState.RaidDetail,
+            NavigationTimeout,
+            detector,
+            stableDetections,
+            cancellationToken).ConfigureAwait(false);
+        if (detailMatch.ActionX is null || detailMatch.ActionY is null)
         {
             throw new InvalidOperationException($"The {Label(mode)} Select Stage button could not be located.");
         }
@@ -477,60 +477,6 @@ public sealed partial class StageMacroRunner
             stepSent: null,
             status: null,
             cancellationToken);
-
-    private async Task<StageScreenMatch> WaitForStateAsync(
-        RobloxWindow window,
-        StageScreenState expected,
-        TimeSpan timeout,
-        IDetectorPack detector,
-        int stableDetections,
-        CancellationToken cancellationToken)
-    {
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
-        StageScreenMatch last = new(StageScreenState.None, 0);
-        StableStateTracker<string> expectedTracker = new(stableDetections);
-        StableStateTracker<string> recoveryTracker = new(stableDetections);
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            ImageFrame frame = CaptureClient(window, detector);
-            last = StageScreenDetector.Detect(frame);
-            (int X, int Y)? previewStart = expected == StageScreenState.PreviewReady ? StageScreenDetector.PreviewStartAction(frame) : null;
-            string? candidate = StageNavigationPolicy.MatchesExpectedState(expected, last.State, previewStart is not null) ? expected.ToString() : null;
-            if (expectedTracker.Update(candidate) is not null)
-            {
-                return previewStart is { } action
-                    ? new StageScreenMatch(StageScreenState.PreviewReady, last.Confidence, action.X, action.Y)
-                    : last;
-            }
-            string? recovery = detector.RecoveryState(frame);
-            if (recoveryTracker.Update(IsRootRecovery(recovery) ? recovery : null) is string stableRecovery)
-            {
-                throw new StageRecoveryException(stableRecovery);
-            }
-            await Task.Delay(180, cancellationToken).ConfigureAwait(false);
-        }
-        throw new TimeoutException($"Timed out waiting for {expected}. Last state: {last.State} ({last.Confidence:P0}).");
-    }
-
-    private async Task<bool> TryWaitForStateAsync(
-        RobloxWindow window,
-        StageScreenState expected,
-        TimeSpan timeout,
-        IDetectorPack detector,
-        int stableDetections,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            await WaitForStateAsync(window, expected, timeout, detector, stableDetections, cancellationToken).ConfigureAwait(false);
-            return true;
-        }
-        catch (TimeoutException)
-        {
-            return false;
-        }
-    }
 
     private async Task EnsureClientSizeAsync(RobloxWindow window, int width, int height, CancellationToken cancellationToken)
     {
@@ -563,19 +509,6 @@ public sealed partial class StageMacroRunner
             throw new InvalidOperationException("Roblox no longer matches the detector pack client size.");
         }
         return _automation.CaptureClient(window);
-    }
-
-    private ImageFrame? TryCaptureClient(RobloxWindow window, IDetectorPack detector)
-    {
-        try
-        {
-            return CaptureClient(window, detector);
-        }
-        catch
-        {
-            // Recovery can proceed even if its optional diagnostic image is unavailable.
-            return null;
-        }
     }
 
     private static void ValidateCompatibility(StageRuntimeModels models, DetectorPackManifest detector)

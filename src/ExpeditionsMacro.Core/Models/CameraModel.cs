@@ -7,9 +7,9 @@ public sealed record CameraCalibrationSettings
 {
     public string Name { get; init; } = "Camera model";
 
-    public int CaptureCount { get; init; } = 12;
+    public int CaptureCount { get; init; } = 6;
 
-    public TimeSpan CaptureDuration { get; init; } = TimeSpan.FromSeconds(3);
+    public TimeSpan CaptureDuration { get; init; } = TimeSpan.FromSeconds(0.5);
 
     public int ArrowHoldMilliseconds { get; init; } = 30;
 
@@ -19,11 +19,13 @@ public sealed record CameraCalibrationSettings
 
     public int SettleMilliseconds { get; init; } = 200;
 
-    public int MaximumSamples { get; init; } = 300;
+    public int MaximumSamples { get; init; } = 240;
 
     public int ZoomTicks { get; init; } = 30;
 
     public int PitchDragPixels { get; init; } = 1800;
+
+    public bool UseDenseYawAtlas { get; init; } = true;
 
     public void Validate()
     {
@@ -35,14 +37,26 @@ public sealed record CameraCalibrationSettings
         if (FineSearchPixels is < 4 or > 100) throw new ArgumentOutOfRangeException(nameof(FineSearchPixels));
         if (SettleMilliseconds is < 25 or > 5000) throw new ArgumentOutOfRangeException(nameof(SettleMilliseconds));
         if (MaximumSamples is < 12 or > 2000) throw new ArgumentOutOfRangeException(nameof(MaximumSamples));
+        if (UseDenseYawAtlas && MaximumSamples < 49)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(MaximumSamples),
+                "Dense yaw setup requires at least 49 atlas samples.");
+        }
         if (ZoomTicks is < 5 or > 80) throw new ArgumentOutOfRangeException(nameof(ZoomTicks));
         if (PitchDragPixels is < 300 or > 5000) throw new ArgumentOutOfRangeException(nameof(PitchDragPixels));
     }
 }
 
+public enum CameraYawAtlasKind
+{
+    PulseSteps = 0,
+    DenseSweep = 1,
+}
+
 public sealed record CameraModelManifest
 {
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
 
@@ -72,6 +86,13 @@ public sealed record CameraModelManifest
 
     public required int SettleMilliseconds { get; init; }
 
+    public CameraYawAtlasKind YawAtlasKind { get; init; } =
+        CameraYawAtlasKind.PulseSteps;
+
+    public int DenseYawTurnMilliseconds { get; init; }
+
+    public int CalibrationDurationMilliseconds { get; init; }
+
     // Schema 3 models created before camera-pose normalization omitted these
     // values. Property defaults keep those models loadable while new models
     // persist the exact preparation settings used during setup.
@@ -87,7 +108,10 @@ public sealed record CameraModelManifest
 
     public void Validate()
     {
-        if (SchemaVersion != CurrentSchemaVersion) throw new InvalidDataException("Unsupported camera model format.");
+        if (SchemaVersion is not 3 and not CurrentSchemaVersion)
+        {
+            throw new InvalidDataException("Unsupported camera model format.");
+        }
         if (string.IsNullOrWhiteSpace(Id) || string.IsNullOrWhiteSpace(Name)) throw new InvalidDataException("Camera model identity is missing.");
         if (ClientWidth <= 0 || ClientHeight <= 0 || Regions is null || Regions.Count is < 2 or > 8 || Regions.Any(region => !region.FitsWithin(ClientWidth, ClientHeight)))
         {
@@ -111,9 +135,22 @@ public sealed record CameraModelManifest
         {
             throw new InvalidDataException("Camera model fine yaw atlas is invalid.");
         }
-        if (FullYawSteps < 3 || AtlasSampleCount != FullYawSteps + 1 || ScanScores.Count != AtlasSampleCount)
+        bool legacyAtlas = SchemaVersion == 3 ||
+            YawAtlasKind == CameraYawAtlasKind.PulseSteps;
+        bool atlasShapeIsValid = legacyAtlas
+            ? AtlasSampleCount == FullYawSteps + 1
+            : YawAtlasKind == CameraYawAtlasKind.DenseSweep &&
+              AtlasSampleCount >= 49 &&
+              DenseYawTurnMilliseconds is >= 750 and <= 10000;
+        if (FullYawSteps < 3 ||
+            !atlasShapeIsValid ||
+            ScanScores.Count != AtlasSampleCount)
         {
             throw new InvalidDataException("Camera model does not contain a complete yaw atlas.");
+        }
+        if (CalibrationDurationMilliseconds is < 0 or > 120000)
+        {
+            throw new InvalidDataException("Camera model calibration duration is invalid.");
         }
         if (SuccessThreshold is < 0 or > 1 || BaselineScore is < 0 or > 1) throw new InvalidDataException("Camera model scores are invalid.");
     }

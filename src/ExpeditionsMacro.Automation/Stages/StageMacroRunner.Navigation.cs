@@ -22,6 +22,11 @@ public sealed partial class StageMacroRunner
         DateTimeOffset deadline = DateTimeOffset.UtcNow + RecoveryTimeout;
         StableStateTracker<string> recoveryTracker =
             new(stableDetections);
+        StableStateTracker<StageScreenState> navigationTracker =
+            new(stableDetections);
+        StableNavigationActionTracker<StageScreenState>
+            changeModeTracker =
+                new(Math.Max(2, stableDetections));
         int playMenuAttempts = 0;
         string? lastRecovery = null;
         bool recovered = false;
@@ -31,7 +36,10 @@ public sealed partial class StageMacroRunner
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = CaptureClient(window, detector);
             StageScreenMatch current = StageScreenDetector.Detect(frame);
-            if (current.State == StageScreenState.GameModeSelector)
+            StageScreenState? stableNavigation =
+                navigationTracker.Update(current.State);
+            if (stableNavigation ==
+                StageScreenState.GameModeSelector)
             {
                 return recovered;
             }
@@ -124,10 +132,17 @@ public sealed partial class StageMacroRunner
 
             (int X, int Y)? changeMode =
                 StageScreenDetector.PostMatchChangeModeAction(frame);
+            (int X, int Y)? stableChangeMode =
+                changeModeTracker.Update(
+                    current.State ==
+                        StageScreenState.PostMatchPreview
+                        ? current.State
+                        : StageScreenState.None,
+                    changeMode);
             GameModeHandoffCommand command =
                 StageNavigationPolicy.SelectGameModeHandoffCommand(
-                    current.State,
-                    changeMode is not null,
+                    stableNavigation ?? StageScreenState.None,
+                    stableChangeMode is not null,
                     recoveryTransitionPending);
             switch (command)
             {
@@ -142,10 +157,12 @@ public sealed partial class StageMacroRunner
                         current.Confidence);
                     await ClickAsync(
                         window,
-                        changeMode!.Value.X,
-                        changeMode.Value.Y,
+                        stableChangeMode!.Value.X,
+                        stableChangeMode.Value.Y,
                         cancellationToken).ConfigureAwait(false);
                     playMenuAttempts = 0;
+                    navigationTracker.Reset();
+                    changeModeTracker.Reset();
                     if (await TryWaitForStateAsync(
                         window,
                         StageScreenState.GameModeSelector,
@@ -246,6 +263,9 @@ public sealed partial class StageMacroRunner
     {
         DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
         StableStateTracker<string> tracker = new(stableDetections);
+        StableNavigationActionTracker<StageScreenState>
+            actionTracker =
+                new(Math.Max(2, stableDetections));
         while (DateTimeOffset.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -255,10 +275,19 @@ public sealed partial class StageMacroRunner
             bool hasChangeMode =
                 StageScreenDetector.PostMatchChangeModeAction(frame)
                 is not null;
+            (int X, int Y)? stableChangeMode =
+                actionTracker.Update(
+                    current.State ==
+                        StageScreenState.PostMatchPreview
+                        ? current.State
+                        : StageScreenState.None,
+                    StageScreenDetector.PostMatchChangeModeAction(
+                        frame));
             GameModeHandoffCommand command =
                 StageNavigationPolicy.SelectGameModeHandoffCommand(
                     current.State,
-                    hasChangeMode);
+                    hasChangeMode &&
+                    stableChangeMode is not null);
             string? candidate = command is
                 GameModeHandoffCommand.Complete or
                 GameModeHandoffCommand.ChangeGamemode
@@ -274,4 +303,111 @@ public sealed partial class StageMacroRunner
         }
         return null;
     }
+
+    private async Task<StageScreenMatch> WaitForStateAsync(
+        RobloxWindow window,
+        StageScreenState expected,
+        TimeSpan timeout,
+        IDetectorPack detector,
+        int stableDetections,
+        CancellationToken cancellationToken)
+    {
+        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
+        StageScreenMatch last = new(StageScreenState.None, 0);
+        StableStateTracker<string> expectedTracker =
+            new(stableDetections);
+        StableNavigationActionTracker<string> actionTracker =
+            new(Math.Max(2, stableDetections));
+        StableStateTracker<string> recoveryTracker =
+            new(stableDetections);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ImageFrame frame = CaptureClient(window, detector);
+            last = StageScreenDetector.Detect(frame);
+            (int X, int Y)? action =
+                ExpectedNavigationAction(expected, last, frame);
+            string? candidate =
+                StageNavigationPolicy.MatchesExpectedState(
+                    expected,
+                    last.State,
+                    expected != StageScreenState.PreviewReady ||
+                    action is not null)
+                    ? expected.ToString()
+                    : null;
+            if (RequiresStableAction(expected))
+            {
+                (int X, int Y)? stableAction =
+                    actionTracker.Update(candidate, action);
+                if (stableAction is not null)
+                {
+                    return new StageScreenMatch(
+                        expected,
+                        last.Confidence,
+                        stableAction.Value.X,
+                        stableAction.Value.Y);
+                }
+            }
+            else if (expectedTracker.Update(candidate) is not null)
+            {
+                return last;
+            }
+
+            string? recovery = detector.RecoveryState(frame);
+            if (recoveryTracker.Update(
+                    IsRootRecovery(recovery) ? recovery : null)
+                is string stableRecovery)
+            {
+                throw new StageRecoveryException(stableRecovery);
+            }
+            await Task.Delay(
+                180,
+                cancellationToken).ConfigureAwait(false);
+        }
+        throw new TimeoutException(
+            $"Timed out waiting for {expected}. Last state: {last.State} ({last.Confidence:P0}).");
+    }
+
+    private async Task<bool> TryWaitForStateAsync(
+        RobloxWindow window,
+        StageScreenState expected,
+        TimeSpan timeout,
+        IDetectorPack detector,
+        int stableDetections,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await WaitForStateAsync(
+                window,
+                expected,
+                timeout,
+                detector,
+                stableDetections,
+                cancellationToken).ConfigureAwait(false);
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
+
+    private static bool RequiresStableAction(
+        StageScreenState expected) =>
+        expected is
+            StageScreenState.StoryDetail or
+            StageScreenState.RaidDetail or
+            StageScreenState.PreviewReady or
+            StageScreenState.Prestart;
+
+    private static (int X, int Y)? ExpectedNavigationAction(
+        StageScreenState expected,
+        StageScreenMatch match,
+        ImageFrame frame) =>
+        expected == StageScreenState.PreviewReady
+            ? StageScreenDetector.PreviewStartAction(frame)
+            : match.ActionX is int x && match.ActionY is int y
+                ? (x, y)
+                : null;
 }

@@ -22,6 +22,7 @@ public static class TeamScreenDetector
 {
     public const int ClientWidth = 808;
     public const int ClientHeight = 611;
+    public const int TopScrollbarCenterY = 240;
 
     private static readonly ScreenRegion Panel = new(105, 105, 605, 370);
     private static readonly ScreenRegion Header = new(80, 100, 285, 110);
@@ -40,6 +41,10 @@ public static class TeamScreenDetector
         new(530, 385, 116, 55),
     ];
     private static readonly int[] ScrollThumbOffsets = [0, 30, 59, 89, 118, 148, 156, 156];
+    // GB-014: nearby Roblox scenery can contain a much taller neutral-gray
+    // strip, so color and minimum length alone do not identify the live thumb.
+    private const int MinimumScrollThumbHeight = 60;
+    private const int MaximumScrollThumbHeight = 95;
 
     public static TeamScreenMatch Detect(ImageFrame image)
     {
@@ -96,7 +101,8 @@ public static class TeamScreenDetector
         for (int x = 620; x <= 659; x++)
         {
             (int StartY, int EndY) run = LongestThumbRun(image, x);
-            if (run.EndY - run.StartY + 1 >= 60)
+            int height = run.EndY - run.StartY + 1;
+            if (height is >= MinimumScrollThumbHeight and <= MaximumScrollThumbHeight)
             {
                 columns.Add((x, run.StartY, run.EndY));
             }

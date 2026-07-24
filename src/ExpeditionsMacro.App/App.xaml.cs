@@ -35,7 +35,9 @@ public partial class App : Application
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         try
         {
-            Services = await AppServices.CreateAsync(Dispatcher);
+            Services = await AppServices.CreateAsync(
+                Dispatcher,
+                startRuntimeServices: !snapshotMode);
             if (snapshotMode)
             {
                 await UiSnapshotRenderer.RenderAsync(Services, e.Args[1]);

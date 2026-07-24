@@ -35,13 +35,14 @@ internal sealed class CameraSpawnShortcutService(
         ImageFrame fingerprint,
         CancellationToken cancellationToken)
     {
-        (int atlasIndex, double atlasScore) = BestAtlasMatch(model.YawAtlas, fingerprint);
+        (int atlasIndex, double atlasScore) =
+            BestAtlasMatch(model, fingerprint);
         int? mousePixelsPerArrowStep = EstimateMousePixelsPerArrowStep(model);
         if (mousePixelsPerArrowStep is null) return null;
 
         int estimatedDrag = CorrectionPixels(
+            model.Manifest,
             atlasIndex,
-            model.Manifest.FullYawSteps,
             mousePixelsPerArrowStep.Value);
         CameraSpawnShortcut? stored = await LoadSafelyAsync(model.Manifest.Id, cancellationToken).ConfigureAwait(false);
         if (stored is not null && !Compatible(stored, model))
@@ -54,8 +55,18 @@ internal sealed class CameraSpawnShortcutService(
         if (stored is not null)
         {
             double fingerprintScore = CameraRegisteredScorer.Score(stored.CreateFingerprint(), fingerprint).Score;
-            int atlasDistance = CircularDistance(stored.SpawnAtlasIndex, atlasIndex, model.Manifest.FullYawSteps);
-            matches = fingerprintScore >= FingerprintThreshold && atlasDistance <= 1;
+            int atlasTurn = model.Manifest.AtlasSampleCount - 1;
+            int atlasDistance = CircularDistance(
+                stored.SpawnAtlasIndex,
+                atlasIndex,
+                atlasTurn);
+            int maximumDistance =
+                model.Manifest.YawAtlasKind ==
+                CameraYawAtlasKind.DenseSweep
+                    ? 3
+                    : 1;
+            matches = fingerprintScore >= FingerprintThreshold &&
+                atlasDistance <= maximumDistance;
         }
 
         return new CameraSpawnShortcutObservation(
@@ -204,12 +215,29 @@ internal sealed class CameraSpawnShortcutService(
         shortcut.CameraModelCreatedAt == model.Manifest.CreatedAt &&
         shortcut.ClientWidth == model.Manifest.ClientWidth &&
         shortcut.ClientHeight == model.Manifest.ClientHeight &&
-        shortcut.SpawnAtlasIndex < model.Manifest.FullYawSteps;
+        shortcut.SpawnAtlasIndex < model.Manifest.AtlasSampleCount - 1;
 
     private static int? EstimateMousePixelsPerArrowStep(CameraModel model)
     {
-        (int Offset, double Score) right = BestFineMatch(model, model.YawAtlas[1], registered: false);
-        (int Offset, double Score) left = BestFineMatch(model, model.YawAtlas[model.Manifest.FullYawSteps - 1], registered: false);
+        int atlasTurn = model.Manifest.AtlasSampleCount - 1;
+        int onePulseIndex =
+            model.Manifest.YawAtlasKind ==
+            CameraYawAtlasKind.DenseSweep
+                ? Math.Clamp(
+                    (int)Math.Round(
+                        atlasTurn /
+                        (double)model.Manifest.FullYawSteps),
+                    1,
+                    atlasTurn - 1)
+                : 1;
+        (int Offset, double Score) right = BestFineMatch(
+            model,
+            model.YawAtlas[onePulseIndex],
+            registered: false);
+        (int Offset, double Score) left = BestFineMatch(
+            model,
+            model.YawAtlas[atlasTurn - onePulseIndex],
+            registered: false);
         List<int> estimates = [];
         if (right.Score >= StepCalibrationThreshold && right.Offset != 0) estimates.Add(right.Offset);
         if (left.Score >= StepCalibrationThreshold && left.Offset != 0) estimates.Add(-left.Offset);
@@ -222,14 +250,30 @@ internal sealed class CameraSpawnShortcutService(
     {
         (int Offset, double Score) fine = BestFineMatch(model, current);
         if (fine.Score >= FineResidualThreshold) return -fine.Offset;
-        (int Index, _) = BestAtlasMatch(model.YawAtlas, current);
-        return CorrectionPixels(Index, model.Manifest.FullYawSteps, mousePixelsPerArrowStep);
+        (int Index, _) = BestAtlasMatch(model, current);
+        return CorrectionPixels(
+            model.Manifest,
+            Index,
+            mousePixelsPerArrowStep);
     }
 
-    private static int CorrectionPixels(int atlasIndex, int fullTurn, int mousePixelsPerArrowStep) =>
-        atlasIndex <= fullTurn / 2
-            ? -atlasIndex * mousePixelsPerArrowStep
-            : (fullTurn - atlasIndex) * mousePixelsPerArrowStep;
+    private static int CorrectionPixels(
+        CameraModelManifest manifest,
+        int atlasIndex,
+        int mousePixelsPerArrowStep)
+    {
+        int fullTurn = manifest.FullYawSteps;
+        double pulsePosition =
+            manifest.YawAtlasKind ==
+            CameraYawAtlasKind.DenseSweep
+                ? atlasIndex * (double)fullTurn /
+                  (manifest.AtlasSampleCount - 1)
+                : atlasIndex;
+        double correction = pulsePosition <= fullTurn / 2d
+            ? -pulsePosition
+            : fullTurn - pulsePosition;
+        return (int)Math.Round(correction * mousePixelsPerArrowStep);
+    }
 
     private static int ClampDrag(int pixels, CameraModel model, int mousePixelsPerArrowStep)
     {
@@ -243,8 +287,18 @@ internal sealed class CameraSpawnShortcutService(
         return Math.Min(difference, fullTurn - difference);
     }
 
-    private static (int Index, double Score) BestAtlasMatch(IReadOnlyList<ImageFrame> atlas, ImageFrame current)
+    private static (int Index, double Score) BestAtlasMatch(
+        CameraModel model,
+        ImageFrame current)
     {
+        IReadOnlyList<ImageFrame> atlas = model.YawAtlas;
+        if (model.Manifest.YawAtlasKind ==
+            CameraYawAtlasKind.DenseSweep)
+        {
+            CameraYawAtlasMatch match =
+                CameraYawAtlasIndex.For(atlas).FindBest(current);
+            return (match.Index, match.Score);
+        }
         int bestIndex = 0;
         double bestScore = double.NegativeInfinity;
         for (int index = 0; index < atlas.Count - 1; index++)
@@ -282,10 +336,24 @@ internal sealed class CameraSpawnShortcutService(
         List<ImageFrame> frames = [];
         for (int index = 0; index < 2; index++)
         {
-            frames.Add(CameraRegionAnalyzer.BuildComposite(automation.CaptureClient(window), model.Manifest.Regions));
+            ImageFrame fullClient = automation.CaptureClient(window);
+            frames.Add(
+                model.Manifest.YawAtlasKind ==
+                CameraYawAtlasKind.DenseSweep
+                    ? CameraDenseThumbnailBuilder.Build(
+                        fullClient,
+                        model.Manifest.Regions,
+                        width)
+                    : CameraRegionAnalyzer.BuildComposite(
+                        fullClient,
+                        model.Manifest.Regions));
             if (index == 0) await Task.Delay(60, cancellationToken).ConfigureAwait(false);
         }
-        return VisionScorer.MakeThumbnail(VisionScorer.Median(frames), width);
+        ImageFrame stable = VisionScorer.Median(frames);
+        return model.Manifest.YawAtlasKind ==
+            CameraYawAtlasKind.DenseSweep
+                ? stable
+                : VisionScorer.MakeThumbnail(stable, width);
     }
 
     private async Task<CameraSpawnShortcut?> LoadSafelyAsync(string id, CancellationToken cancellationToken)

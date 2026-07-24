@@ -15,4 +15,8 @@ internal readonly record struct AlignmentObservation(double DirectScore, FineYaw
 
 internal readonly record struct AlignmentAttemptPlan(CameraYawDirection ScanDirection, int ScanPhasePixels);
 
-internal readonly record struct AtlasMatch(int Index, double Score);
+internal readonly record struct AtlasMatch(
+    int Index,
+    double Score,
+    double FingerprintScore = 0,
+    double FingerprintIsolation = 0);

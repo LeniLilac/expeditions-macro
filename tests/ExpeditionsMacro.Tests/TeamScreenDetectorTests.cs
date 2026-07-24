@@ -28,6 +28,29 @@ public sealed class TeamScreenDetectorTests
     }
 
     [Theory]
+    [InlineData("TeamList_Opening_01.png", TeamScreenState.None, false)]
+    [InlineData("TeamList_Opening_02.png", TeamScreenState.Teams, false)]
+    [InlineData("TeamList_Opening_03.png", TeamScreenState.Teams, true)]
+    [InlineData("TeamList_Opening_04.png", TeamScreenState.Teams, true)]
+    public void OpeningAnimation_DoesNotExposeAnUnrelatedBackgroundStrip(
+        string fileName,
+        TeamScreenState expected,
+        bool expectedAtTop)
+    {
+        ImageFrame image = Load(fileName);
+
+        Assert.Equal(expected, TeamScreenDetector.Detect(image).State);
+        TeamScrollbarThumb? thumb =
+            TeamScreenDetector.FindScrollbarThumb(image);
+        Assert.NotNull(thumb);
+        Assert.InRange(thumb.Value.X, 625, 631);
+        Assert.InRange(thumb.Value.Height, 70, 85);
+        Assert.Equal(
+            expectedAtTop,
+            TeamScreenDetector.IsScrollbarAtTop(thumb.Value));
+    }
+
+    [Theory]
     [InlineData("GameModeNegative_01.png")]
     [InlineData("StorySelector_01.png")]
     [InlineData("StoryDetail_01.png")]
@@ -50,6 +73,7 @@ public sealed class TeamScreenDetectorTests
     public void TeamActions_UseTheReviewedClientRelativeControls()
     {
         Assert.Equal((305, 427), TeamScreenDetector.TeamsTabAction);
+        Assert.Equal(240, TeamScreenDetector.TopScrollbarCenterY);
         Assert.Equal([0, 30, 59, 89, 118, 148, 156, 156],
             Enumerable.Range(1, 8).Select(TeamScreenDetector.ScrollThumbOffsetY));
         Assert.Equal((345, 331), TeamScreenDetector.LoadConfirmAction);

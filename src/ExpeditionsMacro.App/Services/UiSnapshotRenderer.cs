@@ -20,6 +20,7 @@ internal static class UiSnapshotRenderer
         ("Raid", "raid", false),
         ("Camera Models", "camera-models", false),
         ("Placement Models", "placement-models", false),
+        ("Debug", "debug", false),
         ("Settings", "settings", false),
         ("Settings", "settings-debug", true),
     ];

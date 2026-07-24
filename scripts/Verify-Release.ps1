@@ -18,6 +18,17 @@ if (-not $portable) { throw 'The portable application archive is missing.' }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archive = [System.IO.Compression.ZipFile]::OpenRead($portable.FullName)
 try {
+    $rootExecutable = $archive.Entries |
+        Where-Object {
+            $_.FullName.Replace('\', '/').Equals(
+                'ExpeditionsMacro.exe',
+                [System.StringComparison]::OrdinalIgnoreCase)
+        } |
+        Select-Object -First 1
+    if (-not $rootExecutable) {
+        throw 'Portable archive must place ExpeditionsMacro.exe at its root without an extra application folder.'
+    }
+
     $entryNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     foreach ($entry in $archive.Entries) { [void]$entryNames.Add([System.IO.Path]::GetFileName($entry.FullName)) }
     foreach ($required in @('OpenCvSharpExtern.dll', 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll')) {

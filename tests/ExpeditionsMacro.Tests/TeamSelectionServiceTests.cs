@@ -89,17 +89,78 @@ public sealed class TeamSelectionServiceTests
         Assert.Equal(2, automation.Actions.Count(action => action.StartsWith("drag:", StringComparison.Ordinal)));
     }
 
+    [Fact]
+    public async Task Select_WaitsForTheOpeningAnimationAndUsesTheRealTopThumb()
+    {
+        FakeAutomation automation = new(
+            teamSlot: 1,
+            equipmentFixture: "TeamEquipmentConfirm_01.png",
+            openingFixtures:
+            [
+                "TeamList_Opening_01.png",
+                "TeamList_Opening_02.png",
+                "TeamList_Opening_03.png",
+                "TeamList_Opening_04.png",
+            ]);
+        TeamSelectionService service = new(automation);
+
+        await service.SelectAsync(
+            automation.Window,
+            teamSlot: 1,
+            unitMenuKey: 'u');
+
+        Assert.DoesNotContain(
+            automation.Actions,
+            action => action.StartsWith("drag:", StringComparison.Ordinal));
+        Assert.Contains(
+            automation.Actions,
+            action => action.StartsWith("click:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Select_NormalizesAReopenedScrolledListBeforeLoading()
+    {
+        FakeAutomation automation = new(
+            teamSlot: 1,
+            equipmentFixture: "TeamEquipmentConfirm_01.png",
+            initialTeamFixture: "TeamList_Aligned_Team2_01.png");
+        TeamSelectionService service = new(automation);
+
+        await service.SelectAsync(
+            automation.Window,
+            teamSlot: 1,
+            unitMenuKey: 'u');
+
+        TeamScrollbarThumb scrolled =
+            TeamScreenDetector.FindScrollbarThumb(
+                automation.InitialTeamFrame)!.Value;
+        Assert.Contains(
+            $"drag:{scrolled.X},{scrolled.CenterY}->{scrolled.X},{TeamScreenDetector.TopScrollbarCenterY}",
+            automation.Actions);
+    }
+
     private sealed class FakeAutomation : IRobloxAutomation
     {
         private readonly IReadOnlyDictionary<TeamScreenState, ImageFrame> _frames;
+        private readonly IReadOnlyList<ImageFrame> _openingFrames;
         private readonly int _teamSlot;
+        private readonly ImageFrame _topTeamFrame;
+        private Queue<ImageFrame> _pendingOpeningFrames = [];
 
         private ImageFrame _teamFrame;
 
-        public FakeAutomation(int teamSlot, string equipmentFixture)
+        public FakeAutomation(
+            int teamSlot,
+            string equipmentFixture,
+            IReadOnlyList<string>? openingFixtures = null,
+            string initialTeamFixture =
+                "TeamList_Aligned_Team1_Current_01.png")
         {
             _teamSlot = teamSlot;
-            InitialTeamFrame = Load("TeamList_Aligned_Team1_Current_01.png");
+            _openingFrames = openingFixtures?.Select(Load).ToArray() ?? [];
+            _topTeamFrame =
+                Load("TeamList_Aligned_Team1_Current_01.png");
+            InitialTeamFrame = Load(initialTeamFixture);
             AlignedTeamFrame = Load(TeamFixture(teamSlot));
             _teamFrame = InitialTeamFrame;
             _frames = new Dictionary<TeamScreenState, ImageFrame>
@@ -154,8 +215,17 @@ public sealed class TeamSelectionServiceTests
 
         public ImageFrame CaptureScreen(ScreenRegion region) => throw new NotSupportedException();
 
-        public ImageFrame CaptureClient(RobloxWindow window) =>
-            State == TeamScreenState.Teams ? _teamFrame : _frames[State];
+        public ImageFrame CaptureClient(RobloxWindow window)
+        {
+            if (State != TeamScreenState.Teams)
+            {
+                return _frames[State];
+            }
+
+            return _pendingOpeningFrames.Count > 0
+                ? _pendingOpeningFrames.Dequeue()
+                : _teamFrame;
+        }
 
         public Task MoveCursorToClientCenterAsync(RobloxWindow window, CancellationToken cancellationToken) => Task.CompletedTask;
 
@@ -171,6 +241,8 @@ public sealed class TeamSelectionServiceTests
             if (State == TeamScreenState.Units && (x, y) == TeamScreenDetector.TeamsTabAction)
             {
                 _teamFrame = InitialTeamFrame;
+                _pendingOpeningFrames = new Queue<ImageFrame>(
+                    _openingFrames);
                 State = TeamScreenState.Teams;
                 return Task.CompletedTask;
             }
@@ -204,8 +276,15 @@ public sealed class TeamSelectionServiceTests
             TeamScrollbarThumb thumb = TeamScreenDetector.FindScrollbarThumb(_teamFrame)!.Value;
             Assert.Equal((thumb.X, thumb.CenterY), (startX, startY));
             Assert.Equal(thumb.X, endX);
-            Assert.Equal(TargetCenterY, endY);
-            _teamFrame = AlignedTeamFrame;
+            if (endY == TeamScreenDetector.TopScrollbarCenterY)
+            {
+                _teamFrame = _topTeamFrame;
+            }
+            else
+            {
+                Assert.Equal(TargetCenterY, endY);
+                _teamFrame = AlignedTeamFrame;
+            }
             return Task.CompletedTask;
         }
 
@@ -239,7 +318,9 @@ public sealed class TeamSelectionServiceTests
         {
             get
             {
-                TeamScrollbarThumb top = TeamScreenDetector.FindScrollbarThumb(InitialTeamFrame)!.Value;
+                TeamScrollbarThumb top =
+                    TeamScreenDetector.FindScrollbarThumb(
+                        _topTeamFrame)!.Value;
                 return TeamScreenDetector.ScrollThumbTargetCenterY(_teamSlot, top.CenterY);
             }
         }

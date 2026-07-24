@@ -64,6 +64,9 @@ public sealed partial class ExpeditionMacroRunner
             DateTimeOffset.UtcNow + GameModeHandoffTimeout;
         StableStateTracker<ChallengeScreenState> tracker =
             new(Math.Max(1, preset.StableDetections));
+        StableNavigationActionTracker<ChallengeScreenState>
+            actionTracker =
+                new(Math.Max(2, preset.StableDetections));
         ChallengeScreenMatch last =
             new(ChallengeScreenState.None, 0);
         while (DateTimeOffset.UtcNow < deadline)
@@ -72,6 +75,15 @@ public sealed partial class ExpeditionMacroRunner
             ImageFrame frame = CaptureClient(window, detector);
             last = ChallengeScreenDetector.Detect(frame);
             ChallengeScreenState? stable = tracker.Update(last.State);
+            (int X, int Y)? stableChangeMode =
+                actionTracker.Update(
+                    last.State ==
+                        ChallengeScreenState.PostMatchPreview
+                        ? last.State
+                        : ChallengeScreenState.None,
+                    ChallengeScreenDetector.ActionFor(
+                        ChallengeScreenState.PostMatchPreview,
+                        frame));
             if (stable is null)
             {
                 await Task.Delay(
@@ -90,32 +102,28 @@ public sealed partial class ExpeditionMacroRunner
                         last.Confidence);
                     return;
                 case GameModeHandoffCommand.ChangeGamemode:
-                {
-                    (int X, int Y)? changeMode =
-                        ChallengeScreenDetector.ActionFor(
-                            ChallengeScreenState.PostMatchPreview,
-                            frame);
-                    if (changeMode is null)
                     {
-                        await Task.Delay(
-                            preset.PollMilliseconds,
+                        if (stableChangeMode is null)
+                        {
+                            await Task.Delay(
+                                preset.PollMilliseconds,
+                                cancellationToken).ConfigureAwait(false);
+                            continue;
+                        }
+                        report(
+                            "Handoff",
+                            100,
+                            "Leaving the Expedition party through Change Gamemode.",
+                            "expedition_change_gamemode",
+                            last.Confidence);
+                        Focus(window);
+                        await _automation.ClickClientAsync(
+                            window,
+                            stableChangeMode.Value.X,
+                            stableChangeMode.Value.Y,
                             cancellationToken).ConfigureAwait(false);
-                        continue;
+                        break;
                     }
-                    report(
-                        "Handoff",
-                        100,
-                        "Leaving the Expedition party through Change Gamemode.",
-                        "expedition_change_gamemode",
-                        last.Confidence);
-                    Focus(window);
-                    await _automation.ClickClientAsync(
-                        window,
-                        changeMode.Value.X,
-                        changeMode.Value.Y,
-                        cancellationToken).ConfigureAwait(false);
-                    break;
-                }
                 case GameModeHandoffCommand.PressPlayKey:
                     await OpenPlayMenuAsync(
                         window,
@@ -138,6 +146,7 @@ public sealed partial class ExpeditionMacroRunner
                         "The Expedition handoff policy returned an unknown command.");
             }
             tracker.Reset();
+            actionTracker.Reset();
             await Task.Delay(
                 700,
                 cancellationToken).ConfigureAwait(false);
@@ -150,18 +159,18 @@ public sealed partial class ExpeditionMacroRunner
     internal static GameModeHandoffCommand
         SelectGameModeHandoffCommand(
             ChallengeScreenState state) => state switch
-        {
-            ChallengeScreenState.GameModeSelector =>
-                GameModeHandoffCommand.Complete,
-            ChallengeScreenState.Victory or
-            ChallengeScreenState.Defeat =>
-                GameModeHandoffCommand.PressPlayKey,
-            ChallengeScreenState.PostMatchPreview =>
-                GameModeHandoffCommand.ChangeGamemode,
-            ChallengeScreenState.PostMatchHud =>
-                GameModeHandoffCommand.PressPlayKey,
-            _ => GameModeHandoffCommand.Wait,
-        };
+            {
+                ChallengeScreenState.GameModeSelector =>
+                    GameModeHandoffCommand.Complete,
+                ChallengeScreenState.Victory or
+                ChallengeScreenState.Defeat =>
+                    GameModeHandoffCommand.PressPlayKey,
+                ChallengeScreenState.PostMatchPreview =>
+                    GameModeHandoffCommand.ChangeGamemode,
+                ChallengeScreenState.PostMatchHud =>
+                    GameModeHandoffCommand.PressPlayKey,
+                _ => GameModeHandoffCommand.Wait,
+            };
 
     private Task<ImageFrame> OpenPlayMenuAsync(
         RobloxWindow window,
@@ -209,6 +218,9 @@ public sealed partial class ExpeditionMacroRunner
         DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
         StableStateTracker<ChallengeScreenState> tracker =
             new(Math.Max(1, preset.StableDetections));
+        StableNavigationActionTracker<ChallengeScreenState>
+            actionTracker =
+                new(Math.Max(2, preset.StableDetections));
         while (DateTimeOffset.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -219,7 +231,18 @@ public sealed partial class ExpeditionMacroRunner
                 match.State == ChallengeScreenState.PostMatchPreview
                     ? ChallengeScreenState.PostMatchPreview
                     : ChallengeScreenState.None);
-            if (stable == ChallengeScreenState.PostMatchPreview)
+            (int X, int Y)? stableAction =
+                actionTracker.Update(
+                    match.State ==
+                        ChallengeScreenState.PostMatchPreview
+                        ? match.State
+                        : ChallengeScreenState.None,
+                    ChallengeScreenDetector.ActionFor(
+                        ChallengeScreenState.PostMatchPreview,
+                        current));
+            if (stable ==
+                    ChallengeScreenState.PostMatchPreview &&
+                stableAction is not null)
             {
                 return current;
             }

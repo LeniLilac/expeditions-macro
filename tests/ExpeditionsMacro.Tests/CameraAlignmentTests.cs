@@ -28,6 +28,10 @@ public sealed class CameraAlignmentTests
 
         Assert.Equal(30, settings.ArrowHoldMilliseconds);
         Assert.Equal(200, settings.SettleMilliseconds);
+        Assert.Equal(6, settings.CaptureCount);
+        Assert.Equal(TimeSpan.FromSeconds(0.5), settings.CaptureDuration);
+        Assert.Equal(240, settings.MaximumSamples);
+        Assert.True(settings.UseDenseYawAtlas);
         Assert.Equal(30, settings.ZoomTicks);
         Assert.Equal(1800, settings.PitchDragPixels);
         settings.Validate();
@@ -236,13 +240,20 @@ public sealed class CameraAlignmentTests
         try
         {
             ImageFrame goal = VisionScorerTests.Pattern(RobloxClientProfile.Width, RobloxClientProfile.Height);
-            CameraModel expected = CreateModel(goal, Enumerable.Repeat(goal, 7).ToArray());
+            CameraModel created = CreateModel(
+                goal,
+                Enumerable.Repeat(goal, 7).ToArray());
+            CameraModel expected = created with
+            {
+                Manifest = created.Manifest with { SchemaVersion = 3 },
+            };
             CameraModelRepository repository = new(new AppPaths(root));
 
             await repository.SaveAsync(expected);
             CameraModel? actual = await repository.LoadAsync(expected.Manifest.Id);
 
             Assert.NotNull(actual);
+            Assert.Equal(3, actual.Manifest.SchemaVersion);
             Assert.Equal(expected.Manifest.Regions, actual.Manifest.Regions);
             Assert.Equal(expected.Manifest.FullYawSteps, actual.Manifest.FullYawSteps);
             Assert.Equal(expected.Manifest.ArrowHoldMilliseconds, actual.Manifest.ArrowHoldMilliseconds);
@@ -721,6 +732,7 @@ public sealed class CameraAlignmentTests
         FineSearchPixels = 4,
         SettleMilliseconds = 25,
         MaximumSamples = 16,
+        UseDenseYawAtlas = false,
     };
 
     private static ImageFrame Blank(int width, int height) =>

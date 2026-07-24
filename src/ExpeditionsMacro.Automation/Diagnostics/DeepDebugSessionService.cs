@@ -397,7 +397,10 @@ public sealed class DeepDebugSessionService
         string root = Path.Combine(session.StagingDirectory, "configuration", phase);
         Directory.CreateDirectory(root);
         AppSettings settings = _getSettings();
-        await WriteJsonAsync(Path.Combine(root, "settings-sanitized.json"), SanitizedSettings.From(settings)).ConfigureAwait(false);
+        await WriteJsonAsync(
+            Path.Combine(root, "settings-sanitized.json"),
+            DeepDebugSanitizedSettings.From(settings))
+            .ConfigureAwait(false);
         await WriteJsonAsync(Path.Combine(root, "operation-context.json"), session.Context).ConfigureAwait(false);
         await WriteJsonAsync(Path.Combine(root, "environment.json"), new
         {
@@ -663,49 +666,6 @@ public sealed class DeepDebugSessionService
         string? WriterFailure,
         string? OperationError,
         string SecretPolicy);
-    private sealed record SanitizedSettings(
-        int SchemaVersion,
-        AppTheme Theme,
-        string SelectedPresetId,
-        string SelectedChallengePresetId,
-        string SelectedStoryPresetId,
-        string SelectedRaidPresetId,
-        string SelectedMacroPlanId,
-        bool AutoCaptureOnMacroError,
-        bool IncludeLogsInDiagnosticArchives,
-        bool DeepDebugEnabled,
-        bool CheckDetectorUpdates,
-        DateTimeOffset? LastDetectorUpdateCheck,
-        bool MinimizeDuringAutomation,
-        bool RestartRobloxWithPrivateServer,
-        bool PrivateServerLinkConfigured,
-        int MacroHotkeyVirtualKey,
-        int ShiftLockVirtualKey,
-        string PlayMenuKey,
-        string UnitMenuKey)
-    {
-        public static SanitizedSettings From(AppSettings settings) => new(
-            settings.SchemaVersion,
-            settings.Theme,
-            settings.SelectedPresetId,
-            settings.SelectedChallengePresetId,
-            settings.SelectedStoryPresetId,
-            settings.SelectedRaidPresetId,
-            settings.SelectedMacroPlanId,
-            settings.AutoCaptureOnMacroError,
-            settings.IncludeLogsInDiagnosticArchives,
-            settings.DeepDebugEnabled,
-            settings.CheckDetectorUpdates,
-            settings.LastDetectorUpdateCheck,
-            settings.MinimizeDuringAutomation,
-            settings.RestartRobloxWithPrivateServer,
-            !string.IsNullOrWhiteSpace(
-                settings.EncryptedPrivateServerLink),
-            settings.MacroHotkeyVirtualKey,
-            settings.ShiftLockVirtualKey,
-            settings.PlayMenuKey,
-            settings.UnitMenuKey);
-    }
     private sealed class ResolvedArtifacts
     {
         public HashSet<string> ExpeditionPresetIds { get; } = new(StringComparer.OrdinalIgnoreCase);

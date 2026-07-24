@@ -4,6 +4,33 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.15] - 2026-07-24
+
+### Added
+
+- Added an optional Debug workspace with production Play-navigation and saved-team tests, current-screen inspection, client standardization, live detector/action checkpoints, frame review, single-step input authorization, and continuous resume.
+- Deep Debug archives now identify Debug tools and step modes and retain their ordered detector, action, frame, and input checkpoints.
+
+### Changed
+
+- Portable ZIPs now place `ExpeditionsMacro.exe` directly at the archive root instead of inside an additional `ExpeditionsMacro` folder.
+- Camera setup now builds a dense hybrid yaw atlas from one continuously held arrow turn sampled at up to roughly 60 FPS. Loop completion requires both the regional fingerprint and an independently matching fine-yaw reference (or an exact structural match), then verifies the stationary corrected goal. A transient moving-zero capture no longer invalidates a fine sweep that returns correctly, and pulse calibration searches only physically possible atlas ranges. Normal setup targets less than 20 seconds, while a separate 120-second hard timeout protects against a stalled operation.
+- New camera models use schema version 4 so dense visual positions and discrete arrow-pulse distance remain distinct; existing schema 3 camera models remain supported.
+- Verified same-route repeats reuse the already-loaded team and aligned camera; navigation, recovery, interruption, or route changes invalidate only the preparation that must be repeated.
+- Discord result totals now retain whole-plan runtime, victories, and defeats across mode changes while continuing to report each individual match runtime.
+
+### Fixed
+
+- Runtime alignment now uses a strong, isolated dense-atlas fingerprint to begin bounded closed-loop correction even when the nearest moving-sweep frame has lower pixel registration. Ambiguous fingerprints still fall back safely, and fine-yaw plus three-frame goal verification remain mandatory.
+- Dense camera setup now re-observes its captured atlas and returns to the goal in bounded arrow groups after both the continuous sweep and pulse calibration. It no longer assumes the key stops on the callback frame or that equal right/left pulse counts produce an exactly reversible visual yaw.
+- Play, Challenge, Expedition, Story, Raid, and Unit Teams actions now require stable detector-owned coordinates before clicking, preventing an opening or shifting panel animation from authorizing stale input.
+- Unit Teams reopening now waits for the real gray scrollbar thumb to settle and normalizes any retained non-top position before aligning the requested team.
+- Switch thumbs now use fixed inner padding and a color-only focus state, preventing their circular knobs from being clipped at supported Windows scaling.
+
+### Engineering
+
+- Split dense camera calibration, runner preparation/reporting, Macro task execution, Debug stepping, and sanitized Deep Debug settings into focused owners while lowering existing source-debt ceilings.
+
 ## [1.3.0-beta.14] - 2026-07-23
 
 ### Fixed
@@ -619,7 +646,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.14...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.15...HEAD
+[1.3.0-beta.15]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.14...v1.3.0-beta.15
 [1.3.0-beta.14]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.13...v1.3.0-beta.14
 [1.3.0-beta.13]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.12...v1.3.0-beta.13
 [1.3.0-beta.12]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.10...v1.3.0-beta.12

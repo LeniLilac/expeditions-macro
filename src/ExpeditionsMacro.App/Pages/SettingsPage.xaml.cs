@@ -58,6 +58,7 @@ public partial class SettingsPage : UserControl, IAppPage
         AutoCaptureOnErrorCheck.IsChecked = _services.Settings.AutoCaptureOnMacroError;
         IncludeLogsCheck.IsChecked = _services.Settings.IncludeLogsInDiagnosticArchives;
         DeepDebugCheck.IsChecked = _services.Settings.DeepDebugEnabled;
+        DebugModeCheck.IsChecked = _services.Settings.DebugModeEnabled;
         _loading = false;
         VersionText.Text = ProductVersion.Current;
         RobloxText.Text = _services.Automation.FindWindow() is { } window
@@ -93,6 +94,35 @@ public partial class SettingsPage : UserControl, IAppPage
     {
         if (_loading) return;
         await _services.UpdateSettingsAsync(settings => settings with { IncludeLogsInDiagnosticArchives = IncludeLogsCheck.IsChecked == true });
+    }
+
+    private async void DebugModeCheck_Changed(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_loading) return;
+        DebugModeCheck.IsEnabled = false;
+        try
+        {
+            await _services.UpdateSettingsAsync(
+                settings => settings with
+                {
+                    DebugModeEnabled =
+                        DebugModeCheck.IsChecked == true,
+                });
+        }
+        catch
+        {
+            _loading = true;
+            DebugModeCheck.IsChecked =
+                _services.Settings.DebugModeEnabled;
+            _loading = false;
+            throw;
+        }
+        finally
+        {
+            UpdateCaptureState();
+        }
     }
 
     private async void DeepDebugCheck_Changed(object sender, RoutedEventArgs e)
@@ -304,6 +334,7 @@ public partial class SettingsPage : UserControl, IAppPage
         AutoCaptureOnErrorCheck.IsEnabled = !busy;
         IncludeLogsCheck.IsEnabled = !busy;
         DeepDebugCheck.IsEnabled = !busy;
+        DebugModeCheck.IsEnabled = !busy;
         KeyBindingsPanel.UpdateBusyState(busy);
         CaptureStopButton.IsEnabled = _captureOperationActive && busy;
         CaptureStopButton.Content = _services.Coordinator.State == OperationState.Armed ? "Cancel" : "Stop and save";
