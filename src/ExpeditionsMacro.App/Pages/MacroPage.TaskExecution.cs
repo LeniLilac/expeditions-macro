@@ -20,6 +20,7 @@ public partial class MacroPage
         char playMenuKey,
         char? unitMenuKey,
         MacroRunTotals macroTotals,
+        ChallengeRotationState challengeRotation,
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken)
     {
@@ -33,6 +34,7 @@ public partial class MacroPage
                 playMenuKey,
                 unitMenuKey,
                 macroTotals,
+                challengeRotation,
                 progress,
                 cancellationToken),
             MacroTaskKind.Expedition => ExecuteExpeditionAsync(
@@ -79,6 +81,7 @@ public partial class MacroPage
         char playMenuKey,
         char? unitMenuKey,
         MacroRunTotals macroTotals,
+        ChallengeRotationState challengeRotation,
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken)
     {
@@ -100,6 +103,7 @@ public partial class MacroPage
             preset,
             models,
             detector,
+            challengeRotation,
             webhook,
             playMenuKey,
             progress,

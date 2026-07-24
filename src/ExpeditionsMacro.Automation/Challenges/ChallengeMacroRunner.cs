@@ -50,6 +50,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         ChallengePreset preset,
         IReadOnlyDictionary<ChallengeMapId, ChallengeMapRuntimeModels> mapModels,
         IDetectorPack detector,
+        ChallengeRotationState rotation,
         string webhookUrl,
         char playMenuKey,
         IProgress<MacroProgress>? progress = null,
@@ -62,6 +63,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         char? unitMenuKey = null,
         MacroRunTotals? macroTotals = null)
     {
+        ArgumentNullException.ThrowIfNull(rotation);
         if (maximumCompletedRuns is < 1) throw new ArgumentOutOfRangeException(nameof(maximumCompletedRuns));
         preset.ValidateReady();
         playMenuKey = ValidatePlayMenuKey(playMenuKey);
@@ -76,7 +78,6 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
                 "No visible Roblox window was found.");
         DateTimeOffset startedAt = DateTimeOffset.UtcNow;
         Stopwatch runtime = Stopwatch.StartNew();
-        ChallengeRotationState rotation = new();
         ChallengeType? currentType = null;
         ChallengeMapId? currentMap = null;
         DateTimeOffset? waitingUntil = null;
@@ -103,7 +104,6 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
             waitingUntil,
             rotation.DailyLimitUntilUtc is not null));
         DiscordRunReporter reporter = new(_discord, webhookUrl, "Challenge Macro", "challenge", Write, macroTotals);
-
         Write($"Using Roblox window '{window.Title}' ({window.ProcessDescription}).");
         PublishSummary();
         try

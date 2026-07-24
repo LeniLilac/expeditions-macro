@@ -24,7 +24,7 @@ internal static class StageNavigationPolicy
             StageScreenState.GameModeSelector => GameModeHandoffCommand.Complete,
             StageScreenState.Victory or StageScreenState.Defeat => GameModeHandoffCommand.PressPlayKey,
             StageScreenState.PostMatchPreview when hasStageChangeModeAction => GameModeHandoffCommand.ChangeGamemode,
-            StageScreenState.PostMatchPreview or StageScreenState.PostMatchHud => GameModeHandoffCommand.PressPlayKey,
+            StageScreenState.PostMatchPreview => GameModeHandoffCommand.PressPlayKey,
             StageScreenState.StorySelector or StageScreenState.RaidSelector or StageScreenState.PreviewReady => GameModeHandoffCommand.Back,
             _ => GameModeHandoffCommand.PressPlayKey,
         };

@@ -1030,8 +1030,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
         return navigation is
             ChallengeScreenState.Victory or
             ChallengeScreenState.Defeat or
-            ChallengeScreenState.PostMatchPreview or
-            ChallengeScreenState.PostMatchHud
+            ChallengeScreenState.PostMatchPreview
             ? "post_match_party"
             : null;
     }

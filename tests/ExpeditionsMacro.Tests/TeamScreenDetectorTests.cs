@@ -17,6 +17,8 @@ public sealed class TeamScreenDetectorTests
     [InlineData("TeamList_Aligned_Team6_01.png", TeamScreenState.Teams)]
     [InlineData("TeamList_Aligned_Bottom_01.png", TeamScreenState.Teams)]
     [InlineData("TeamLoadConfirm_01.png", TeamScreenState.LoadConfirm)]
+    [InlineData("TeamLoadConfirm_Bottom_Team7_01.png", TeamScreenState.LoadConfirm)]
+    [InlineData("TeamLoadConfirm_Bottom_Team8_01.png", TeamScreenState.LoadConfirm)]
     [InlineData("TeamEquipmentConfirm_01.png", TeamScreenState.EquipmentConfirm)]
     [InlineData("TeamEquipmentConfirm_Compact_01.png", TeamScreenState.EquipmentConfirm)]
     public void ReviewedTeamFixtures_MatchTheirExpectedState(string fileName, TeamScreenState expected)

@@ -39,25 +39,6 @@ public sealed class ChallengeMacroRunnerTests
     }
 
     [Fact]
-    public void PrestartPlayAction_IsAvailableForSafeCameraFailureExit()
-    {
-        string[] captures = Directory.GetFiles(
-            TestPaths.ChallengeDatasets,
-            "Prestart_*.png",
-            SearchOption.AllDirectories);
-
-        Assert.NotEmpty(captures);
-        foreach (string path in captures)
-        {
-            ImageFrame frame = ImageCodec.Load(path);
-            (int X, int Y)? play = ChallengeScreenDetector.PlayAction(frame);
-            Assert.True(play is not null, $"Play was not located in {path}.");
-            Assert.InRange(play.Value.X, 152, 180);
-            Assert.InRange(play.Value.Y, 570, 598);
-        }
-    }
-
-    [Fact]
     public async Task MapRecognition_ParksCursorBeforeDiscardingHighlightedSelectorFrame()
     {
         bool parked = false;
@@ -136,10 +117,10 @@ public sealed class ChallengeMacroRunnerTests
     [Fact]
     public async Task PlayMenuKey_FirstIgnoredPress_IsRetried()
     {
-        ImageFrame hud = ImageCodec.Load(Path.Combine(
+        ImageFrame terminal = ImageCodec.Load(Path.Combine(
             TestPaths.ChallengeDatasets,
-            "PostMatchHud",
-            "PostMatchHud_01.png"));
+            "Defeat",
+            "Defeat_04.png"));
         ImageFrame preview = ImageCodec.Load(Path.Combine(
             TestPaths.ChallengeDatasets,
             "PostMatchPreview",
@@ -153,7 +134,7 @@ public sealed class ChallengeMacroRunnerTests
             capture: () =>
             {
                 captures++;
-                return hud.Clone();
+                return terminal.Clone();
             },
             pressKey: (key, _) =>
             {
@@ -206,15 +187,15 @@ public sealed class ChallengeMacroRunnerTests
     [Fact]
     public async Task PlayMenuKey_LateTransitionBeforeRetry_IsAcceptedWithoutAnotherPress()
     {
-        ImageFrame hud = ImageCodec.Load(Path.Combine(
+        ImageFrame terminal = ImageCodec.Load(Path.Combine(
             TestPaths.ChallengeDatasets,
-            "PostMatchHud",
-            "PostMatchHud_01.png"));
+            "Defeat",
+            "Defeat_04.png"));
         ImageFrame preview = ImageCodec.Load(Path.Combine(
             TestPaths.ChallengeDatasets,
             "PostMatchPreview",
             "PostMatchPreview_03.png"));
-        Queue<ImageFrame> captures = new([hud, preview]);
+        Queue<ImageFrame> captures = new([terminal, preview]);
         int presses = 0;
         int waits = 0;
 

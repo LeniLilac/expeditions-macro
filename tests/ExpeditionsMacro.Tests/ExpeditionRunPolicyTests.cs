@@ -193,7 +193,6 @@ public sealed class ExpeditionRunPolicyTests
     [InlineData(ChallengeScreenState.Victory, "PressPlayKey")]
     [InlineData(ChallengeScreenState.Defeat, "PressPlayKey")]
     [InlineData(ChallengeScreenState.PostMatchPreview, "ChangeGamemode")]
-    [InlineData(ChallengeScreenState.PostMatchHud, "PressPlayKey")]
     [InlineData(ChallengeScreenState.Teleporting, "Wait")]
     [InlineData(ChallengeScreenState.None, "Wait")]
     public void CompletedRunHandoff_UsesOnlyStateOwnedActions(

@@ -1,6 +1,6 @@
 # Detector image dataset
 
-This repository includes 413 image fixtures used to build and regression-test the bundled Anime Expeditions detector pack, specialized UI detectors, and automatic camera-region selection. Of these, 410 are 808 by 611 Roblox client captures: 274 Expeditions fixtures, 75 selective Challenge fixtures, 38 Story/Raid/team fixtures, 8 cross-mode navigation variants, and 15 camera fixtures. The remaining three are privacy-safe 304 by 192 grayscale camera composites derived from a reported runtime-alignment failure. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
+This repository includes 416 image fixtures used to build and regression-test the bundled Anime Expeditions detector pack, specialized UI detectors, and automatic camera-region selection. Of these, 413 are 808 by 611 Roblox client captures: 274 Expeditions fixtures, 76 selective Challenge fixtures, 40 Story/Raid/team fixtures, 8 cross-mode navigation variants, and 15 camera fixtures. The remaining three are privacy-safe 304 by 192 grayscale camera composites derived from a reported runtime-alignment failure. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
 
 Captures are 808 by 611 PNG files organized under:
 

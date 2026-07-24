@@ -167,8 +167,6 @@ public sealed partial class ExpeditionMacroRunner
                     GameModeHandoffCommand.PressPlayKey,
                 ChallengeScreenState.PostMatchPreview =>
                     GameModeHandoffCommand.ChangeGamemode,
-                ChallengeScreenState.PostMatchHud =>
-                    GameModeHandoffCommand.PressPlayKey,
                 _ => GameModeHandoffCommand.Wait,
             };
 

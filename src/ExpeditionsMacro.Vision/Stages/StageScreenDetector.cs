@@ -26,7 +26,6 @@ public enum StageScreenState
     Victory,
     Defeat,
     PostMatchPreview,
-    PostMatchHud,
 }
 
 public sealed record StageScreenMatch(StageScreenState State, double Confidence, int? ActionX = null, int? ActionY = null);
@@ -106,7 +105,6 @@ public static class StageScreenDetector
             ChallengeScreenState.Prestart => new(StageScreenState.Prestart, shared.Confidence, shared.ActionX, shared.ActionY),
             ChallengeScreenState.PreviewReady => new(StageScreenState.PreviewReady, shared.Confidence, shared.ActionX, shared.ActionY),
             ChallengeScreenState.PostMatchPreview => new(StageScreenState.PostMatchPreview, shared.Confidence, shared.ActionX, shared.ActionY),
-            ChallengeScreenState.PostMatchHud => new(StageScreenState.PostMatchHud, shared.Confidence, shared.ActionX, shared.ActionY),
             ChallengeScreenState.GameModeSelector => new(StageScreenState.GameModeSelector, shared.Confidence),
             _ => null,
         };

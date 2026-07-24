@@ -1,5 +1,6 @@
 using System.Windows;
 using ExpeditionsMacro.App.Services;
+using ExpeditionsMacro.Automation.Challenges;
 using ExpeditionsMacro.Automation.Diagnostics;
 using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Navigation;
@@ -28,6 +29,7 @@ public partial class MacroPage
     {
         bool captureHistory = _services.Settings.AutoCaptureOnMacroError;
         MacroRunTotals macroTotals = new();
+        ChallengeRotationState challengeRotation = new();
         if (captureHistory) _services.DiagnosticCapture.BeginAutomaticHistory("Macro plan started");
         try
         {
@@ -42,6 +44,7 @@ public partial class MacroPage
                     playMenuKey,
                     unitMenuKey,
                     macroTotals,
+                    challengeRotation,
                     progress,
                     token),
                 progress,

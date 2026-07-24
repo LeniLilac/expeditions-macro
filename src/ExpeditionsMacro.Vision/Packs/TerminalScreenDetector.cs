@@ -21,10 +21,23 @@ internal static class TerminalScreenDetector
         bool defeat = state.Equals("defeat", StringComparison.OrdinalIgnoreCase);
         if (!victory && !defeat) return 0;
 
-        double bannerScore = Components(image, victory)
+        double bannerScore = Components(image, victory, minimumDefeatRed: 90)
             .Select(ScoreBanner)
             .DefaultIfEmpty(0)
             .Max();
+        if (defeat)
+        {
+            // Current Challenge panels join the red title banner to the outer
+            // frame through dim decorative pixels. A second, brighter mask
+            // isolates the same solid banner body without loosening its
+            // geometry or the independent Repeat Stage action requirement.
+            bannerScore = Math.Max(
+                bannerScore,
+                Components(image, victory: false, minimumDefeatRed: 120)
+                    .Select(ScoreBanner)
+                    .DefaultIfEmpty(0)
+                    .Max());
+        }
         double buttonScore = ActionButtonDetector.Score(image, state);
         if (bannerScore < 0.60 || buttonScore < 0.60) return 0;
         return Math.Clamp(0.72 * bannerScore + 0.28 * buttonScore, 0, 1);
@@ -42,7 +55,10 @@ internal static class TerminalScreenDetector
         return Math.Clamp(0.30 * horizontal + 0.25 * vertical + 0.25 * width + 0.20 * height, 0, 1);
     }
 
-    private static IReadOnlyList<Component> Components(ImageFrame image, bool victory)
+    private static IReadOnlyList<Component> Components(
+        ImageFrame image,
+        bool victory,
+        byte minimumDefeatRed)
     {
         int width = SearchRegion.Width;
         int height = SearchRegion.Height;
@@ -61,7 +77,7 @@ internal static class TerminalScreenDetector
                 byte blue = image.Pixels[pixel + 2];
                 mask[localY * width + localX] = victory
                     ? blue >= 100 && green >= 80 && blue - red >= 35 && green - red >= 25
-                    : red >= 90 && red - green >= 35 && red - blue >= 20;
+                    : red >= minimumDefeatRed && red - green >= 35 && red - blue >= 20;
             }
         }
 

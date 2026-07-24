@@ -132,6 +132,7 @@ public sealed class ChallengeMapDetectorTests
             preset,
             new Dictionary<ChallengeMapId, ChallengeMapRuntimeModels>(),
             detector,
+            new ChallengeRotationState(),
             string.Empty,
             'P'));
 

@@ -30,7 +30,7 @@
     },
     {
       "path": "src/ExpeditionsMacro.Automation/Expeditions/ExpeditionMacroRunner.cs",
-      "maxLines": 1120,
+      "maxLines": 1119,
       "reason": "Existing mode-runner orchestration debt; extract state-specific workflow services when touched."
     },
     {
@@ -67,11 +67,6 @@
       "path": "src/ExpeditionsMacro.App/Pages/ExpeditionsPage.xaml.cs",
       "maxLines": 556,
       "reason": "Existing page-controller debt; extract preset editing and operation coordination."
-    },
-    {
-      "path": "src/ExpeditionsMacro.Vision/Challenges/ChallengeScreenDetector.cs",
-      "maxLines": 525,
-      "reason": "Existing multi-state detector debt; split stable screen families without changing state priority."
     },
     {
       "path": "tools/ExpeditionsMacro.DeepDebugViewer/MainWindow.xaml.cs",

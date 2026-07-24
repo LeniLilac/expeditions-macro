@@ -17,7 +17,6 @@ public enum ChallengeScreenState
     PreviewReady,
     Teleporting,
     PostMatchPreview,
-    PostMatchHud,
     Prestart,
     Victory,
     Defeat,
@@ -79,7 +78,6 @@ public static class ChallengeScreenDetector
             ChallengeScreenState.Victory,
             ChallengeScreenState.Prestart,
             ChallengeScreenState.Teleporting,
-            ChallengeScreenState.PostMatchHud,
             ChallengeScreenState.PreviewReady,
             ChallengeScreenState.PostMatchPreview,
             ChallengeScreenState.ChallengeList,
@@ -113,13 +111,6 @@ public static class ChallengeScreenDetector
         double victoryClose = ActionButtonDetector.Score(image, "challenge_victory_close");
         double defeat = TerminalScreenDetector.Score(image, "defeat");
         double prestart = RewardScreenDetector.HasHeader(image) ? 0 : StartDialogDetector.Score(image);
-        // A live prestart can contain both the cyan hotbar Play icon and bright
-        // yellow map geometry. Those pixels independently resemble the two
-        // post-match HUD anchors, but the centered Start Game dialog is the
-        // stronger, state-defining signal and must win the collision.
-        double postMatchHud = prestart >= Threshold(ChallengeScreenState.Prestart)
-            ? 0
-            : PostMatchHudScore(image);
         double challengeList = ChallengeListScore(image, panel);
         double challengeListUnavailable = ChallengeListUnavailableScore(image, panel);
         double availability = Math.Max(selectStage, enterMatchmaking);
@@ -155,7 +146,6 @@ public static class ChallengeScreenDetector
             [ChallengeScreenState.PreviewReady] = preview,
             [ChallengeScreenState.Teleporting] = teleporting,
             [ChallengeScreenState.PostMatchPreview] = postMatchPreview,
-            [ChallengeScreenState.PostMatchHud] = postMatchHud,
             [ChallengeScreenState.Prestart] = prestart,
             [ChallengeScreenState.Victory] = victory,
             [ChallengeScreenState.Defeat] = defeat,
@@ -177,9 +167,6 @@ public static class ChallengeScreenDetector
     public static (int X, int Y) DefeatRetryAction(ImageFrame image) =>
         ActionButtonDetector.ActionFor(image, "defeat") ?? (225, 438);
 
-    public static (int X, int Y)? PlayAction(ImageFrame image) =>
-        ActionButtonDetector.ActionFor(image, "challenge_post_match_play");
-
     public static ScreenRegion? PrestartOcclusion(ImageFrame image) => StartDialogDetector.OcclusionFor(image);
 
     public static (int X, int Y)? ActionFor(ChallengeScreenState state, ImageFrame image) => state switch
@@ -191,7 +178,6 @@ public static class ChallengeScreenDetector
         ChallengeScreenState.PreviewReady => PreviewReadyAction(image),
         ChallengeScreenState.Teleporting => null,
         ChallengeScreenState.PostMatchPreview => ChangeModeAction(image),
-        ChallengeScreenState.PostMatchHud => PostMatchPlayAction(image),
         ChallengeScreenState.Prestart => StartDialogDetector.ActionFor(image),
         ChallengeScreenState.Victory => ActionButtonDetector.ActionFor(image, "challenge_victory_close"),
         ChallengeScreenState.Defeat => ActionButtonDetector.ActionFor(image, "defeat"),
@@ -208,7 +194,6 @@ public static class ChallengeScreenDetector
         ChallengeScreenState.PreviewReady => 0.78,
         ChallengeScreenState.Teleporting => 0.80,
         ChallengeScreenState.PostMatchPreview => 0.76,
-        ChallengeScreenState.PostMatchHud => 0.76,
         ChallengeScreenState.Prestart => 0.82,
         ChallengeScreenState.Victory => 0.74,
         ChallengeScreenState.Defeat => 0.75,
@@ -274,20 +259,6 @@ public static class ChallengeScreenDetector
             0,
             1);
     }
-
-    private static double PostMatchHudScore(ImageFrame image)
-    {
-        double play = ActionButtonDetector.Score(image, "challenge_post_match_play");
-        double gameResults = ActionButtonDetector.Score(image, "challenge_game_results");
-        return play == 0 || gameResults == 0
-            ? 0
-            : Math.Clamp(0.60 * play + 0.40 * gameResults, 0, 1);
-    }
-
-    private static (int X, int Y)? PostMatchPlayAction(ImageFrame image) =>
-        PostMatchHudScore(image) >= Threshold(ChallengeScreenState.PostMatchHud)
-            ? PlayAction(image)
-            : null;
 
     private static double CompactExpeditionPartyScore(ImageFrame image)
     {

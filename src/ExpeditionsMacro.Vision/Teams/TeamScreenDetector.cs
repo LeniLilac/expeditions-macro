@@ -41,6 +41,7 @@ public static class TeamScreenDetector
         new(530, 385, 116, 55),
     ];
     private static readonly int[] ScrollThumbOffsets = [0, 30, 59, 89, 118, 148, 156, 156];
+    private const double MinimumVisibleLoadButtonFraction = 0.075;
     // GB-014: nearby Roblox scenery can contain a much taller neutral-gray
     // strip, so color and minimum length alone do not identify the live thumb.
     private const int MinimumScrollThumbHeight = 60;
@@ -178,7 +179,9 @@ public static class TeamScreenDetector
         double header = ColorFraction(image, Header, IsGold);
         double dark = DarkFraction(image, TeamsPanel);
         double close = ActionButtonDetector.Score(image, "team_close");
-        int loadRows = LoadButtonRows.Count(region => ColorFraction(image, region, IsGreenButton) >= 0.075);
+        int loadRows = LoadButtonRows.Count(
+            region => ColorFraction(image, region, IsGreenButton) >=
+                MinimumVisibleLoadButtonFraction);
         const double minimumHeader = 0.018;
         const double minimumDark = 0.42;
         if (header < minimumHeader || dark < minimumDark || close == 0 || loadRows < 2) return 0;
@@ -194,7 +197,12 @@ public static class TeamScreenDetector
     private static double DimmedTeamsEvidence(ImageFrame image)
     {
         double dark = DarkFraction(image, TeamsPanel);
-        int loadRows = LoadButtonRows.Count(region => ColorFraction(image, region, IsGreenButton) >= 0.10);
+        // The clicked bottom-row button can dim below ten percent while the
+        // modal is open. Two other live rows plus the modal action remain
+        // required, so use the reviewed list threshold consistently.
+        int loadRows = LoadButtonRows.Count(
+            region => ColorFraction(image, region, IsGreenButton) >=
+                MinimumVisibleLoadButtonFraction);
         if (dark < 0.80 || loadRows < 2) return 0;
         return Math.Clamp(0.45 * Ramp(dark, 0.80, 0.96) + 0.55 * (loadRows / 3d), 0, 1);
     }

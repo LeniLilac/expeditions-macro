@@ -164,6 +164,7 @@ public partial class ChallengesPage : UserControl, IAppPage
                 preset,
                 mapModels,
                 detector,
+                new ChallengeRotationState(),
                 webhook,
                 playMenuKey,
                 progress,
@@ -179,7 +180,6 @@ public partial class ChallengesPage : UserControl, IAppPage
             token),
             new DeepDebugOperationContext { ChallengePresetId = preset.Id });
     }
-
     private async void SavePreset_Click(object sender, RoutedEventArgs e)
     {
         try
