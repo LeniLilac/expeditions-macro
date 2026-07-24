@@ -1,6 +1,6 @@
 # Detector image dataset
 
-This repository includes 419 image fixtures used to build and regression-test the bundled Anime Expeditions detector pack, specialized UI detectors, and automatic camera-region selection. Of these, 416 are 808 by 611 Roblox client captures: 274 Expeditions fixtures, 76 selective Challenge fixtures, 43 Story/Raid/team fixtures, 8 cross-mode navigation variants, and 15 camera fixtures. The remaining three are privacy-safe 304 by 192 grayscale camera composites derived from a reported runtime-alignment failure. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
+This repository includes 431 image fixtures used to build and regression-test the bundled Anime Expeditions detector pack, specialized UI detectors, and automatic camera-region selection. Of these, 428 are 808 by 611 Roblox client captures: 277 Expeditions fixtures, 79 selective Challenge fixtures, 43 Story/Raid/team fixtures, 8 cross-mode navigation variants, 15 camera fixtures, and 6 experimental resource-refuel fixtures. The remaining three are privacy-safe 304 by 192 grayscale camera composites derived from a reported runtime-alignment failure. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
 
 Captures are 808 by 611 PNG files organized under:
 
@@ -14,6 +14,8 @@ Lobby-entry and post-match Story, Raid, Challenge, and Expedition detail variant
 
 Camera-alignment fixtures are organized under `datasets/anime-expeditions/camera-rotations/`. Each of the three Expedition and four Story/Challenge maps contributes a goal frame plus a clearly incorrect yaw from a continuous right-arrow rotation. These fixtures verify that automatic setup selects four textured regions spanning the left, center, and right of the client and keeps an incorrect yaw well below the alignment threshold. The `RuntimeProjectionDrift` composites additionally verify that final alignment accepts a coherent cross-session vertical projection shift without broadening the thumbnail atlas or accepting a nearby wrong yaw. `UnrenderedWorld` preserves the textureless blue load failure that must be rejected before the macro moves the camera or places units.
 
+Experimental Areas, Gold Mine, and Resource Drill fixtures are organized under `datasets/anime-expeditions/refuel/`. They support only the Debug-page route calibration tool; no released Macro task or automatic refuel schedule consumes them.
+
 The current builder recognizes these dataset names:
 
 - `Roblox_Disconnect`
@@ -23,13 +25,13 @@ The current builder recognizes these dataset names:
 - `Expedition_Map_Preview_Map1`, `Expedition_Map1_Prestart`, `Expedition_Midgame_Start`
 - `Expedition_Checkpoint`, `Expedition_Checkpoint_Node`, `Expedition_Checkpoint_Extract_Confirm`
 - `Expedition_Continue_Button`, `Expedition_Continue_Button_Confirm`
-- `Expedition_Reward_Select`, `Select2`, `Select3`, and `Select4`
+- `Expedition_Reward_Select`, `Select2`, `Select3`, `Select4`, and `Select5`
 - `Expedition_Victory_UI`, `Expedition_Defeat_UI`, `Expedition_Empty_Unit_Bar`
 - `Expedition_Defense_Node`, `Assault_Node`, `Elite_Node`, `Boss_Node`
 
 The three `Difficultly*_LayoutShift` folders and `AFK_Chamber` are golden-test fixtures for specialized app detectors; they are not reference-builder inputs. The `Expedition_Midgame_Start` dataset includes hovered-button frames from a reported long-running stall.
 
-`Expedition_Reward_Transition` contains purple, gold, and blue reward layouts while one card is still collapsed or moving. `Expedition_Gameplay_Negative` contains ordinary full-match frames that previously resembled the legacy three-region reward template. Both are specialized-detector regression fixtures and are not builder inputs.
+`Expedition_Reward_Transition` contains purple, gold, and blue reward layouts while one card is still collapsed or moving. `Expedition_Reward_Select5` preserves three consecutive high-saturation blue-overlay frames from a beta.16 run where the old broad header scan rejected the live seven-pixel progress bar as a thick cyan band. `Expedition_Gameplay_Negative` contains ordinary full-match frames that previously resembled the legacy three-region reward template. The transition and gameplay-negative folders are specialized-detector regression fixtures and are not builder inputs.
 
 `Expedition_Continue_Button_Confirm_006.png` reproduces a reported confirmation stall. The player-name/title area above the modal was replaced with an opaque rectangle before the fixture entered Git history; the Roblox client dimensions and confirmation pixels are unchanged.
 

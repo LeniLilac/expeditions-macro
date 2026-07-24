@@ -101,7 +101,11 @@ public partial class MainWindow : Window
         if (_pages[key] is MacroPage macro) macro.SetSnapshotScroll(showPageEnd);
         if (_pages[key] is SettingsPage settings) settings.SetSnapshotScroll(showPageEnd);
         if (_pages[key] is ChallengesPage challenges) challenges.SetSnapshotScroll(showPageEnd);
-        if (_pages[key] is DebugPage debug) debug.SetSnapshotState();
+        if (_pages[key] is DebugPage debug)
+        {
+            debug.SetSnapshotState();
+            debug.SetSnapshotScroll(showPageEnd);
+        }
     }
 
     internal async Task VerifyBackgroundModelRefreshAsync()

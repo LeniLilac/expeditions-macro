@@ -110,6 +110,18 @@ internal static class RewardScreenDetector
         // view. Requiring that overlay prevents bright sky or scenery behind a
         // Start dialog from masquerading as the cyan reward progress bar.
         if (BlueOverlayFraction(image) < 0.60) return null;
+        // Strong HDR/color profiles can make the entire header band satisfy the
+        // older broad cyan predicate. Prefer the brighter, higher-contrast
+        // progress-bar color so the seven-pixel bar remains separable from that
+        // wash. Retain the broad scan for dimmer captured variants.
+        return FindHeaderRows(image, brightProgressOnly: true)
+            ?? FindHeaderRows(image, brightProgressOnly: false);
+    }
+
+    private static HeaderMatch? FindHeaderRows(
+        ImageFrame image,
+        bool brightProgressOnly)
+    {
         double bestRow = 0;
         int bestY = 0;
         int supportingRows = 0;
@@ -126,7 +138,16 @@ internal static class RewardScreenDetector
                 byte red = image.Pixels[pixel];
                 byte green = image.Pixels[pixel + 1];
                 byte blue = image.Pixels[pixel + 2];
-                if (green < 85 || blue < 55 || green - red < 18 || blue - red < 8) continue;
+                bool progressCyan = brightProgressOnly
+                    ? green >= 150 &&
+                      blue >= 110 &&
+                      green - red >= 45 &&
+                      blue - red >= 20
+                    : green >= 85 &&
+                      blue >= 55 &&
+                      green - red >= 18 &&
+                      blue - red >= 8;
+                if (!progressCyan) continue;
                 count++;
                 minimumX = Math.Min(minimumX, x);
                 maximumX = Math.Max(maximumX, x);

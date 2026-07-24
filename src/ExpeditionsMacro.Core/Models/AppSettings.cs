@@ -17,6 +17,8 @@ public sealed record AppSettings
 
     public const string DefaultUnitMenuKey = "";
 
+    public const string DefaultAreasMenuKey = "";
+
     public const string PlayMenuKeySetupInstructions =
         "1. Go to the Settings menu in game\n" +
         "2. Go to the Keybinds section in settings\n" +
@@ -68,11 +70,16 @@ public sealed record AppSettings
 
     public string UnitMenuKey { get; init; } = DefaultUnitMenuKey;
 
+    public string AreasMenuKey { get; init; } = DefaultAreasMenuKey;
+
+    public ResourceRefuelDebugSettings ResourceRefuelDebug { get; init; } = new();
+
     public static int ParseShiftLockKey(
         int virtualKey,
         int macroHotkeyVirtualKey,
         string? playMenuKey,
-        string? unitMenuKey)
+        string? unitMenuKey,
+        string? areasMenuKey = null)
     {
         string displayName = KeyboardKey.GetDisplayName(virtualKey);
         if (!KeyboardKey.IsSupportedShiftLockKey(virtualKey))
@@ -89,6 +96,7 @@ public sealed record AppSettings
         {
             ("Play menu", playMenuKey),
             ("Unit menu", unitMenuKey),
+            ("Areas menu", areasMenuKey),
         })
         {
             string candidate = binding.Value?.Trim() ?? string.Empty;
@@ -125,6 +133,17 @@ public sealed record AppSettings
     }
 
     public static char ParseUnitMenuKey(string? value, int macroHotkeyVirtualKey, string? playMenuKey)
+        => ParseUnitMenuKey(
+            value,
+            macroHotkeyVirtualKey,
+            playMenuKey,
+            areasMenuKey: null);
+
+    public static char ParseUnitMenuKey(
+        string? value,
+        int macroHotkeyVirtualKey,
+        string? playMenuKey,
+        string? areasMenuKey)
     {
         string candidate = value?.Trim() ?? string.Empty;
         if (candidate.Length != 1 || !char.IsAsciiLetter(candidate[0]))
@@ -143,6 +162,53 @@ public sealed record AppSettings
         if (play.Length == 1 && char.ToUpperInvariant(play[0]) == key)
         {
             throw new InvalidDataException("The Unit menu key and Play menu key must be different.");
+        }
+
+        string areas = areasMenuKey?.Trim() ?? string.Empty;
+        if (areas.Length == 1 &&
+            char.ToUpperInvariant(areas[0]) == key)
+        {
+            throw new InvalidDataException(
+                "The Unit menu key and Areas menu key must be different.");
+        }
+
+        return key;
+    }
+
+    public static char ParseAreasMenuKey(
+        string? value,
+        int macroHotkeyVirtualKey,
+        string? playMenuKey,
+        string? unitMenuKey)
+    {
+        string candidate = value?.Trim() ?? string.Empty;
+        if (candidate.Length != 1 ||
+            !char.IsAsciiLetter(candidate[0]))
+        {
+            throw new InvalidDataException(
+                "Set the Areas menu key under Settings > Controls to the same letter assigned to Toggle Areas in Anime Expeditions.");
+        }
+
+        char key = char.ToUpperInvariant(candidate[0]);
+        if (macroHotkeyVirtualKey == key)
+        {
+            throw new InvalidDataException(
+                $"The Areas menu key and macro start/stop hotkey cannot both be {key}.");
+        }
+
+        foreach ((string Label, string? Value) binding in new[]
+        {
+            ("Play menu", playMenuKey),
+            ("Unit menu", unitMenuKey),
+        })
+        {
+            string other = binding.Value?.Trim() ?? string.Empty;
+            if (other.Length == 1 &&
+                char.ToUpperInvariant(other[0]) == key)
+            {
+                throw new InvalidDataException(
+                    $"The Areas menu key and {binding.Label} key must be different.");
+            }
         }
 
         return key;

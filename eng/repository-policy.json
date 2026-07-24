@@ -40,7 +40,7 @@
     },
     {
       "path": "src/ExpeditionsMacro.Windows/WindowsRobloxAutomation.cs",
-      "maxLines": 866,
+      "maxLines": 857,
       "reason": "Existing Windows adapter debt; separate window, capture, keyboard, pointer, and diagnostics concerns."
     },
     {

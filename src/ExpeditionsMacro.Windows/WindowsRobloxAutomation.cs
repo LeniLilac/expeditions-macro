@@ -394,15 +394,6 @@ public sealed partial class WindowsRobloxAutomation : IRobloxAutomation, IDispos
         }
     }
 
-    public Task TapShiftLockKeyAsync(RobloxWindow window, int virtualKey, CancellationToken cancellationToken) =>
-        _keyboard.TapShiftLockKeyAsync(window, virtualKey, cancellationToken);
-
-    public Task TapLetterKeyAsync(RobloxWindow window, char key, CancellationToken cancellationToken) =>
-        _keyboard.TapLetterKeyAsync(window, key, cancellationToken);
-
-    public Task TapUnitKeyAsync(RobloxWindow window, int unitKey, int holdMilliseconds, CancellationToken cancellationToken) =>
-        _keyboard.TapUnitKeyAsync(window, unitKey, holdMilliseconds, cancellationToken);
-
     private void SendMouse(uint flags, int dx = 0, int dy = 0, uint data = 0)
     {
         NativeMethods.Input[] inputs =

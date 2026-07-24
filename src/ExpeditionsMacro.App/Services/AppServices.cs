@@ -7,6 +7,7 @@ using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Expeditions;
 using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Automation.Recovery;
+using ExpeditionsMacro.Automation.Refuel;
 using ExpeditionsMacro.Automation.Scheduling;
 using ExpeditionsMacro.Automation.Stages;
 using ExpeditionsMacro.Automation.Teams;
@@ -95,10 +96,14 @@ public sealed class AppServices : IDisposable
                 Settings.ShiftLockVirtualKey,
                 Settings.MacroHotkeyVirtualKey,
                 Settings.PlayMenuKey,
-                Settings.UnitMenuKey));
+                Settings.UnitMenuKey,
+                Settings.AreasMenuKey));
         RobloxRecovery = new RobloxPrivateServerRecoveryService(
             Automation,
             new WindowsRobloxProcessController());
+        ResourceRefuel = new ResourceRefuelService(
+            Automation,
+            RobloxRecovery);
         _discord = new DiscordWebhookClient();
         Teams = new TeamSelectionService(Automation);
         Stages = new StageMacroRunner(Automation, Camera, Placement, Teams, _discord);
@@ -142,6 +147,7 @@ public sealed class AppServices : IDisposable
     public PlacementService Placement { get; }
     public CameraAlignmentEngine Camera { get; }
     public RobloxPrivateServerRecoveryService RobloxRecovery { get; }
+    public ResourceRefuelService ResourceRefuel { get; }
     public TeamSelectionService Teams { get; }
     public StageMacroRunner Stages { get; }
     public MacroScheduler Scheduler { get; }

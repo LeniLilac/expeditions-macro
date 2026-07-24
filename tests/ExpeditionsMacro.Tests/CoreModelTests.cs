@@ -192,6 +192,69 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public void AppSettings_AreasMenuKeyIsDebugOnlyAndNormalizesLetters()
+    {
+        AppSettings settings = new();
+
+        Assert.Equal(string.Empty, settings.AreasMenuKey);
+        Assert.Equal(
+            'G',
+            AppSettings.ParseAreasMenuKey(
+                " g ",
+                AppSettings.DefaultMacroHotkeyVirtualKey,
+                "P",
+                "U"));
+        Assert.Throws<InvalidDataException>(
+            () => AppSettings.ParseAreasMenuKey(
+                string.Empty,
+                AppSettings.DefaultMacroHotkeyVirtualKey,
+                "P",
+                "U"));
+    }
+
+    [Theory]
+    [InlineData("G", 0x47, "P", "U")]
+    [InlineData("P", 0x75, "P", "U")]
+    [InlineData("U", 0x75, "P", "U")]
+    public void AppSettings_AreasMenuKeyMustDifferFromOtherControls(
+        string areas,
+        int macroKey,
+        string play,
+        string unit)
+    {
+        Assert.Throws<InvalidDataException>(
+            () => AppSettings.ParseAreasMenuKey(
+                areas,
+                macroKey,
+                play,
+                unit));
+    }
+
+    [Fact]
+    public void ResourceRefuelDebugSettings_ValidatesRouteTimingAndRetries()
+    {
+        ResourceRefuelDebugSettings settings = new();
+
+        settings.Validate();
+        Assert.Equal(
+            [('W', 1200), ('A', 700), ('W', 900)],
+            settings.RouteFor(ResourceRefuelTarget.GoldMine));
+        Assert.Equal(
+            [('W', 1200), ('A', 700), ('W', 900), ('A', 700)],
+            settings.RouteFor(ResourceRefuelTarget.ResourceDrill));
+        Assert.Throws<InvalidDataException>(
+            () => (settings with
+            {
+                GoldForward1Milliseconds = 49,
+            }).Validate());
+        Assert.Throws<InvalidDataException>(
+            () => (settings with
+            {
+                RetryCount = 6,
+            }).Validate());
+    }
+
+    [Fact]
     public void ModelId_IsReadableStableAndNameSensitive()
     {
         string first = ModelId.FromName("Expedition Map 1");

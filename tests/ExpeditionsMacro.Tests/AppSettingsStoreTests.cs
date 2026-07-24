@@ -22,6 +22,13 @@ public sealed class AppSettingsStoreTests
                 DebugModeEnabled = true,
                 DiscordErrorUserId = "123456789012345678",
                 ShiftLockVirtualKey = KeyboardKey.RightShift,
+                AreasMenuKey = "G",
+                ResourceRefuelDebug =
+                    new ResourceRefuelDebugSettings
+                    {
+                        GoldForward1Milliseconds = 4321,
+                        RetryCount = 4,
+                    },
             });
 
             AppSettingsStore restartedProcess = new(new AppPaths(root));
@@ -36,6 +43,14 @@ public sealed class AppSettingsStoreTests
             Assert.True(loaded.DebugModeEnabled);
             Assert.Equal("123456789012345678", loaded.DiscordErrorUserId);
             Assert.Equal(KeyboardKey.RightShift, loaded.ShiftLockVirtualKey);
+            Assert.Equal("G", loaded.AreasMenuKey);
+            Assert.Equal(
+                4321,
+                loaded.ResourceRefuelDebug
+                    .GoldForward1Milliseconds);
+            Assert.Equal(
+                4,
+                loaded.ResourceRefuelDebug.RetryCount);
         }
         finally
         {

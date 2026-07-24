@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using ExpeditionsMacro.App.Services;
 using ExpeditionsMacro.Automation.Diagnostics;
+using ExpeditionsMacro.Automation.Refuel;
 using ExpeditionsMacro.Core.Models;
 
 namespace ExpeditionsMacro.App.Pages;
@@ -55,6 +56,27 @@ public partial class DebugPage : UserControl, IAppPage
                 value,
                 $"Team {value}"))
             .ToArray();
+        RefuelStartCombo.ItemsSource = new[]
+        {
+            new DebugOption<ResourceRefuelStart>(
+                ResourceRefuelStart.CurrentLobby,
+                "Lobby (Areas closed)"),
+            new DebugOption<ResourceRefuelStart>(
+                ResourceRefuelStart.RestartPrivateServer,
+                "Restart Roblox, then lobby"),
+        };
+        RefuelTargetCombo.ItemsSource = new[]
+        {
+            new DebugOption<ResourceRefuelTarget>(
+                ResourceRefuelTarget.GoldMine,
+                "Gold Mine"),
+            new DebugOption<ResourceRefuelTarget>(
+                ResourceRefuelTarget.ResourceDrill,
+                "Resource Drill"),
+            new DebugOption<ResourceRefuelTarget>(
+                ResourceRefuelTarget.Both,
+                "Gold Mine, then Resource Drill"),
+        };
         StepModeCombo.ItemsSource = new[]
         {
             new DebugOption<DebugStepMode>(
@@ -71,6 +93,8 @@ public partial class DebugPage : UserControl, IAppPage
         NavigationModeCombo.SelectedIndex = 0;
         ChallengeTypeCombo.SelectedItem = ChallengeType.Trait;
         TeamCombo.SelectedIndex = 0;
+        RefuelStartCombo.SelectedIndex = 0;
+        RefuelTargetCombo.SelectedIndex = 0;
         StepModeCombo.SelectedIndex = 0;
         _services.DebugCheckpoints.CheckpointAdded +=
             DebugCheckpoint_Added;
@@ -85,6 +109,7 @@ public partial class DebugPage : UserControl, IAppPage
     public async Task OnShownAsync()
     {
         await RefreshPresetsAsync();
+        LoadRefuelRouteSettings();
         UpdateControls();
     }
 
@@ -109,6 +134,17 @@ public partial class DebugPage : UserControl, IAppPage
             null,
             null,
             null));
+    }
+
+    internal void SetSnapshotScroll(bool showRefuel)
+    {
+        UpdateLayout();
+        DebugToolsScroll.ScrollToVerticalOffset(
+            showRefuel
+                ? RefuelCard.TranslatePoint(
+                    new Point(),
+                    DebugToolsStack).Y
+                : 0);
     }
 
     private async Task RefreshPresetsAsync()

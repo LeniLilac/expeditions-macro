@@ -20,6 +20,7 @@ Sources:
 - `error-challenge-macro-20260721-121531(1).zip`: a ten-frame app-version 1.2.0 automatic failure capture at one-second intervals. One frame was retained for a King's Tomb Start Game dialog that the former detector priority mistook for the post-match HUD because the hotbar Play icon and bright floor geometry resembled its two anchors. The player identity strip was replaced with an opaque rectangle; the dialog and every conflicting detector pixel are unchanged.
 - `error-challenge-macro-20260722-123749.zip`: an app-version 1.2.1 automatic failure capture after a valid King's Tomb preview Start click. Two original frames were retained from the animated `Teleporting...` transition that exceeded the former fixed 35-second prestart deadline. The frames contain no account or display names, chat, notifications, desktop chrome, or secrets, so no pixels were changed.
 - `deep-debug-macro-plan-20260724-060813-201e846e7a3c4c15b79283fdcffc4011.zip`: an app-version 1.3.0-beta.13 run whose current wide School Grounds Defeat panel remained open for more than one minute. `Defeat_04.png` preserves its first stable terminal frame; it contains no account or display names, chat, notifications, desktop chrome, or secrets, so no pixels were changed.
+- `deep-debug-macro-plan-20260724-180044-551fb2b555fc478f92a14fa1a32801da.zip`: an app-version 1.3.0-beta.13 run whose second Rose Kingdom Victory panel remained open until the user stopped the macro. `Victory_08.png` through `Victory_10.png` preserve three consecutive animated reward frames. They contain no account or display names, chat, notifications, desktop chrome, or secrets, so no pixels were changed.
 
 The full bursts remain local diagnostic artifacts. Frames containing a visible player or display name in party previews are excluded unless the identifying text can be isolated from detector evidence. The display-name strip in `Prestart_FlowerForest_01.png`, `GameplayNegative_08.png`, `PreviewReady_03.png`, and `PostMatchPreview_03.png` was replaced with an opaque rectangle; every other retained fixture preserves its original pixels.
 
@@ -30,6 +31,8 @@ The full bursts remain local diagnostic artifacts. Frames containing a visible p
 `GameplayNegative_09.png` preserves the former small-Play-button HUD regression as a negative. The configured Play key owns post-match navigation directly from an open Victory or Defeat panel; the cyan hotbar control and **Game Results** button are not an actionable state.
 
 `Defeat_04.png` verifies the current wide terminal whose dim red outer decoration connects to its bright title banner. Defeat recognition isolates the bright banner body and still requires the independent yellow **Repeat Stage** action.
+
+`Victory_08.png` through `Victory_10.png` verify that the animated cyan reward artwork is not required for a stable terminal decision. Victory instead requires its independently detected Close and **View Party** actions plus the repeated roster-reward structure.
 
 `Prestart_KingsTomb_03.png` reproduces the reported v1.2.0 prestart timeout and verifies that a geometrically valid Start Game dialog takes precedence over coincidental post-match anchor matches.
 

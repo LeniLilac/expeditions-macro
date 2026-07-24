@@ -24,6 +24,8 @@ public partial class SettingsKeyBindingsPanel : UserControl
 
     public string UnitDiagnostic { get; private set; } = "Not set";
 
+    public string AreasDiagnostic { get; private set; } = "Not set";
+
     public string ShiftLockDiagnostic { get; private set; } = "Left Ctrl";
 
     public string HotkeyDisplayName => _services?.Hotkey.DisplayName ?? "F6";
@@ -48,6 +50,7 @@ public partial class SettingsKeyBindingsPanel : UserControl
         UpdateMacroDisplay();
         UpdatePlayDisplay();
         UpdateUnitDisplay();
+        UpdateAreasDisplay();
         UpdateShiftLockDisplay();
         UpdateButtons();
     }
@@ -68,18 +71,26 @@ public partial class SettingsKeyBindingsPanel : UserControl
 
     private void UnitButton_Click(object sender, RoutedEventArgs e) => BeginCapture(BindingTarget.Unit, UnitButton);
 
+    private void AreasButton_Click(object sender, RoutedEventArgs e) => BeginCapture(BindingTarget.Areas, AreasButton);
+
     private void ShiftLockButton_Click(object sender, RoutedEventArgs e) => BeginCapture(BindingTarget.ShiftLock, ShiftLockButton);
 
     private void BeginCapture(BindingTarget target, Button button)
     {
         if (_busy || _saving) return;
         _captureTarget = target;
-        button.Content = target is BindingTarget.Play or BindingTarget.Unit ? "Press a letter..." : "Press a key...";
+        button.Content = target is
+            BindingTarget.Play or
+            BindingTarget.Unit or
+            BindingTarget.Areas
+                ? "Press a letter..."
+                : "Press a key...";
         StatusFor(target).Text = target switch
         {
             BindingTarget.Macro => "Press a letter, number, punctuation, numpad, or function key. Escape cancels; F12 is reserved.",
             BindingTarget.Play => "Press the letter assigned to Toggle Play Menu. Escape cancels.",
             BindingTarget.Unit => "Press the letter assigned to Toggle Units. Escape cancels.",
+            BindingTarget.Areas => "Press the letter assigned to Toggle Areas. Escape cancels.",
             _ => "Press the key assigned to Shift Lock, including left/right Shift or Ctrl. Escape cancels.",
         };
         Keyboard.Focus(button);
@@ -99,7 +110,10 @@ public partial class SettingsKeyBindingsPanel : UserControl
 
         int virtualKey = KeyInterop.VirtualKeyFromKey(key);
         BindingTarget target = _captureTarget;
-        if (target is BindingTarget.Play or BindingTarget.Unit)
+        if (target is
+            BindingTarget.Play or
+            BindingTarget.Unit or
+            BindingTarget.Areas)
         {
             if (virtualKey is < 0x41 or > 0x5A)
             {
@@ -139,6 +153,9 @@ public partial class SettingsKeyBindingsPanel : UserControl
                 case BindingTarget.Unit:
                     await ApplyUnitAsync((char)virtualKey);
                     break;
+                case BindingTarget.Areas:
+                    await ApplyAreasAsync((char)virtualKey);
+                    break;
                 case BindingTarget.ShiftLock:
                     await ApplyShiftLockAsync(virtualKey);
                     break;
@@ -161,7 +178,12 @@ public partial class SettingsKeyBindingsPanel : UserControl
     private async Task ApplyMacroAsync(int virtualKey)
     {
         AppServices services = Services;
-        ValidateBindings(virtualKey, services.Settings.PlayMenuKey, services.Settings.UnitMenuKey, services.Settings.ShiftLockVirtualKey);
+        ValidateBindings(
+            virtualKey,
+            services.Settings.PlayMenuKey,
+            services.Settings.UnitMenuKey,
+            services.Settings.AreasMenuKey,
+            services.Settings.ShiftLockVirtualKey);
         int previous = services.Hotkey.VirtualKey;
         string display = KeyboardKey.GetDisplayName(virtualKey);
         MacroButton.Content = display;
@@ -188,32 +210,125 @@ public partial class SettingsKeyBindingsPanel : UserControl
         _ = AppSettings.ParsePlayMenuKey(key.ToString(), services.Hotkey.VirtualKey);
         if (!string.IsNullOrWhiteSpace(services.Settings.UnitMenuKey))
         {
-            _ = AppSettings.ParseUnitMenuKey(services.Settings.UnitMenuKey, services.Hotkey.VirtualKey, key.ToString());
+            _ = AppSettings.ParseUnitMenuKey(
+                services.Settings.UnitMenuKey,
+                services.Hotkey.VirtualKey,
+                key.ToString(),
+                services.Settings.AreasMenuKey);
         }
-        _ = AppSettings.ParseShiftLockKey(services.Settings.ShiftLockVirtualKey, services.Hotkey.VirtualKey, key.ToString(), services.Settings.UnitMenuKey);
+        if (!string.IsNullOrWhiteSpace(
+                services.Settings.AreasMenuKey))
+        {
+            _ = AppSettings.ParseAreasMenuKey(
+                services.Settings.AreasMenuKey,
+                services.Hotkey.VirtualKey,
+                key.ToString(),
+                services.Settings.UnitMenuKey);
+        }
+        _ = AppSettings.ParseShiftLockKey(
+            services.Settings.ShiftLockVirtualKey,
+            services.Hotkey.VirtualKey,
+            key.ToString(),
+            services.Settings.UnitMenuKey,
+            services.Settings.AreasMenuKey);
         await services.UpdateSettingsAsync(settings => settings with { PlayMenuKey = key.ToString() });
     }
 
     private async Task ApplyUnitAsync(char key)
     {
         AppServices services = Services;
-        _ = AppSettings.ParseUnitMenuKey(key.ToString(), services.Hotkey.VirtualKey, services.Settings.PlayMenuKey);
-        _ = AppSettings.ParseShiftLockKey(services.Settings.ShiftLockVirtualKey, services.Hotkey.VirtualKey, services.Settings.PlayMenuKey, key.ToString());
+        _ = AppSettings.ParseUnitMenuKey(
+            key.ToString(),
+            services.Hotkey.VirtualKey,
+            services.Settings.PlayMenuKey,
+            services.Settings.AreasMenuKey);
+        if (!string.IsNullOrWhiteSpace(
+                services.Settings.AreasMenuKey))
+        {
+            _ = AppSettings.ParseAreasMenuKey(
+                services.Settings.AreasMenuKey,
+                services.Hotkey.VirtualKey,
+                services.Settings.PlayMenuKey,
+                key.ToString());
+        }
+        _ = AppSettings.ParseShiftLockKey(
+            services.Settings.ShiftLockVirtualKey,
+            services.Hotkey.VirtualKey,
+            services.Settings.PlayMenuKey,
+            key.ToString(),
+            services.Settings.AreasMenuKey);
         await services.UpdateSettingsAsync(settings => settings with { UnitMenuKey = key.ToString() });
+    }
+
+    private async Task ApplyAreasAsync(char key)
+    {
+        AppServices services = Services;
+        _ = AppSettings.ParseAreasMenuKey(
+            key.ToString(),
+            services.Hotkey.VirtualKey,
+            services.Settings.PlayMenuKey,
+            services.Settings.UnitMenuKey);
+        if (!string.IsNullOrWhiteSpace(
+                services.Settings.UnitMenuKey))
+        {
+            _ = AppSettings.ParseUnitMenuKey(
+                services.Settings.UnitMenuKey,
+                services.Hotkey.VirtualKey,
+                services.Settings.PlayMenuKey,
+                key.ToString());
+        }
+        _ = AppSettings.ParseShiftLockKey(
+            services.Settings.ShiftLockVirtualKey,
+            services.Hotkey.VirtualKey,
+            services.Settings.PlayMenuKey,
+            services.Settings.UnitMenuKey,
+            key.ToString());
+        await services.UpdateSettingsAsync(settings =>
+            settings with { AreasMenuKey = key.ToString() });
     }
 
     private async Task ApplyShiftLockAsync(int virtualKey)
     {
         AppServices services = Services;
-        _ = AppSettings.ParseShiftLockKey(virtualKey, services.Hotkey.VirtualKey, services.Settings.PlayMenuKey, services.Settings.UnitMenuKey);
+        _ = AppSettings.ParseShiftLockKey(
+            virtualKey,
+            services.Hotkey.VirtualKey,
+            services.Settings.PlayMenuKey,
+            services.Settings.UnitMenuKey,
+            services.Settings.AreasMenuKey);
         await services.UpdateSettingsAsync(settings => settings with { ShiftLockVirtualKey = virtualKey });
     }
 
-    private void ValidateBindings(int macroKey, string playKey, string unitKey, int shiftLockKey)
+    private void ValidateBindings(
+        int macroKey,
+        string playKey,
+        string unitKey,
+        string areasKey,
+        int shiftLockKey)
     {
         if (!string.IsNullOrWhiteSpace(playKey)) _ = AppSettings.ParsePlayMenuKey(playKey, macroKey);
-        if (!string.IsNullOrWhiteSpace(unitKey)) _ = AppSettings.ParseUnitMenuKey(unitKey, macroKey, playKey);
-        _ = AppSettings.ParseShiftLockKey(shiftLockKey, macroKey, playKey, unitKey);
+        if (!string.IsNullOrWhiteSpace(unitKey))
+        {
+            _ = AppSettings.ParseUnitMenuKey(
+                unitKey,
+                macroKey,
+                playKey,
+                areasKey);
+        }
+        if (!string.IsNullOrWhiteSpace(areasKey))
+        {
+            _ = AppSettings.ParseAreasMenuKey(
+                areasKey,
+                macroKey,
+                playKey,
+                unitKey);
+        }
+        _ = AppSettings.ParseShiftLockKey(
+            shiftLockKey,
+            macroKey,
+            playKey,
+            unitKey,
+            areasKey);
     }
 
     private void UpdateMacroDisplay()
@@ -249,7 +364,11 @@ public partial class SettingsKeyBindingsPanel : UserControl
         AppServices services = Services;
         try
         {
-            char key = AppSettings.ParseUnitMenuKey(services.Settings.UnitMenuKey, services.Hotkey.VirtualKey, services.Settings.PlayMenuKey);
+            char key = AppSettings.ParseUnitMenuKey(
+                services.Settings.UnitMenuKey,
+                services.Hotkey.VirtualKey,
+                services.Settings.PlayMenuKey,
+                services.Settings.AreasMenuKey);
             if (_captureTarget != BindingTarget.Unit) UnitButton.Content = key.ToString();
             UnitStatusText.Text = $"{key} must match Anime Expeditions' Toggle Units binding.";
             UnitDiagnostic = key.ToString();
@@ -269,7 +388,12 @@ public partial class SettingsKeyBindingsPanel : UserControl
         string display = KeyboardKey.GetDisplayName(services.Settings.ShiftLockVirtualKey);
         try
         {
-            _ = AppSettings.ParseShiftLockKey(services.Settings.ShiftLockVirtualKey, services.Hotkey.VirtualKey, services.Settings.PlayMenuKey, services.Settings.UnitMenuKey);
+            _ = AppSettings.ParseShiftLockKey(
+                services.Settings.ShiftLockVirtualKey,
+                services.Hotkey.VirtualKey,
+                services.Settings.PlayMenuKey,
+                services.Settings.UnitMenuKey,
+                services.Settings.AreasMenuKey);
             if (_captureTarget != BindingTarget.ShiftLock) ShiftLockButton.Content = display;
             ShiftLockStatusText.Text = $"{display} must match Anime Expeditions' Shift Lock binding.";
             ShiftLockDiagnostic = display;
@@ -279,6 +403,41 @@ public partial class SettingsKeyBindingsPanel : UserControl
             if (_captureTarget != BindingTarget.ShiftLock) ShiftLockButton.Content = display;
             ShiftLockStatusText.Text = error.Message;
             ShiftLockDiagnostic = "Conflict";
+        }
+    }
+
+    private void UpdateAreasDisplay()
+    {
+        AppServices services = Services;
+        try
+        {
+            char key = AppSettings.ParseAreasMenuKey(
+                services.Settings.AreasMenuKey,
+                services.Hotkey.VirtualKey,
+                services.Settings.PlayMenuKey,
+                services.Settings.UnitMenuKey);
+            if (_captureTarget != BindingTarget.Areas)
+            {
+                AreasButton.Content = key.ToString();
+            }
+            AreasStatusText.Text =
+                $"{key} must match Anime Expeditions' Toggle Areas binding.";
+            AreasDiagnostic = key.ToString();
+        }
+        catch (InvalidDataException error)
+        {
+            bool empty = string.IsNullOrWhiteSpace(
+                services.Settings.AreasMenuKey);
+            if (_captureTarget != BindingTarget.Areas)
+            {
+                AreasButton.Content = empty
+                    ? "Set key"
+                    : services.Settings.AreasMenuKey;
+            }
+            AreasStatusText.Text = empty
+                ? "Required only by the experimental resource-refuel Debug tools."
+                : error.Message;
+            AreasDiagnostic = empty ? "Not set" : "Conflict";
         }
     }
 
@@ -306,6 +465,8 @@ public partial class SettingsKeyBindingsPanel : UserControl
         MacroButton.IsEnabled = enabled && _captureTarget is BindingTarget.None or BindingTarget.Macro;
         PlayButton.IsEnabled = enabled && _captureTarget is BindingTarget.None or BindingTarget.Play;
         UnitButton.IsEnabled = enabled && _captureTarget is BindingTarget.None or BindingTarget.Unit;
+        AreasButton.IsEnabled = enabled &&
+            _captureTarget is BindingTarget.None or BindingTarget.Areas;
         ShiftLockButton.IsEnabled = enabled && _captureTarget is BindingTarget.None or BindingTarget.ShiftLock;
     }
 
@@ -314,6 +475,7 @@ public partial class SettingsKeyBindingsPanel : UserControl
         BindingTarget.Macro => MacroStatusText,
         BindingTarget.Play => PlayStatusText,
         BindingTarget.Unit => UnitStatusText,
+        BindingTarget.Areas => AreasStatusText,
         BindingTarget.ShiftLock => ShiftLockStatusText,
         _ => throw new ArgumentOutOfRangeException(nameof(target)),
     };
@@ -326,6 +488,7 @@ public partial class SettingsKeyBindingsPanel : UserControl
         Macro,
         Play,
         Unit,
+        Areas,
         ShiftLock,
     }
 }

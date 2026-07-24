@@ -21,6 +21,7 @@ internal static class UiSnapshotRenderer
         ("Camera Models", "camera-models", false),
         ("Placement Models", "placement-models", false),
         ("Debug", "debug", false),
+        ("Debug", "debug-refuel", true),
         ("Settings", "settings", false),
         ("Settings", "settings-debug", true),
     ];

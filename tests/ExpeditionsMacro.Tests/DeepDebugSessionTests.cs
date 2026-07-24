@@ -54,7 +54,14 @@ public sealed class DeepDebugSessionTests
             DiscordErrorUserId = userId,
             PlayMenuKey = "P",
             UnitMenuKey = "U",
+            AreasMenuKey = "G",
             ShiftLockVirtualKey = KeyboardKey.RightControl,
+            ResourceRefuelDebug =
+                new ResourceRefuelDebugSettings
+                {
+                    DrillLeft2Milliseconds = 2468,
+                    RetryCount = 3,
+                },
         };
         DeepDebugSessionService service = CreateService(paths, () => settings, () => log);
 
@@ -94,6 +101,17 @@ public sealed class DeepDebugSessionTests
         Assert.NotNull(archive.GetEntry("models/start/placement/placement-one/placement.json"));
         using JsonDocument sanitized = JsonDocument.Parse(await ReadEntryAsync(archive, "configuration/start/settings-sanitized.json"));
         Assert.Equal(KeyboardKey.RightControl, sanitized.RootElement.GetProperty("shift_lock_virtual_key").GetInt32());
+        Assert.Equal(
+            "G",
+            sanitized.RootElement
+                .GetProperty("areas_menu_key")
+                .GetString());
+        Assert.Equal(
+            2468,
+            sanitized.RootElement
+                .GetProperty("resource_refuel_debug")
+                .GetProperty("drill_left2_milliseconds")
+                .GetInt32());
         Assert.True(
             sanitized.RootElement
                 .GetProperty("debug_mode_enabled")

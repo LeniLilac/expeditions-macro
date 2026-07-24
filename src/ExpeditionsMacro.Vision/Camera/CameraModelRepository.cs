@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
@@ -29,7 +30,9 @@ public sealed class CameraModelRepository : ICameraModelRepository
             if (!File.Exists(file)) continue;
             try
             {
-                CameraModelManifest? manifest = await JsonFileStore.ReadAsync<CameraModelManifest>(file, cancellationToken).ConfigureAwait(false);
+                CameraModelManifest? manifest = await ReadManifestAsync(
+                    file,
+                    cancellationToken).ConfigureAwait(false);
                 manifest?.Validate();
                 if (manifest is not null) manifests.Add(manifest);
             }
@@ -44,7 +47,9 @@ public sealed class CameraModelRepository : ICameraModelRepository
     public async Task<CameraModel?> LoadAsync(string id, CancellationToken cancellationToken = default)
     {
         string directory = Path.Combine(_paths.CameraModels, ValidateId(id));
-        CameraModelManifest? manifest = await JsonFileStore.ReadAsync<CameraModelManifest>(Path.Combine(directory, "manifest.json"), cancellationToken).ConfigureAwait(false);
+        CameraModelManifest? manifest = await ReadManifestAsync(
+            Path.Combine(directory, "manifest.json"),
+            cancellationToken).ConfigureAwait(false);
         if (manifest is null) return null;
         manifest.Validate();
         ImageFrame reference = ImageCodec.Load(Path.Combine(directory, "reference.png"), PixelFormat.Gray8);
@@ -63,6 +68,91 @@ public sealed class CameraModelRepository : ICameraModelRepository
         if (fineAtlas.Count != manifest.FineYawOffsets.Count) throw new InvalidDataException("Camera model fine yaw atlas is incomplete.");
         return new CameraModel(manifest, reference, overlay, fineAtlas, atlas);
     }
+
+    private static async Task<CameraModelManifest?> ReadManifestAsync(
+        string path,
+        CancellationToken cancellationToken)
+    {
+        if (!File.Exists(path)) return null;
+
+        JsonDocument document;
+        try
+        {
+            await using FileStream stream = new(
+                path,
+                FileMode.Open,
+                FileAccess.Read,
+                FileShare.Read);
+            document = await JsonDocument.ParseAsync(
+                stream,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (JsonException error)
+        {
+            throw DamagedManifest(error);
+        }
+
+        using (document)
+        {
+            JsonElement root = document.RootElement;
+            string fallbackId =
+                Path.GetFileName(Path.GetDirectoryName(path))
+                ?? "unknown";
+            string name = ReadString(root, "name")
+                ?? ReadString(root, "id")
+                ?? fallbackId;
+            int? schemaVersion = ReadInt32(root, "schema_version");
+
+            if (schemaVersion is < 3)
+            {
+                throw new InvalidDataException(
+                    $"Camera model '{name}' uses obsolete format schema " +
+                    $"{schemaVersion} and cannot run in this version. " +
+                    "Open each affected preset, choose a current camera " +
+                    "model, and click Save preset. Rebuilding the Macro " +
+                    "plan alone does not replace a preset's camera model.");
+            }
+
+            if (schemaVersion > CameraModelManifest.CurrentSchemaVersion)
+            {
+                throw new InvalidDataException(
+                    $"Camera model '{name}' uses newer format schema " +
+                    $"{schemaVersion}. Update Expeditions Macro before " +
+                    "using this model.");
+            }
+
+            try
+            {
+                return root.Deserialize<CameraModelManifest>(
+                    JsonFileStore.Options);
+            }
+            catch (JsonException error)
+            {
+                throw DamagedManifest(error);
+            }
+        }
+    }
+
+    private static string? ReadString(JsonElement root, string propertyName) =>
+        root.ValueKind == JsonValueKind.Object
+        && root.TryGetProperty(propertyName, out JsonElement property)
+        && property.ValueKind == JsonValueKind.String
+            ? property.GetString()
+            : null;
+
+    private static int? ReadInt32(JsonElement root, string propertyName) =>
+        root.ValueKind == JsonValueKind.Object
+        && root.TryGetProperty(propertyName, out JsonElement property)
+        && property.TryGetInt32(out int value)
+            ? value
+            : null;
+
+    private static InvalidDataException DamagedManifest(JsonException error) =>
+        new(
+            "Camera model metadata is damaged or incomplete. Recreate the " +
+            "camera model, select it in each affected preset, and save the " +
+            "preset.",
+            error);
 
     public async Task SaveAsync(CameraModel model, CancellationToken cancellationToken = default)
     {

@@ -43,8 +43,9 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <StackPanel>
+            <ScrollViewer x:Name="DebugToolsScroll"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="DebugToolsStack">
                     <Border Style="{StaticResource FormCard}">
                         <StackPanel>
                             <TextBlock Style="{StaticResource SectionTitle}"
@@ -104,6 +105,129 @@
                                     icons:Lucide.Icon="Users"
                                     Content="Test team swap"
                                     Click="RunTeam_Click" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border x:Name="RefuelCard"
+                            Margin="0,14,0,0"
+                            Style="{StaticResource FormCard}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource SectionTitle}"
+                                       Text="Resource refuel (experimental)" />
+                            <TextBlock Margin="0,14,0,0"
+                                       Style="{StaticResource FieldLabel}"
+                                       Text="Start state" />
+                            <ComboBox x:Name="RefuelStartCombo"
+                                      Margin="0,7,0,0"
+                                      DisplayMemberPath="Label" />
+                            <TextBlock Margin="0,12,0,0"
+                                       Style="{StaticResource FieldLabel}"
+                                       Text="Station" />
+                            <ComboBox x:Name="RefuelTargetCombo"
+                                      Margin="0,7,0,0"
+                                      DisplayMemberPath="Label" />
+
+                            <TextBlock Margin="0,14,0,0"
+                                       Style="{StaticResource FieldLabel}"
+                                       Text="Gold Mine route (ms)" />
+                            <Grid Margin="0,7,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource Caption}"
+                                               Text="W1" />
+                                    <TextBox x:Name="GoldForward1Text"
+                                             Margin="0,4,0,0" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Style="{StaticResource Caption}"
+                                               Text="A" />
+                                    <TextBox x:Name="GoldLeftText"
+                                             Margin="0,4,0,0" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="4">
+                                    <TextBlock Style="{StaticResource Caption}"
+                                               Text="W2" />
+                                    <TextBox x:Name="GoldForward2Text"
+                                             Margin="0,4,0,0" />
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock Margin="0,12,0,0"
+                                       Style="{StaticResource FieldLabel}"
+                                       Text="Resource Drill route (ms)" />
+                            <Grid Margin="0,7,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="8" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource Caption}"
+                                               Text="W1" />
+                                    <TextBox x:Name="DrillForward1Text"
+                                             Margin="0,4,0,0" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Style="{StaticResource Caption}"
+                                               Text="A1" />
+                                    <TextBox x:Name="DrillLeft1Text"
+                                             Margin="0,4,0,0" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="2">
+                                    <TextBlock Style="{StaticResource Caption}"
+                                               Text="W2" />
+                                    <TextBox x:Name="DrillForward2Text"
+                                             Margin="0,4,0,0" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="2"
+                                            Grid.Column="2">
+                                    <TextBlock Style="{StaticResource Caption}"
+                                               Text="A2" />
+                                    <TextBox x:Name="DrillLeft2Text"
+                                             Margin="0,4,0,0" />
+                                </StackPanel>
+                            </Grid>
+
+                            <Grid Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Style="{StaticResource FieldLabel}"
+                                               Text="Retries" />
+                                    <TextBox x:Name="RefuelRetriesText"
+                                             Margin="0,7,0,0" />
+                                </StackPanel>
+                            </Grid>
+                            <StackPanel Margin="0,16,0,0"
+                                        HorizontalAlignment="Right"
+                                        Orientation="Horizontal">
+                                <Button x:Name="SaveRefuelRouteButton"
+                                        Height="34"
+                                        icons:Lucide.Icon="Save"
+                                        Content="Save route"
+                                        Click="SaveRefuelRoute_Click" />
+                                <Button x:Name="RunRefuelButton"
+                                        Height="34"
+                                        Margin="8,0,0,0"
+                                        Style="{StaticResource PrimaryButton}"
+                                        icons:Lucide.Icon="RefreshCw"
+                                        Content="Test refuel"
+                                        Click="RunRefuel_Click" />
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 

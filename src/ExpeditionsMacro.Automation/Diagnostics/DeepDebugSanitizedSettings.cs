@@ -22,7 +22,9 @@ internal sealed record DeepDebugSanitizedSettings(
     int MacroHotkeyVirtualKey,
     int ShiftLockVirtualKey,
     string PlayMenuKey,
-    string UnitMenuKey)
+    string UnitMenuKey,
+    string AreasMenuKey,
+    ResourceRefuelDebugSettings ResourceRefuelDebug)
 {
     public static DeepDebugSanitizedSettings From(
         AppSettings settings) => new(
@@ -46,5 +48,7 @@ internal sealed record DeepDebugSanitizedSettings(
         settings.MacroHotkeyVirtualKey,
         settings.ShiftLockVirtualKey,
         settings.PlayMenuKey,
-        settings.UnitMenuKey);
+        settings.UnitMenuKey,
+        settings.AreasMenuKey,
+        settings.ResourceRefuelDebug);
 }

@@ -4,6 +4,24 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.18] - 2026-07-24
+
+### Added
+
+- Added experimental Gold Mine and Resource Drill refuel routes to the Debug workspace for dataset collection and route tuning. Tests can start from the current lobby or relaunch through the configured private server, use a configurable Areas key, teleport through Expeditions Hub, replay configurable movement paths, and verify the detected fuel controls.
+- Added a configurable Areas menu key under Settings. It is used only by the experimental refuel Debug tools in this release.
+
+### Fixed
+
+- Challenge Victory detection now uses the stable Close, View Party, and repeated roster-reward structure instead of animated cyan result artwork, preventing bright Victory frames from being mistaken for ordinary gameplay.
+- Expedition card-reward detection now recognizes the current bright cyan progress header without weakening its button and gameplay-negative checks, allowing the macro to choose a card before Roblox auto-selects one.
+- Obsolete schema 1 and 2 camera models now produce an actionable preset-specific error instead of a raw JSON deserialization failure. Expedition presets also warn immediately when their referenced camera model is missing.
+
+### Tests
+
+- Added privacy-reviewed current Victory, bright card-reward, Areas, Expeditions Hub, Gold Mine, and Resource Drill fixtures to the full cross-state detector corpus.
+- Added Debug refuel route, physical held-key, settings persistence, Deep Debug, and legacy-camera compatibility regressions.
+
 ## [1.3.0-beta.17] - 2026-07-24
 
 ### Fixed
@@ -672,7 +690,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.17...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.18...HEAD
+[1.3.0-beta.18]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.17...v1.3.0-beta.18
 [1.3.0-beta.17]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.16...v1.3.0-beta.17
 [1.3.0-beta.16]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.15...v1.3.0-beta.16
 [1.3.0-beta.15]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.14...v1.3.0-beta.15

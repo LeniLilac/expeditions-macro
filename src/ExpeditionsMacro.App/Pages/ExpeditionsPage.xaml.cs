@@ -271,7 +271,7 @@ public partial class ExpeditionsPage : UserControl, IAppPage
         PresetNameText.Text = preset.Name;
         MapCombo.SelectedIndex = preset.MapNumber - 1;
         DifficultyCombo.SelectedIndex = preset.Difficulty - 1;
-        CameraCombo.SelectedItem = _cameraModels.FirstOrDefault(model => model.Id == preset.CameraModelId);
+        CameraPresetSelection.Apply(CameraCombo, PhaseText, _cameraModels, preset.CameraModelId);
         PlacementCombo.SelectedItem = _placementModels.FirstOrDefault(model => model.Id == preset.PlacementModelId);
         TeamCombo.SelectedItem = TeamChoices().First(value => value.Value == preset.TeamSlot);
         ExtractCheck.IsChecked = preset.ExtractAtCheckpoint;

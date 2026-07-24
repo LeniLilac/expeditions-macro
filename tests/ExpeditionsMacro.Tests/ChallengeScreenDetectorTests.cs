@@ -316,6 +316,31 @@ public sealed class ChallengeScreenDetectorTests
     }
 
     [Fact]
+    public void AnimatedVictoryRewards_RemainStableAcrossConsecutiveFrames()
+    {
+        for (int frame = 8; frame <= 10; frame++)
+        {
+            string file = Path.Combine(
+                TestPaths.ChallengeDatasets,
+                "Victory",
+                $"Victory_{frame:00}.png");
+
+            ChallengeScreenMatch match =
+                ChallengeScreenDetector.Detect(
+                    ImageCodec.Load(file));
+
+            Assert.Equal(
+                ChallengeScreenState.Victory,
+                match.State);
+            Assert.InRange(
+                match.Confidence,
+                ChallengeScreenDetector.Threshold(
+                    ChallengeScreenState.Victory),
+                1);
+        }
+    }
+
+    [Fact]
     public void ChallengeDetailTooltip_DoesNotMatchATerminalScreen()
     {
         string directory = Path.Combine(TestPaths.ChallengeDatasets, "ChallengeDetailTooltipNegative");

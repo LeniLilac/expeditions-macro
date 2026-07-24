@@ -18,12 +18,35 @@ internal sealed class WindowsKeyboardInput
         PulseKeyAsync(window, KeyboardInputDescriptor.FromShiftLockVirtualKey(virtualKey), 70, cancellationToken);
 
     public Task TapLetterKeyAsync(RobloxWindow window, char key, CancellationToken cancellationToken)
+        => HoldLetterKeyAsync(
+            window,
+            key,
+            holdMilliseconds: 70,
+            cancellationToken);
+
+    public Task HoldLetterKeyAsync(
+        RobloxWindow window,
+        char key,
+        int holdMilliseconds,
+        CancellationToken cancellationToken)
     {
         char normalized = char.ToUpperInvariant(key);
         if (!char.IsAsciiLetter(normalized)) throw new ArgumentOutOfRangeException(nameof(key), "The Roblox key must be A through Z.");
+        if (holdMilliseconds is < 1 or > 10000)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(holdMilliseconds));
+        }
         int virtualKey = normalized;
         int scanCode = checked((int)NativeMethods.MapVirtualKey((uint)virtualKey, 0));
-        return PulseKeyAsync(window, new KeyboardInputDescriptor(virtualKey, scanCode, false), 70, cancellationToken);
+        return PulseKeyAsync(
+            window,
+            new KeyboardInputDescriptor(
+                virtualKey,
+                scanCode,
+                false),
+            holdMilliseconds,
+            cancellationToken);
     }
 
     public Task TapUnitKeyAsync(RobloxWindow window, int unitKey, int holdMilliseconds, CancellationToken cancellationToken)

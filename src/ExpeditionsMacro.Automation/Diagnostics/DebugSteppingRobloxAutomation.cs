@@ -256,6 +256,21 @@ public sealed class DebugSteppingRobloxAutomation : IRobloxAutomation, IDisposab
                 cancellationToken),
             cancellationToken);
 
+    public Task HoldLetterKeyAsync(
+        RobloxWindow window,
+        char key,
+        int holdMilliseconds,
+        CancellationToken cancellationToken) =>
+        TraceAsync(
+            $"Hold {char.ToUpperInvariant(key)}",
+            $"Hold {char.ToUpperInvariant(key)} for {holdMilliseconds} ms.",
+            () => _inner.HoldLetterKeyAsync(
+                window,
+                key,
+                holdMilliseconds,
+                cancellationToken),
+            cancellationToken);
+
     public Task TapUnitKeyAsync(
         RobloxWindow window,
         int unitKey,

@@ -28,7 +28,14 @@ public sealed class DetectorPackGoldenTests
         ["victory"] = ["Expedition_Victory_UI"],
         ["defeat"] = ["Expedition_Defeat_UI"],
         ["extract_confirm"] = ["Expedition_Checkpoint_Extract_Confirm"],
-        ["reward"] = ["Expedition_Reward_Select", "Expedition_Reward_Select2", "Expedition_Reward_Select3", "Expedition_Reward_Select4"],
+        ["reward"] =
+        [
+            "Expedition_Reward_Select",
+            "Expedition_Reward_Select2",
+            "Expedition_Reward_Select3",
+            "Expedition_Reward_Select4",
+            "Expedition_Reward_Select5",
+        ],
         ["confirm"] = ["Expedition_Continue_Button_Confirm"],
         ["checkpoint"] = ["Expedition_Checkpoint", "Expedition_Checkpoint_Node"],
         ["start"] = ["Expedition_Map1_Prestart", "Expedition_Midgame_Start"],
@@ -61,7 +68,7 @@ public sealed class DetectorPackGoldenTests
             }
         }
 
-        Assert.Equal(204, checkedImages);
+        Assert.Equal(207, checkedImages);
         Assert.True(failures.Length == 0, $"Compiled detector regressions:{Environment.NewLine}{failures}");
     }
 
@@ -93,7 +100,7 @@ public sealed class DetectorPackGoldenTests
             }
         }
 
-        Assert.Equal(204, checkedImages);
+        Assert.Equal(207, checkedImages);
         Assert.True(failures.Length == 0, $"Cross-state detector regressions:{Environment.NewLine}{failures}");
     }
 
@@ -469,7 +476,7 @@ public sealed class DetectorPackGoldenTests
 
     [Fact]
     [Trait("Category", "Golden")]
-    public void RewardDetector_IsRarityIndependentAcrossAllFourCardDatasets()
+    public void RewardDetector_IsRarityIndependentAcrossAllCapturedCardDatasets()
     {
         if (!DatasetsAvailable()) return;
         CompiledDetectorPack pack = Pack.Value;

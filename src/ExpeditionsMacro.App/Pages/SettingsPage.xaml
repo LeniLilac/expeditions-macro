@@ -108,6 +108,8 @@
                             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
                             <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Unit menu key" /><TextBlock x:Name="UnitMenuKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
                             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Areas menu key" /><TextBlock x:Name="AreasMenuKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
                             <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Shift Lock key" /><TextBlock x:Name="ShiftLockKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
                             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
                             <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Runtime" /><TextBlock HorizontalAlignment="Right" Text=".NET 10, Windows x64" /></Grid>

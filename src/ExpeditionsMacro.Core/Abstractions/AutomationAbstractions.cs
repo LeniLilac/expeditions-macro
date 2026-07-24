@@ -96,6 +96,14 @@ public interface IRobloxAutomation
 
     Task TapLetterKeyAsync(RobloxWindow window, char key, CancellationToken cancellationToken);
 
+    Task HoldLetterKeyAsync(
+        RobloxWindow window,
+        char key,
+        int holdMilliseconds,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException(
+            "This automation backend does not support held letter input.");
+
     Task TapUnitKeyAsync(RobloxWindow window, int unitKey, int holdMilliseconds, CancellationToken cancellationToken);
 }
 

@@ -138,6 +138,8 @@ public partial class DebugPage
             _services.DebugCheckpoints.IsWaiting;
         RunNavigationButton.IsEnabled = !busy;
         RunTeamButton.IsEnabled = !busy;
+        RunRefuelButton.IsEnabled = !busy;
+        SaveRefuelRouteButton.IsEnabled = !busy;
         InspectScreenButton.IsEnabled = !busy;
         NormalizeClientButton.IsEnabled = !busy;
         NavigationStartCombo.IsEnabled = !busy;
@@ -145,6 +147,16 @@ public partial class DebugPage
         NavigationPresetCombo.IsEnabled = !busy;
         ChallengeTypeCombo.IsEnabled = !busy;
         TeamCombo.IsEnabled = !busy;
+        RefuelStartCombo.IsEnabled = !busy;
+        RefuelTargetCombo.IsEnabled = !busy;
+        GoldForward1Text.IsEnabled = !busy;
+        GoldLeftText.IsEnabled = !busy;
+        GoldForward2Text.IsEnabled = !busy;
+        DrillForward1Text.IsEnabled = !busy;
+        DrillLeft1Text.IsEnabled = !busy;
+        DrillForward2Text.IsEnabled = !busy;
+        DrillLeft2Text.IsEnabled = !busy;
+        RefuelRetriesText.IsEnabled = !busy;
         StepModeCombo.IsEnabled = !busy;
         PauseButton.IsEnabled = debugActive && !waiting;
         StepButton.IsEnabled = debugActive && waiting;

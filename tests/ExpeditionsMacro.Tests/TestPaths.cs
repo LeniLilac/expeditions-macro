@@ -46,6 +46,12 @@ internal static class TestPaths
         "anime-expeditions",
         "camera-rotations");
 
+    public static string RefuelDatasets => Path.Combine(
+        RepositoryRoot,
+        "datasets",
+        "anime-expeditions",
+        "refuel");
+
     public static string NewTemporaryDirectory()
     {
         string path = Path.Combine(Path.GetTempPath(), "ExpeditionsMacro.Tests", Guid.NewGuid().ToString("N"));

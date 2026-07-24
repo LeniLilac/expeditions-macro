@@ -52,7 +52,6 @@ public static class ChallengeScreenDetector
     private static readonly ScreenRegion ChallengeListFirstSeparatorRegion = new(265, 282, 435, 15);
     private static readonly ScreenRegion ChallengeListSecondSeparatorRegion = new(265, 373, 435, 15);
     private static readonly ScreenRegion RegularChallengeTabRegion = new(135, 180, 135, 75);
-    private static readonly ScreenRegion VictoryRosterRegion = new(510, 180, 150, 275);
     private static readonly ScreenRegion TeleportLogoRegion = new(190, 145, 430, 160);
     private static readonly ScreenRegion TeleportBottomFadeRegion = new(0, 455, ClientWidth, 156);
 
@@ -130,9 +129,10 @@ public static class ChallengeScreenDetector
         double postMatchPreview = previewStart > 0 || postMatchAction == 0
             ? 0
             : Math.Clamp(0.72 * postMatchAction + 0.28 * DarkPartyPanelScore(image), 0, 1);
-        double victory = victoryClose == 0 || victoryParty == 0
-            ? 0
-            : Math.Clamp(0.30 * panel + 0.25 * victoryClose + 0.30 * victoryParty + 0.15 * VictoryRosterScore(image), 0, 1);
+        double victory = ChallengeVictoryDetector.Score(
+            image,
+            victoryClose,
+            victoryParty);
         double teleporting = TeleportingScore(image);
 
         Dictionary<ChallengeScreenState, double> scores = new()
@@ -389,18 +389,6 @@ public static class ChallengeScreenDetector
         return neutral < 0.45 ? 0 : 0.72 + 0.28 * Ramp(neutral, 0.45, 0.68);
     }
 
-    private static double VictoryRosterScore(ImageFrame image)
-    {
-        int supportedRows = 0;
-        const int rowHeight = 50;
-        for (int row = 0; row < 5; row++)
-        {
-            ScreenRegion region = new(VictoryRosterRegion.X, VictoryRosterRegion.Y + row * rowHeight, VictoryRosterRegion.Width, rowHeight);
-            if (ColorFraction(image, region, IsRewardYellow) >= 0.008) supportedRows++;
-        }
-        return supportedRows < 3 ? 0 : 0.62 + 0.38 * ((supportedRows - 3) / 2d);
-    }
-
     private static double ColorFraction(ImageFrame image, ScreenRegion region, Func<byte, byte, byte, bool> predicate)
     {
         if (!region.FitsWithin(image.Width, image.Height)) return 0;
@@ -459,9 +447,6 @@ public static class ChallengeScreenDetector
 
     private static bool IsExpeditionGreen(byte red, byte green, byte blue) =>
         green >= 75 && green - red >= 18 && green - blue >= 8;
-
-    private static bool IsRewardYellow(byte red, byte green, byte blue) =>
-        red >= 120 && green >= 80 && blue <= 95 && red - blue >= 45;
 
     private static bool IsDark(byte red, byte green, byte blue) =>
         red + green + blue <= 150;

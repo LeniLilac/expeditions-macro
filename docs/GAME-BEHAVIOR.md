@@ -30,8 +30,8 @@ This ledger records Anime Expeditions behavior that has been established from re
 - Exit: shared game-mode selector.
 - Do not: close the terminal before pressing the Play key, substitute a visible Play-button click for the configured key, or assume every mode's party has the same button layout.
 - Failure rule: after three key attempts without a recognized party or game-mode selector, stop with the Play-binding setup error.
-- Evidence: a manual Story Victory sequence reviewed on 2026-07-22 using v1.3.0-beta.6 shows terminal, Play-key transition, Story party, and shared selector. Four later passive captures begin after the physical Play keypress and independently show Story, Raid, Expedition, and Challenge party-to-selector transitions; they do not contain Victory or Defeat terminals and are not evidence for terminal recognition. The direct terminal keypress path also existed in v1.2.1's Expedition mode-switch workflow. A beta.13 deep-debug run reviewed on 2026-07-24 preserves the current wide School Grounds Defeat panel and confirms that the background hotbar Play control and **Game Results** button must not replace terminal recognition.
-- Protected by: `StageHandoffPolicyTests.DifferentModeVictory_UsesTheFieldObservedPlayMenuSequence`, `ExpeditionRunPolicyTests.CompletedRunHandoff_UsesOnlyStateOwnedActions`, `ChallengeScreenDetectorTests.CurrentWideDefeatPanel_WinsOverBackgroundHudControls`, and Challenge handoff policy tests.
+- Evidence: a manual Story Victory sequence reviewed on 2026-07-22 using v1.3.0-beta.6 shows terminal, Play-key transition, Story party, and shared selector. Four later passive captures begin after the physical Play keypress and independently show Story, Raid, Expedition, and Challenge party-to-selector transitions; they do not contain Victory or Defeat terminals and are not evidence for terminal recognition. The direct terminal keypress path also existed in v1.2.1's Expedition mode-switch workflow. A beta.13 deep-debug run reviewed on 2026-07-24 preserves the current wide School Grounds Defeat panel and confirms that the background hotbar Play control and **Game Results** button must not replace terminal recognition. A second beta.13 run preserves consecutive Rose Kingdom Victory frames whose animated cyan reward artwork intermittently erased the former generic panel score while the Close, **View Party**, and roster-reward structures remained unchanged.
+- Protected by: `StageHandoffPolicyTests.DifferentModeVictory_UsesTheFieldObservedPlayMenuSequence`, `ExpeditionRunPolicyTests.CompletedRunHandoff_UsesOnlyStateOwnedActions`, `ChallengeScreenDetectorTests.CurrentWideDefeatPanel_WinsOverBackgroundHudControls`, `ChallengeScreenDetectorTests.AnimatedVictoryRewards_RemainStableAcrossConsecutiveFrames`, and Challenge handoff policy tests.
 
 ### GB-002: Repeat an identical scheduled route
 
@@ -243,6 +243,30 @@ This ledger records Anime Expeditions behavior that has been established from re
 - Ownership: every Debug tool uses the exclusive operation coordinator. When Deep Debug is enabled, the archive includes the selected tool/preset, step mode, ordered checkpoints, frames, detector traces, and resulting input events.
 - Do not: interpret rewind as an attempt to reverse already-sent Roblox input, or maintain separate Debug-only click coordinates.
 - Protected by: `DebugCheckpointControllerTests`, the existing mode navigation suites, saved-team tests, Deep Debug archive tests, and both-theme Debug page snapshots.
+
+### GB-019: Experimental resource-refuel route tests
+
+- Status: **Field confirmed for manual navigation; experimental Debug-only automation**.
+- Start A: the player is in the standard lobby pose with Areas closed. Start B: close the verified Roblox process, launch the saved private-server link, then wait for the same stable lobby.
+- Areas route: press the configured **Toggle Areas** letter, select **Expeditions**, and click **Expeditions Hub**.
+- Blind movement: after the Hub click, wait for teleport completion, then perform the user-configured Gold Mine route (`W`, `A`, `W`) or Resource Drill route (`W`, `A`, `W`, `A`). Do not use image/color detection during this movement.
+- Interaction: press `E`, then begin visual verification. Require the expected Gold Mine or Resource Drill panel, click its detected **Add Fuel** action, require the quantity dialog, click detected **Max**, then click the confirmed green action.
+- Retry: if `E` does not expose the expected station panel, reopen Areas, teleport to Expeditions Hub, and replay the complete configured route. Bound retries to the saved Debug value.
+- Between stations/end: use Areas again between Gold Mine and Resource Drill. After the final station, open Play with the configured Play key.
+- Ownership: use the same coordinator, focus/canonical-client checks, acknowledged clicks, held-key cleanup, checkpoint stepping, and Deep Debug tracing as other automation.
+- Product boundary: this tool exists only on the Debug page for route calibration and dataset gathering. It is not a Macro task, has no automatic schedule, and must not infer an eight-hour due time.
+- Evidence: a 419-frame passive capture reviewed on 2026-07-24 covers Lobby → Areas → Expeditions Hub → Gold Mine → Add Fuel → Areas → Expeditions Hub → Resource Drill → Add Fuel → Play. Physical movement/input timing is user described because the passive archive contains frames but no input events.
+- Protected by: `ResourceRefuelDetectorTests`, `ResourceRefuelServiceTests`, Areas-binding persistence/conflict tests, Deep Debug sanitized-settings tests, and both-theme Debug/Settings snapshots.
+
+### GB-020: Select a high-saturation Expedition reward
+
+- Status: **Field confirmed**.
+- Entry: a live three-card Expedition reward chooser with a global blue/cyan wash, a thin progress bar, and three **Select Upgrade** actions.
+- Action: identify the thin bright progress bar independently from the broader wash, require the repeated live action row, then click the first detected **Select Upgrade** action.
+- Exit: the reward chooser closes and ordinary node monitoring resumes.
+- Do not: reject the chooser merely because a color/HDR profile makes the full header band cyan, click a card from the overlay color alone, or wait for Roblox's automatic selection timer.
+- Evidence: three consecutive beta.16 Deep Debug frames reviewed on 2026-07-24. The complete chooser remained visible for about 24 seconds with a reward score of zero and no macro input; Roblox eventually auto-selected the right card. The affected profile made all 55 rows of the old broad cyan search band pass, while the actual bright progress bar remained a distinct seven-row structure.
+- Protected by: `DetectorPackGoldenTests.RewardDetector_IsRarityIndependentAcrossAllCapturedCardDatasets`, the complete cross-state corpus, and `Expedition_Reward_Select5`.
 
 ## Reusable evidence workflow
 

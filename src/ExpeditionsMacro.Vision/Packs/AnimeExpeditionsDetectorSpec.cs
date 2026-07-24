@@ -47,7 +47,7 @@ public static class AnimeExpeditionsDetectorSpec
         new("victory", ["Expedition_Victory_UI"], [new(125, 150, 95, 27)], 225, 438, 0.90),
         new("defeat", ["Expedition_Defeat_UI"], [new(125, 150, 95, 27)], 225, 438, 0.90),
         new("extract_confirm", ["Expedition_Checkpoint_Extract_Confirm"], [new(283, 217, 241, 176)], 345, 378, 0.82),
-        new("reward", ["Expedition_Reward_Select", "Expedition_Reward_Select2", "Expedition_Reward_Select3", "Expedition_Reward_Select4"], [new(136, 383, 116, 19), new(345, 383, 117, 19), new(554, 383, 118, 19)], 194, 391, 0.76),
+        new("reward", ["Expedition_Reward_Select", "Expedition_Reward_Select2", "Expedition_Reward_Select3", "Expedition_Reward_Select4", "Expedition_Reward_Select5"], [new(136, 383, 116, 19), new(345, 383, 117, 19), new(554, 383, 118, 19)], 194, 391, 0.76),
         new("confirm", ["Expedition_Continue_Button_Confirm"], [new(280, 255, 248, 93)], 345, 331, 0.80),
         new("checkpoint", ["Expedition_Checkpoint", "Expedition_Checkpoint_Node"], [new(310, 482, 185, 36)], 448, 500, 0.78),
         new("start", ["Expedition_Map1_Prestart", "Expedition_Midgame_Start"], [new(315, 100, 180, 92)], 404, 177, 0.82),
