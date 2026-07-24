@@ -44,7 +44,16 @@ internal static class LobbyPlayNavigator
         {
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame current = capture();
-            if (isOpen(current)) return;
+            if (isOpen(current))
+            {
+                if (await waitForOpen(
+                        TimeSpan.FromSeconds(3),
+                        cancellationToken).ConfigureAwait(false))
+                {
+                    return;
+                }
+                continue;
+            }
 
             if (!isLobby(current))
             {
@@ -57,7 +66,13 @@ internal static class LobbyPlayNavigator
             if (await waitForOpen(TimeSpan.FromSeconds(3), cancellationToken).ConfigureAwait(false)) return;
 
             current = capture();
-            if (isOpen(current)) return;
+            if (isOpen(current) &&
+                await waitForOpen(
+                    TimeSpan.FromSeconds(3),
+                    cancellationToken).ConfigureAwait(false))
+            {
+                return;
+            }
             keyAttemptMissed?.Invoke(attempt);
         }
 

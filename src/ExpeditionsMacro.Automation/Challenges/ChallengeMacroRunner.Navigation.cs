@@ -24,14 +24,34 @@ public sealed partial class ChallengeMacroRunner
         CancellationToken cancellationToken)
     {
         DateTimeOffset deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(90);
+        StableStateTracker<ChallengeScreenState> navigationTracker =
+            new(preset.StableDetections);
+        StableNavigationActionTracker<ChallengeScreenState>
+            actionTracker =
+                new(Math.Max(2, preset.StableDetections));
         string? lastRecovery = null;
         while (DateTimeOffset.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = CaptureClient(window, detector);
             ChallengeScreenMatch match = ChallengeScreenDetector.Detect(frame);
-            if (match.State is ChallengeScreenState.ChallengeList or ChallengeScreenState.ChallengeListUnavailable) return;
-            if (match.State is ChallengeScreenState.ChallengeAvailable or ChallengeScreenState.ChallengeCooldown)
+            ChallengeScreenState? stableNavigation =
+                navigationTracker.Update(match.State);
+            (int X, int Y)? stableAction =
+                actionTracker.Update(
+                    IsChallengeNavigationAction(match.State)
+                        ? match.State
+                        : ChallengeScreenState.None,
+                    MatchAction(match));
+            if (stableNavigation is
+                ChallengeScreenState.ChallengeList or
+                ChallengeScreenState.ChallengeListUnavailable)
+            {
+                return;
+            }
+            if (stableNavigation is
+                ChallengeScreenState.ChallengeAvailable or
+                ChallengeScreenState.ChallengeCooldown)
             {
                 await ReturnToChallengeSelectorWithVerificationAsync(
                     preset.StableDetections,
@@ -60,17 +80,27 @@ public sealed partial class ChallengeMacroRunner
                     cancellationToken).ConfigureAwait(false);
                 return;
             }
-            if (match.State == ChallengeScreenState.GameModeSelector)
+            if (match.State == ChallengeScreenState.GameModeSelector &&
+                stableNavigation ==
+                    ChallengeScreenState.GameModeSelector)
             {
                 report("Navigation", 0, "Opening Challenges from the game-mode selector.", "game_mode_selector", match.Confidence);
                 await ClickAsync(window, match.ActionX!.Value, match.ActionY!.Value, cancellationToken).ConfigureAwait(false);
                 await Task.Delay(850, cancellationToken).ConfigureAwait(false);
                 continue;
             }
-            if (match.State == ChallengeScreenState.PostMatchPreview)
+            if (match.State ==
+                    ChallengeScreenState.PostMatchPreview &&
+                stableAction is not null)
             {
-                await ClickAsync(window, match.ActionX!.Value, match.ActionY!.Value, cancellationToken).ConfigureAwait(false);
+                await ClickAsync(
+                    window,
+                    stableAction.Value.X,
+                    stableAction.Value.Y,
+                    cancellationToken).ConfigureAwait(false);
                 await Task.Delay(850, cancellationToken).ConfigureAwait(false);
+                navigationTracker.Reset();
+                actionTracker.Reset();
                 continue;
             }
             if (match.State is ChallengeScreenState.Victory or ChallengeScreenState.Defeat)
@@ -209,6 +239,9 @@ public sealed partial class ChallengeMacroRunner
     {
         DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
         StableStateTracker<ChallengeScreenState> tracker = new(preset.StableDetections);
+        StableNavigationActionTracker<ChallengeScreenState>
+            actionTracker =
+                new(Math.Max(2, preset.StableDetections));
         while (DateTimeOffset.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -218,9 +251,27 @@ public sealed partial class ChallengeMacroRunner
                 ? match.State
                 : ChallengeScreenState.None;
             ChallengeScreenState? stable = tracker.Update(candidate);
-            if (stable is ChallengeScreenState.ChallengeList or ChallengeScreenState.ChallengeListUnavailable)
+            (int X, int Y)? stableAction =
+                actionTracker.Update(
+                    candidate is
+                        ChallengeScreenState.ChallengeList or
+                        ChallengeScreenState.ChallengeListUnavailable
+                        ? candidate
+                        : ChallengeScreenState.None,
+                    MatchAction(match));
+            if ((stable is
+                    ChallengeScreenState.ChallengeList or
+                    ChallengeScreenState.ChallengeListUnavailable) &&
+                stableAction is not null)
             {
-                return new ChallengeSelectorObservation(frame, match with { State = stable.Value });
+                return new ChallengeSelectorObservation(
+                    frame,
+                    match with
+                    {
+                        State = stable.Value,
+                        ActionX = stableAction.Value.X,
+                        ActionY = stableAction.Value.Y,
+                    });
             }
             if (match.State != ChallengeScreenState.None) report("Waiting", 0, $"Detected {Label(match.State)}.", match.State.ToString(), match.Confidence);
             await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);

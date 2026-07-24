@@ -1,6 +1,7 @@
 using System.Windows;
 using ExpeditionsMacro.App.Services;
 using ExpeditionsMacro.Automation.Diagnostics;
+using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
@@ -26,6 +27,7 @@ public partial class MacroPage
         CancellationToken cancellationToken)
     {
         bool captureHistory = _services.Settings.AutoCaptureOnMacroError;
+        MacroRunTotals macroTotals = new();
         if (captureHistory) _services.DiagnosticCapture.BeginAutomaticHistory("Macro plan started");
         try
         {
@@ -39,6 +41,7 @@ public partial class MacroPage
                     discordUserId,
                     playMenuKey,
                     unitMenuKey,
+                    macroTotals,
                     progress,
                     token),
                 progress,

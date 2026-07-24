@@ -46,6 +46,7 @@ public sealed class DeepDebugSessionTests
         AppSettings settings = new()
         {
             DeepDebugEnabled = true,
+            DebugModeEnabled = true,
             EncryptedWebhook = "protected-secret-value",
             EncryptedPrivateServerLink =
                 "protected-private-server-value",
@@ -63,6 +64,8 @@ public sealed class DeepDebugSessionTests
             {
                 CameraModelIds = ["camera-one"],
                 PlacementModelIds = ["placement-one"],
+                DebugTool = "team-swap",
+                DebugStepMode = "BeforeActions",
             },
             _ =>
             {
@@ -93,8 +96,26 @@ public sealed class DeepDebugSessionTests
         Assert.Equal(KeyboardKey.RightControl, sanitized.RootElement.GetProperty("shift_lock_virtual_key").GetInt32());
         Assert.True(
             sanitized.RootElement
+                .GetProperty("debug_mode_enabled")
+                .GetBoolean());
+        Assert.True(
+            sanitized.RootElement
                 .GetProperty("private_server_link_configured")
                 .GetBoolean());
+        using JsonDocument operationContext = JsonDocument.Parse(
+            await ReadEntryAsync(
+                archive,
+                "configuration/start/operation-context.json"));
+        Assert.Equal(
+            "team-swap",
+            operationContext.RootElement
+                .GetProperty("debug_tool")
+                .GetString());
+        Assert.Equal(
+            "BeforeActions",
+            operationContext.RootElement
+                .GetProperty("debug_step_mode")
+                .GetString());
 
         using JsonDocument manifest = JsonDocument.Parse(await ReadEntryAsync(archive, "manifest.json"));
         Assert.Equal("success", manifest.RootElement.GetProperty("outcome").GetString());

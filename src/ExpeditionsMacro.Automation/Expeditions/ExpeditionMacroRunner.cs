@@ -3,6 +3,7 @@ using ExpeditionsMacro.Automation.Camera;
 using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Automation.Placement;
+using ExpeditionsMacro.Automation.Scheduling;
 using ExpeditionsMacro.Automation.Teams;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
@@ -72,7 +73,8 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
         Func<Exception, CancellationToken, Task>? recoverableFailure = null,
         int? maximumRuns = null,
         char? unitMenuKey = null,
-        Func<int, int, TimeSpan, CancellationToken, Task<bool>>? continueScheduledRoute = null)
+        Func<int, int, TimeSpan, CancellationToken, Task<bool>>? continueScheduledRoute = null,
+        MacroRunTotals? macroTotals = null)
     {
         if (maximumRuns is < 1) throw new ArgumentOutOfRangeException(nameof(maximumRuns));
         preset.Validate();
@@ -91,7 +93,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
         int defeats = 0;
         int recoveries = 0;
         int bossesSeen = 0;
-        bool teamLoaded = preset.TeamSlot == 0;
+        RepeatedRoutePreparationState preparation = new(preset.TeamSlot);
 
         void Write(string message, MacroEventLevel level = MacroEventLevel.Information, string? state = null, double? confidence = null) =>
             log?.Invoke(new MacroEvent(DateTimeOffset.Now, level, message, state, confidence));
@@ -99,7 +101,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
         void Report(string phase, int percent, string message, string? state = null, double? confidence = null) =>
             progress?.Report(new MacroProgress(phase, percent, message, state, confidence));
         DiscordRunTarget reportTarget = new(preset.MapNumber, preset.Difficulty, string.Empty);
-        DiscordRunReporter reporter = new(_discord, webhookUrl, "Expeditions Macro", "expeditions", Write);
+        DiscordRunReporter reporter = new(_discord, webhookUrl, "Expeditions Macro", "expeditions", Write, macroTotals);
 
         Write($"Using Roblox window '{window.Title}' ({window.ProcessDescription}).");
         PublishSummary();
@@ -156,13 +158,18 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                         Write("Challenge reset reached while waiting for the next Expedition run. Returning to Challenges.", MacroEventLevel.Success);
                         return;
                     }
-                    Write("Prestart screen recognized. Preparing camera.", MacroEventLevel.Success);
-                    if (!teamLoaded)
-                    {
-                        await _teams.SelectAsync(window, preset.TeamSlot, unitMenuKey!.Value, progress, cancellationToken).ConfigureAwait(false);
-                        teamLoaded = true;
-                    }
-                    await PrepareCameraAsync(window, preset, cameraModel, progress, Write, cancellationToken).ConfigureAwait(false);
+                    bool arrivedFromRepeatStage =
+                        preparation.ConfirmRepeatStagePrestart();
+                    await PrepareMatchAsync(
+                        window,
+                        preset,
+                        cameraModel,
+                        unitMenuKey,
+                        preparation,
+                        arrivedFromRepeatStage,
+                        progress,
+                        Write,
+                        cancellationToken).ConfigureAwait(false);
                     await ThrowIfRecoveryAsync(window, detector, preset, cancellationToken).ConfigureAwait(false);
                     if (ExpeditionRunPolicy.StopDeadlineReached(DateTimeOffset.UtcNow, stopAfterCurrentRunUtc))
                     {
@@ -220,6 +227,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                             Report("Completed", 100, "The same Expedition preset is next. Repeating the stage.", terminal.State, null);
                             Write("The scheduler kept the same Expedition route; using Repeat Stage instead of reopening Play.", MacroEventLevel.Success, "repeat_stage", null);
                             await ClickActionAsync(window, detector, terminal.State, terminal.Frame, cancellationToken).ConfigureAwait(false);
+                            preparation.MarkRepeatStageRequested();
                             await Task.Delay(4500, cancellationToken).ConfigureAwait(false);
                             continue;
                         }
@@ -252,11 +260,13 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                     }
                     else Report("Completed", 100, "Defeat recognized. Repeating the stage.");
                     await ClickActionAsync(window, detector, terminal.State, cancellationToken).ConfigureAwait(false);
+                    preparation.MarkRepeatStageRequested();
                     await Task.Delay(4500, cancellationToken).ConfigureAwait(false);
                 }
                 catch (CameraWorldNotRenderedException world)
                     when (preset.AutoRecover)
                 {
+                    preparation.Invalidate();
                     recoveries++;
                     PublishSummary();
                     string detail =
@@ -338,6 +348,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                 catch (RecoveryNeededException recovery)
                 {
                     if (!preset.AutoRecover) throw new InvalidOperationException($"{Label(recovery.State)} was recognized, but automatic recovery is disabled.", recovery);
+                    preparation.Invalidate();
                     recoveries++;
                     PublishSummary();
                     await RecoverToPrestartAsync(window, recovery.State, preset, detector, reporter, notify: true, runtime, victories, defeats, playMenuKey, Report, Write, cancellationToken).ConfigureAwait(false);
@@ -350,6 +361,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                 {
                     string? recovery = await ProbeStableRecoveryStateAsync(window, detector, preset, allowNavigationEntry: false, cancellationToken).ConfigureAwait(false);
                     if (!preset.AutoRecover || recovery is null) throw;
+                    preparation.Invalidate();
                     recoveries++;
                     PublishSummary();
                     Write("An action failed while a recovery screen was visible; switching to automatic recovery.", MacroEventLevel.Warning);
@@ -381,25 +393,6 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
             report,
             log,
             cancellationToken);
-
-    private async Task PrepareCameraAsync(
-        RobloxWindow window,
-        ExpeditionPreset preset,
-        CameraModel model,
-        IProgress<MacroProgress>? progress,
-        Action<string, MacroEventLevel, string?, double?> log,
-        CancellationToken cancellationToken)
-    {
-        double score = await _camera.PrepareAndAlignAsync(
-            model,
-            window,
-            preset.ZoomTicks,
-            preset.PitchDragPixels,
-            progress,
-            cancellationToken).ConfigureAwait(false);
-        log($"Camera alignment finished at {score:P0} confidence.", MacroEventLevel.Information, null, score);
-        await Task.Delay(350, cancellationToken).ConfigureAwait(false);
-    }
 
     private async Task ExtractAtCheckpointAsync(
         RobloxWindow window,
@@ -972,34 +965,12 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
         }
     }
 
-    private Task ClickActionAsync(RobloxWindow window, IDetectorPack detector, string state, CancellationToken cancellationToken) =>
-        ClickActionAsync(window, detector, state, clientImage: null, cancellationToken);
-
-    private async Task ClickActionAsync(
-        RobloxWindow window,
-        IDetectorPack detector,
-        string state,
-        ImageFrame? clientImage,
-        CancellationToken cancellationToken)
-    {
-        Focus(window);
-        ImageFrame actionFrame = clientImage ?? CaptureClient(window, detector);
-        (int x, int y) = detector.ActionFor(state, actionFrame);
-        await _automation.ClickClientAsync(window, x, y, cancellationToken).ConfigureAwait(false);
-    }
-
     private ImageFrame CaptureClient(RobloxWindow window, IDetectorPack detector)
     {
         Focus(window);
         ClientBounds bounds = _automation.GetClientBounds(window);
         if (bounds.Width != detector.Manifest.ClientWidth || bounds.Height != detector.Manifest.ClientHeight) throw new InvalidOperationException("Roblox no longer matches the detector pack client size.");
         return _automation.CaptureClient(window);
-    }
-
-    private ImageFrame? TryCaptureClient(RobloxWindow window, IDetectorPack detector)
-    {
-        try { return CaptureClient(window, detector); }
-        catch { return null; }
     }
 
     private async Task<string?> ProbeStableRecoveryStateAsync(

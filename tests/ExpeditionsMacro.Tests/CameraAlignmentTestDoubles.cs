@@ -28,6 +28,15 @@ internal sealed class FakeAutomation(ImageFrame screenCapture) : IRobloxAutomati
     public Func<int, int, ImageFrame>? CaptureAtYaw { get; init; }
     public Func<int, int, bool, ImageFrame>? CaptureAtCameraState { get; init; }
     public int FullYawSteps { get; init; } = 12;
+    public int DenseSweepSamplesPerTurn { get; init; }
+    public int LastDenseSweepSampleIntervalMilliseconds { get; private set; }
+    public int LastDenseSweepMaximumSamples { get; private set; }
+    public ImageFrame? DenseFineSweepZeroFrame { get; init; }
+
+    public bool SimulateDenseSweepTiming { get; init; }
+
+    public int DenseSweepReleaseMouseOffset { get; init; }
+    public int DenseSweepReleaseYawOffset { get; init; }
     public int YawStep { get; set; }
     public int MouseOffset { get; private set; }
     public bool ShiftLockState { get; private set; }
@@ -85,6 +94,102 @@ internal sealed class FakeAutomation(ImageFrame screenCapture) : IRobloxAutomati
         YawStep = ((YawStep + delta) % FullYawSteps + FullYawSteps) % FullYawSteps;
         _unobservedYawDelta += delta;
         return Task.CompletedTask;
+    }
+    public async Task CaptureCameraYawSweepAsync(
+        RobloxWindow window,
+        CameraYawDirection direction,
+        TimeSpan maximumDuration,
+        int maximumSamples,
+        int sampleIntervalMilliseconds,
+        Func<CameraYawSweepSample, bool> observe,
+        CancellationToken cancellationToken)
+    {
+        LastDenseSweepSampleIntervalMilliseconds =
+            sampleIntervalMilliseconds;
+        LastDenseSweepMaximumSamples = maximumSamples;
+        int directionValue = (int)direction;
+        int sweepSamples = DenseSweepSamplesPerTurn > 0
+            ? DenseSweepSamplesPerTurn
+            : FullYawSteps;
+        int origin = YawStep;
+        for (int sample = 1;
+             sample <= Math.Min(maximumSamples, sweepSamples) &&
+             sample * sampleIntervalMilliseconds <=
+             maximumDuration.TotalMilliseconds;
+             sample++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (SimulateDenseSweepTiming)
+            {
+                await Task.Delay(
+                    sampleIntervalMilliseconds,
+                    cancellationToken);
+            }
+            int travelled = (int)Math.Round(
+                sample * (double)FullYawSteps / sweepSamples);
+            YawStep =
+                ((origin + directionValue * travelled) % FullYawSteps +
+                 FullYawSteps) %
+                FullYawSteps;
+            if (!observe(new CameraYawSweepSample(
+                    TimeSpan.FromMilliseconds(
+                        sample * sampleIntervalMilliseconds),
+                    CaptureClient(window))))
+            {
+                MouseOffset += DenseSweepReleaseMouseOffset;
+                YawStep =
+                    ((YawStep + DenseSweepReleaseYawOffset) %
+                     FullYawSteps + FullYawSteps) %
+                    FullYawSteps;
+                break;
+            }
+        }
+    }
+
+    public async Task CaptureCameraFineYawSweepAsync(
+        RobloxWindow window,
+        int radiusPixels,
+        int sampleStridePixels,
+        Action<CameraFineYawSweepSample> observe,
+        CancellationToken cancellationToken)
+    {
+        int origin = MouseOffset;
+        int currentOffset = 0;
+        try
+        {
+            for (int offset = -radiusPixels;
+                 offset <= radiusPixels;
+                 offset += sampleStridePixels)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (SimulateDenseSweepTiming)
+                {
+                    await Task.Delay(
+                        Math.Abs(offset - currentOffset) * 16,
+                        cancellationToken);
+                }
+                currentOffset = offset;
+                MouseOffset = origin + offset;
+                ImageFrame frame =
+                    offset == 0 &&
+                    DenseFineSweepZeroFrame is not null
+                        ? DenseFineSweepZeroFrame.Clone()
+                        : CaptureClient(window);
+                observe(new CameraFineYawSweepSample(
+                    offset,
+                    frame));
+            }
+        }
+        finally
+        {
+            if (SimulateDenseSweepTiming && currentOffset != 0)
+            {
+                await Task.Delay(
+                    Math.Abs(currentOffset) * 16,
+                    CancellationToken.None);
+            }
+            MouseOffset = origin;
+        }
     }
     public Task ZoomOutFullyAsync(RobloxWindow window, int ticks, CancellationToken cancellationToken)
     {

@@ -19,6 +19,8 @@ Releases are built from committed source on an annotated semantic-version tag. N
 7. Run `scripts/Build-Release.ps1 -Version <version>` and `scripts/Verify-Release.ps1`.
 8. Audit the publish set for datasets, secrets, local paths, logs, personal models, and generated files.
 
+The portable ZIP must expose `ExpeditionsMacro.exe` at its archive root. Do not wrap the published files in another application directory; Windows already creates a folder named after the ZIP during normal extraction.
+
 ## Publish and verify
 
 1. Commit and push the release-ready source before tagging.

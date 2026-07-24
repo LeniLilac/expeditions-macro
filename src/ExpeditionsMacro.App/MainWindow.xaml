@@ -61,6 +61,7 @@
                         <TextBlock Margin="18,18,18,7" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource FaintBrush}" Text="TOOLS" />
                         <RadioButton x:Name="CameraNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Camera Models" icons:Lucide.Icon="Camera" Content="Camera Models" Checked="Navigation_Checked" />
                         <RadioButton x:Name="PlacementNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Placement Models" icons:Lucide.Icon="MapPin" Content="Placement Models" Checked="Navigation_Checked" />
+                        <RadioButton x:Name="DebugNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Debug" icons:Lucide.Icon="Bug" Content="Debug" Visibility="Collapsed" Checked="Navigation_Checked" />
                         <RadioButton x:Name="SettingsNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Settings" icons:Lucide.Icon="Settings" Content="Settings" Checked="Navigation_Checked" />
                     </StackPanel>
                     <StackPanel Grid.Row="2">

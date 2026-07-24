@@ -8,6 +8,7 @@ public sealed class TeamSelectionService
 {
     private const int AlignmentAttempts = 2;
     private const int LoadClickAttempts = 2;
+    private const int StableLayoutDetections = 2;
     private readonly IRobloxAutomation _automation;
 
     public TeamSelectionService(IRobloxAutomation automation) => _automation = automation;
@@ -71,13 +72,29 @@ public sealed class TeamSelectionService
         int teamSlot,
         CancellationToken cancellationToken)
     {
-        ImageFrame initialImage = CaptureClient(window);
-        TeamScrollbarThumb topThumb = TeamScreenDetector.FindScrollbarThumb(initialImage) ??
-            throw new InvalidOperationException("The Unit Team scrollbar could not be located.");
+        TeamScrollbarThumb topThumb = await WaitForStableTeamListAsync(
+            window,
+            TimeSpan.FromSeconds(4),
+            cancellationToken).ConfigureAwait(false);
         if (!TeamScreenDetector.IsScrollbarAtTop(topThumb))
         {
-            throw new InvalidOperationException(
-                $"The Unit Team list did not reopen at its expected top position. Scrollbar center: {topThumb.CenterY}.");
+            EnsureFocus(window);
+            await _automation.DragClientAsync(
+                window,
+                topThumb.X,
+                topThumb.CenterY,
+                topThumb.X,
+                TeamScreenDetector.TopScrollbarCenterY,
+                cancellationToken).ConfigureAwait(false);
+            topThumb = await WaitForStableTeamListAsync(
+                window,
+                TimeSpan.FromSeconds(3),
+                cancellationToken).ConfigureAwait(false);
+            if (!TeamScreenDetector.IsScrollbarAtTop(topThumb))
+            {
+                throw new InvalidOperationException(
+                    $"The Unit Team scrollbar could not be normalized to its top position. Last center: {topThumb.CenterY}.");
+            }
         }
         int targetCenterY = TeamScreenDetector.ScrollThumbTargetCenterY(teamSlot, topThumb.CenterY);
 
@@ -111,6 +128,54 @@ public sealed class TeamSelectionService
         }
 
         throw lastTimeout ?? new TimeoutException($"Team {teamSlot} did not open its Load Team confirmation.");
+    }
+
+    private async Task<TeamScrollbarThumb> WaitForStableTeamListAsync(
+        RobloxWindow window,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
+        TeamScrollbarThumb? candidate = null;
+        TeamScrollbarThumb? last = null;
+        int consecutive = 0;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            ImageFrame image = CaptureClient(window);
+            TeamScreenMatch state = TeamScreenDetector.Detect(image);
+            TeamScrollbarThumb? thumb = state.State == TeamScreenState.Teams
+                ? TeamScreenDetector.FindScrollbarThumb(image)
+                : null;
+            last = thumb ?? last;
+            if (thumb is not null &&
+                candidate is TeamScrollbarThumb prior &&
+                SameThumbGeometry(prior, thumb.Value))
+            {
+                consecutive++;
+            }
+            else if (thumb is not null)
+            {
+                candidate = thumb;
+                consecutive = 1;
+            }
+            else
+            {
+                candidate = null;
+                consecutive = 0;
+            }
+
+            if (consecutive >= StableLayoutDetections)
+            {
+                return thumb!.Value;
+            }
+            await Task.Delay(150, cancellationToken).ConfigureAwait(false);
+        }
+
+        throw new InvalidOperationException(
+            last is null
+                ? "The Unit Team scrollbar could not be located after the interface finished opening."
+                : $"The Unit Team scrollbar did not settle before team selection. Last center: {last.Value.CenterY}.");
     }
 
     private async Task<(int X, int Y)> AlignLoadTeamActionAsync(
@@ -261,6 +326,13 @@ public sealed class TeamSelectionService
 
     private static (int X, int Y) ResolveAction(TeamScreenMatch match, (int X, int Y) fallback) =>
         match.ActionX is int x && match.ActionY is int y ? (x, y) : fallback;
+
+    private static bool SameThumbGeometry(
+        TeamScrollbarThumb left,
+        TeamScrollbarThumb right) =>
+        Math.Abs(left.X - right.X) <= 2 &&
+        Math.Abs(left.CenterY - right.CenterY) <= 2 &&
+        Math.Abs(left.Height - right.Height) <= 3;
 
     private ImageFrame CaptureClient(RobloxWindow window)
     {

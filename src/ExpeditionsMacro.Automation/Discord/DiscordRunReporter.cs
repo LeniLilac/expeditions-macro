@@ -13,6 +13,7 @@ public sealed class DiscordRunReporter
     private readonly string _macroName;
     private readonly string _attachmentPrefix;
     private readonly Action<string, MacroEventLevel, string?, double?> _log;
+    private readonly MacroRunTotals? _macroTotals;
     private readonly object _pendingGate = new();
     private readonly HashSet<Task> _pending = [];
 
@@ -21,13 +22,15 @@ public sealed class DiscordRunReporter
         string webhookUrl,
         string macroName,
         string attachmentPrefix,
-        Action<string, MacroEventLevel, string?, double?> log)
+        Action<string, MacroEventLevel, string?, double?> log,
+        MacroRunTotals? macroTotals = null)
     {
         _notifier = notifier;
         _webhookUrl = webhookUrl;
         _macroName = macroName;
         _attachmentPrefix = attachmentPrefix;
         _log = log;
+        _macroTotals = macroTotals;
     }
 
     public void Queue(
@@ -111,14 +114,18 @@ public sealed class DiscordRunReporter
         int victories,
         int defeats,
         DiscordRunTarget target,
-        TimeSpan? matchRuntime) => new()
+        TimeSpan? matchRuntime)
+    {
+        MacroRunTotalsSnapshot? totals =
+            _macroTotals?.RecordEvent(eventName);
+        return new DiscordNotification
         {
             WebhookUrl = _webhookUrl,
             Event = eventName,
-            Runtime = runtime,
+            Runtime = totals?.Runtime ?? runtime,
             MatchRuntime = matchRuntime,
-            Victories = victories,
-            Defeats = defeats,
+            Victories = totals?.Victories ?? victories,
+            Defeats = totals?.Defeats ?? defeats,
             MapNumber = target.MapNumber,
             Difficulty = target.Difficulty,
             Detail = detail,
@@ -127,6 +134,7 @@ public sealed class DiscordRunReporter
             AttachmentPrefix = _attachmentPrefix,
             Screenshot = screenshot?.Clone(),
         };
+    }
 
     private async Task SendCoreAsync(
         DiscordNotification notification,

@@ -19,5 +19,5 @@ if (Test-Path -LiteralPath $output) { Remove-Item -LiteralPath $output -Recurse 
 $process = Start-Process -FilePath $executable -ArgumentList @('--snapshot-ui', $output) -PassThru -Wait -WindowStyle Hidden
 if ($process.ExitCode -ne 0) { throw "UI snapshot renderer exited with code $($process.ExitCode)." }
 $files = @(Get-ChildItem -LiteralPath $output -File -Filter '*.png')
-if ($files.Count -ne 22) { throw "Expected 22 dark/light UI snapshots, found $($files.Count)." }
+if ($files.Count -ne 24) { throw "Expected 24 dark/light UI snapshots, found $($files.Count)." }
 $files | Sort-Object Name | Select-Object Name, Length

@@ -56,9 +56,27 @@ public sealed class AppServices : IDisposable
             () => Log.CurrentFile,
             Log.Info,
             Log.Warning);
-        VisionTrace.Detected += DeepDebug.RecordVisionTrace;
+        DebugCheckpoints = new DebugCheckpointController();
+        VisionTrace.Detected += RecordVisionTrace;
         automation.AutomationTrace += DeepDebug.RecordWindowsTrace;
-        Automation = new DeepDebugRobloxAutomation(automation, DeepDebug);
+        IRobloxAutomation tracedAutomation =
+            new DeepDebugRobloxAutomation(automation, DeepDebug);
+        Automation = new DebugSteppingRobloxAutomation(
+            tracedAutomation,
+            DebugCheckpoints);
+        DebugCheckpoints.CheckpointAdded += checkpoint =>
+            DeepDebug.RecordEvent(
+                "debug_checkpoint",
+                checkpoint.Kind.ToString().ToLowerInvariant(),
+                new
+                {
+                    checkpoint.Sequence,
+                    checkpoint.Title,
+                    checkpoint.Detail,
+                    checkpoint.State,
+                    checkpoint.Confidence,
+                    HasFrame = checkpoint.Frame is not null,
+                });
         SecretProtector = new DpapiSecretProtector();
         Hotkey = new GlobalHotkeyService();
         Coordinator = new OperationCoordinator(dispatcher);
@@ -114,6 +132,7 @@ public sealed class AppServices : IDisposable
     public CameraSpawnShortcutRepository CameraShortcuts { get; }
     public DetectorPackRepository DetectorPacks { get; }
     public DeepDebugSessionService DeepDebug { get; }
+    public DebugCheckpointController DebugCheckpoints { get; }
     public IRobloxAutomation Automation { get; }
     public ISecretProtector SecretProtector { get; }
     public GlobalHotkeyService Hotkey { get; }
@@ -132,7 +151,11 @@ public sealed class AppServices : IDisposable
     public DetectorPackUpdateService DetectorUpdates { get; }
     public AppSettings Settings { get; private set; } = new();
 
-    public static async Task<AppServices> CreateAsync(Dispatcher dispatcher)
+    public event EventHandler? SettingsChanged;
+
+    public static async Task<AppServices> CreateAsync(
+        Dispatcher dispatcher,
+        bool startRuntimeServices = true)
     {
         AppServices services = new(dispatcher);
         services.Log.Info("Starting Expeditions Macro.");
@@ -152,9 +175,17 @@ public sealed class AppServices : IDisposable
         services.Hotkey.Configure(configuredHotkey);
         services.Coordinator.HotkeyDisplayName = services.Hotkey.DisplayName;
         await services.EnsureBundledDetectorPackAsync();
-        await services.NormalizeRobloxWindowOnStartupAsync();
-        services.Hotkey.Start();
-        services.Log.Info($"Startup complete. {services.Hotkey.DisplayName} listener: {(services.Hotkey.IsRegistered ? "ready" : "unavailable")}.");
+        if (startRuntimeServices)
+        {
+            await services.NormalizeRobloxWindowOnStartupAsync();
+            services.Hotkey.Start();
+            services.Log.Info($"Startup complete. {services.Hotkey.DisplayName} listener: {(services.Hotkey.IsRegistered ? "ready" : "unavailable")}.");
+        }
+        else
+        {
+            services.Log.Info(
+                "Snapshot startup complete without Roblox normalization or global hotkey registration.");
+        }
         return services;
     }
 
@@ -163,6 +194,7 @@ public sealed class AppServices : IDisposable
         AppSettings updated = update(Settings);
         await SettingsStore.SaveAsync(updated);
         Settings = updated;
+        SettingsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public IDetectorPack TraceDetector(IDetectorPack detector) => new DeepDebugDetectorPack(detector, DeepDebug);
@@ -196,12 +228,18 @@ public sealed class AppServices : IDisposable
     public void Dispose()
     {
         Coordinator.Cancel();
-        VisionTrace.Detected -= DeepDebug.RecordVisionTrace;
+        VisionTrace.Detected -= RecordVisionTrace;
         if (Automation is IDisposable automation) automation.Dispose();
         Log.Info("Application closing.");
         Hotkey.Dispose();
         DetectorUpdates.Dispose();
         _discord.Dispose();
+    }
+
+    private void RecordVisionTrace(VisionDetectionTrace trace)
+    {
+        DeepDebug.RecordVisionTrace(trace);
+        DebugCheckpoints.RecordDetection(trace);
     }
 
     private async Task EnsureBundledDetectorPackAsync()

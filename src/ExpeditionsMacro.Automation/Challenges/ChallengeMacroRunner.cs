@@ -59,7 +59,8 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         Func<Exception, CancellationToken, Task>? recoverableFailure = null,
         int? maximumCompletedRuns = null,
         bool returnWhenUnavailable = false,
-        char? unitMenuKey = null)
+        char? unitMenuKey = null,
+        MacroRunTotals? macroTotals = null)
     {
         if (maximumCompletedRuns is < 1) throw new ArgumentOutOfRangeException(nameof(maximumCompletedRuns));
         preset.ValidateReady();
@@ -101,7 +102,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
             currentMap,
             waitingUntil,
             rotation.DailyLimitUntilUtc is not null));
-        DiscordRunReporter reporter = new(_discord, webhookUrl, "Challenge Macro", "challenge", Write);
+        DiscordRunReporter reporter = new(_discord, webhookUrl, "Challenge Macro", "challenge", Write, macroTotals);
 
         Write($"Using Roblox window '{window.Title}' ({window.ProcessDescription}).");
         PublishSummary();
@@ -677,40 +678,6 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
             $"The Challenge selector remained open after {SchedulerHandoffMaximumAttempts} focused close attempts, so control was not returned to the task scheduler.");
     }
 
-    private async Task<ChallengeScreenMatch> OpenChallengeTypeAsync(
-        RobloxWindow window,
-        ChallengePreset preset,
-        IDetectorPack detector,
-        ChallengeType type,
-        Action<string, int, string, string?, double?> report,
-        CancellationToken cancellationToken)
-    {
-        for (int attempt = 1; attempt <= 3; attempt++)
-        {
-            (int x, int y) = ChallengeScreenDetector.ActionForType(type);
-            await ClickAsync(window, x, y, cancellationToken).ConfigureAwait(false);
-            DateTimeOffset deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(5);
-            StableStateTracker<ChallengeScreenState> tracker = new(preset.StableDetections);
-            while (DateTimeOffset.UtcNow < deadline)
-            {
-                ImageFrame frame = CaptureClient(window, detector);
-                ChallengeScreenMatch match = ChallengeScreenDetector.Detect(frame);
-                ChallengeScreenState candidate = match.State is ChallengeScreenState.ChallengeAvailable or ChallengeScreenState.ChallengeCooldown
-                    ? match.State
-                    : ChallengeScreenState.None;
-                ChallengeScreenState? stable = tracker.Update(candidate);
-                if (stable is ChallengeScreenState.ChallengeAvailable or ChallengeScreenState.ChallengeCooldown)
-                {
-                    report("Challenge selection", 15, stable == ChallengeScreenState.ChallengeAvailable ? "Select Stage is available." : "Challenge is on cooldown.", stable.ToString(), match.Confidence);
-                    return match with { State = stable.Value };
-                }
-                await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
-            }
-            report("Challenge selection", 10, $"Selector click did not open Challenge {type} (attempt {attempt}/3).", null, null);
-        }
-        throw new InvalidOperationException($"Challenge {Label(type)} could not be opened from the fixed selector row.");
-    }
-
     private async Task<ChallengeMapId> RecognizeMapAsync(
         RobloxWindow window,
         ChallengePreset preset,
@@ -879,30 +846,6 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         return teleportDeadline > currentDeadline ? teleportDeadline : currentDeadline;
     }
 
-    private async Task<ImageFrame?> TryWaitForScreenAsync(
-        RobloxWindow window,
-        ChallengePreset preset,
-        IDetectorPack detector,
-        ChallengeScreenState desired,
-        TimeSpan timeout,
-        Action<string, int, string, string?, double?> report,
-        CancellationToken cancellationToken)
-    {
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
-        StableStateTracker<ChallengeScreenState> tracker = new(preset.StableDetections);
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            ImageFrame frame = CaptureClient(window, detector);
-            ChallengeScreenMatch match = ChallengeScreenDetector.Detect(frame);
-            ChallengeScreenState? stable = tracker.Update(match.State == desired ? desired : ChallengeScreenState.None);
-            if (stable == desired) return frame;
-            if (match.State != ChallengeScreenState.None) report("Waiting", 0, $"Detected {Label(match.State)}.", match.State.ToString(), match.Confidence);
-            await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
-        }
-        return null;
-    }
-
     private async Task PrepareCameraAsync(
         RobloxWindow window,
         ChallengePreset preset,
@@ -978,19 +921,6 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
             throw new InvalidOperationException("Roblox no longer matches the detector pack client size.");
         }
         return _automation.CaptureClient(window);
-    }
-
-    private ImageFrame? TryCaptureClient(RobloxWindow window, IDetectorPack detector)
-    {
-        try
-        {
-            return CaptureClient(window, detector);
-        }
-        catch
-        {
-            // Recovery must continue even if the diagnostic screenshot cannot be captured.
-            return null;
-        }
     }
 
     private void Focus(RobloxWindow window)

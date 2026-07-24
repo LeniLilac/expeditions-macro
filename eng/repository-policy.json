@@ -20,22 +20,22 @@
   "lineDebt": [
     {
       "path": "src/ExpeditionsMacro.Automation/Challenges/ChallengeMacroRunner.cs",
-      "maxLines": 1078,
+      "maxLines": 1008,
       "reason": "Existing mode-runner orchestration debt; extract state-specific workflow services when touched."
     },
     {
       "path": "src/ExpeditionsMacro.Automation/Camera/CameraAlignmentEngine.cs",
-      "maxLines": 1298,
+      "maxLines": 1258,
       "reason": "Existing calibration/alignment orchestration debt; split observation, search, and verification ownership."
     },
     {
       "path": "src/ExpeditionsMacro.Automation/Expeditions/ExpeditionMacroRunner.cs",
-      "maxLines": 1149,
+      "maxLines": 1120,
       "reason": "Existing mode-runner orchestration debt; extract state-specific workflow services when touched."
     },
     {
       "path": "src/ExpeditionsMacro.App/Pages/MacroPage.xaml.cs",
-      "maxLines": 950,
+      "maxLines": 767,
       "reason": "Existing page-controller debt; move scheduling, persistence, and operation coordination into focused services."
     },
     {
@@ -45,12 +45,12 @@
     },
     {
       "path": "src/ExpeditionsMacro.Automation/Stages/StageMacroRunner.cs",
-      "maxLines": 647,
+      "maxLines": 580,
       "reason": "Existing shared Story/Raid orchestration debt; extract navigation and terminal handoff services."
     },
     {
       "path": "src/ExpeditionsMacro.Automation/Diagnostics/DeepDebugSessionService.cs",
-      "maxLines": 719,
+      "maxLines": 679,
       "reason": "Existing diagnostic lifecycle debt; split archive writing, manifest capture, and retention."
     },
     {

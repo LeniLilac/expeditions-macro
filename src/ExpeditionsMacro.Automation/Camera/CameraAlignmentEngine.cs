@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
@@ -42,6 +43,14 @@ public sealed partial class CameraAlignmentEngine
         CancellationToken cancellationToken = default)
     {
         settings.Validate();
+        Stopwatch setupTimer = Stopwatch.StartNew();
+        using CancellationTokenSource setupTimeout =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (settings.UseDenseYawAtlas)
+        {
+            setupTimeout.CancelAfter(TimeSpan.FromSeconds(120));
+        }
+        CancellationToken setupToken = setupTimeout.Token;
         RobloxWindow window = RequireWindow();
         Focus(window);
         ClientBounds initialClient = _automation.GetClientBounds(window);
@@ -52,8 +61,8 @@ public sealed partial class CameraAlignmentEngine
             if (initialClient.Width != RobloxClientProfile.Width || initialClient.Height != RobloxClientProfile.Height)
             {
                 progress?.Report(new MacroProgress("Camera setup", 1, $"Resizing Roblox to {RobloxClientProfile.Width} × {RobloxClientProfile.Height}."));
-                await _automation.ResizeClientAsync(window, RobloxClientProfile.Width, RobloxClientProfile.Height, cancellationToken).ConfigureAwait(false);
-                await Task.Delay(250, cancellationToken).ConfigureAwait(false);
+                await _automation.ResizeClientAsync(window, RobloxClientProfile.Width, RobloxClientProfile.Height, setupToken).ConfigureAwait(false);
+                await Task.Delay(250, setupToken).ConfigureAwait(false);
             }
             ClientBounds client = _automation.GetClientBounds(window);
             if (client.Width != RobloxClientProfile.Width || client.Height != RobloxClientProfile.Height)
@@ -68,8 +77,8 @@ public sealed partial class CameraAlignmentEngine
                 "Camera setup",
                 2,
                 progress,
-                cancellationToken).ConfigureAwait(false);
-            shiftLockKey = await EnableShiftLockAsync(window, "Camera setup", 3, progress, cancellationToken).ConfigureAwait(false);
+                setupToken).ConfigureAwait(false);
+            shiftLockKey = await EnableShiftLockAsync(window, "Camera setup", 3, progress, setupToken).ConfigureAwait(false);
             await ClampPitchAsync(
                 window,
                 settings.PitchDragPixels,
@@ -78,7 +87,7 @@ public sealed partial class CameraAlignmentEngine
                 "Camera setup",
                 4,
                 progress,
-                cancellationToken).ConfigureAwait(false);
+                setupToken).ConfigureAwait(false);
 
             List<ImageFrame> goalFrames = [];
             int interval = settings.CaptureCount <= 1
@@ -86,19 +95,24 @@ public sealed partial class CameraAlignmentEngine
                 : (int)Math.Round(settings.CaptureDuration.TotalMilliseconds / (settings.CaptureCount - 1));
             for (int index = 0; index < settings.CaptureCount; index++)
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                setupToken.ThrowIfCancellationRequested();
                 goalFrames.Add(_automation.CaptureClient(window));
                 progress?.Report(new MacroProgress(
                     "Camera setup",
                     6 + (int)Math.Round(10d * (index + 1) / settings.CaptureCount),
                     $"Capturing goal example {index + 1} of {settings.CaptureCount}"));
-                if (index + 1 < settings.CaptureCount) await Task.Delay(interval, cancellationToken).ConfigureAwait(false);
+                if (index + 1 < settings.CaptureCount) await Task.Delay(interval, setupToken).ConfigureAwait(false);
             }
 
             progress?.Report(new MacroProgress("Camera setup", 17, "Choosing stable map regions automatically."));
             IReadOnlyList<ScreenRegion> regions = CameraRegionAnalyzer.SelectStableRegions(goalFrames);
             ImageFrame[] composites = goalFrames.Select(frame => CameraRegionAnalyzer.BuildComposite(frame, regions)).ToArray();
             ImageFrame reference = VisionScorer.Median(composites);
+            ImageFrame denseReference = VisionScorer.Median(
+                goalFrames.Select(frame =>
+                    CameraDenseThumbnailBuilder.Build(
+                        frame,
+                        regions)).ToArray());
             double baseline = Median(composites.Select(frame => VisionScorer.RobustSimilarity(reference, frame)));
             progress?.Report(new MacroProgress(
                 "Camera setup",
@@ -106,24 +120,62 @@ public sealed partial class CameraAlignmentEngine
                 $"Selected {regions.Count} stable regions. Baseline confidence: {baseline:P0}",
                 Confidence: baseline));
 
-            IReadOnlyList<FineYawReference> goalNeighborhood = await LearnFineYawNeighborhoodAsync(
-                window,
-                regions,
-                reference,
-                settings,
-                progress,
-                cancellationToken).ConfigureAwait(false);
+            IReadOnlyList<FineYawReference> goalNeighborhood =
+                settings.UseDenseYawAtlas
+                    ? await LearnDenseFineYawNeighborhoodAsync(
+                        window,
+                        regions,
+                        reference,
+                        denseReference,
+                        settings,
+                        progress,
+                        setupToken).ConfigureAwait(false)
+                    : await LearnFineYawNeighborhoodAsync(
+                        window,
+                        regions,
+                        reference,
+                        settings,
+                        progress,
+                        setupToken).ConfigureAwait(false);
 
-            (int fullYawSteps, IReadOnlyList<double> scanScores, IReadOnlyList<ImageFrame> atlas) = await LearnFullTurnAsync(
-                window,
-                regions,
-                reference,
+            YawCalibrationResult yawCalibration;
+            if (settings.UseDenseYawAtlas)
+            {
+                yawCalibration = await LearnDenseYawAtlasAsync(
+                    window,
+                    regions,
+                    reference,
+                    denseReference,
+                    baseline,
+                    goalNeighborhood,
+                    settings,
+                    progress,
+                    setupToken).ConfigureAwait(false);
+            }
+            else
+            {
+                (int fullYawSteps,
+                    IReadOnlyList<double> scanScores,
+                    IReadOnlyList<ImageFrame> atlas) =
+                    await LearnFullTurnAsync(
+                        window,
+                        regions,
+                        reference,
+                        baseline,
+                        goalNeighborhood,
+                        settings,
+                        progress,
+                        setupToken).ConfigureAwait(false);
+                yawCalibration = new YawCalibrationResult(
+                    CameraYawAtlasKind.PulseSteps,
+                    fullYawSteps,
+                    0,
+                    scanScores,
+                    atlas);
+            }
+            double threshold = VisionScorer.ChooseSuccessThreshold(
                 baseline,
-                goalNeighborhood,
-                settings,
-                progress,
-                cancellationToken).ConfigureAwait(false);
-            double threshold = VisionScorer.ChooseSuccessThreshold(baseline, scanScores);
+                yawCalibration.ScanScores);
             string id = ModelId.FromName(settings.Name);
             CameraModelManifest manifest = new()
             {
@@ -138,12 +190,17 @@ public sealed partial class CameraAlignmentEngine
                 FineStepPixels = settings.FineStepPixels,
                 FineSearchPixels = settings.FineSearchPixels,
                 FineYawOffsets = goalNeighborhood.Select(item => item.Offset).ToArray(),
-                FullYawSteps = fullYawSteps,
+                FullYawSteps = yawCalibration.FullYawSteps,
                 SettleMilliseconds = settings.SettleMilliseconds,
+                YawAtlasKind = yawCalibration.Kind,
+                DenseYawTurnMilliseconds =
+                    yawCalibration.TurnMilliseconds,
+                CalibrationDurationMilliseconds =
+                    (int)setupTimer.ElapsedMilliseconds,
                 ZoomTicks = settings.ZoomTicks,
                 PitchDragPixels = settings.PitchDragPixels,
-                AtlasSampleCount = atlas.Count,
-                ScanScores = scanScores,
+                AtlasSampleCount = yawCalibration.Atlas.Count,
+                ScanScores = yawCalibration.ScanScores,
                 CreatedAt = DateTimeOffset.UtcNow,
             };
             ImageFrame goalOverlay = CameraRegionAnalyzer.AnnotateGoal(goalFrames[0], regions);
@@ -152,13 +209,23 @@ public sealed partial class CameraAlignmentEngine
                 reference,
                 goalOverlay,
                 goalNeighborhood.Select(item => item.Thumbnail).ToArray(),
-                atlas);
-            await _models.SaveAsync(model, cancellationToken).ConfigureAwait(false);
+                yawCalibration.Atlas);
+            await _models.SaveAsync(model, setupToken).ConfigureAwait(false);
             progress?.Report(new MacroProgress(
                 "Camera setup",
                 100,
-                $"Setup complete. '{manifest.Name}' learned {fullYawSteps} arrow steps per turn across {regions.Count} regions."));
+                settings.UseDenseYawAtlas
+                    ? $"Setup complete in {setupTimer.Elapsed.TotalSeconds:F1}s. '{manifest.Name}' learned {manifest.AtlasSampleCount - 1} dense yaw positions and {manifest.FullYawSteps} arrow steps per turn."
+                    : $"Setup complete. '{manifest.Name}' learned {manifest.FullYawSteps} arrow steps per turn across {regions.Count} regions."));
             return model;
+        }
+        catch (OperationCanceledException) when (
+            settings.UseDenseYawAtlas &&
+            !cancellationToken.IsCancellationRequested &&
+            setupTimeout.IsCancellationRequested)
+        {
+            throw new InvalidOperationException(
+                "Camera setup did not complete within 120 seconds. Keep Roblox focused and retry.");
         }
         finally
         {
@@ -854,26 +921,6 @@ public sealed partial class CameraAlignmentEngine
         return null;
     }
 
-    private async Task<AlignmentObservation> StableObservationAsync(
-        CameraModel model,
-        RobloxWindow window,
-        int count,
-        CancellationToken cancellationToken)
-    {
-        List<ImageFrame> frames = [];
-        for (int index = 0; index < count; index++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            frames.Add(CaptureComposite(window, model.Manifest.Regions));
-            if (index + 1 < count) await Task.Delay(60, cancellationToken).ConfigureAwait(false);
-        }
-        ImageFrame stable = VisionScorer.Median(frames);
-        ImageFrame thumbnail = VisionScorer.MakeThumbnail(stable, model.FineYawAtlas[0].Width);
-        return new AlignmentObservation(
-            CameraRegisteredScorer.ScoreComposite(model.Reference, stable).Score,
-            BestFineYawMatch(model, thumbnail));
-    }
-
     private async Task<double> RefineWithArrowsAsync(
         RobloxWindow window,
         CameraModel model,
@@ -1015,74 +1062,6 @@ public sealed partial class CameraAlignmentEngine
         return await StableScoreAsync(model, window, 2, cancellationToken).ConfigureAwait(false);
     }
 
-    private static FineYawMatch BestFineYawMatch(CameraModel model, ImageFrame currentThumbnail)
-    {
-        int bestIndex = 0;
-        double bestScore = double.NegativeInfinity;
-        for (int index = 0; index < model.FineYawAtlas.Count; index++)
-        {
-            double score = CameraRegisteredScorer.Score(model.FineYawAtlas[index], currentThumbnail).Score;
-            if (score <= bestScore) continue;
-            bestIndex = index;
-            bestScore = score;
-        }
-        return new FineYawMatch(model.Manifest.FineYawOffsets[bestIndex], bestScore);
-    }
-
-    private async Task<ImageFrame> CurrentThumbnailAsync(
-        CameraModel model,
-        RobloxWindow window,
-        int width,
-        int count,
-        CancellationToken cancellationToken)
-    {
-        List<ImageFrame> frames = [];
-        for (int index = 0; index < count; index++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            frames.Add(CaptureComposite(window, model.Manifest.Regions));
-            if (index + 1 < count) await Task.Delay(60, cancellationToken).ConfigureAwait(false);
-        }
-        return VisionScorer.MakeThumbnail(VisionScorer.Median(frames), width);
-    }
-
-    private async Task<double> StableScoreAsync(CameraModel model, RobloxWindow window, int count, CancellationToken cancellationToken)
-    {
-        List<double> scores = [];
-        for (int index = 0; index < count; index++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            scores.Add(Score(model, window));
-            if (index + 1 < count) await Task.Delay(60, cancellationToken).ConfigureAwait(false);
-        }
-        double[] sorted = scores.Order().ToArray();
-        return sorted.Length % 2 == 1 ? sorted[sorted.Length / 2] : (sorted[sorted.Length / 2 - 1] + sorted[sorted.Length / 2]) / 2;
-    }
-
-    private async Task<(ImageFrame Frame, double Score)> StablePreparedScoreAsync(
-        ImageFrame reference,
-        RobloxWindow window,
-        IReadOnlyList<ScreenRegion> regions,
-        int count,
-        CancellationToken cancellationToken)
-    {
-        List<ImageFrame> frames = [];
-        for (int index = 0; index < count; index++)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            frames.Add(CaptureComposite(window, regions));
-            if (index + 1 < count) await Task.Delay(60, cancellationToken).ConfigureAwait(false);
-        }
-        ImageFrame stable = VisionScorer.Median(frames);
-        return (stable, VisionScorer.RobustSimilarity(reference, stable));
-    }
-
-    private ImageFrame CaptureComposite(RobloxWindow window, IReadOnlyList<ScreenRegion> regions) =>
-        CameraRegionAnalyzer.BuildComposite(_automation.CaptureClient(window), regions);
-
-    private double Score(CameraModel model, RobloxWindow window) =>
-        GoalEvidence(model, _automation.CaptureClient(window));
-
     private async Task EnsureClientSizeAsync(
         RobloxWindow window,
         CameraModelManifest manifest,
@@ -1175,25 +1154,6 @@ public sealed partial class CameraAlignmentEngine
         ImageFrame frame = _automation.CaptureClient(window);
         if (regions is null) return VisionScorer.PrepareGray(frame, 160, 101);
         return VisionScorer.MakeThumbnail(CameraRegionAnalyzer.BuildComposite(frame, regions), 160);
-    }
-
-    private static AtlasMatch BestAtlasMatch(IReadOnlyList<ImageFrame> atlas, ImageFrame current)
-    {
-        if (atlas.Count == 0) throw new ArgumentException("The yaw atlas is empty.", nameof(atlas));
-        double[] raw = atlas.Select(frame => VisionScorer.RobustSimilarity(frame, current)).ToArray();
-        int[] candidates = raw
-            .Select((score, index) => (Score: score, Index: index))
-            .OrderByDescending(item => item.Score)
-            .Take(Math.Min(8, atlas.Count))
-            .Select(item => item.Index)
-            .ToArray();
-        AtlasMatch best = new(candidates[0], double.NegativeInfinity);
-        foreach (int index in candidates)
-        {
-            double score = CameraRegisteredScorer.Score(atlas[index], current).Score;
-            if (score > best.Score) best = new AtlasMatch(index, score);
-        }
-        return best;
     }
 
     private static double GoalEvidence(CameraModel model, ImageFrame fullClient)

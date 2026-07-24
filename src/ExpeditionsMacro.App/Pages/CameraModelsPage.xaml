@@ -57,19 +57,19 @@
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                             <StackPanel Margin="0,0,20,0">
                                 <TextBlock Style="{StaticResource SectionTitle}" Text="Calibration" />
-                                <TextBlock Margin="0,5,0,0" MaxWidth="640" HorizontalAlignment="Left" Style="{StaticResource Caption}" Text="Setup zooms fully out, sets a top-down pitch, learns a fine goal neighborhood, then learns one complete turn with Right-arrow pulses." TextWrapping="Wrap" />
+                                <TextBlock Margin="0,5,0,0" MaxWidth="640" HorizontalAlignment="Left" Style="{StaticResource Caption}" Text="Setup builds a dense visual atlas from one continuous turn, calibrates arrow movement, and includes the fine-yaw neighborhood while targeting a sub-20-second setup." TextWrapping="Wrap" />
                             </StackPanel>
                             <Button x:Name="CalibrationToggle" Grid.Column="1" Height="34" icons:Lucide.Icon="SlidersHorizontal" Content="Show tuning" Click="CalibrationToggle_Click" />
                         </Grid>
                         <Grid x:Name="CalibrationPanel" Margin="0,18,0,0" MaxWidth="640" HorizontalAlignment="Stretch" Visibility="Collapsed">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="16" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
                             <Grid.RowDefinitions><RowDefinition Height="66" /><RowDefinition Height="66" /><RowDefinition Height="66" /></Grid.RowDefinitions>
-                            <StackPanel><TextBlock Style="{StaticResource FieldLabel}" Text="Goal captures" /><TextBox x:Name="CaptureCountText" Margin="0,7,0,0" Text="12" /></StackPanel>
-                            <StackPanel Grid.Column="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Capture time, seconds" /><TextBox x:Name="CaptureSecondsText" Margin="0,7,0,0" Text="3.0" /></StackPanel>
+                            <StackPanel><TextBlock Style="{StaticResource FieldLabel}" Text="Goal captures" /><TextBox x:Name="CaptureCountText" Margin="0,7,0,0" Text="6" /></StackPanel>
+                            <StackPanel Grid.Column="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Capture time, seconds" /><TextBox x:Name="CaptureSecondsText" Margin="0,7,0,0" Text="0.5" /></StackPanel>
                             <StackPanel Grid.Row="1"><TextBlock Style="{StaticResource FieldLabel}" Text="Arrow hold, ms" /><TextBox x:Name="ArrowHoldText" Margin="0,7,0,0" Text="30" /></StackPanel>
                             <StackPanel Grid.Row="1" Grid.Column="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Fine drag, pixels" /><TextBox x:Name="FinePixelsText" Margin="0,7,0,0" Text="1" /></StackPanel>
                             <StackPanel Grid.Row="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Settle time, ms" /><TextBox x:Name="SettleText" Margin="0,7,0,0" Text="200" /></StackPanel>
-                            <StackPanel Grid.Row="2" Grid.Column="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Maximum arrow samples" /><TextBox x:Name="MaxSamplesText" Margin="0,7,0,0" Text="300" /></StackPanel>
+                            <StackPanel Grid.Row="2" Grid.Column="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Maximum dense frames" /><TextBox x:Name="MaxSamplesText" Margin="0,7,0,0" Text="240" /></StackPanel>
                         </Grid>
                     </StackPanel>
                 </Border>

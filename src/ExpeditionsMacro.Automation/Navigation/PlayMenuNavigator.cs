@@ -27,7 +27,15 @@ internal static class PlayMenuNavigator
         {
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame current = capture();
-            if (ChallengeScreenDetector.Detect(current).State == ChallengeScreenState.PostMatchPreview) return current;
+            if (ChallengeScreenDetector.Detect(current).State ==
+                ChallengeScreenState.PostMatchPreview)
+            {
+                ImageFrame? verified = await waitForPreview(
+                    transitionTimeout,
+                    cancellationToken).ConfigureAwait(false);
+                if (verified is not null) return verified;
+                continue;
+            }
 
             attemptStarted?.Invoke(attempt);
             await pressKey(key, cancellationToken).ConfigureAwait(false);
