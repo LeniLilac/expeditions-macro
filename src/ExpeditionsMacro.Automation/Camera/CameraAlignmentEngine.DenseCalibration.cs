@@ -24,7 +24,8 @@ public sealed partial class CameraAlignmentEngine
 
     private sealed record DenseYawSample(
         TimeSpan Elapsed,
-        ImageFrame Thumbnail);
+        ImageFrame Thumbnail,
+        CameraYawAtlasIndex.CameraYawFingerprint Fingerprint);
 
     private async Task<YawCalibrationResult> LearnDenseYawAtlasAsync(
         RobloxWindow window,
@@ -68,11 +69,12 @@ public sealed partial class CameraAlignmentEngine
                     CameraDenseThumbnailBuilder.Build(
                         sample.Frame,
                         regions);
-                samples.Add(new DenseYawSample(
-                    sample.Elapsed,
-                    thumbnail));
                 CameraYawAtlasIndex.CameraYawFingerprint fingerprint =
                     CameraYawAtlasIndex.CameraYawFingerprint.Create(thumbnail);
+                samples.Add(new DenseYawSample(
+                    sample.Elapsed,
+                    thumbnail,
+                    fingerprint));
                 double fingerprintScore =
                     goalFingerprint.Similarity(fingerprint);
                 if (fingerprintScore < 0.89)
@@ -159,6 +161,27 @@ public sealed partial class CameraAlignmentEngine
         {
             throw new InvalidOperationException(
                 "The dense yaw sweep did not recognize a complete turn within 7.25 seconds. Keep Roblox focused and retry setup.");
+        }
+        DenseYawPeriodDecision period =
+            DenseYawPeriodPolicy.ReduceRepeatedTurn(
+                samples
+                    .Select(sample => new DenseYawPeriodSample(
+                        sample.Elapsed,
+                        sample.Thumbnail,
+                        sample.Fingerprint))
+                    .ToArray(),
+                goalThumbnail,
+                turnElapsed);
+        if (period.FoldedRepeatedTurn)
+        {
+            turnElapsed = period.TurnElapsed;
+            progress?.Report(new MacroProgress(
+                "Camera setup",
+                74,
+                $"The first closure sample was skipped; retained one {turnElapsed.TotalSeconds:F2}s revolution and discarded the repeated turn ({period.LowerQuartileAgreement:P0}–{period.MedianAgreement:P0} fingerprint, {period.MedianStructureAgreement:P0} structure across {period.PairCount} checks).",
+                Confidence: Math.Min(
+                    period.LowerQuartileAgreement,
+                    period.MedianStructureAgreement)));
         }
 
         ImageFrame[] atlas = ResampleDenseAtlas(

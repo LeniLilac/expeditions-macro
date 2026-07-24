@@ -79,7 +79,7 @@ public sealed class CameraCoarseAtlasEvidencePolicyTests
     [Theory]
     [InlineData(CameraYawAtlasKind.DenseSweep, 0.10, 0.99, 0.15)]
     [InlineData(CameraYawAtlasKind.DenseSweep, 0.39, 0.99, 0.02)]
-    [InlineData(CameraYawAtlasKind.DenseSweep, 0.39, 0.95, 0.16)]
+    [InlineData(CameraYawAtlasKind.DenseSweep, 0.39, 0.93, 0.16)]
     [InlineData(CameraYawAtlasKind.PulseSteps, 0.39, 0.99, 0.16)]
     public void AmbiguousEvidence_DoesNotEarnCoarseInput(
         CameraYawAtlasKind kind,
@@ -99,6 +99,30 @@ public sealed class CameraCoarseAtlasEvidencePolicyTests
             ReportedMinimumRegisteredScore);
 
         Assert.False(reliable);
+    }
+
+    [Theory]
+    [InlineData(0.17, 0.94, true)]
+    [InlineData(0.14, 0.99, false)]
+    [InlineData(0.30, 0.93, false)]
+    public void KnownPhysicalTransitionCanReplaceGlobalIsolation(
+        double registered,
+        double fingerprint,
+        bool expected)
+    {
+        AtlasMatch match = new(
+            3,
+            registered,
+            fingerprint,
+            FingerprintIsolation: 0);
+
+        bool reliable = CameraCoarseAtlasEvidencePolicy
+            .IsReliableWithinKnownTransition(
+                CameraYawAtlasKind.DenseSweep,
+                match,
+                ReportedMinimumRegisteredScore);
+
+        Assert.Equal(expected, reliable);
     }
 
     [Fact]

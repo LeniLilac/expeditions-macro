@@ -84,7 +84,7 @@ public sealed class TeamSelectionService
                 topThumb.X,
                 topThumb.CenterY,
                 topThumb.X,
-                TeamScreenDetector.TopScrollbarCenterY,
+                TeamScreenDetector.TopScrollbarDragLimitY,
                 cancellationToken).ConfigureAwait(false);
             topThumb = await WaitForStableTeamListAsync(
                 window,
@@ -202,15 +202,21 @@ public sealed class TeamSelectionService
 
             TeamScrollbarThumb thumb = TeamScreenDetector.FindScrollbarThumb(image) ??
                 throw new InvalidOperationException("The Unit Team scrollbar could not be located.");
-            if (Math.Abs(thumb.CenterY - targetCenterY) > 4)
+            bool aligned = teamSlot >= 7
+                ? TeamScreenDetector.IsScrollbarAtBottom(thumb)
+                : Math.Abs(thumb.CenterY - targetCenterY) <= 4;
+            if (!aligned)
             {
+                int dragEndY = teamSlot >= 7
+                    ? TeamScreenDetector.BottomScrollbarDragLimitY
+                    : targetCenterY;
                 EnsureFocus(window);
                 await _automation.DragClientAsync(
                     window,
                     thumb.X,
                     thumb.CenterY,
                     thumb.X,
-                    targetCenterY,
+                    dragEndY,
                     cancellationToken).ConfigureAwait(false);
             }
 

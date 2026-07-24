@@ -36,8 +36,11 @@ public sealed class TeamSelectionServiceTests
         TeamScrollbarThumb initialThumb = TeamScreenDetector.FindScrollbarThumb(automation.InitialTeamFrame)!.Value;
         if (teamSlot != 1)
         {
+            int dragEndY = teamSlot >= 7
+                ? TeamScreenDetector.BottomScrollbarDragLimitY
+                : TeamScreenDetector.ScrollThumbTargetCenterY(teamSlot, initialThumb.CenterY);
             expected.Add(
-                $"drag:{initialThumb.X},{initialThumb.CenterY}->{initialThumb.X},{TeamScreenDetector.ScrollThumbTargetCenterY(teamSlot, initialThumb.CenterY)}");
+                $"drag:{initialThumb.X},{initialThumb.CenterY}->{initialThumb.X},{dragEndY}");
         }
         int targetCenterY =
             TeamScreenDetector.ScrollThumbTargetCenterY(teamSlot, initialThumb.CenterY);
@@ -89,6 +92,29 @@ public sealed class TeamSelectionServiceTests
         Assert.Equal(2, automation.Actions.Count(action => action.StartsWith("drag:", StringComparison.Ordinal)));
     }
 
+    [Theory]
+    [InlineData(7)]
+    [InlineData(8)]
+    public async Task Select_LowerTeamsDragPastTheTrackSoRobloxClampsAtBottom(
+        int teamSlot)
+    {
+        FakeAutomation automation = new(
+            teamSlot,
+            equipmentFixture: "TeamEquipmentConfirm_01.png");
+        TeamSelectionService service = new(automation);
+
+        await service.SelectAsync(
+            automation.Window,
+            teamSlot,
+            unitMenuKey: 'u');
+
+        Assert.Contains(
+            automation.Actions,
+            action => action.EndsWith(
+                $",{TeamScreenDetector.BottomScrollbarDragLimitY}",
+                StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task Select_WaitsForTheOpeningAnimationAndUsesTheRealTopThumb()
     {
@@ -135,7 +161,7 @@ public sealed class TeamSelectionServiceTests
             TeamScreenDetector.FindScrollbarThumb(
                 automation.InitialTeamFrame)!.Value;
         Assert.Contains(
-            $"drag:{scrolled.X},{scrolled.CenterY}->{scrolled.X},{TeamScreenDetector.TopScrollbarCenterY}",
+            $"drag:{scrolled.X},{scrolled.CenterY}->{scrolled.X},{TeamScreenDetector.TopScrollbarDragLimitY}",
             automation.Actions);
     }
 
@@ -276,9 +302,16 @@ public sealed class TeamSelectionServiceTests
             TeamScrollbarThumb thumb = TeamScreenDetector.FindScrollbarThumb(_teamFrame)!.Value;
             Assert.Equal((thumb.X, thumb.CenterY), (startX, startY));
             Assert.Equal(thumb.X, endX);
-            if (endY == TeamScreenDetector.TopScrollbarCenterY)
+            if (endY == TeamScreenDetector.TopScrollbarDragLimitY)
             {
                 _teamFrame = _topTeamFrame;
+            }
+            else if (_teamSlot >= 7)
+            {
+                Assert.Equal(
+                    TeamScreenDetector.BottomScrollbarDragLimitY,
+                    endY);
+                _teamFrame = AlignedTeamFrame;
             }
             else
             {

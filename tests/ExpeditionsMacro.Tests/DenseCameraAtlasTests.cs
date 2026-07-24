@@ -155,8 +155,16 @@ public sealed class DenseCameraAtlasTests
                 model.FineYawAtlas[zeroIndex].Pixels);
             Assert.NotNull(
                 await repository.LoadAsync(model.Manifest.Id));
-            Assert.Equal(0, automation.YawStep);
-            Assert.Equal(0, automation.MouseOffset);
+            int visualOffset =
+                ((automation.YawStep * 7 +
+                  automation.MouseOffset) %
+                 goal.Width + goal.Width) %
+                goal.Width;
+            Assert.Equal(0, visualOffset);
+            Assert.InRange(
+                Math.Abs(automation.MouseOffset),
+                0,
+                settings.FineSearchPixels);
             Assert.False(automation.ShiftLockState);
         }
         finally
@@ -224,6 +232,15 @@ public sealed class DenseCameraAtlasTests
                  goal.Width + goal.Width) %
                 goal.Width;
             Assert.Equal(0, visualOffset);
+            int directionChanges = automation.ArrowPulses
+                .Zip(
+                    automation.ArrowPulses.Skip(1),
+                    (first, second) => first != second)
+                .Count(changed => changed);
+            Assert.True(
+                directionChanges <= 3,
+                $"Dense goal restoration changed arrow direction " +
+                $"{directionChanges} times.");
             Assert.Contains(
                 updates,
                 update =>
@@ -241,6 +258,109 @@ public sealed class DenseCameraAtlasTests
         {
             TestPaths.DeleteTemporaryDirectory(root);
         }
+    }
+
+    [Fact]
+    public async Task Calibrate_MissedFirstClosureDiscardsTheRepeatedTurn()
+    {
+        const int fullYawSteps = 72;
+        const int samplesPerTurn = 180;
+        ImageFrame goal = Texture(
+            RobloxClientProfile.Width,
+            RobloxClientProfile.Height);
+        ImageFrame[] yawFrames = Enumerable.Range(0, fullYawSteps)
+            .Select(yaw => Shift(goal, yaw * 7))
+            .ToArray();
+        FakeAutomation automation = new(goal)
+        {
+            FullYawSteps = fullYawSteps,
+            DenseSweepSamplesPerTurn = samplesPerTurn,
+            DenseSweepTurnCount = 2,
+            DenseSweepFrameAtSample = (sample, yaw) =>
+                sample <= samplesPerTurn + 20 &&
+                (yaw <= 2 || yaw >= fullYawSteps - 2)
+                    ? yawFrames[18]
+                    : yawFrames[yaw],
+            CaptureAtCameraState = (yaw, mouse, _) =>
+                mouse == 0
+                    ? yawFrames[yaw]
+                    : Shift(yawFrames[yaw], mouse),
+        };
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            CameraAlignmentEngine engine = new(
+                automation,
+                new CameraModelRepository(new AppPaths(root)));
+            List<MacroProgress> updates = [];
+
+            CameraModel model = await engine.CalibrateAsync(
+                new CameraCalibrationSettings
+                {
+                    Name = "Missed first closure",
+                    CaptureCount = 3,
+                    CaptureDuration = TimeSpan.FromMilliseconds(60),
+                    ArrowHoldMilliseconds = 30,
+                    FineStepPixels = 1,
+                    FineSearchPixels = 16,
+                    SettleMilliseconds = 25,
+                    MaximumSamples = 240,
+                },
+                new InlineProgress<MacroProgress>(updates.Add));
+
+            Assert.InRange(
+                model.Manifest.DenseYawTurnMilliseconds,
+                2700,
+                3100);
+            Assert.InRange(
+                model.Manifest.AtlasSampleCount,
+                150,
+                200);
+            Assert.Equal(fullYawSteps, model.Manifest.FullYawSteps);
+            Assert.Equal(0, automation.YawStep);
+            Assert.Contains(
+                updates,
+                update => update.Message.Contains(
+                    "discarded the repeated turn",
+                    StringComparison.Ordinal));
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Fact]
+    public void DensePeriodPolicyDoesNotFoldOneSlowRevolution()
+    {
+        ImageFrame goal = VisionScorer.MakeThumbnail(
+            VisionScorer.PrepareGray(Texture(320, 180)));
+        const int sampleCount = 120;
+        DenseYawPeriodSample[] samples =
+            Enumerable.Range(1, sampleCount)
+                .Select(index =>
+                {
+                    ImageFrame frame = ShiftGray(
+                        goal,
+                        index * goal.Width / sampleCount);
+                    return new DenseYawPeriodSample(
+                        TimeSpan.FromMilliseconds(index * 50),
+                        frame,
+                        CameraYawAtlasIndex.CameraYawFingerprint.Create(
+                            frame));
+                })
+                .ToArray();
+
+        DenseYawPeriodDecision decision =
+            DenseYawPeriodPolicy.ReduceRepeatedTurn(
+                samples,
+                goal,
+                TimeSpan.FromSeconds(6));
+
+        Assert.False(decision.FoldedRepeatedTurn);
+        Assert.Equal(TimeSpan.FromSeconds(6), decision.TurnElapsed);
+        Assert.True(decision.MedianAgreement >= 0.96);
+        Assert.True(decision.MedianStructureAgreement < 0.33);
     }
 
     [Theory]
@@ -378,6 +498,71 @@ public sealed class DenseCameraAtlasTests
 
         Assert.Equal(3, match.Index);
         Assert.True(match.Score > 0.95);
+    }
+
+    [Fact]
+    public void CircularNearSearchPrefersThePhysicallyReachableAlias()
+    {
+        ImageFrame goal = VisionScorer.MakeThumbnail(
+            VisionScorer.PrepareGray(Texture(320, 180)));
+        ImageFrame[] atlas =
+        [
+            goal,
+            ShiftGray(goal, 8),
+            ShiftGray(goal, 15),
+            ShiftGray(goal, 24),
+            ShiftGray(goal, 32),
+            ShiftGray(goal, 40),
+            ShiftGray(goal, 16),
+            ShiftGray(goal, 56),
+            goal,
+        ];
+        CameraYawAtlasIndex index =
+            CameraYawAtlasIndex.For(atlas);
+        ImageFrame current = ShiftGray(goal, 16);
+
+        CameraYawAtlasMatch global = index.FindBest(current);
+        CameraYawAtlasMatch near = index.FindBestNear(
+            current,
+            centerIndex: 2,
+            radius: 1);
+
+        Assert.Equal(6, global.Index);
+        Assert.Equal(2, near.Index);
+        Assert.True(near.Score > 0.90);
+    }
+
+    [Theory]
+    [InlineData(52, 3)]
+    [InlineData(61, 3)]
+    [InlineData(121, 6)]
+    [InlineData(240, 10)]
+    public void FingerprintIsolationUsesAStableAngularNeighborhood(
+        int positions,
+        int expectedRadius)
+    {
+        Assert.Equal(
+            expectedRadius,
+            CameraYawAtlasIndex
+                .FingerprintNeighborhoodRadiusFor(positions));
+    }
+
+    [Theory]
+    [InlineData(15, 3, 3)]
+    [InlineData(5, 3, 2)]
+    [InlineData(3, 3, 1)]
+    [InlineData(2, 3, 1)]
+    [InlineData(1, 3, 1)]
+    public void DenseGoalCorrectionShrinksNearTheGoal(
+        int remaining,
+        int maximumBatch,
+        int expected)
+    {
+        Assert.Equal(
+            expected,
+            CameraAlignmentEngine.DenseGoalCorrectionBatch(
+                remaining,
+                maximumBatch));
     }
 
     [Fact]

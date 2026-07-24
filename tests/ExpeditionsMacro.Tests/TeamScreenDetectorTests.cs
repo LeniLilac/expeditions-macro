@@ -9,6 +9,7 @@ public sealed class TeamScreenDetectorTests
     [Theory]
     [InlineData("TeamUnits_01.png", TeamScreenState.Units)]
     [InlineData("TeamList_01.png", TeamScreenState.Teams)]
+    [InlineData("TeamList_Top_BackgroundDecoy_01.png", TeamScreenState.Teams)]
     [InlineData("TeamList_Aligned_Team1_Current_01.png", TeamScreenState.Teams)]
     [InlineData("TeamList_Aligned_Team2_01.png", TeamScreenState.Teams)]
     [InlineData("TeamList_Aligned_Team3_01.png", TeamScreenState.Teams)]
@@ -44,6 +45,12 @@ public sealed class TeamScreenDetectorTests
         Assert.Equal(expected, TeamScreenDetector.Detect(image).State);
         TeamScrollbarThumb? thumb =
             TeamScreenDetector.FindScrollbarThumb(image);
+        if (expected == TeamScreenState.None)
+        {
+            Assert.Null(thumb);
+            return;
+        }
+
         Assert.NotNull(thumb);
         Assert.InRange(thumb.Value.X, 625, 631);
         Assert.InRange(thumb.Value.Height, 70, 85);
@@ -62,6 +69,8 @@ public sealed class TeamScreenDetectorTests
     [InlineData("StoryDetail_Mastery_Wide_01.png")]
     [InlineData("RaidSelector_01.png")]
     [InlineData("RaidDetail_01.png")]
+    [InlineData("RaidDetail_Current_CustomFont_01.png")]
+    [InlineData("RaidDetail_Current_DefaultFont_01.png")]
     [InlineData("StoryVictory_Act_01.png")]
     [InlineData("StoryDefeat_Act_01.png")]
     [InlineData("RaidVictory_01.png")]
@@ -76,6 +85,8 @@ public sealed class TeamScreenDetectorTests
     {
         Assert.Equal((305, 427), TeamScreenDetector.TeamsTabAction);
         Assert.Equal(240, TeamScreenDetector.TopScrollbarCenterY);
+        Assert.Equal(190, TeamScreenDetector.TopScrollbarDragLimitY);
+        Assert.Equal(440, TeamScreenDetector.BottomScrollbarDragLimitY);
         Assert.Equal([0, 30, 59, 89, 118, 148, 156, 156],
             Enumerable.Range(1, 8).Select(TeamScreenDetector.ScrollThumbOffsetY));
         Assert.Equal((345, 331), TeamScreenDetector.LoadConfirmAction);
@@ -151,6 +162,18 @@ public sealed class TeamScreenDetectorTests
 
         Assert.True(TeamScreenDetector.IsScrollbarAtTop(top));
         Assert.False(TeamScreenDetector.IsScrollbarAtTop(scrolled));
+    }
+
+    [Fact]
+    public void CurrentPanel_AnchorsTheThumbToItsCloseButtonInsteadOfBackgroundScenery()
+    {
+        TeamScrollbarThumb thumb =
+            TeamScreenDetector.FindScrollbarThumb(
+                Load("TeamList_Top_BackgroundDecoy_01.png"))!.Value;
+
+        Assert.InRange(thumb.X, 625, 631);
+        Assert.InRange(thumb.CenterY, 239, 241);
+        Assert.True(TeamScreenDetector.IsScrollbarAtTop(thumb));
     }
 
     [Theory]

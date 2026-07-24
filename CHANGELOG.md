@@ -4,6 +4,20 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.17] - 2026-07-24
+
+### Fixed
+
+- Saved-team loading now anchors the scrollbar thumb to the detected Unit Teams panel, preventing similarly sized gray scenery from being dragged.
+- Team 7 and Team 8 alignment now over-drags to the physical bottom limit so Roblox clamps the thumb instead of leaving the lower Load Team actions clipped after an under-travelled drag.
+- Raid detail detection now supports the current Spirit City panel under both Roblox font settings even when the red Close circle visually connects to its border, allowing the configured act selection to proceed.
+- Dense camera setup now discards a proven repeated revolution when sampling skips the first loop seam, measures fingerprint separation over a consistent angular neighborhood, constrains post-pulse lookup to the physically reachable yaw range, and accepts a verified fine-mouse return beside the atlas seam instead of oscillating between one left and one right arrow pulse.
+
+### Tests
+
+- Added a privacy-reviewed Team list fixture containing both the real scrollbar thumb and a valid-height gray scenery decoy.
+- Added privacy-reviewed current Raid detail fixtures with Roblox's custom and default fonts.
+
 ## [1.3.0-beta.16] - 2026-07-24
 
 ### Fixed
@@ -658,7 +672,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.16...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.17...HEAD
+[1.3.0-beta.17]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.16...v1.3.0-beta.17
 [1.3.0-beta.16]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.15...v1.3.0-beta.16
 [1.3.0-beta.15]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.14...v1.3.0-beta.15
 [1.3.0-beta.14]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.13...v1.3.0-beta.14

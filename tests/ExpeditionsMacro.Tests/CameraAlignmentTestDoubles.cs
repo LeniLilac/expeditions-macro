@@ -29,6 +29,12 @@ internal sealed class FakeAutomation(ImageFrame screenCapture) : IRobloxAutomati
     public Func<int, int, bool, ImageFrame>? CaptureAtCameraState { get; init; }
     public int FullYawSteps { get; init; } = 12;
     public int DenseSweepSamplesPerTurn { get; init; }
+    public int DenseSweepTurnCount { get; init; } = 1;
+    public Func<int, int, ImageFrame>? DenseSweepFrameAtSample
+    {
+        get;
+        init;
+    }
     public int LastDenseSweepSampleIntervalMilliseconds { get; private set; }
     public int LastDenseSweepMaximumSamples { get; private set; }
     public ImageFrame? DenseFineSweepZeroFrame { get; init; }
@@ -112,8 +118,10 @@ internal sealed class FakeAutomation(ImageFrame screenCapture) : IRobloxAutomati
             ? DenseSweepSamplesPerTurn
             : FullYawSteps;
         int origin = YawStep;
+        int totalSweepSamples =
+            sweepSamples * Math.Max(1, DenseSweepTurnCount);
         for (int sample = 1;
-             sample <= Math.Min(maximumSamples, sweepSamples) &&
+             sample <= Math.Min(maximumSamples, totalSweepSamples) &&
              sample * sampleIntervalMilliseconds <=
              maximumDuration.TotalMilliseconds;
              sample++)
@@ -131,10 +139,13 @@ internal sealed class FakeAutomation(ImageFrame screenCapture) : IRobloxAutomati
                 ((origin + directionValue * travelled) % FullYawSteps +
                  FullYawSteps) %
                 FullYawSteps;
+            ImageFrame captured =
+                DenseSweepFrameAtSample?.Invoke(sample, YawStep)
+                ?? CaptureClient(window);
             if (!observe(new CameraYawSweepSample(
                     TimeSpan.FromMilliseconds(
                         sample * sampleIntervalMilliseconds),
-                    CaptureClient(window))))
+                    captured.Clone())))
             {
                 MouseOffset += DenseSweepReleaseMouseOffset;
                 YawStep =

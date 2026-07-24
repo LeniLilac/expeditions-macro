@@ -244,14 +244,16 @@ public static class StageScreenDetector
         double header = ColorFraction(image, DetailHeader, accent);
         double top = BestHorizontalLineFraction(image, DetailTopEdge, accent);
         double dark = ColorFraction(image, DetailPanel, IsDark);
-        double close = ActionButtonDetector.Score(image, "stage_detail_close");
-        if (header < 0.018 || top < 0.45 || dark < 0.38 || close == 0) return 0;
+        // The current Raid layout can connect the decorative Close circle to
+        // the accent border, so it is not a stable isolated component. The
+        // caller independently requires a live Select Stage action before
+        // treating this structure as actionable detail UI. See GB-007.
+        if (header < 0.018 || top < 0.45 || dark < 0.38) return 0;
         return Math.Clamp(
-            0.58 +
+            0.68 +
             0.12 * Ramp(header, 0.018, 0.12) +
             0.12 * Ramp(top, 0.45, 0.95) +
-            0.08 * Ramp(dark, 0.38, 0.78) +
-            0.10 * close,
+            0.08 * Ramp(dark, 0.38, 0.78),
             0,
             1);
     }

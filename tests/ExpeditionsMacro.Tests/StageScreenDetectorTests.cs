@@ -27,6 +27,8 @@ public sealed class StageScreenDetectorTests
     [InlineData("StoryDetail_Mastery_Wide_01.png", StageScreenState.StoryDetail)]
     [InlineData("RaidSelector_01.png", StageScreenState.RaidSelector)]
     [InlineData("RaidDetail_01.png", StageScreenState.RaidDetail)]
+    [InlineData("RaidDetail_Current_CustomFont_01.png", StageScreenState.RaidDetail)]
+    [InlineData("RaidDetail_Current_DefaultFont_01.png", StageScreenState.RaidDetail)]
     [InlineData("RaidPartyPreview_01.png", StageScreenState.PreviewReady)]
     [InlineData("StoryPartyPreview_Mastery_01.png", StageScreenState.PreviewReady)]
     [InlineData("StoryPostMatchParty_Mastery_01.png", StageScreenState.PostMatchPreview)]
@@ -53,6 +55,8 @@ public sealed class StageScreenDetectorTests
     [InlineData("StoryDetail_01.png", StageScreenState.StoryDetail)]
     [InlineData("StoryDetail_Mastery_01.png", StageScreenState.StoryDetail)]
     [InlineData("RaidDetail_01.png", StageScreenState.RaidDetail)]
+    [InlineData("RaidDetail_Current_CustomFont_01.png", StageScreenState.RaidDetail)]
+    [InlineData("RaidDetail_Current_DefaultFont_01.png", StageScreenState.RaidDetail)]
     public void DetailScreens_MapTheLiveSelectStageButton(string fileName, StageScreenState expected)
     {
         StageScreenMatch match = StageScreenDetector.Detect(Load(fileName));

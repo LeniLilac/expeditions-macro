@@ -23,6 +23,8 @@ public static class TeamScreenDetector
     public const int ClientWidth = 808;
     public const int ClientHeight = 611;
     public const int TopScrollbarCenterY = 240;
+    public const int TopScrollbarDragLimitY = 190;
+    public const int BottomScrollbarDragLimitY = 440;
 
     private static readonly ScreenRegion Panel = new(105, 105, 605, 370);
     private static readonly ScreenRegion Header = new(80, 100, 285, 110);
@@ -95,11 +97,24 @@ public static class TeamScreenDetector
     public static bool IsScrollbarAtTop(TeamScrollbarThumb thumb) =>
         thumb.CenterY is >= 230 and <= 245;
 
+    public static bool IsScrollbarAtBottom(TeamScrollbarThumb thumb) =>
+        thumb.CenterY is >= 390 and <= 405;
+
     public static TeamScrollbarThumb? FindScrollbarThumb(ImageFrame image)
     {
         Validate(image);
+        (int X, int Y)? closeAction =
+            ActionButtonDetector.ActionFor(image, "team_close");
+        if (closeAction is null) return null;
+
+        // GB-014: both reviewed panel widths keep the scrollbar three to nine
+        // pixels right of the live Close-button center. Searching relative to
+        // that owned structure prevents similarly sized gray scenery from
+        // winning the longest-run comparison.
+        int minimumX = Math.Clamp(closeAction.Value.X + 3, 0, image.Width - 1);
+        int maximumX = Math.Clamp(closeAction.Value.X + 9, minimumX, image.Width - 1);
         List<(int X, int StartY, int EndY)> columns = [];
-        for (int x = 620; x <= 659; x++)
+        for (int x = minimumX; x <= maximumX; x++)
         {
             (int StartY, int EndY) run = LongestThumbRun(image, x);
             int height = run.EndY - run.StartY + 1;
@@ -129,7 +144,11 @@ public static class TeamScreenDetector
     {
         ValidateTeamSlot(teamSlot);
         TeamScrollbarThumb? thumb = FindScrollbarThumb(image);
-        if (thumb is null || Math.Abs(thumb.Value.CenterY - targetThumbCenterY) > 4)
+        bool aligned = thumb is TeamScrollbarThumb found &&
+            (teamSlot >= 7
+                ? IsScrollbarAtBottom(found)
+                : Math.Abs(found.CenterY - targetThumbCenterY) <= 4);
+        if (!aligned)
         {
             return null;
         }

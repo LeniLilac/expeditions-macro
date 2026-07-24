@@ -15,7 +15,9 @@ public sealed class CameraYawAtlasIndex
     private const int GridRows = 5;
     private const int CandidateSeeds = 8;
     private const int BoundedCandidateSeeds = 2;
-    private const int FingerprintNeighborhoodRadius = 2;
+    private const int NearCandidateSeeds = 4;
+    private const int MinimumFingerprintNeighborhoodRadius = 2;
+    private const int FingerprintNeighborhoodDivisor = 24;
     private static readonly ConditionalWeakTable<
         IReadOnlyList<ImageFrame>,
         CameraYawAtlasIndex> Cache = new();
@@ -82,6 +84,35 @@ public sealed class CameraYawAtlasIndex
             BoundedCandidateSeeds);
     }
 
+    public CameraYawAtlasMatch FindBestNear(
+        ImageFrame current,
+        int centerIndex,
+        int radius)
+    {
+        if (centerIndex < 0 || centerIndex >= _uniqueCount)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(centerIndex));
+        }
+        if (radius < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(radius));
+        }
+        int boundedRadius = Math.Min(
+            radius,
+            Math.Max(1, _uniqueCount / 2));
+        int[] allowed = Enumerable.Range(
+                -boundedRadius,
+                boundedRadius * 2 + 1)
+            .Select(offset => Normalize(centerIndex + offset))
+            .Distinct()
+            .ToArray();
+        return FindBest(
+            current,
+            allowed,
+            NearCandidateSeeds);
+    }
+
     private CameraYawAtlasMatch FindBest(
         ImageFrame current,
         IEnumerable<int> allowedIndices,
@@ -137,10 +168,12 @@ public sealed class CameraYawAtlasIndex
                 _fingerprints[index].Similarity(currentFingerprint),
                 0);
         }
+        int fingerprintNeighborhoodRadius =
+            FingerprintNeighborhoodRadiusFor(_uniqueCount);
         double[] remoteScores = fingerprintScores
             .Where(item =>
                 CircularDistance(item.Index, best.Index) >
-                FingerprintNeighborhoodRadius)
+                fingerprintNeighborhoodRadius)
             .Select(item => item.Score)
             .ToArray();
         if (remoteScores.Length == 0) return best;
@@ -148,6 +181,20 @@ public sealed class CameraYawAtlasIndex
             0,
             best.FingerprintScore - remoteScores.Max());
         return best with { FingerprintIsolation = isolation };
+    }
+
+    public static int FingerprintNeighborhoodRadiusFor(
+        int uniqueCount)
+    {
+        if (uniqueCount < 2)
+        {
+            throw new ArgumentOutOfRangeException(nameof(uniqueCount));
+        }
+        return Math.Max(
+            MinimumFingerprintNeighborhoodRadius,
+            (int)Math.Ceiling(
+                uniqueCount /
+                (double)FingerprintNeighborhoodDivisor));
     }
 
     private int Normalize(int index) =>
