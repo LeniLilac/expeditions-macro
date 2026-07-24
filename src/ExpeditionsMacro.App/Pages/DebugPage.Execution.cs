@@ -214,13 +214,11 @@ public partial class DebugPage
                 stage is
                     StageScreenState.Victory or
                     StageScreenState.Defeat or
-                    StageScreenState.PostMatchPreview or
-                    StageScreenState.PostMatchHud ||
+                    StageScreenState.PostMatchPreview ||
                 challenge is
                     ChallengeScreenState.Victory or
                     ChallengeScreenState.Defeat or
-                    ChallengeScreenState.PostMatchPreview or
-                    ChallengeScreenState.PostMatchHud,
+                    ChallengeScreenState.PostMatchPreview,
             _ => false,
         };
         if (!valid)

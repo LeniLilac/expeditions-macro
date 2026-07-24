@@ -167,7 +167,7 @@ public sealed class TeamSelectionServiceTests
             {
                 [TeamScreenState.None] = Load("GameModeNegative_01.png"),
                 [TeamScreenState.Units] = Load("TeamUnits_01.png"),
-                [TeamScreenState.LoadConfirm] = Load("TeamLoadConfirm_01.png"),
+                [TeamScreenState.LoadConfirm] = Load(LoadConfirmFixture(teamSlot)),
                 [TeamScreenState.EquipmentConfirm] = Load(equipmentFixture),
             };
             TeamScreenMatch match = TeamScreenDetector.Detect(_frames[TeamScreenState.EquipmentConfirm]);
@@ -335,6 +335,13 @@ public sealed class TeamSelectionServiceTests
             6 => "TeamList_Aligned_Team6_01.png",
             7 or 8 => "TeamList_Aligned_Bottom_01.png",
             _ => throw new ArgumentOutOfRangeException(nameof(teamSlot)),
+        };
+
+        private static string LoadConfirmFixture(int teamSlot) => teamSlot switch
+        {
+            7 => "TeamLoadConfirm_Bottom_Team7_01.png",
+            8 => "TeamLoadConfirm_Bottom_Team8_01.png",
+            _ => "TeamLoadConfirm_01.png",
         };
 
         private static ImageFrame Load(string name) => ImageCodec.Load(Path.Combine(TestPaths.StageDatasets, name));

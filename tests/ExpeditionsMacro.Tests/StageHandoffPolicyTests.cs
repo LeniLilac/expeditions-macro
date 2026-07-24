@@ -30,7 +30,6 @@ public sealed class StageHandoffPolicyTests
     [InlineData(StageScreenState.Defeat, false, "PressPlayKey")]
     [InlineData(StageScreenState.PostMatchPreview, true, "ChangeGamemode")]
     [InlineData(StageScreenState.PostMatchPreview, false, "PressPlayKey")]
-    [InlineData(StageScreenState.PostMatchHud, false, "PressPlayKey")]
     [InlineData(StageScreenState.StorySelector, false, "Back")]
     [InlineData(StageScreenState.RaidSelector, false, "Back")]
     [InlineData(StageScreenState.PreviewReady, false, "Back")]

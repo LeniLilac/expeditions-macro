@@ -89,8 +89,6 @@ internal static class ActionButtonDetector
         ["stage_victory_repeat"] = new(new ScreenRegion(225, 390, 165, 90), ButtonColor.Yellow, 304, 437, 65, 42, 80, 135, 18, 48, 0.36),
         ["challenge_victory_party"] = new(new ScreenRegion(125, 395, 365, 80), ButtonColor.Purple, 304, 437, 100, 35, 250, 350, 16, 42, 0.25),
         ["challenge_victory_close"] = new(new ScreenRegion(625, 125, 90, 80), ButtonColor.Red, 670, 155, 48, 35, 14, 34, 14, 34, 0.35, 0.40),
-        ["challenge_post_match_play"] = new(new ScreenRegion(152, 570, 28, 28), ButtonColor.Cyan, 164, 584, 16, 16, 8, 28, 8, 28, 0.08, 0.30, 40),
-        ["challenge_game_results"] = new(new ScreenRegion(330, 450, 150, 75), ButtonColor.Yellow, 403, 491, 85, 40, 25, 120, 12, 40, 0.20, 0.38),
         ["team_close"] = new(new ScreenRegion(610, 100, 110, 110), ButtonColor.Red, 660, 150, 55, 65, 14, 36, 14, 36, 0.35, 0.40),
         ["units_unequip_all"] = new(new ScreenRegion(105, 405, 155, 70), ButtonColor.Red, 180, 442, 48, 35, 85, 135, 18, 42, 0.30),
         ["units_teams"] = new(new ScreenRegion(215, 405, 165, 70), ButtonColor.Purple, 294, 442, 48, 35, 85, 135, 18, 42, 0.25),

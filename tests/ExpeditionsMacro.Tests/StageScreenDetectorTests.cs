@@ -133,16 +133,18 @@ public sealed class StageScreenDetectorTests
     }
 
     [Fact]
-    public void PostMatchHud_RemainsDistinctFromThePartyPreview()
+    public void LegacySmallPlayHud_IsNotAnActionableStageScreen()
     {
         ImageFrame image = ImageCodec.Load(Path.Combine(
             TestPaths.ChallengeDatasets,
-            "PostMatchHud",
-            "PostMatchHud_01.png"));
+            "GameplayNegative",
+            "GameplayNegative_09.png"));
 
         StageScreenMatch match = StageScreenDetector.Detect(image);
 
-        Assert.Equal(StageScreenState.PostMatchHud, match.State);
+        Assert.Equal(StageScreenState.None, match.State);
+        Assert.Null(match.ActionX);
+        Assert.Null(match.ActionY);
     }
 
     [Fact]
@@ -207,6 +209,8 @@ public sealed class StageScreenDetectorTests
     [InlineData("TeamList_Aligned_Team6_01.png")]
     [InlineData("TeamList_Aligned_Bottom_01.png")]
     [InlineData("TeamLoadConfirm_01.png")]
+    [InlineData("TeamLoadConfirm_Bottom_Team7_01.png")]
+    [InlineData("TeamLoadConfirm_Bottom_Team8_01.png")]
     [InlineData("TeamEquipmentConfirm_01.png")]
     [InlineData("TeamEquipmentConfirm_Compact_01.png")]
     public void TeamInterfaces_DoNotStealStageNavigation(string fileName)

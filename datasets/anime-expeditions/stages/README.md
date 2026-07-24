@@ -1,6 +1,6 @@
 # Story, Raid, and team fixtures
 
-This directory contains 38 reviewed 808 by 611 Roblox client-area frames used by the Story, Raid, and saved-team detectors. The retained PNGs contain no account names, chat, notifications, desktop chrome, or secrets. Captured UI pixels remain unscaled and unmodified except for the documented account-name redactions; the three Story wide-button fixtures use documented black padding outside their supplied panel crops.
+This directory contains 40 reviewed 808 by 611 Roblox client-area frames used by the Story, Raid, and saved-team detectors. The retained PNGs contain no account names, chat, notifications, desktop chrome, or secrets. Captured UI pixels remain unscaled and unmodified except for the documented account-name redactions; the three Story wide-button fixtures use documented black padding outside their supplied panel crops.
 
 Sources:
 
@@ -18,5 +18,7 @@ Sources:
 - `deep-debug-macro-plan-20260722-131337-69d254a6ff604443b65c602d39444a2d.zip`: a Spirit City Raid post-match party with a disabled Start action and active Change Gamemode action. The display-name strip at client coordinates `(460, 250)` through `(590, 317)` was replaced with an opaque rectangle; all navigation and action-detector pixels are unchanged.
 - `deep-debug-diagnostic-capture-20260723-101044-cc48cf283de74b628cfe68d899fa929f.zip`: a passive beta.13 capture of the gray Unit Teams scrollbar positioning Teams 1 through 6 as the first full row and Teams 7 through 8 at the shared bottom limit. Physical drags are user reported. The seven retained frames are unmodified 808 by 611 Roblox client captures with no account name, chat, desktop chrome, notification, or secret.
 - A supplied Deep Debug capture contributed four consecutive frames from the Unit Teams opening animation. The real 73–75 pixel scrollbar thumb rises from its opening position to the top while a much taller neutral-gray strip remains visible in the Roblox background outside the panel. The retained frames are unmodified 808 by 611 client captures with no account name, chat, desktop chrome, notification, or secret.
+
+- Two beta.15 Debug Team Swap runs contributed the settled Team 7 and Team 8 Load Team confirmation frames. Both actions used the verified bottom scrollbar limit; the clicked/current row's dimmed green button fell just below the former modal background threshold. The retained frames are unmodified 808 by 611 client captures with no account name, chat, desktop chrome, notification, or secret.
 
 The full bursts remain local diagnostic artifacts. Only structurally distinct frames needed for detector and cross-state regression are retained here.

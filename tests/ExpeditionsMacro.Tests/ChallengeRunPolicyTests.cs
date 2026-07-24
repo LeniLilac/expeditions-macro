@@ -65,14 +65,21 @@ public sealed class ChallengeRunPolicyTests
     }
 
     [Fact]
-    public void AllCooldownAcrossAFullReset_InfersDailyLimitUntilMidnightUtc()
+    public void SeparateScheduledInvocations_SharedStateInfersDailyLimitUntilMidnightUtc()
     {
-        ChallengeRotationState state = new();
+        ChallengeRotationState operationState = new();
         DateTimeOffset first = new(2026, 7, 19, 20, 10, 0, TimeSpan.Zero);
+        DateTimeOffset afterReset = new(2026, 7, 19, 20, 30, 5, TimeSpan.Zero);
 
-        Assert.False(state.ObserveAllCooldown(first));
-        Assert.True(state.ObserveAllCooldown(new DateTimeOffset(2026, 7, 19, 20, 30, 5, TimeSpan.Zero)));
-        Assert.Equal(new DateTimeOffset(2026, 7, 20, 0, 0, 0, TimeSpan.Zero), state.DailyLimitUntilUtc);
+        Assert.False(operationState.ObserveAllCooldown(first));
+        Assert.True(operationState.ObserveAllCooldown(afterReset));
+        Assert.Equal(
+            new DateTimeOffset(2026, 7, 20, 0, 0, 0, TimeSpan.Zero),
+            operationState.DailyLimitUntilUtc);
+
+        ChallengeRotationState discardedInvocationState = new();
+        Assert.False(discardedInvocationState.ObserveAllCooldown(afterReset));
+        Assert.Null(discardedInvocationState.DailyLimitUntilUtc);
     }
 
     [Fact]

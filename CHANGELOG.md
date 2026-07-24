@@ -4,6 +4,18 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.16] - 2026-07-24
+
+### Fixed
+
+- Challenge daily-limit evidence now persists across one-match scheduler handoffs. When every regular Challenge remains unavailable after a complete global reset, the task becomes ineligible until the next midnight UTC while the scheduler continues with the next eligible priority.
+- Saved-team loading now recognizes the Team 7 and Team 8 Load Team confirmation after reaching the shared bottom scrollbar limit, even when the clicked or current row dims one underlying green action.
+- Current wide Challenge Defeat panels now override their background HUD controls and complete the match normally. The obsolete small-Play-button post-match state was removed; the configured Play key continues to open navigation directly from the terminal.
+
+### Tests
+
+- Added privacy-reviewed Team 7, Team 8, and current wide Challenge Defeat fixtures to the saved-team, terminal, and cross-state navigation regressions.
+
 ## [1.3.0-beta.15] - 2026-07-24
 
 ### Added
@@ -646,7 +658,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.15...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.16...HEAD
+[1.3.0-beta.16]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.15...v1.3.0-beta.16
 [1.3.0-beta.15]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.14...v1.3.0-beta.15
 [1.3.0-beta.14]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.13...v1.3.0-beta.14
 [1.3.0-beta.13]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.12...v1.3.0-beta.13
