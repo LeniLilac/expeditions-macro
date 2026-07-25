@@ -74,17 +74,12 @@ internal static class UiSnapshotRenderer
                         key,
                         showPageEnd,
                         showDebugUtilities);
+                    Size size = SnapshotSize(key);
                     await File.WriteAllTextAsync(
                         progressPath,
-                        $"Rendering {file} ({theme.ToString().ToLowerInvariant()}).");
+                        $"Rendering {file} ({theme.ToString().ToLowerInvariant()}) at {size.Width:0}x{size.Height:0}.");
                     await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                     if (window.Content is not FrameworkElement root) throw new InvalidOperationException("The main window has no renderable content.");
-                    Size size = string.Equals(
-                        key,
-                        "Placement Setup",
-                        StringComparison.OrdinalIgnoreCase)
-                        ? new Size(1660, 1040)
-                        : new Size(1200, 780);
                     window.Width = size.Width;
                     window.Height = size.Height;
                     root.Measure(size);
@@ -113,6 +108,32 @@ internal static class UiSnapshotRenderer
         {
             window.Close();
         }
+    }
+
+    private static Size SnapshotSize(string key)
+    {
+        Size standard = new(1200, 780);
+        if (!string.Equals(
+                key,
+                "Placement Setup",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return standard;
+        }
+
+        Size wide = new(1660, 1040);
+        if (string.Equals(
+                Environment.GetEnvironmentVariable("CI"),
+                "true",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return standard;
+        }
+        Rect workArea = SystemParameters.WorkArea;
+        return workArea.Width >= wide.Width &&
+               workArea.Height >= wide.Height
+            ? wide
+            : standard;
     }
 
     private static void VerifyBundledFont(MainWindow window)

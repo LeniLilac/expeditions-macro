@@ -14,7 +14,7 @@ All notable changes to Expeditions Macro are documented here.
 
 ### Fixed
 
-- UI snapshot validation now records page-level progress, exits without hidden modal dialogs on renderer errors, and reports a bounded timeout instead of consuming the entire GitHub Actions job window.
+- UI snapshot validation now records page-level progress, exits without hidden modal dialogs on renderer errors, reports a bounded timeout, and uses the standard render size when a hosted display cannot contain the wider Placement Setup canvas.
 
 ### Tests
 
