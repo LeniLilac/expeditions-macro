@@ -312,8 +312,10 @@ public sealed class AppServices : IDisposable
     private async Task EnsureBundledDetectorPackAsync()
     {
         string source = Path.Combine(AppContext.BaseDirectory, "Resources", "DetectorPacks", AnimeExpeditionsDetectorSpec.PackId, AnimeExpeditionsDetectorSpec.BundledPackVersion);
-        if (!Directory.Exists(source)) throw new DirectoryNotFoundException("The bundled detector pack is missing from this build.");
-        await DetectorPacks.EnsureBundledAsync(source);
+        if (await DetectorPacks.EnsureBundledAsync(source))
+        {
+            Log.Info("Installed or repaired the bundled detector pack.");
+        }
     }
 
     private async Task<(string? Path, string? Error)> CaptureFailureDiagnosticsAsync(string macroName, string failure)

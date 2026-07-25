@@ -132,6 +132,65 @@ public sealed class DetectorPackRepositoryTests
     }
 
     [Fact]
+    public async Task EnsureBundled_ReplacesACorruptedNewerInstalledPack()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        string newer = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            await CopyWithVersionAsync(TestPaths.DetectorPack, newer, "1.0.3");
+            AppPaths paths = new(root);
+            DetectorPackRepository repository = new(paths);
+            await repository.InstallDirectoryAsync(newer);
+            File.Delete(Path.Combine(
+                paths.DetectorPacks,
+                AnimeExpeditionsDetectorSpec.PackId,
+                "current",
+                "challenge-maps",
+                "fairy-king-forest.png"));
+
+            Assert.True(await repository.EnsureBundledAsync(TestPaths.DetectorPack));
+
+            Assert.Equal("1.0.2", Assert.Single(await repository.ListAsync()).Version);
+            Assert.True((await repository.LoadAsync(AnimeExpeditionsDetectorSpec.PackId))!.SupportsChallengeMaps);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+            TestPaths.DeleteTemporaryDirectory(newer);
+        }
+    }
+
+    [Fact]
+    public async Task EnsureBundled_ExplainsWhenTheBundledCopyIsDamaged()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        string damaged = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            CopyDirectory(TestPaths.DetectorPack, damaged);
+            File.Delete(Path.Combine(
+                damaged,
+                "challenge-maps",
+                "fairy-king-forest.png"));
+            DetectorPackRepository repository = new(new AppPaths(root));
+
+            InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(
+                () => repository.EnsureBundledAsync(damaged));
+
+            Assert.Contains("bundled with this copy", error.Message, StringComparison.Ordinal);
+            Assert.Contains("new empty folder", error.Message, StringComparison.Ordinal);
+            Assert.Contains("fairy-king-forest.png", error.InnerException!.Message, StringComparison.Ordinal);
+            Assert.Empty(await repository.ListAsync());
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+            TestPaths.DeleteTemporaryDirectory(damaged);
+        }
+    }
+
+    [Fact]
     public async Task InstallDirectory_RejectsAChangedCompiledReference()
     {
         string root = TestPaths.NewTemporaryDirectory();

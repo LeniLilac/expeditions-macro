@@ -4,6 +4,16 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.23] - 2026-07-25
+
+### Changed
+
+- Renamed the Fast no-align import/export panel to **Share config**.
+
+### Fixed
+
+- Startup now validates installed detector-pack files before trusting their version and atomically restores a damaged cache from the bundled copy. An incomplete application bundle now reports actionable clean-reinstall guidance instead of only naming the first missing detector image.
+
 ## [1.3.0-beta.22] - 2026-07-25
 
 ### Changed
@@ -761,7 +771,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.22...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.23...HEAD
+[1.3.0-beta.23]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.22...v1.3.0-beta.23
 [1.3.0-beta.22]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.21...v1.3.0-beta.22
 [1.3.0-beta.21]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.20...v1.3.0-beta.21
 [1.3.0-beta.20]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.19...v1.3.0-beta.20

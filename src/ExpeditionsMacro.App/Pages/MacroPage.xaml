@@ -280,7 +280,7 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <TextBlock Style="{StaticResource SectionTitle}"
-                               Text="Share Fast no align plan" />
+                               Text="Share config" />
                     <TextBox x:Name="ShareCodeText"
                              Grid.Row="1"
                              Height="68"

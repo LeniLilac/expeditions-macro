@@ -20,4 +20,4 @@ For release updates, ZIP the contents of the version directory so `manifest.json
 
 The app checks stable releases at `LeniLilac/expeditions-macro`, prompts before installation, and never updates a pack while automation owns Roblox input.
 
-At startup, an older bundled pack is installed automatically. A same-version installation is replaced when its manifest or on-disk hashes differ, while a newer installed pack is preserved.
+At startup, every installed pack is validated against its own manifest before its version is trusted. An older bundled pack is installed automatically, and a damaged installed pack is atomically replaced with the bundled copy even when the installed manifest claims a newer version. A healthy same-version installation is retained only when its manifest matches the bundled copy, while a healthy newer installed pack is preserved. If the app's own bundled payload is incomplete or damaged, startup stops with clean-reinstall guidance rather than attempting to run with partial detector coverage.

@@ -101,38 +101,53 @@ public sealed class DetectorPackRepository : IDetectorPackRepository
 
     public async Task<bool> EnsureBundledAsync(string sourceDirectory, CancellationToken cancellationToken = default)
     {
-        DetectorPackManifest bundled = await JsonFileStore.ReadAsync<DetectorPackManifest>(Path.Combine(sourceDirectory, "manifest.json"), cancellationToken).ConfigureAwait(false)
-            ?? throw new InvalidDataException("Bundled detector pack has no manifest.");
-        bundled.Validate();
-        Version bundledVersion = ParseVersion(bundled);
+        DetectorPackManifest bundled;
+        Version bundledVersion;
+        try
+        {
+            bundled = await JsonFileStore.ReadAsync<DetectorPackManifest>(Path.Combine(sourceDirectory, "manifest.json"), cancellationToken).ConfigureAwait(false)
+                ?? throw new InvalidDataException("Bundled detector pack has no manifest.");
+            bundled.Validate();
+            bundledVersion = ParseVersion(bundled);
+        }
+        catch (Exception error) when (error is InvalidDataException or System.Text.Json.JsonException)
+        {
+            throw BundledPackDamaged(error);
+        }
+
         DetectorPackManifest? current = (await ListAsync(cancellationToken).ConfigureAwait(false))
             .FirstOrDefault(pack => pack.PackId.Equals(bundled.PackId, StringComparison.OrdinalIgnoreCase));
 
         if (current is not null)
         {
-            Version currentVersion = ParseVersion(current);
-            int comparison = currentVersion.CompareTo(bundledVersion);
-            if (comparison > 0) return false;
-            if (comparison == 0)
+            string currentDirectory = Path.Combine(_paths.DetectorPacks, ValidateId(current.PackId), "current");
+            try
             {
-                string currentDirectory = Path.Combine(_paths.DetectorPacks, ValidateId(current.PackId), "current");
+                await ValidateFilesAsync(currentDirectory, current, cancellationToken).ConfigureAwait(false);
+                int comparison = ParseVersion(current).CompareTo(bundledVersion);
+                if (comparison > 0) return false;
                 string currentManifestPath = Path.Combine(currentDirectory, "manifest.json");
-                if (await HasSameManifestAsync(currentManifestPath, Path.Combine(sourceDirectory, "manifest.json"), cancellationToken).ConfigureAwait(false))
+                if (comparison == 0 &&
+                    await HasSameManifestAsync(currentManifestPath, Path.Combine(sourceDirectory, "manifest.json"), cancellationToken).ConfigureAwait(false))
                 {
-                    try
-                    {
-                        await ValidateFilesAsync(currentDirectory, current, cancellationToken).ConfigureAwait(false);
-                        return false;
-                    }
-                    catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException)
-                    {
-                        // Replace a same-version pack whose declared payload is no longer healthy.
-                    }
+                    return false;
                 }
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidDataException)
+            {
+                // Replace an installed pack whose manifest or declared payload is no longer healthy,
+                // even when its version is newer than the copy bundled with the app.
             }
         }
 
-        await InstallDirectoryAsync(sourceDirectory, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await InstallDirectoryAsync(sourceDirectory, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception error) when (error is InvalidDataException or System.Text.Json.JsonException)
+        {
+            throw BundledPackDamaged(error);
+        }
         return true;
     }
 
@@ -201,6 +216,12 @@ public sealed class DetectorPackRepository : IDetectorPackRepository
         Version.TryParse(manifest.Version, out Version? version)
             ? version
             : throw new InvalidDataException($"Detector pack '{manifest.PackId}' has an invalid version.");
+
+    private static InvalidDataException BundledPackDamaged(Exception innerException) =>
+        new(
+            "The detector files bundled with this copy of Expeditions Macro are incomplete or damaged. " +
+            "Reinstall the app, or extract the portable ZIP into a new empty folder.",
+            innerException);
 
     private static string SafeArchivePath(string root, string relative)
     {
