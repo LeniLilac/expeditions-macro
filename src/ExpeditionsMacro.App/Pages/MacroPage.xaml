@@ -194,82 +194,71 @@
                                     BorderBrush="{DynamicResource BorderBrush}"
                                     BorderThickness="0,1,0,0"
                                     Visibility="Collapsed">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="112" />
-                                        <ColumnDefinition Width="16" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Margin="0,2,0,0"
-                                               VerticalAlignment="Top"
-                                               Style="{StaticResource FieldLabel}"
-                                               Text="Mode options" />
-                                    <WrapPanel Grid.Column="2">
-                                        <StackPanel x:Name="TaskDefeatRetriesPanel"
-                                                    Width="124"
-                                                    Margin="0,0,16,0">
-                                            <TextBlock Style="{StaticResource FieldLabel}"
-                                                       Text="Defeat retries" />
-                                            <TextBox x:Name="TaskDefeatRetriesText"
-                                                     Margin="0,7,0,0"
-                                                     Text="0" />
-                                        </StackPanel>
-                                        <StackPanel x:Name="TaskChallengeTypesPanel"
-                                                    Margin="0,0,16,0">
-                                            <TextBlock Style="{StaticResource FieldLabel}"
-                                                       Text="Challenge types" />
-                                            <StackPanel Margin="0,7,0,0"
-                                                        Orientation="Horizontal">
-                                                <CheckBox x:Name="TaskTraitCheck"
-                                                          Margin="0"
-                                                          IsChecked="True"
-                                                          Content="Trait" />
-                                                <CheckBox x:Name="TaskStatCheck"
-                                                          Margin="14,0,0,0"
-                                                          IsChecked="True"
-                                                          Content="Stat" />
-                                                <CheckBox x:Name="TaskSpriteCheck"
-                                                          Margin="14,0,0,0"
-                                                          IsChecked="True"
-                                                          Content="Sprite" />
-                                            </StackPanel>
-                                        </StackPanel>
-                                        <StackPanel x:Name="TaskExpeditionOptionsPanel"
+                                <WrapPanel>
+                                    <StackPanel x:Name="TaskDefeatRetriesPanel"
+                                                Width="124"
+                                                Margin="0,0,16,0">
+                                        <TextBlock Style="{StaticResource FieldLabel}"
+                                                   Text="Defeat retries" />
+                                        <TextBox x:Name="TaskDefeatRetriesText"
+                                                 Margin="0,7,0,0"
+                                                 Text="0" />
+                                    </StackPanel>
+                                    <StackPanel x:Name="TaskChallengeTypesPanel"
+                                                Margin="0,0,16,0">
+                                        <TextBlock Style="{StaticResource FieldLabel}"
+                                                   Text="Challenge types" />
+                                        <StackPanel Margin="0,7,0,0"
                                                     Orientation="Horizontal">
-                                            <StackPanel Width="110"
-                                                        Margin="0,0,16,0">
-                                                <TextBlock Style="{StaticResource FieldLabel}"
-                                                           Text="Difficulty" />
-                                                <ComboBox x:Name="TaskDifficultyCombo"
-                                                          Margin="0,7,0,0" />
-                                            </StackPanel>
-                                            <StackPanel Width="174"
-                                                        Margin="0,0,16,0">
-                                                <TextBlock Style="{StaticResource FieldLabel}"
-                                                           Text="Extraction" />
-                                                <CheckBox x:Name="TaskExtractCheck"
-                                                          Margin="0,7,0,0"
-                                                          IsChecked="True"
-                                                          Content="Extract at checkpoint" />
-                                            </StackPanel>
-                                            <StackPanel Width="164">
-                                                <TextBlock Style="{StaticResource FieldLabel}"
-                                                           Text="Boss nodes before extract" />
-                                                <TextBox x:Name="TaskBossNodesText"
-                                                         Margin="0,7,0,0"
-                                                         Text="1" />
-                                            </StackPanel>
+                                            <CheckBox x:Name="TaskTraitCheck"
+                                                      Margin="0"
+                                                      IsChecked="True"
+                                                      Content="Trait" />
+                                            <CheckBox x:Name="TaskStatCheck"
+                                                      Margin="14,0,0,0"
+                                                      IsChecked="True"
+                                                      Content="Stat" />
+                                            <CheckBox x:Name="TaskSpriteCheck"
+                                                      Margin="14,0,0,0"
+                                                      IsChecked="True"
+                                                      Content="Sprite" />
                                         </StackPanel>
-                                        <StackPanel x:Name="TaskStoryOptionsPanel"
-                                                    Width="150">
+                                    </StackPanel>
+                                    <StackPanel x:Name="TaskExpeditionOptionsPanel"
+                                                Orientation="Horizontal">
+                                        <StackPanel Width="110"
+                                                    Margin="0,0,16,0">
                                             <TextBlock Style="{StaticResource FieldLabel}"
-                                                       Text="Story options" />
-                                            <CheckBox x:Name="TaskHardModeCheck"
-                                                      Margin="0,7,0,0"
-                                                      Content="Hard mode" />
+                                                       Text="Difficulty" />
+                                            <ComboBox x:Name="TaskDifficultyCombo"
+                                                      Margin="0,7,0,0" />
                                         </StackPanel>
-                                    </WrapPanel>
-                                </Grid>
+                                        <StackPanel Width="174"
+                                                    Margin="0,0,16,0">
+                                            <TextBlock Style="{StaticResource FieldLabel}"
+                                                       Text="Extraction" />
+                                            <CheckBox x:Name="TaskExtractCheck"
+                                                      Margin="0,7,0,0"
+                                                      IsChecked="True"
+                                                      Content="Extract at checkpoint" />
+                                        </StackPanel>
+                                        <StackPanel Width="164">
+                                            <TextBlock Style="{StaticResource FieldLabel}"
+                                                       Text="Boss nodes before extract" />
+                                            <TextBox x:Name="TaskBossNodesText"
+                                                     Margin="0,7,0,0"
+                                                     Text="1" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel x:Name="TaskStoryOptionsPanel"
+                                                Width="150">
+                                        <TextBlock Style="{StaticResource FieldLabel}"
+                                                   Text="Story options" />
+                                        <CheckBox x:Name="TaskHardModeCheck"
+                                                  Margin="0,7,0,0"
+                                                  Content="Hard mode" />
+                                    </StackPanel>
+                                </WrapPanel>
                             </Border>
                             <TextBlock x:Name="TaskEditorStatusText"
                                        Margin="0,8,0,0"

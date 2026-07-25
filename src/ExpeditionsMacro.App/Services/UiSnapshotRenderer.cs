@@ -35,6 +35,11 @@ internal static class UiSnapshotRenderer
     {
         string output = Path.GetFullPath(outputDirectory);
         Directory.CreateDirectory(output);
+        string progressPath =
+            Path.Combine(output, "snapshot-progress.txt");
+        await File.WriteAllTextAsync(
+            progressPath,
+            "Creating snapshot window.");
         MainWindow window = new(services, snapshotMode: true)
         {
             Width = 1200,
@@ -51,7 +56,11 @@ internal static class UiSnapshotRenderer
         try
         {
             await Dispatcher.Yield(DispatcherPriority.Loaded);
+            await File.WriteAllTextAsync(
+                progressPath,
+                "Refreshing model-backed pages.");
             await window.VerifyBackgroundModelRefreshAsync();
+            int rendered = 0;
             foreach (AppTheme theme in new[] { AppTheme.Dark, AppTheme.Light })
             {
                 ThemeService.Apply(theme);
@@ -65,6 +74,9 @@ internal static class UiSnapshotRenderer
                         key,
                         showPageEnd,
                         showDebugUtilities);
+                    await File.WriteAllTextAsync(
+                        progressPath,
+                        $"Rendering {file} ({theme.ToString().ToLowerInvariant()}).");
                     await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                     if (window.Content is not FrameworkElement root) throw new InvalidOperationException("The main window has no renderable content.");
                     Size size = string.Equals(
@@ -90,8 +102,12 @@ internal static class UiSnapshotRenderer
                     encoder.Frames.Add(BitmapFrame.Create(bitmap));
                     await using FileStream stream = new(Path.Combine(output, $"{file}-{theme.ToString().ToLowerInvariant()}.png"), FileMode.Create, FileAccess.Write, FileShare.None);
                     encoder.Save(stream);
+                    rendered++;
                 }
             }
+            await File.WriteAllTextAsync(
+                progressPath,
+                $"Completed {rendered} snapshots.");
         }
         finally
         {

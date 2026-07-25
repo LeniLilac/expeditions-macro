@@ -61,15 +61,6 @@ public partial class PlacementModelsPage
     private RadioButton FastUnit6Button =>
         FastEditorPanel.FastUnit6Button;
 
-    private TextBox FastDefaultDelayText =>
-        FastEditorPanel.FastDefaultDelayText;
-
-    private StackPanel FastAfterStartDelayPanel =>
-        FastEditorPanel.FastAfterStartDelayPanel;
-
-    private TextBox FastAfterStartDelayText =>
-        FastEditorPanel.FastAfterStartDelayText;
-
     private TextBlock FastPlacementCountText =>
         FastEditorPanel.FastPlacementCountText;
 

@@ -50,12 +50,6 @@ public partial class PlacementModelsPage
             return;
         }
         _selectedFastPhase = phase;
-        if (FastAfterStartDelayPanel is not null)
-        {
-            FastAfterStartDelayPanel.IsEnabled =
-                phase == PlacementPhase.AfterStart &&
-                !_services.Coordinator.IsBusy;
-        }
     }
 
     private void ApplyDefaultFastTarget()
@@ -279,22 +273,6 @@ public partial class PlacementModelsPage
         {
             return;
         }
-        if (!TryReadDelay(
-            FastDefaultDelayText,
-            out int delay))
-        {
-            FastStatusText.Text =
-                "Delay must be a non-negative whole number.";
-            return;
-        }
-        if (!TryReadAfterStartDelay(
-            out int afterStartDelay))
-        {
-            FastStatusText.Text =
-                "After Start delay must be 0 through 3600 seconds.";
-            return;
-        }
-
         Point point = e.GetPosition(PlacementCanvas);
         int x = Math.Clamp(
             (int)Math.Round(point.X),
@@ -325,11 +303,14 @@ public partial class PlacementModelsPage
             X = x,
             Y = y,
             Phase = _selectedFastPhase,
-            DelayAfterMilliseconds = delay,
+            DelayAfterMilliseconds =
+                PlacementAuthoringRules
+                    .DefaultStepDelayMilliseconds,
             DelayAfterStartMilliseconds =
                 _selectedFastPhase ==
                     PlacementPhase.AfterStart
-                    ? afterStartDelay
+                    ? PlacementAuthoringRules
+                        .DefaultAfterStartDelayMilliseconds
                     : 0,
         };
         _steps.Add(row);
@@ -372,30 +353,6 @@ public partial class PlacementModelsPage
         _steps.Remove(row);
         FastStatusText.Text = "Placement removed.";
         e.Handled = true;
-    }
-
-    private bool TryReadAfterStartDelay(
-        out int milliseconds)
-    {
-        milliseconds = 0;
-        if (_selectedFastPhase ==
-            PlacementPhase.BeforeStart)
-        {
-            return true;
-        }
-        if (!double.TryParse(
-                FastAfterStartDelayText.Text,
-                NumberStyles.Float,
-                CultureInfo.InvariantCulture,
-                out double seconds) ||
-            seconds is < 0 or > 3600)
-        {
-            return false;
-        }
-        milliseconds = (int)Math.Round(
-            seconds * 1000,
-            MidpointRounding.AwayFromZero);
-        return true;
     }
 
     private void FastPrepare_Click(

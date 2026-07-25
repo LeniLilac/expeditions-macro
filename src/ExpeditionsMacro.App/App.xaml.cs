@@ -1,3 +1,4 @@
+using System.IO;
 using System.Threading;
 using System.Windows;
 using System.Windows.Threading;
@@ -10,6 +11,8 @@ public partial class App : Application
 {
     private Mutex? _singleInstance;
     private bool _ownsSingleInstance;
+    private bool _snapshotMode;
+    private string? _snapshotOutputDirectory;
 
     public AppServices Services { get; private set; } = null!;
 
@@ -19,8 +22,15 @@ public partial class App : Application
         // Startup performs file and detector-pack I/O before the first window exists.
         // Keep WPF alive across those awaits, then restore normal main-window shutdown.
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
-        bool snapshotMode = e.Args.Length == 2 && string.Equals(e.Args[0], "--snapshot-ui", StringComparison.OrdinalIgnoreCase);
-        if (!snapshotMode)
+        _snapshotMode =
+            e.Args.Length == 2 &&
+            string.Equals(
+                e.Args[0],
+                "--snapshot-ui",
+                StringComparison.OrdinalIgnoreCase);
+        _snapshotOutputDirectory =
+            _snapshotMode ? e.Args[1] : null;
+        if (!_snapshotMode)
         {
             _singleInstance = new Mutex(initiallyOwned: true, "Local\\ExpeditionsMacro.App", out bool created);
             _ownsSingleInstance = created;
@@ -37,8 +47,8 @@ public partial class App : Application
         {
             Services = await AppServices.CreateAsync(
                 Dispatcher,
-                startRuntimeServices: !snapshotMode);
-            if (snapshotMode)
+                startRuntimeServices: !_snapshotMode);
+            if (_snapshotMode)
             {
                 await UiSnapshotRenderer.RenderAsync(Services, e.Args[1]);
                 Shutdown(0);
@@ -58,6 +68,12 @@ public partial class App : Application
                 new FileLogger(paths.Logs).Error("Application startup failed.", error);
             }
             catch { }
+            if (_snapshotMode)
+            {
+                WriteSnapshotFailure(error);
+                Shutdown(1);
+                return;
+            }
             MessageBox.Show($"Expeditions Macro could not start.\n\n{error.Message}\n\nDetails were written to the logs folder.", "Startup error", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
@@ -74,7 +90,31 @@ public partial class App : Application
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         try { Services?.Log.Error("Unhandled UI error.", e.Exception); } catch { }
+        if (_snapshotMode)
+        {
+            WriteSnapshotFailure(e.Exception);
+            e.Handled = true;
+            Shutdown(1);
+            return;
+        }
         MessageBox.Show(e.Exception.Message, "Unexpected error", MessageBoxButton.OK, MessageBoxImage.Error);
         e.Handled = true;
+    }
+
+    private void WriteSnapshotFailure(Exception error)
+    {
+        try
+        {
+            string output = Path.GetFullPath(
+                _snapshotOutputDirectory ??
+                Path.Combine(
+                    Path.GetTempPath(),
+                    "ExpeditionsMacroUiSnapshots"));
+            Directory.CreateDirectory(output);
+            File.WriteAllText(
+                Path.Combine(output, "snapshot-error.txt"),
+                error.ToString());
+        }
+        catch { }
     }
 }

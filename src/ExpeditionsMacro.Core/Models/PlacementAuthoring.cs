@@ -24,6 +24,10 @@ public static class PlacementAuthoringRules
 {
     public const int MinimumPlacementSpacingPixels = 7;
 
+    public const int DefaultStepDelayMilliseconds = 900;
+
+    public const int DefaultAfterStartDelayMilliseconds = 30_000;
+
     public static bool AreSeparated(
         int firstX,
         int firstY,

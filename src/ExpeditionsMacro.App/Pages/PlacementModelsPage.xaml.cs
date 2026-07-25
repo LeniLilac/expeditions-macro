@@ -138,10 +138,6 @@ public partial class PlacementModelsPage : UserControl, IAppPage
 
         if (FastWorkflow)
         {
-            FastDefaultDelayText.Text =
-                (model.Steps.FirstOrDefault()?
-                    .DelayAfterMilliseconds ?? 900)
-                .ToString(CultureInfo.InvariantCulture);
             if (model.CameraPreparationMode ==
                 CameraPreparationMode.FastNoAlign &&
                 model.Target is not null)
@@ -193,8 +189,6 @@ public partial class PlacementModelsPage : UserControl, IAppPage
     {
         if (FastWorkflow)
         {
-            FastDefaultDelayText.Text = "900";
-            FastAfterStartDelayText.Text = "0";
             FastBeforeStartButton.IsChecked = true;
             FastUnit1Button.IsChecked = true;
             if (_selectedSetupTarget is not null)
@@ -467,11 +461,6 @@ public partial class PlacementModelsPage : UserControl, IAppPage
         FastUnit6Button.IsEnabled = !busy;
         FastBeforeStartButton.IsEnabled = !busy;
         FastAfterStartButton.IsEnabled = !busy;
-        FastDefaultDelayText.IsEnabled = !busy;
-        FastAfterStartDelayText.IsEnabled =
-            !busy &&
-            _selectedFastPhase ==
-                PlacementPhase.AfterStart;
         PlacementCanvas.IsEnabled = !busy;
     }
 }

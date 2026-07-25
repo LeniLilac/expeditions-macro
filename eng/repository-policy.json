@@ -34,11 +34,6 @@
       "reason": "Existing mode-runner orchestration debt; extract state-specific workflow services when touched."
     },
     {
-      "path": "src/ExpeditionsMacro.App/Pages/MacroPage.xaml.cs",
-      "maxLines": 621,
-      "reason": "Existing page-controller debt; move scheduling, persistence, and operation coordination into focused services."
-    },
-    {
       "path": "src/ExpeditionsMacro.Windows/WindowsRobloxAutomation.cs",
       "maxLines": 857,
       "reason": "Existing Windows adapter debt; separate window, capture, keyboard, pointer, and diagnostics concerns."

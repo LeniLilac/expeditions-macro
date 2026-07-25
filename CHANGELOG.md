@@ -4,6 +4,23 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.22] - 2026-07-25
+
+### Changed
+
+- Simplified Fast no-align Placement Setup by removing the redundant global placement interval and After Start delay fields. Newly authored steps use a 900 ms placement interval, and new After Start placements default to 30 seconds while remaining independently editable in the step list.
+- Fast no-align and legacy macro plans are now shown only in their matching workflow. Upgrading settings from beta.20 enables Fast no align by default while preserving legacy presets, plans, camera models, and placement models for users who later disable it.
+- Tightened the Macro task editor so mode-specific options align directly beneath the primary fields without an empty label rail or oversized blank area.
+
+### Fixed
+
+- UI snapshot validation now records page-level progress, exits without hidden modal dialogs on renderer errors, and reports a bounded timeout instead of consuming the entire GitHub Actions job window.
+
+### Tests
+
+- Added upgrade-default, plan-workflow separation, and Fast no-align timing-default regressions.
+- Revalidated the complete application, detector, Deep Debug Viewer, dark/light UI, portable, and installer release paths.
+
 ## [1.3.0-beta.21] - 2026-07-25
 
 ### Added
@@ -744,7 +761,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.21...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.22...HEAD
+[1.3.0-beta.22]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.21...v1.3.0-beta.22
 [1.3.0-beta.21]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.20...v1.3.0-beta.21
 [1.3.0-beta.20]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.19...v1.3.0-beta.20
 [1.3.0-beta.19]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.18...v1.3.0-beta.19

@@ -21,7 +21,9 @@ public partial class PlacementModelsPage
             X = 390,
             Y = 352,
             Phase = PlacementPhase.BeforeStart,
-            DelayAfterMilliseconds = 900,
+            DelayAfterMilliseconds =
+                PlacementAuthoringRules
+                    .DefaultStepDelayMilliseconds,
         });
         _steps.Add(new PlacementStepRow
         {
@@ -29,8 +31,12 @@ public partial class PlacementModelsPage
             X = 445,
             Y = 394,
             Phase = PlacementPhase.AfterStart,
-            DelayAfterStartMilliseconds = 5000,
-            DelayAfterMilliseconds = 900,
+            DelayAfterStartMilliseconds =
+                PlacementAuthoringRules
+                    .DefaultAfterStartDelayMilliseconds,
+            DelayAfterMilliseconds =
+                PlacementAuthoringRules
+                    .DefaultStepDelayMilliseconds,
         });
         _steps.Add(new PlacementStepRow
         {
@@ -38,10 +44,11 @@ public partial class PlacementModelsPage
             X = 505,
             Y = 332,
             Phase = PlacementPhase.BeforeStart,
-            DelayAfterMilliseconds = 900,
+            DelayAfterMilliseconds =
+                PlacementAuthoringRules
+                    .DefaultStepDelayMilliseconds,
         });
         FastAfterStartButton.IsChecked = true;
-        FastAfterStartDelayText.Text = "5";
         FastStepsList.SelectedIndex = 1;
         FastStatusText.Text = string.Empty;
         UpdateFastPlacementCount();

@@ -295,6 +295,19 @@ public sealed class PlacementAuthoringTests
     }
 
     [Fact]
+    public void FastPlacement_DefaultTimingUsesThirtySecondAfterStartDelay()
+    {
+        Assert.Equal(
+            900,
+            PlacementAuthoringRules
+                .DefaultStepDelayMilliseconds);
+        Assert.Equal(
+            30_000,
+            PlacementAuthoringRules
+                .DefaultAfterStartDelayMilliseconds);
+    }
+
+    [Fact]
     public void FastPlacement_SharedExpeditionSetupCoversEveryExpeditionMap()
     {
         PlacementTarget shared = new()

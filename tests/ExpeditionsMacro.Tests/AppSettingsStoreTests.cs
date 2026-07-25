@@ -39,6 +39,57 @@ public sealed class AppSettingsStoreTests
     }
 
     [Fact]
+    public async Task Beta20Settings_DefaultToFastNoAlignWithoutLosingLegacySelections()
+    {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            $"expeditions-settings-{Guid.NewGuid():N}");
+        try
+        {
+            AppPaths paths = new(root);
+            paths.EnsureCreated();
+            await File.WriteAllTextAsync(
+                paths.SettingsFile,
+                """
+                {
+                  "selected_preset_id": "legacy-expedition",
+                  "selected_challenge_preset_id": "legacy-challenge",
+                  "selected_story_preset_id": "legacy-story",
+                  "selected_raid_preset_id": "legacy-raid",
+                  "selected_macro_plan_id": "legacy-plan"
+                }
+                """);
+
+            AppSettings loaded =
+                await new AppSettingsStore(paths).LoadAsync();
+
+            Assert.True(loaded.FastNoAlignEnabled);
+            Assert.Equal(
+                "legacy-expedition",
+                loaded.SelectedPresetId);
+            Assert.Equal(
+                "legacy-challenge",
+                loaded.SelectedChallengePresetId);
+            Assert.Equal(
+                "legacy-story",
+                loaded.SelectedStoryPresetId);
+            Assert.Equal(
+                "legacy-raid",
+                loaded.SelectedRaidPresetId);
+            Assert.Equal(
+                "legacy-plan",
+                loaded.SelectedMacroPlanId);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ReportingSettings_SurviveAStoreRestart()
     {
         string root = Path.Combine(Path.GetTempPath(), $"expeditions-settings-{Guid.NewGuid():N}");

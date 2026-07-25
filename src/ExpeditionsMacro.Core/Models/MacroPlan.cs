@@ -134,6 +134,9 @@ public sealed record MacroPlan
     public IReadOnlyList<MacroTaskProgress> Progress { get; init; } = [];
     public DateTimeOffset UpdatedAt { get; init; } = DateTimeOffset.UtcNow;
 
+    public bool UsesPlacementSetupWorkflow =>
+        Tasks.All(task => task.UsesPlacementSetup);
+
     public void Validate()
     {
         if (SchemaVersion != CurrentSchemaVersion) throw new InvalidDataException("Unsupported macro plan format.");

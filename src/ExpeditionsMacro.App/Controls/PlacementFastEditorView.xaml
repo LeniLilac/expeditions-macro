@@ -227,11 +227,6 @@
                         BorderThickness="1"
                         CornerRadius="5">
                     <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="12" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="180" />
                             <ColumnDefinition Width="18" />
@@ -328,32 +323,6 @@
                                       Margin="0,7,0,0"
                                       DisplayMemberPath="Name" />
                         </StackPanel>
-                        <Grid Grid.Row="2"
-                              Grid.Column="2"
-                              Grid.ColumnSpan="3"
-                              HorizontalAlignment="Right">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="104" />
-                                <ColumnDefinition Width="10" />
-                                <ColumnDefinition Width="124" />
-                            </Grid.ColumnDefinitions>
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource FieldLabel}"
-                                           Text="Interval, ms" />
-                                <TextBox x:Name="FastDefaultDelayText"
-                                         Margin="0,7,0,0"
-                                         Text="900" />
-                            </StackPanel>
-                            <StackPanel x:Name="FastAfterStartDelayPanel"
-                                        Grid.Column="2"
-                                        IsEnabled="False">
-                                <TextBlock Style="{StaticResource FieldLabel}"
-                                           Text="After Start, s" />
-                                <TextBox x:Name="FastAfterStartDelayText"
-                                         Margin="0,7,0,0"
-                                         Text="0" />
-                            </StackPanel>
-                        </Grid>
                     </Grid>
                 </Border>
             </Grid>

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using ExpeditionsMacro.App.Models;
+using ExpeditionsMacro.Core.Models;
 
 namespace ExpeditionsMacro.App.Pages;
 
@@ -59,12 +60,15 @@ public partial class PlacementModelsPage
 
     private int ReadPlaybackDelay()
     {
-        TextBox field = FastWorkflow
-            ? FastDefaultDelayText
-            : DefaultDelayText;
-        return TryReadDelay(field, out int delay)
+        if (FastWorkflow)
+        {
+            return PlacementAuthoringRules
+                .DefaultStepDelayMilliseconds;
+        }
+        return TryReadDelay(DefaultDelayText, out int delay)
             ? delay
-            : 900;
+            : PlacementAuthoringRules
+                .DefaultStepDelayMilliseconds;
     }
 
     private static bool TryReadDelay(
