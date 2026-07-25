@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using ExpeditionsMacro.Automation.Activity;
+using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Automation.Runtime;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Imaging;
@@ -14,6 +15,8 @@ public sealed partial class ExpeditionMacroRunner
         RobloxWindow window,
         ExpeditionPreset preset,
         PlacementModel placement,
+        IReadOnlyList<PlacementStep> initialRetryableSteps,
+        IReadOnlyList<PlacementStep> afterStartSteps,
         IDetectorPack detector,
         Stopwatch matchRuntime,
         Action<int> bossesChanged,
@@ -27,6 +30,9 @@ public sealed partial class ExpeditionMacroRunner
         // Confirm it independently so one UI animation frame cannot trigger rejoin.
         StableStateTracker<string> recoveryTracker = new(ExpeditionRunPolicy.RecoveryStableDetections(preset));
         InactivityKeepAlive keepAlive = new();
+        List<PlacementStep> retryableSteps =
+            [.. initialRetryableSteps];
+        int nextAfterStartStep = 0;
         string? currentNode = null;
         int bosses = 0;
         report("Gameplay", 0, "Gameplay active. Watching node type, pauses, rewards, and run end.", null, null);
@@ -51,6 +57,33 @@ public sealed partial class ExpeditionMacroRunner
             string? candidate = ExpeditionRunPolicy.PreferActiveState(detector.Manifest, scores, detector.Classify(scores));
             ThrowForStableRecovery(recoveryTracker, candidate, activeRunOnly: true);
             if (candidate is not null) report("Gameplay", 0, $"Detected {Label(candidate)}.", candidate, scores[candidate]);
+            if (candidate is null &&
+                nextAfterStartStep <
+                    afterStartSteps.Count &&
+                PlacementExecutionPlan.IsAfterStartDue(
+                    afterStartSteps[nextAfterStartStep],
+                    matchRuntime.Elapsed))
+            {
+                PlacementStep step =
+                    afterStartSteps[nextAfterStartStep];
+                report(
+                    "Placement",
+                    5,
+                    $"Placing Unit {step.UnitKey} at " +
+                    $"{matchRuntime.Elapsed.TotalSeconds:F1}s " +
+                    "after Start.",
+                    null,
+                    null);
+                await PlaceStepsAsync(
+                    window,
+                    placement,
+                    [step],
+                    preset,
+                    log,
+                    cancellationToken).ConfigureAwait(false);
+                retryableSteps.Add(step);
+                nextAfterStartStep++;
+            }
             if (candidate is null) await keepAlive.TryPulseAsync((key, token) => _automation.TapLetterKeyAsync(window, key, token), cancellationToken).ConfigureAwait(false);
             string? state = stateTracker.Update(candidate);
             if (state is null)
@@ -111,7 +144,15 @@ public sealed partial class ExpeditionMacroRunner
                     await ExtractAtCheckpointAsync(window, detector, preset, frame, report, log, cancellationToken).ConfigureAwait(false);
                     continue;
                 }
-                await RetryRemainingUnitsAsync(window, placement, preset, detector, frame, log, cancellationToken).ConfigureAwait(false);
+                await RetryRemainingUnitsAsync(
+                    window,
+                    placement,
+                    retryableSteps,
+                    preset,
+                    detector,
+                    frame,
+                    log,
+                    cancellationToken).ConfigureAwait(false);
                 report("Transition", 0, $"Continuing from the {state} pause.", state, score);
                 // Placement retries can take several seconds. Re-capture the pause so
                 // the click follows its current control rather than a stale frame.

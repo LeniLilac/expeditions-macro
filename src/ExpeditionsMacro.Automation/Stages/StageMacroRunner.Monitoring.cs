@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using ExpeditionsMacro.Automation.Activity;
+using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Automation.Runtime;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Imaging;
@@ -11,9 +12,10 @@ namespace ExpeditionsMacro.Automation.Stages;
 
 public sealed partial class StageMacroRunner
 {
-    private async Task<TerminalObservation> RunMatchAsync(
+    private Task<TerminalObservation> RunConfiguredMatchAsync(
         RobloxWindow window,
-        PlacementModel? delayedPlacement,
+        StageRuntimeModels models,
+        CameraPreparationMode cameraMode,
         StoryPreset? story,
         RaidPreset? raid,
         IDetectorPack detector,
@@ -21,8 +23,53 @@ public sealed partial class StageMacroRunner
         int stableDetections,
         CancellationToken cancellationToken)
     {
-        int delaySeconds = story?.DelayedPlacementSeconds ?? raid!.DelayedPlacementSeconds;
-        bool placed = delayedPlacement is null;
+        PlacementModel? afterStartModel =
+            cameraMode == CameraPreparationMode.FastNoAlign
+                ? models.PrestartPlacement
+                : models.DelayedPlacement;
+        IReadOnlyList<PlacementStep> afterStart =
+            PlacementExecutionPlan.AfterStart(
+                cameraMode,
+                models.PrestartPlacement,
+                models.DelayedPlacement);
+        int delaySeconds =
+            cameraMode == CameraPreparationMode.FastNoAlign
+                ? 0
+                : story?.DelayedPlacementSeconds ??
+                    raid!.DelayedPlacementSeconds;
+        return RunMatchAsync(
+            window,
+            afterStartModel,
+            afterStart,
+            cameraMode,
+            delaySeconds,
+            story,
+            raid,
+            detector,
+            matchRuntime,
+            stableDetections,
+            cancellationToken);
+    }
+
+    private async Task<TerminalObservation> RunMatchAsync(
+        RobloxWindow window,
+        PlacementModel? delayedPlacement,
+        IReadOnlyList<PlacementStep> delayedSteps,
+        CameraPreparationMode cameraMode,
+        int delaySeconds,
+        StoryPreset? story,
+        RaidPreset? raid,
+        IDetectorPack detector,
+        Stopwatch matchRuntime,
+        int stableDetections,
+        CancellationToken cancellationToken)
+    {
+        bool fast =
+            cameraMode ==
+            CameraPreparationMode.FastNoAlign;
+        int nextFastStep = 0;
+        bool placed = delayedPlacement is null ||
+            delayedSteps.Count == 0;
         StableStateTracker<string> terminalTracker = new(stableDetections);
         StableStateTracker<string> recoveryTracker = new(stableDetections);
         RaidDropDismissalTracker dropDismissal = new(raid);
@@ -65,13 +112,39 @@ public sealed partial class StageMacroRunner
             await keepAlive.TryPulseAsync((key, token) => _automation.TapLetterKeyAsync(window, key, token), cancellationToken).ConfigureAwait(false);
 
             bool placementCompletedThisIteration = false;
-            if (!placed &&
+            if (terminalCandidate is null &&
+                recovery is null &&
+                fast &&
+                !placed &&
+                PlacementExecutionPlan.IsAfterStartDue(
+                    delayedSteps[nextFastStep],
+                    matchRuntime.Elapsed))
+            {
+                PlacementStep step =
+                    delayedSteps[nextFastStep];
+                await PlayPlacementAsync(
+                    window,
+                    delayedPlacement!,
+                    [step],
+                    story,
+                    raid,
+                    cancellationToken).ConfigureAwait(false);
+                nextFastStep++;
+                placed =
+                    nextFastStep >= delayedSteps.Count;
+                placementCompletedThisIteration = true;
+            }
+            else if (terminalCandidate is null &&
+                recovery is null &&
+                !fast &&
+                !placed &&
                 matchRuntime.Elapsed >= TimeSpan.FromSeconds(delaySeconds))
             {
                 placed = true;
                 await PlayPlacementAsync(
                     window,
                     delayedPlacement!,
+                    delayedSteps,
                     story,
                     raid,
                     cancellationToken).ConfigureAwait(false);

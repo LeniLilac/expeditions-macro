@@ -1,6 +1,6 @@
 # Detector image dataset
 
-This repository includes 433 image fixtures used to build and regression-test the bundled Anime Expeditions detector pack, specialized UI detectors, and automatic camera-region selection. Of these, 430 are 808 by 611 Roblox client captures: 277 Expeditions fixtures, 80 selective Challenge fixtures, 44 Story/Raid/team fixtures, 8 cross-mode navigation variants, 15 camera fixtures, and 6 experimental resource-refuel fixtures. The remaining three are privacy-safe 304 by 192 grayscale camera composites derived from a reported runtime-alignment failure. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
+This repository includes 444 image fixtures used to build and regression-test the bundled Anime Expeditions detector pack, specialized UI detectors, and automatic camera-region selection. Of these, 441 are 808 by 611 Roblox client captures: 277 Expeditions fixtures, 80 selective Challenge fixtures, 45 Story/Raid/team fixtures, 8 cross-mode navigation variants, 15 camera fixtures, 6 experimental resource-refuel fixtures, and 10 game-settings fixtures. The remaining three are privacy-safe 304 by 192 grayscale camera composites derived from a reported runtime-alignment failure. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
 
 Captures are 808 by 611 PNG files organized under:
 
@@ -15,6 +15,8 @@ Lobby-entry and post-match Story, Raid, Challenge, and Expedition detail variant
 Camera-alignment fixtures are organized under `datasets/anime-expeditions/camera-rotations/`. Each of the three Expedition and four Story/Challenge maps contributes a goal frame plus a clearly incorrect yaw from a continuous right-arrow rotation. These fixtures verify that automatic setup selects four textured regions spanning the left, center, and right of the client and keeps an incorrect yaw well below the alignment threshold. The `RuntimeProjectionDrift` composites additionally verify that final alignment accepts a coherent cross-session vertical projection shift without broadening the thumbnail atlas or accepting a nearby wrong yaw. `UnrenderedWorld` preserves the textureless blue load failure that must be rejected before the macro moves the camera or places units.
 
 Experimental Areas, Gold Mine, and Resource Drill fixtures are organized under `datasets/anime-expeditions/refuel/`. They support only the Debug-page route calibration tool; no released Macro task or automatic refuel schedule consumes them.
+
+Startup settings fixtures are organized under `datasets/anime-expeditions/settings/`. They cover the closed Lobby, the Settings opening animation, supported UI Scale values, each required settings page, and the Units page at both scroll boundaries.
 
 The current builder recognizes these dataset names:
 

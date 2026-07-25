@@ -16,6 +16,7 @@ public partial class StoryPage : UserControl, IAppPage
     private readonly ObservableCollection<StoryPreset> _presets = [];
     private readonly ObservableCollection<CameraModelManifest> _cameras = [];
     private readonly ObservableCollection<CatalogOption> _placements = [];
+    private IReadOnlyList<PlacementModel> _allPlacementModels = [];
     private bool _loading;
 
     public StoryPage(AppServices services)
@@ -24,6 +25,7 @@ public partial class StoryPage : UserControl, IAppPage
         InitializeComponent();
         PresetCombo.ItemsSource = _presets;
         CameraCombo.ItemsSource = _cameras;
+        CameraModeCombo.ItemsSource = CameraModeChoices();
         PrestartCombo.ItemsSource = _placements;
         DelayedCombo.ItemsSource = _placements;
         MapCombo.ItemsSource = MapChoices();
@@ -34,6 +36,10 @@ public partial class StoryPage : UserControl, IAppPage
     }
 
     public Func<Task>? IdleHotkeyAction => null;
+
+    internal void SetSnapshotFastMode() =>
+        SelectCameraMode(
+            CameraPreparationMode.FastNoAlign);
 
     public async Task OnShownAsync()
     {
@@ -123,6 +129,7 @@ public partial class StoryPage : UserControl, IAppPage
         bool act = SelectedRunKind() == StoryRunKind.Act;
         ActCombo.IsEnabled = act;
         HardCheck.IsEnabled = act;
+        if (!_loading) RefreshPlacementOptions();
     }
 
     private void TuningToggle_Click(object sender, RoutedEventArgs e)
@@ -136,7 +143,17 @@ public partial class StoryPage : UserControl, IAppPage
     {
         if (MapCombo.SelectedItem is not NamedChoice<ChallengeMapId> map) throw new InvalidOperationException("Choose a Story map.");
         if (RunKindCombo.SelectedItem is not NamedChoice<StoryRunKind> run) throw new InvalidOperationException("Choose a Story run type.");
-        if (CameraCombo.SelectedItem is not CameraModelManifest camera) throw new InvalidOperationException("Choose a camera model.");
+        CameraPreparationMode cameraMode =
+            SelectedCameraMode();
+        CameraModelManifest? camera =
+            CameraCombo.SelectedItem as
+                CameraModelManifest;
+        if (cameraMode == CameraPreparationMode.CameraModel &&
+            camera is null)
+        {
+            throw new InvalidOperationException(
+                "Choose a camera model.");
+        }
         if (TeamCombo.SelectedItem is not TeamChoice team) throw new InvalidOperationException("Choose a team setting.");
         string name = NameText.Text.Trim();
         StoryPreset preset = new()
@@ -147,9 +164,13 @@ public partial class StoryPage : UserControl, IAppPage
             RunKind = run.Value,
             ActNumber = ActCombo.SelectedItem is int act ? act : 1,
             HardMode = run.Value == StoryRunKind.Act && HardCheck.IsChecked == true,
-            CameraModelId = camera.Id,
+            CameraPreparationMode = cameraMode,
+            CameraModelId = camera?.Id ?? string.Empty,
             PrestartPlacementModelId = SelectedPlacement(PrestartCombo),
-            DelayedPlacementModelId = SelectedPlacement(DelayedCombo),
+            DelayedPlacementModelId =
+                cameraMode == CameraPreparationMode.FastNoAlign
+                    ? string.Empty
+                    : SelectedPlacement(DelayedCombo),
             DelayedPlacementSeconds = ParseInt(DelayText, "After-start delay"),
             TeamSlot = team.Value,
             DefeatRetries = ParseInt(RetriesText, "Defeat retries"),
@@ -171,6 +192,10 @@ public partial class StoryPage : UserControl, IAppPage
         SelectChoice(RunKindCombo, preset.RunKind);
         ActCombo.SelectedItem = preset.ActNumber;
         HardCheck.IsChecked = preset.HardMode;
+        SelectCameraMode(preset.CameraPreparationMode);
+        RefreshPlacementOptions(
+            preset.PrestartPlacementModelId,
+            preset.DelayedPlacementModelId);
         CameraCombo.SelectedItem = _cameras.FirstOrDefault(value => value.Id == preset.CameraModelId);
         SelectPlacement(PrestartCombo, preset.PrestartPlacementModelId);
         SelectPlacement(DelayedCombo, preset.DelayedPlacementModelId);
@@ -192,6 +217,10 @@ public partial class StoryPage : UserControl, IAppPage
         RunKindCombo.SelectedIndex = 0;
         ActCombo.SelectedItem = 1;
         HardCheck.IsChecked = false;
+        SelectCameraMode(
+            _services.Settings.FastNoAlignEnabled
+                ? CameraPreparationMode.FastNoAlign
+                : CameraPreparationMode.CameraModel);
         CameraCombo.SelectedIndex = _cameras.Count > 0 ? 0 : -1;
         PrestartCombo.SelectedIndex = 0;
         DelayedCombo.SelectedIndex = 0;
@@ -210,9 +239,9 @@ public partial class StoryPage : UserControl, IAppPage
     {
         _cameras.Clear();
         foreach (CameraModelManifest camera in await _services.CameraModels.ListAsync()) _cameras.Add(camera);
-        _placements.Clear();
-        _placements.Add(new CatalogOption(string.Empty, "Don't place"));
-        foreach (PlacementModel placement in await _services.PlacementModels.ListAsync()) _placements.Add(new CatalogOption(placement.Id, placement.Name));
+        _allPlacementModels =
+            await _services.PlacementModels.ListAsync();
+        RefreshPlacementOptions();
     }
 
     private async Task RefreshPresetsAsync()
@@ -225,12 +254,146 @@ public partial class StoryPage : UserControl, IAppPage
 
     private StoryRunKind SelectedRunKind() => (RunKindCombo.SelectedItem as NamedChoice<StoryRunKind>)?.Value ?? StoryRunKind.Act;
     private static string SelectedPlacement(ComboBox combo) => (combo.SelectedItem as CatalogOption)?.Id ?? string.Empty;
-    private void SelectPlacement(ComboBox combo, string id) => combo.SelectedItem = _placements.FirstOrDefault(value => value.Id == id) ?? _placements[0];
+    private void SelectPlacement(
+        ComboBox combo,
+        string id) =>
+        combo.SelectedItem =
+            _placements.FirstOrDefault(
+                value => value.Id == id) ??
+            _placements.FirstOrDefault();
     private static void SelectChoice<T>(ComboBox combo, T value) => combo.SelectedItem = combo.Items.Cast<NamedChoice<T>>().First(item => EqualityComparer<T>.Default.Equals(item.Value, value));
     private static int ParseInt(TextBox box, string label) => int.TryParse(box.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) ? value : throw new InvalidDataException($"{label} must be a whole number.");
     private static IReadOnlyList<TeamChoice> TeamChoices() => [new(0, "Don't change"), .. Enumerable.Range(1, 8).Select(value => new TeamChoice(value, $"Team {value}"))];
     private static IReadOnlyList<NamedChoice<ChallengeMapId>> MapChoices() => [new(ChallengeMapId.SchoolGrounds, "School Grounds"), new(ChallengeMapId.FlowerForest, "Flower Forest"), new(ChallengeMapId.RoseKingdom, "Rose Kingdom"), new(ChallengeMapId.FairyKingForest, "Fairy King Forest"), new(ChallengeMapId.KingsTomb, "King's Tomb")];
     private static IReadOnlyList<NamedChoice<StoryRunKind>> RunChoices() => [new(StoryRunKind.Act, "Act"), new(StoryRunKind.Infinite, "Infinite"), new(StoryRunKind.Mastery, "Mastery")];
+
+    private void CameraMode_Changed(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (CameraCombo is null ||
+            PrestartCombo is null)
+        {
+            return;
+        }
+        ApplyCameraModeLayout();
+        RefreshPlacementOptions();
+    }
+
+    private void PlacementRoute_Changed(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (!_loading &&
+            PrestartCombo is not null)
+        {
+            RefreshPlacementOptions();
+        }
+    }
+
+    private void ApplyCameraModeLayout()
+    {
+        bool fast =
+            SelectedCameraMode() ==
+            CameraPreparationMode.FastNoAlign;
+        StoryCameraRow.Height =
+            fast ? new GridLength(0) : new GridLength(54);
+        StoryDelayedRow.Height =
+            fast ? new GridLength(0) : new GridLength(54);
+        StoryDelayRow.Height =
+            fast ? new GridLength(0) : new GridLength(54);
+        PrimaryPlacementLabel.Text =
+            fast
+                ? "Placement model"
+                : "Before-start placement";
+    }
+
+    private void RefreshPlacementOptions(
+        string? primaryId = null,
+        string? delayedId = null)
+    {
+        if (MapCombo.SelectedItem is not
+                NamedChoice<ChallengeMapId> map ||
+            RunKindCombo.SelectedItem is not
+                NamedChoice<StoryRunKind> run)
+        {
+            return;
+        }
+        primaryId ??=
+            (PrestartCombo.SelectedItem as
+                CatalogOption)?.Id;
+        delayedId ??=
+            (DelayedCombo.SelectedItem as
+                CatalogOption)?.Id;
+        int act =
+            run.Value == StoryRunKind.Act &&
+            ActCombo.SelectedItem is int selectedAct
+                ? selectedAct
+                : 1;
+        PlacementTarget target = new()
+        {
+            Mode = PlacementTargetMode.Story,
+            MapNumber = (int)map.Value,
+            StoryRunKind = run.Value,
+            ActNumber = act,
+        };
+        CameraPreparationMode mode =
+            SelectedCameraMode();
+        _placements.Clear();
+        if (mode == CameraPreparationMode.CameraModel)
+        {
+            _placements.Add(
+                new CatalogOption(
+                    string.Empty,
+                    "Don't place"));
+        }
+        foreach (PlacementModel placement in
+                 _allPlacementModels.Where(
+                     model => model.IsCompatibleWith(
+                         mode,
+                         target)))
+        {
+            _placements.Add(
+                new CatalogOption(
+                    placement.Id,
+                    placement.Name));
+        }
+        SelectPlacement(PrestartCombo, primaryId ?? string.Empty);
+        if (mode == CameraPreparationMode.CameraModel)
+        {
+            SelectPlacement(
+                DelayedCombo,
+                delayedId ?? string.Empty);
+        }
+        else
+        {
+            DelayedCombo.SelectedItem = null;
+        }
+    }
+
+    private CameraPreparationMode SelectedCameraMode() =>
+        (CameraModeCombo.SelectedItem as
+            NamedChoice<CameraPreparationMode>)?.Value ??
+        CameraPreparationMode.CameraModel;
+
+    private void SelectCameraMode(
+        CameraPreparationMode mode) =>
+        CameraModeCombo.SelectedItem =
+            CameraModeCombo.Items
+                .Cast<NamedChoice<CameraPreparationMode>>()
+                .First(choice => choice.Value == mode);
+
+    private static IReadOnlyList<
+        NamedChoice<CameraPreparationMode>>
+        CameraModeChoices() =>
+        [
+            new(
+                CameraPreparationMode.FastNoAlign,
+                "Fast no align"),
+            new(
+                CameraPreparationMode.CameraModel,
+                "Camera model"),
+        ];
 
     private void UpdatePresetActions()
     {

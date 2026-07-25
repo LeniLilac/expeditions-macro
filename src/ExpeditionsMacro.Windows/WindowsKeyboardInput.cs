@@ -24,6 +24,16 @@ internal sealed class WindowsKeyboardInput
             holdMilliseconds: 70,
             cancellationToken);
 
+    public Task TapKeyboardKeyAsync(
+        RobloxWindow window,
+        RobloxKeyboardKey key,
+        CancellationToken cancellationToken) =>
+        PulseKeyAsync(
+            window,
+            KeyboardInputDescriptor.FromRobloxKey(key),
+            holdMilliseconds: 70,
+            cancellationToken);
+
     public Task HoldLetterKeyAsync(
         RobloxWindow window,
         char key,

@@ -9,6 +9,7 @@ using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Automation.Recovery;
 using ExpeditionsMacro.Automation.Refuel;
 using ExpeditionsMacro.Automation.Scheduling;
+using ExpeditionsMacro.Automation.Settings;
 using ExpeditionsMacro.Automation.Stages;
 using ExpeditionsMacro.Automation.Teams;
 using ExpeditionsMacro.Automation.Updates;
@@ -45,6 +46,9 @@ public sealed class AppServices : IDisposable
         StoryPresets = new StoryPresetRepository(Paths);
         RaidPresets = new RaidPresetRepository(Paths);
         MacroPlans = new MacroPlanRepository(Paths);
+        FastNoAlignShare = new FastNoAlignShareService(
+            MacroPlans,
+            PlacementModels);
         PresetDeletion = new PresetDeletionService(Presets, ChallengePresets, StoryPresets, RaidPresets, MacroPlans);
         CameraModels = new CameraModelRepository(Paths);
         CameraShortcuts = new CameraSpawnShortcutRepository(Paths);
@@ -96,6 +100,8 @@ public sealed class AppServices : IDisposable
                 Settings.PlayMenuKey,
                 Settings.UnitMenuKey,
                 Settings.AreasMenuKey));
+        FastNoAlign = new FastNoAlignPreparationSession(
+            CameraPose);
         Camera = new CameraAlignmentEngine(
             Automation,
             CameraModels,
@@ -117,16 +123,36 @@ public sealed class AppServices : IDisposable
         ResourceRefuel = new ResourceRefuelService(
             Automation,
             RobloxRecovery);
+        StartupPreflight =
+            new MacroStartupPreflightService(Automation);
         _discord = new DiscordWebhookClient();
         Teams = new TeamSelectionService(Automation);
-        Stages = new StageMacroRunner(Automation, Camera, Placement, Teams, _discord);
+        Stages = new StageMacroRunner(
+            Automation,
+            Camera,
+            Placement,
+            Teams,
+            _discord,
+            FastNoAlign);
         Scheduler = new MacroScheduler(MacroPlans);
         RecoveringScheduler = new RecoveringMacroScheduler(
             Scheduler,
             MacroPlans,
             RobloxRecovery);
-        Challenges = new ChallengeMacroRunner(Automation, Camera, Placement, Teams, _discord);
-        Expeditions = new ExpeditionMacroRunner(Automation, Camera, Placement, Teams, _discord);
+        Challenges = new ChallengeMacroRunner(
+            Automation,
+            Camera,
+            Placement,
+            Teams,
+            _discord,
+            FastNoAlign);
+        Expeditions = new ExpeditionMacroRunner(
+            Automation,
+            Camera,
+            Placement,
+            Teams,
+            _discord,
+            FastNoAlign);
         DetectorUpdates = new DetectorPackUpdateService(DetectorPacks);
         Hotkey.Pressed += (_, _) =>
         {
@@ -145,6 +171,7 @@ public sealed class AppServices : IDisposable
     public StoryPresetRepository StoryPresets { get; }
     public RaidPresetRepository RaidPresets { get; }
     public MacroPlanRepository MacroPlans { get; }
+    public FastNoAlignShareService FastNoAlignShare { get; }
     public PresetDeletionService PresetDeletion { get; }
     public CameraModelRepository CameraModels { get; }
     public CameraSpawnShortcutRepository CameraShortcuts { get; }
@@ -159,9 +186,11 @@ public sealed class AppServices : IDisposable
     public IPlacementCaptureService PlacementCapture { get; }
     public PlacementService Placement { get; }
     public CameraPosePreparationService CameraPose { get; }
+    public FastNoAlignPreparationSession FastNoAlign { get; }
     public CameraAlignmentEngine Camera { get; }
     public RobloxPrivateServerRecoveryService RobloxRecovery { get; }
     public ResourceRefuelService ResourceRefuel { get; }
+    public MacroStartupPreflightService StartupPreflight { get; }
     public TeamSelectionService Teams { get; }
     public StageMacroRunner Stages { get; }
     public MacroScheduler Scheduler { get; }
@@ -237,6 +266,24 @@ public sealed class AppServices : IDisposable
         (string? path, string? diagnosticError) = await diagnosticTask;
         (bool sent, string? discordError) = await pingTask;
         return new MacroFailureHandlingResult(path, sent, diagnosticError, discordError);
+    }
+
+    public async Task<MacroFailureHandlingResult>
+        HandleRecoverableMacroFailureAsync(
+            string macroName,
+            Exception error)
+    {
+        (string? path, string? diagnosticError) =
+            Settings.AutoCaptureOnMacroError
+                ? await CaptureFailureDiagnosticsAsync(
+                    $"{macroName} recovery",
+                    error.Message)
+                : (null, null);
+        return new MacroFailureHandlingResult(
+            path,
+            DiscordPingsSent: false,
+            diagnosticError,
+            DiscordError: null);
     }
 
     public async Task TestDiscordWebhookAsync(string webhookUrl, CancellationToken cancellationToken)

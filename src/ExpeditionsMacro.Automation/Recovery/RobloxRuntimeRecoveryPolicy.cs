@@ -16,6 +16,7 @@ public static class RobloxRuntimeRecoveryPolicy
         ArgumentNullException.ThrowIfNull(error);
         if (error is OperationCanceledException or PlayMenuBindingException) return false;
         if (error is RobloxSessionUnavailableException or
+            RobloxUiUnavailableException or
             CameraWorldNotRenderedException or
             TimeoutException or
             Win32Exception)

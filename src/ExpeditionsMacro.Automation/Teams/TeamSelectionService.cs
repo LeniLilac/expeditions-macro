@@ -1,14 +1,18 @@
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Imaging;
+using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Teams;
 
 namespace ExpeditionsMacro.Automation.Teams;
 
 public sealed class TeamSelectionService
 {
-    private const int AlignmentAttempts = 2;
     private const int LoadClickAttempts = 2;
     private const int StableLayoutDetections = 2;
+    private static readonly TimeSpan TopAlignmentTimeout =
+        TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan TeamAlignmentTimeout =
+        TimeSpan.FromSeconds(15);
     private readonly IRobloxAutomation _automation;
 
     public TeamSelectionService(IRobloxAutomation automation) => _automation = automation;
@@ -72,30 +76,11 @@ public sealed class TeamSelectionService
         int teamSlot,
         CancellationToken cancellationToken)
     {
-        TeamScrollbarThumb topThumb = await WaitForStableTeamListAsync(
-            window,
-            TimeSpan.FromSeconds(4),
-            cancellationToken).ConfigureAwait(false);
-        if (!TeamScreenDetector.IsScrollbarAtTop(topThumb))
-        {
-            EnsureFocus(window);
-            await _automation.DragClientAsync(
+        TeamScrollbarThumb topThumb =
+            await NormalizeTeamListTopAsync(
                 window,
-                topThumb.X,
-                topThumb.CenterY,
-                topThumb.X,
-                TeamScreenDetector.TopScrollbarDragLimitY,
-                cancellationToken).ConfigureAwait(false);
-            topThumb = await WaitForStableTeamListAsync(
-                window,
-                TimeSpan.FromSeconds(3),
-                cancellationToken).ConfigureAwait(false);
-            if (!TeamScreenDetector.IsScrollbarAtTop(topThumb))
-            {
-                throw new InvalidOperationException(
-                    $"The Unit Team scrollbar could not be normalized to its top position. Last center: {topThumb.CenterY}.");
-            }
-        }
+                cancellationToken)
+                .ConfigureAwait(false);
         int targetCenterY = TeamScreenDetector.ScrollThumbTargetCenterY(teamSlot, topThumb.CenterY);
 
         TimeoutException? lastTimeout = null;
@@ -128,6 +113,46 @@ public sealed class TeamSelectionService
         }
 
         throw lastTimeout ?? new TimeoutException($"Team {teamSlot} did not open its Load Team confirmation.");
+    }
+
+    private async Task<TeamScrollbarThumb>
+        NormalizeTeamListTopAsync(
+            RobloxWindow window,
+            CancellationToken cancellationToken)
+    {
+        TeamScrollbarThumb thumb =
+            await WaitForStableTeamListAsync(
+                window,
+                TimeSpan.FromSeconds(4),
+                cancellationToken).ConfigureAwait(false);
+        DateTimeOffset deadline =
+            DateTimeOffset.UtcNow +
+            TopAlignmentTimeout;
+        while (!TeamScreenDetector.IsScrollbarAtTop(
+                   thumb))
+        {
+            if (DateTimeOffset.UtcNow >= deadline)
+            {
+                throw new RobloxUiUnavailableException(
+                    $"The Unit Team scrollbar could not be normalized to its stable top position. Last center: {thumb.CenterY}.");
+            }
+            EnsureFocus(window);
+            await _automation.DragClientAsync(
+                window,
+                thumb.X,
+                thumb.CenterY,
+                thumb.X,
+                TeamScreenDetector
+                    .TopScrollbarDragLimitY,
+                cancellationToken).ConfigureAwait(false);
+            thumb = await WaitForStableTeamListAsync(
+                window,
+                Remaining(
+                    deadline,
+                    TimeSpan.FromSeconds(3)),
+                cancellationToken).ConfigureAwait(false);
+        }
+        return thumb;
     }
 
     private async Task<TeamScrollbarThumb> WaitForStableTeamListAsync(
@@ -172,7 +197,7 @@ public sealed class TeamSelectionService
             await Task.Delay(150, cancellationToken).ConfigureAwait(false);
         }
 
-        throw new InvalidOperationException(
+        throw new RobloxUiUnavailableException(
             last is null
                 ? "The Unit Team scrollbar could not be located after the interface finished opening."
                 : $"The Unit Team scrollbar did not settle before team selection. Last center: {last.Value.CenterY}.");
@@ -184,13 +209,16 @@ public sealed class TeamSelectionService
         int targetCenterY,
         CancellationToken cancellationToken)
     {
-        for (int attempt = 0; attempt < AlignmentAttempts; attempt++)
+        DateTimeOffset deadline =
+            DateTimeOffset.UtcNow +
+            TeamAlignmentTimeout;
+        while (DateTimeOffset.UtcNow < deadline)
         {
             ImageFrame image = CaptureClient(window);
             TeamScreenMatch state = TeamScreenDetector.Detect(image);
             if (state.State != TeamScreenState.Teams)
             {
-                throw new InvalidOperationException(
+                throw new RobloxUiUnavailableException(
                     $"The Unit Team list was lost while aligning Team {teamSlot}. Last state: {state.State} ({state.Confidence:P0}).");
             }
 
@@ -201,36 +229,50 @@ public sealed class TeamSelectionService
             if (action is not null) return action.Value;
 
             TeamScrollbarThumb thumb = TeamScreenDetector.FindScrollbarThumb(image) ??
-                throw new InvalidOperationException("The Unit Team scrollbar could not be located.");
-            bool aligned = teamSlot >= 7
-                ? TeamScreenDetector.IsScrollbarAtBottom(thumb)
-                : Math.Abs(thumb.CenterY - targetCenterY) <= 4;
-            if (!aligned)
+                throw new RobloxUiUnavailableException("The Unit Team scrollbar could not be located.");
+            int dragEndY = teamSlot switch
             {
-                int dragEndY = teamSlot >= 7
-                    ? TeamScreenDetector.BottomScrollbarDragLimitY
-                    : targetCenterY;
-                EnsureFocus(window);
-                await _automation.DragClientAsync(
-                    window,
-                    thumb.X,
-                    thumb.CenterY,
-                    thumb.X,
-                    dragEndY,
-                    cancellationToken).ConfigureAwait(false);
-            }
+                1 => TeamScreenDetector.TopScrollbarDragLimitY,
+                >= 7 => TeamScreenDetector.BottomScrollbarDragLimitY,
+                _ => targetCenterY,
+            };
+            EnsureFocus(window);
+            await _automation.DragClientAsync(
+                window,
+                thumb.X,
+                thumb.CenterY,
+                thumb.X,
+                dragEndY,
+                cancellationToken).ConfigureAwait(false);
 
             action = await WaitForAlignedLoadActionAsync(
                 window,
                 teamSlot,
                 targetCenterY,
-                TimeSpan.FromSeconds(3),
+                Remaining(
+                    deadline,
+                    TimeSpan.FromSeconds(3)),
                 cancellationToken).ConfigureAwait(false);
             if (action is not null) return action.Value;
         }
 
-        throw new InvalidOperationException(
+        throw new RobloxUiUnavailableException(
             $"Team {teamSlot} could not be aligned to a fully visible Load Team button.");
+    }
+
+    private static TimeSpan Remaining(
+        DateTimeOffset deadline,
+        TimeSpan maximum)
+    {
+        TimeSpan remaining =
+            deadline - DateTimeOffset.UtcNow;
+        if (remaining <= TimeSpan.Zero)
+        {
+            return TimeSpan.FromMilliseconds(1);
+        }
+        return remaining < maximum
+            ? remaining
+            : maximum;
     }
 
     private async Task<(int X, int Y)?> WaitForAlignedLoadActionAsync(
@@ -322,12 +364,12 @@ public sealed class TeamSelectionService
             if (last.State == TeamScreenState.None) return;
         }
 
-        throw new InvalidOperationException($"The Unit Team window did not close after loading the selected team. Last state: {last.State}.");
+        throw new RobloxUiUnavailableException($"The Unit Team window did not close after loading the selected team. Last state: {last.State}.");
     }
 
     private void EnsureFocus(RobloxWindow window)
     {
-        if (!_automation.Focus(window)) throw new InvalidOperationException("Windows could not focus Roblox while changing teams.");
+        if (!_automation.Focus(window)) throw new RobloxSessionUnavailableException("Windows could not focus Roblox while changing teams.");
     }
 
     private static (int X, int Y) ResolveAction(TeamScreenMatch match, (int X, int Y) fallback) =>
@@ -346,7 +388,7 @@ public sealed class TeamSelectionService
         var bounds = _automation.GetClientBounds(window);
         if (bounds.Width != TeamScreenDetector.ClientWidth || bounds.Height != TeamScreenDetector.ClientHeight)
         {
-            throw new InvalidOperationException(
+            throw new RobloxSessionUnavailableException(
                 $"Roblox no longer matches the required {TeamScreenDetector.ClientWidth} by {TeamScreenDetector.ClientHeight} client size while changing teams.");
         }
 

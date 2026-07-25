@@ -23,7 +23,7 @@ internal static class UiSnapshotRenderer
         ("Story", "story", false, false),
         ("Raid", "raid", false, false),
         ("Camera Models", "camera-models", false, false),
-        ("Placement Models", "placement-models", false, false),
+        ("Placement Setup", "placement-setup", false, false),
         ("Debug", "debug", false, false),
         ("Debug", "debug-refuel", true, false),
         ("Debug", "debug-utilities", false, true),
@@ -67,11 +67,23 @@ internal static class UiSnapshotRenderer
                         showDebugUtilities);
                     await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                     if (window.Content is not FrameworkElement root) throw new InvalidOperationException("The main window has no renderable content.");
-                    Size size = new(1200, 780);
+                    Size size = string.Equals(
+                        key,
+                        "Placement Setup",
+                        StringComparison.OrdinalIgnoreCase)
+                        ? new Size(1660, 1040)
+                        : new Size(1200, 780);
+                    window.Width = size.Width;
+                    window.Height = size.Height;
                     root.Measure(size);
                     root.Arrange(new Rect(size));
                     root.UpdateLayout();
-                    RenderTargetBitmap bitmap = new(1200, 780, 96, 96, PixelFormats.Pbgra32);
+                    RenderTargetBitmap bitmap = new(
+                        (int)size.Width,
+                        (int)size.Height,
+                        96,
+                        96,
+                        PixelFormats.Pbgra32);
                     bitmap.Render(root);
                     EnsureVisiblePixels(bitmap, file, theme);
                     PngBitmapEncoder encoder = new();

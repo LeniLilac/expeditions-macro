@@ -305,6 +305,96 @@ public sealed class DeepDebugSessionTests
         Assert.NotNull(archive.GetEntry("models/start/detector-packs/anime-expeditions-expeditions/manifest.json"));
     }
 
+    [Fact]
+    public async Task FastPlanSnapshotResolvesRouteSetupWithoutLegacyPreset()
+    {
+        using TestDirectory directory = new();
+        AppPaths paths = new(directory.Path);
+        paths.EnsureCreated();
+        PlacementTarget target = new()
+        {
+            Mode = PlacementTargetMode.Expedition,
+            MapNumber = 2,
+        };
+        string setupId = PlacementSetupCatalog.IdFor(target);
+        Directory.CreateDirectory(
+            Path.Combine(
+                paths.PlacementModels,
+                setupId));
+        await File.WriteAllTextAsync(
+            Path.Combine(
+                paths.PlacementModels,
+                setupId,
+                "placement.json"),
+            "placement");
+        Directory.CreateDirectory(
+            Path.Combine(
+                paths.DetectorPacks,
+                "anime-expeditions-expeditions",
+                "current"));
+        await File.WriteAllTextAsync(
+            Path.Combine(
+                paths.DetectorPacks,
+                "anime-expeditions-expeditions",
+                "current",
+                "manifest.json"),
+            "detector");
+        MacroPlan plan = new()
+        {
+            Id = "fast-plan",
+            Name = "Fast plan",
+            Tasks =
+            [
+                new MacroTaskDefinition
+                {
+                    Id = "fast-expedition",
+                    Kind = MacroTaskKind.Expedition,
+                    Name = "Flower Forest",
+                    PlacementTarget = target,
+                },
+            ],
+        };
+        await JsonFileStore.WriteAtomicAsync(
+            Path.Combine(
+                paths.MacroPlans,
+                $"{plan.Id}.json"),
+            plan);
+        AppSettings settings = new()
+        {
+            DeepDebugEnabled = true,
+        };
+        DeepDebugSessionService service =
+            CreateService(
+                paths,
+                () => settings,
+                () => null);
+
+        await service.RunOperationAsync(
+            "Macro plan",
+            new DeepDebugOperationContext
+            {
+                MacroPlanId = plan.Id,
+            },
+            _ => Task.CompletedTask,
+            CancellationToken.None);
+
+        string archivePath = Assert.Single(
+            Directory.EnumerateFiles(
+                paths.Diagnostics,
+                "deep-debug-*.zip"));
+        using ZipArchive archive =
+            ZipFile.OpenRead(archivePath);
+        Assert.NotNull(
+            archive.GetEntry(
+                $"models/start/placement/{setupId}/placement.json"));
+        Assert.NotNull(
+            archive.GetEntry(
+                "models/start/detector-packs/anime-expeditions-expeditions/manifest.json"));
+        Assert.Null(
+            archive.GetEntry(
+                "configuration/start/presets/expeditions"));
+    }
+
     private static DeepDebugSessionService CreateService(
         AppPaths paths,
         Func<AppSettings> settings,

@@ -34,7 +34,9 @@ public sealed class RecoveringMacroScheduler
         Action<MacroEvent>? log = null,
         CancellationToken cancellationToken = default,
         Func<Exception, CancellationToken, Task>?
-            recoverableFailure = null)
+            recoverableFailure = null,
+        Func<CancellationToken, Task>?
+            prepareSession = null)
     {
         MacroPlan plan = initialPlan;
         RobloxRestartCircuitBreaker circuitBreaker = new();
@@ -42,6 +44,11 @@ public sealed class RecoveringMacroScheduler
         {
             try
             {
+                if (prepareSession is not null)
+                {
+                    await prepareSession(
+                        cancellationToken).ConfigureAwait(false);
+                }
                 await _scheduler.RunAsync(
                     plan,
                     execute,

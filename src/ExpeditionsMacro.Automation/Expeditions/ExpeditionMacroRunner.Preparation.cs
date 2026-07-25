@@ -10,7 +10,7 @@ public sealed partial class ExpeditionMacroRunner
     private async Task PrepareMatchAsync(
         RobloxWindow window,
         ExpeditionPreset preset,
-        CameraModel model,
+        CameraModel? model,
         char? unitMenuKey,
         RepeatedRoutePreparationState preparation,
         bool arrivedFromRepeatStage,
@@ -46,13 +46,38 @@ public sealed partial class ExpeditionMacroRunner
             return;
         }
 
+        if (preset.CameraPreparationMode ==
+            CameraPreparationMode.FastNoAlign)
+        {
+            bool prepared =
+                await _fastNoAlign.EnsurePreparedAsync(
+                    window,
+                    preset.ZoomTicks,
+                    preset.PitchDragPixels,
+                    progress,
+                    cancellationToken).ConfigureAwait(false);
+            preparation.MarkCameraAligned();
+            log(
+                prepared
+                    ? "Fast no align prepared zoom and pitch without changing yaw."
+                    : "Fast no align reused the camera pose preserved from the previous match.",
+                MacroEventLevel.Success,
+                prepared
+                    ? "fast_no_align"
+                    : "fast_no_align_reused",
+                null);
+            return;
+        }
+
         log(
             "Prestart screen recognized. Preparing camera.",
             MacroEventLevel.Success,
             null,
             null);
         double score = await _camera.PrepareAndAlignAsync(
-            model,
+            model ??
+                throw new InvalidDataException(
+                    "Choose a camera model for this Expedition preset."),
             window,
             preset.ZoomTicks,
             preset.PitchDragPixels,

@@ -32,6 +32,40 @@ public sealed class ChallengePresetTests
     }
 
     [Fact]
+    public void FastReadyPreset_UsesOneCombinedPlacementPerMap()
+    {
+        ChallengePreset preset = Draft() with
+        {
+            CameraPreparationMode =
+                CameraPreparationMode.FastNoAlign,
+            Maps = ChallengePreset.EmptyMapProfiles()
+                .Select(profile => profile with
+                {
+                    PrestartPlacementModelId =
+                        $"fast-{(int)profile.Map}",
+                })
+                .ToArray(),
+        };
+
+        preset.ValidateReady();
+
+        ChallengePreset split = preset with
+        {
+            Maps =
+            [
+                preset.Maps[0] with
+                {
+                    DelayedPlacementModelId =
+                        "separate-after-start",
+                },
+                .. preset.Maps.Skip(1),
+            ],
+        };
+        Assert.Throws<InvalidDataException>(
+            split.ValidateReady);
+    }
+
+    [Fact]
     public void Preset_RequiresAnEnabledChallengeType()
     {
         ChallengePreset preset = Draft() with

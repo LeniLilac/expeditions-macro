@@ -69,7 +69,7 @@ public sealed partial class CameraAlignmentEngine
             ClientBounds client = _automation.GetClientBounds(window);
             if (client.Width != RobloxClientProfile.Width || client.Height != RobloxClientProfile.Height)
             {
-                throw new InvalidOperationException($"Roblox did not accept the standard {RobloxClientProfile.Width} × {RobloxClientProfile.Height} client size.");
+                throw new RobloxSessionUnavailableException($"Roblox did not accept the standard {RobloxClientProfile.Width} × {RobloxClientProfile.Height} client size.");
             }
             await _posePreparation.ClampZoomAsync(
                 window,
@@ -281,7 +281,7 @@ public sealed partial class CameraAlignmentEngine
             ClientBounds client = _automation.GetClientBounds(window);
             if (client.Width != model.Manifest.ClientWidth || client.Height != model.Manifest.ClientHeight)
             {
-                throw new InvalidOperationException("Roblox does not match the client size stored by the camera model.");
+                throw new RobloxSessionUnavailableException("Roblox does not match the client size stored by the camera model.");
             }
             if (manageShiftLock)
             {
@@ -1088,7 +1088,7 @@ public sealed partial class CameraAlignmentEngine
         ClientBounds resized = _automation.GetClientBounds(window);
         if (resized.Width != manifest.ClientWidth || resized.Height != manifest.ClientHeight)
         {
-            throw new InvalidOperationException("Roblox does not match the client size stored by the camera model.");
+            throw new RobloxSessionUnavailableException("Roblox does not match the client size stored by the camera model.");
         }
     }
 
@@ -1171,11 +1171,11 @@ public sealed partial class CameraAlignmentEngine
         await Task.Delay(settleMilliseconds, cancellationToken).ConfigureAwait(false);
     }
 
-    private RobloxWindow RequireWindow() => _automation.FindWindow() ?? throw new InvalidOperationException("No visible Roblox window was found.");
+    private RobloxWindow RequireWindow() => _automation.FindWindow() ?? throw new RobloxSessionUnavailableException("No visible Roblox window was found.");
 
     private void Focus(RobloxWindow window)
     {
-        if (!_automation.Focus(window)) throw new InvalidOperationException($"Found '{window.Title}', but Windows could not focus it. Restore Roblox and try again.");
+        if (!_automation.Focus(window)) throw new RobloxSessionUnavailableException($"Found '{window.Title}', but Windows could not focus it. Restore Roblox and try again.");
     }
 
     private static string DirectionLabel(CameraYawDirection direction) => direction == CameraYawDirection.Left ? "left" : "right";

@@ -30,6 +30,8 @@ public partial class MacroPage : UserControl, IAppPage
     private readonly ObservableCollection<MacroPlan> _plans = [];
     private readonly ObservableCollection<MacroPresetChoice> _allPresets = [];
     private readonly ObservableCollection<MacroPresetChoice> _visiblePresets = [];
+    private readonly ObservableCollection<PlacementSetupRoute>
+        _visibleRoutes = [];
     private readonly Dictionary<string, StoryPreset> _storyPresets = new(StringComparer.OrdinalIgnoreCase);
     private readonly DispatcherTimer _runtimeTimer;
     private DateTimeOffset? _runStarted;
@@ -48,6 +50,17 @@ public partial class MacroPage : UserControl, IAppPage
             .Select(kind => new NamedChoice<MacroTaskKind>(kind, Label(kind)))
             .ToArray();
         TaskPresetCombo.ItemsSource = _visiblePresets;
+        TaskRouteCombo.ItemsSource = _visibleRoutes;
+        TaskDifficultyCombo.ItemsSource = Enumerable
+            .Range(1, 3)
+            .Select(value =>
+                new NamedChoice<int>(
+                    value,
+                    $"Difficulty {value}"))
+            .ToArray();
+        TaskDifficultyCombo.DisplayMemberPath =
+            nameof(NamedChoice<int>.Name);
+        TaskDifficultyCombo.SelectedIndex = 0;
         _runtimeTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => UpdateRuntime(), Dispatcher);
         _services.Coordinator.StateChanged += (_, _) => Dispatcher.BeginInvoke(CoordinatorStateChanged);
         _services.Hotkey.BindingChanged += (_, _) => Dispatcher.BeginInvoke(UpdateHotkeyText);
@@ -95,6 +108,8 @@ public partial class MacroPage : UserControl, IAppPage
         WebhookPassword.Password = string.Empty;
         WebhookVisible.Text = string.Empty;
         DiscordUserIdText.Text = string.Empty;
+        ShareCodeText.Text = string.Empty;
+        SharePlanStatusText.Text = string.Empty;
         ClearPrivateServerRecoverySnapshot();
         PopulateSnapshotTasks();
         UpdateLayout();
@@ -200,7 +215,7 @@ public partial class MacroPage : UserControl, IAppPage
                 MacroProgress.Value = Math.Clamp(value.Percent, 0, 100);
             });
         });
-
+        _services.FastNoAlign.Invalidate();
         await _services.Coordinator.RunNowAsync(
             "Macro plan",
             token => RunPlanWithFailureHandlingAsync(
@@ -214,44 +229,6 @@ public partial class MacroPage : UserControl, IAppPage
                 token),
             new DeepDebugOperationContext { MacroPlanId = plan.Id });
     }
-
-    private async Task<IReadOnlyDictionary<ChallengeMapId, ChallengeMapRuntimeModels>> LoadChallengeModelsAsync(
-        ChallengePreset preset,
-        CancellationToken cancellationToken)
-    {
-        Dictionary<ChallengeMapId, ChallengeMapRuntimeModels> result = [];
-        foreach (ChallengeMapProfile profile in preset.Maps)
-        {
-            CameraModel camera = await _services.CameraModels.LoadAsync(profile.CameraModelId, cancellationToken).ConfigureAwait(false)
-                ?? throw new InvalidOperationException($"The {Label(profile.Map)} camera model could not be loaded.");
-            PlacementModel? prestart = await LoadOptionalPlacementAsync(profile.PrestartPlacementModelId, cancellationToken).ConfigureAwait(false);
-            PlacementModel? delayed = await LoadOptionalPlacementAsync(profile.DelayedPlacementModelId, cancellationToken).ConfigureAwait(false);
-            result[profile.Map] = new ChallengeMapRuntimeModels(camera, prestart, delayed);
-        }
-        return result;
-    }
-
-    private async Task<StageRuntimeModels> LoadStageModelsAsync(
-        string cameraId,
-        string prestartId,
-        string delayedId,
-        CancellationToken cancellationToken)
-    {
-        CameraModel camera = await _services.CameraModels.LoadAsync(cameraId, cancellationToken).ConfigureAwait(false)
-            ?? throw new InvalidOperationException("The selected camera model could not be loaded.");
-        PlacementModel? prestart = await LoadOptionalPlacementAsync(prestartId, cancellationToken).ConfigureAwait(false);
-        PlacementModel? delayed = await LoadOptionalPlacementAsync(delayedId, cancellationToken).ConfigureAwait(false);
-        return new StageRuntimeModels(camera, prestart, delayed);
-    }
-
-    private Task<PlacementModel?> LoadOptionalPlacementAsync(string id, CancellationToken cancellationToken) =>
-        string.IsNullOrWhiteSpace(id)
-            ? Task.FromResult<PlacementModel?>(null)
-            : LoadRequiredPlacementAsync(id, cancellationToken);
-
-    private async Task<PlacementModel?> LoadRequiredPlacementAsync(string id, CancellationToken cancellationToken) =>
-        await _services.PlacementModels.LoadAsync(id, cancellationToken).ConfigureAwait(false)
-        ?? throw new InvalidOperationException($"Placement model '{id}' could not be loaded.");
 
     private async Task<IDetectorPack> LoadDetectorAsync(string id, CancellationToken cancellationToken) =>
         _services.TraceDetector(
@@ -267,7 +244,10 @@ public partial class MacroPage : UserControl, IAppPage
     {
         cancellationToken.ThrowIfCancellationRequested();
         await Dispatcher.InvokeAsync(() => AppendLog($"RECOVERABLE: {error.Message}"));
-        MacroFailureHandlingResult result = await _services.HandleMacroFailureAsync(macroName, webhook, discordUserId, error).ConfigureAwait(false);
+        MacroFailureHandlingResult result =
+            await _services.HandleRecoverableMacroFailureAsync(
+                macroName,
+                error).ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         await Dispatcher.InvokeAsync(() => AppendFailureHandlingResult(result));
     }
@@ -392,168 +372,12 @@ public partial class MacroPage : UserControl, IAppPage
         }
     }
 
-    private void TaskKindCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (TaskPresetCombo is null) return;
-        RefreshVisiblePresets();
-        UpdateTaskTargetEditor();
-    }
-
-    private void TaskPresetCombo_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateTaskTargetEditor();
-
-    private void AddOrUpdateTask_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            if (TaskKindCombo.SelectedItem is not NamedChoice<MacroTaskKind> kind) throw new InvalidOperationException("Choose a task mode.");
-            if (TaskPresetCombo.SelectedItem is not MacroPresetChoice preset) throw new InvalidOperationException($"Create and select a {Label(kind.Value)} preset first.");
-            bool runtimeTarget = IsInfiniteStory(preset);
-            int target = kind.Value == MacroTaskKind.Challenge ? 1 : ParsePositiveInt(TaskTargetText, runtimeTarget ? "Runtime minutes" : "Victory target");
-            string id = _editingTaskId ?? $"task-{Guid.NewGuid():N}";
-            MacroTaskDefinition definition = new()
-            {
-                Id = id,
-                Kind = kind.Value,
-                PresetId = preset.Id,
-                Name = preset.Name,
-                Priority = 1,
-                Enabled = TaskEnabledCheck.IsChecked == true,
-                TargetVictories = runtimeTarget ? 1 : target,
-                TargetRuntimeMinutes = runtimeTarget ? target : 180,
-                CompleteOnRuntimeDefeat = runtimeTarget,
-            };
-            definition.Validate();
-
-            int existingIndex = IndexOfTask(_editingTaskId);
-            MacroTaskProgress progress = existingIndex >= 0 && SameWork(TaskRows[existingIndex].Definition, definition)
-                ? TaskRows[existingIndex].Progress
-                : new MacroTaskProgress { TaskId = id };
-            MacroTaskRow row = new() { Definition = definition, Progress = progress };
-            if (existingIndex >= 0) TaskRows[existingIndex] = row;
-            else TaskRows.Add(row);
-            TaskEditorStatusText.Text = existingIndex >= 0 ? "Task updated. Save the plan to persist it." : "Task added. Save the plan to persist it.";
-            ReindexRows();
-            ResetTaskEditor();
-        }
-        catch (Exception error)
-        {
-            TaskEditorStatusText.Text = error.Message;
-        }
-    }
-
-    private void EditTask_Click(object sender, RoutedEventArgs e)
-    {
-        if ((sender as FrameworkElement)?.Tag is not MacroTaskRow row) return;
-        _editingTaskId = row.Definition.Id;
-        TaskKindCombo.SelectedItem = TaskKindCombo.Items.Cast<NamedChoice<MacroTaskKind>>().First(value => value.Value == row.Definition.Kind);
-        RefreshVisiblePresets();
-        TaskPresetCombo.SelectedItem = _visiblePresets.FirstOrDefault(value => value.Kind == row.Definition.Kind && value.Id == row.Definition.PresetId);
-        TaskEnabledCheck.IsChecked = row.Definition.Enabled;
-        TaskTargetText.Text = row.Definition.CompleteOnRuntimeDefeat
-            ? row.Definition.TargetRuntimeMinutes.ToString(CultureInfo.InvariantCulture)
-            : row.Definition.TargetVictories.ToString(CultureInfo.InvariantCulture);
-        AddTaskButton.Content = "Update task";
-        CancelTaskEditButton.Visibility = Visibility.Visible;
-        TaskEditorStatusText.Text = "Editing this task. Changing its preset or target resets its saved progress.";
-        UpdateTaskTargetEditor();
-    }
-
-    private void CancelTaskEdit_Click(object sender, RoutedEventArgs e) => ResetTaskEditor();
-
-    private void RemoveTask_Click(object sender, RoutedEventArgs e)
-    {
-        if ((sender as FrameworkElement)?.Tag is not MacroTaskRow row) return;
-        TaskRows.Remove(row);
-        ReindexRows();
-        if (_editingTaskId == row.Definition.Id) ResetTaskEditor();
-        TaskEditorStatusText.Text = "Task removed. Save the plan to persist the change.";
-    }
-
-    private void MoveTaskUp_Click(object sender, RoutedEventArgs e) => MoveTask((sender as FrameworkElement)?.Tag as MacroTaskRow, -1);
-
-    private void MoveTaskDown_Click(object sender, RoutedEventArgs e) => MoveTask((sender as FrameworkElement)?.Tag as MacroTaskRow, 1);
-
-    private void MoveTask(MacroTaskRow? row, int direction)
-    {
-        if (row is null) return;
-        int index = TaskRows.IndexOf(row);
-        int target = index + direction;
-        if (index < 0 || target < 0 || target >= TaskRows.Count) return;
-        TaskRows.Move(index, target);
-        ReindexRows();
-        TaskEditorStatusText.Text = "Priority changed. Save the plan to persist the order.";
-    }
-
-    private void ResetTaskEditor()
-    {
-        _editingTaskId = null;
-        AddTaskButton.Content = "Add task";
-        CancelTaskEditButton.Visibility = Visibility.Collapsed;
-        TaskEnabledCheck.IsChecked = true;
-        TaskTargetText.Text = "1";
-        UpdateTaskTargetEditor();
-    }
-
-    private void ReindexRows()
-    {
-        MacroTaskRow[] rows = TaskRows
-            .Select((row, index) => new MacroTaskRow
-            {
-                Definition = row.Definition with { Priority = index + 1 },
-                Progress = row.Progress,
-            })
-            .ToArray();
-        TaskRows.Clear();
-        foreach (MacroTaskRow row in rows) TaskRows.Add(row);
-        EmptyTasksText.Visibility = TaskRows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    private async Task RefreshPresetCatalogAsync()
-    {
-        _allPresets.Clear();
-        _storyPresets.Clear();
-        foreach (ChallengePreset preset in await _services.ChallengePresets.ListAsync()) _allPresets.Add(new MacroPresetChoice(MacroTaskKind.Challenge, preset.Id, preset.Name));
-        foreach (ExpeditionPreset preset in await _services.Presets.ListAsync()) _allPresets.Add(new MacroPresetChoice(MacroTaskKind.Expedition, preset.Id, preset.Name));
-        foreach (StoryPreset preset in await _services.StoryPresets.ListAsync())
-        {
-            _storyPresets[preset.Id] = preset;
-            _allPresets.Add(new MacroPresetChoice(MacroTaskKind.Story, preset.Id, preset.Name));
-        }
-        foreach (RaidPreset preset in await _services.RaidPresets.ListAsync()) _allPresets.Add(new MacroPresetChoice(MacroTaskKind.Raid, preset.Id, preset.Name));
-    }
-
     private async Task RefreshPlansAsync()
     {
         string? selected = (PlanCombo.SelectedItem as MacroPlan)?.Id;
         _plans.Clear();
         foreach (MacroPlan plan in await _services.MacroPlans.ListAsync()) _plans.Add(plan);
         PlanCombo.SelectedItem = _plans.FirstOrDefault(value => value.Id == selected);
-    }
-
-    private void RefreshVisiblePresets()
-    {
-        MacroPresetChoice? selected = TaskPresetCombo.SelectedItem as MacroPresetChoice;
-        MacroTaskKind kind = SelectedTaskKind();
-        _visiblePresets.Clear();
-        foreach (MacroPresetChoice preset in _allPresets.Where(value => value.Kind == kind).OrderBy(value => value.Name, StringComparer.CurrentCultureIgnoreCase))
-        {
-            _visiblePresets.Add(preset);
-        }
-        TaskPresetCombo.SelectedItem = _visiblePresets.FirstOrDefault(value => value.Id == selected?.Id) ?? _visiblePresets.FirstOrDefault();
-        TaskEditorStatusText.Text = _visiblePresets.Count == 0 ? $"Create a {Label(kind)} preset before adding this task." : string.Empty;
-    }
-
-    private void UpdateTaskTargetEditor()
-    {
-        if (TaskTargetLabel is null || TaskTargetText is null) return;
-        MacroTaskKind kind = SelectedTaskKind();
-        bool challenge = kind == MacroTaskKind.Challenge;
-        bool runtime = TaskPresetCombo.SelectedItem is MacroPresetChoice preset && IsInfiniteStory(preset);
-        TaskTargetLabel.Text = challenge ? "Schedule" : runtime ? "Runtime, min" : "Victories";
-        TaskTargetText.IsEnabled = !challenge && !_services.Coordinator.IsBusy;
-        if (challenge) TaskTargetText.Text = "Every reset";
-        else if (runtime && !int.TryParse(TaskTargetText.Text, out _)) TaskTargetText.Text = "180";
-        else if (!runtime && !int.TryParse(TaskTargetText.Text, out _)) TaskTargetText.Text = "1";
     }
 
     private void ApplyTotals()
@@ -572,6 +396,15 @@ public partial class MacroPage : UserControl, IAppPage
         TaskRowsControl.IsEnabled = !busy;
         TaskKindCombo.IsEnabled = !busy;
         TaskPresetCombo.IsEnabled = !busy;
+        TaskRouteCombo.IsEnabled = !busy;
+        TaskDefeatRetriesText.IsEnabled = !busy;
+        TaskTraitCheck.IsEnabled = !busy;
+        TaskStatCheck.IsEnabled = !busy;
+        TaskSpriteCheck.IsEnabled = !busy;
+        TaskDifficultyCombo.IsEnabled = !busy;
+        TaskExtractCheck.IsEnabled = !busy;
+        TaskBossNodesText.IsEnabled = !busy;
+        TaskHardModeCheck.IsEnabled = !busy;
         TaskEnabledCheck.IsEnabled = !busy;
         AddTaskButton.IsEnabled = !busy;
         CancelTaskEditButton.IsEnabled = !busy;
@@ -581,6 +414,13 @@ public partial class MacroPage : UserControl, IAppPage
         ShowWebhookCheck.IsEnabled = !busy;
         DiscordUserIdText.IsEnabled = !busy;
         TestWebhookButton.IsEnabled = !busy && !_testingWebhook;
+        ShareCodeText.IsEnabled = !busy;
+        ExportPlanCodeButton.IsEnabled = !busy;
+        CopyPlanCodeButton.IsEnabled =
+            !busy &&
+            !string.IsNullOrWhiteSpace(
+                ShareCodeText.Text);
+        ImportPlanCodeButton.IsEnabled = !busy;
         SetPrivateServerRecoveryControlsEnabled(!busy);
         UpdateTaskTargetEditor();
 
@@ -737,9 +577,23 @@ public partial class MacroPage : UserControl, IAppPage
     private static bool SameWork(MacroTaskDefinition left, MacroTaskDefinition right) =>
         left.Kind == right.Kind &&
         left.PresetId == right.PresetId &&
+        ((left.PlacementTarget is null &&
+          right.PlacementTarget is null) ||
+         (left.PlacementTarget is not null &&
+          right.PlacementTarget is not null &&
+          left.PlacementTarget.Matches(
+              right.PlacementTarget))) &&
         left.TargetVictories == right.TargetVictories &&
         left.TargetRuntimeMinutes == right.TargetRuntimeMinutes &&
-        left.CompleteOnRuntimeDefeat == right.CompleteOnRuntimeDefeat;
+        left.CompleteOnRuntimeDefeat == right.CompleteOnRuntimeDefeat &&
+        left.Difficulty == right.Difficulty &&
+        left.HardMode == right.HardMode &&
+        left.DefeatRetries == right.DefeatRetries &&
+        left.RunTraitChallenge == right.RunTraitChallenge &&
+        left.RunStatChallenge == right.RunStatChallenge &&
+        left.RunSpriteChallenge == right.RunSpriteChallenge &&
+        left.ExtractAtCheckpoint == right.ExtractAtCheckpoint &&
+        left.BossesBeforeExtract == right.BossesBeforeExtract;
 
     private static int ParsePositiveInt(TextBox field, string label) =>
         int.TryParse(field.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) && value > 0

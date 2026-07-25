@@ -6,6 +6,39 @@ namespace ExpeditionsMacro.Tests;
 public sealed class AppSettingsStoreTests
 {
     [Fact]
+    public async Task LegacySettings_DefaultStartupGameCheckToEnabled()
+    {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            $"expeditions-settings-{Guid.NewGuid():N}");
+        try
+        {
+            AppPaths paths = new(root);
+            paths.EnsureCreated();
+            await File.WriteAllTextAsync(
+                paths.SettingsFile,
+                """
+                {
+                  "theme": "dark"
+                }
+                """);
+
+            AppSettings loaded =
+                await new AppSettingsStore(paths).LoadAsync();
+
+            Assert.True(
+                loaded.AutoCheckGameSettingsOnStart);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ReportingSettings_SurviveAStoreRestart()
     {
         string root = Path.Combine(Path.GetTempPath(), $"expeditions-settings-{Guid.NewGuid():N}");
@@ -41,6 +74,9 @@ public sealed class AppSettingsStoreTests
                 loaded.EncryptedPrivateServerLink);
             Assert.True(loaded.RestartRobloxWithPrivateServer);
             Assert.True(loaded.DebugModeEnabled);
+            Assert.True(
+                loaded.AutoCheckGameSettingsOnStart);
+            Assert.True(loaded.FastNoAlignEnabled);
             Assert.Equal("123456789012345678", loaded.DiscordErrorUserId);
             Assert.Equal(KeyboardKey.RightShift, loaded.ShiftLockVirtualKey);
             Assert.Equal("G", loaded.AreasMenuKey);

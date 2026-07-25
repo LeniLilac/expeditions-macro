@@ -32,6 +32,38 @@ public sealed class WindowsRobloxAutomationTests
     }
 
     [Theory]
+    [InlineData(RobloxKeyboardKey.Backspace, 0x08, 0x0E, false)]
+    [InlineData(RobloxKeyboardKey.Enter, 0x0D, 0x1C, false)]
+    [InlineData(RobloxKeyboardKey.Backslash, 0xDC, 0x2B, false)]
+    [InlineData(RobloxKeyboardKey.Digit0, 0x30, 0x0B, false)]
+    [InlineData(RobloxKeyboardKey.Digit1, 0x31, 0x02, false)]
+    [InlineData(RobloxKeyboardKey.Digit2, 0x32, 0x03, false)]
+    [InlineData(RobloxKeyboardKey.Digit3, 0x33, 0x04, false)]
+    [InlineData(RobloxKeyboardKey.Digit4, 0x34, 0x05, false)]
+    [InlineData(RobloxKeyboardKey.Digit5, 0x35, 0x06, false)]
+    [InlineData(RobloxKeyboardKey.Digit6, 0x36, 0x07, false)]
+    [InlineData(RobloxKeyboardKey.Digit7, 0x37, 0x08, false)]
+    [InlineData(RobloxKeyboardKey.Digit8, 0x38, 0x09, false)]
+    [InlineData(RobloxKeyboardKey.Digit9, 0x39, 0x0A, false)]
+    [InlineData(RobloxKeyboardKey.Period, 0xBE, 0x34, false)]
+    [InlineData(RobloxKeyboardKey.LeftArrow, 0x25, 0x4B, true)]
+    [InlineData(RobloxKeyboardKey.RightArrow, 0x27, 0x4D, true)]
+    [InlineData(RobloxKeyboardKey.DownArrow, 0x28, 0x50, true)]
+    public void GeneralKeyboardKeys_MapToPhysicalScanCodes(
+        RobloxKeyboardKey input,
+        int expectedVirtualKey,
+        int expectedScanCode,
+        bool expectedExtended)
+    {
+        KeyboardInputDescriptor key =
+            KeyboardInputDescriptor.FromRobloxKey(input);
+
+        Assert.Equal(expectedVirtualKey, key.VirtualKey);
+        Assert.Equal(expectedScanCode, key.ScanCode);
+        Assert.Equal(expectedExtended, key.Extended);
+    }
+
+    [Theory]
     [InlineData("RobloxPlayerBeta")]
     [InlineData("Windows10Universal")]
     [InlineData("Roblox")]

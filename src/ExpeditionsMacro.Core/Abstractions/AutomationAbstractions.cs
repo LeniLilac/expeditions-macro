@@ -22,6 +22,27 @@ public enum CameraYawDirection
     Right = 1,
 }
 
+public enum RobloxKeyboardKey
+{
+    Backspace,
+    Enter,
+    Backslash,
+    Digit0,
+    Digit1,
+    Digit2,
+    Digit3,
+    Digit4,
+    Digit5,
+    Digit6,
+    Digit7,
+    Digit8,
+    Digit9,
+    Period,
+    LeftArrow,
+    RightArrow,
+    DownArrow,
+}
+
 public readonly record struct CameraYawSweepSample(
     TimeSpan Elapsed,
     ImageFrame Frame);
@@ -95,6 +116,13 @@ public interface IRobloxAutomation
     Task TapShiftLockKeyAsync(RobloxWindow window, int virtualKey, CancellationToken cancellationToken);
 
     Task TapLetterKeyAsync(RobloxWindow window, char key, CancellationToken cancellationToken);
+
+    Task TapKeyboardKeyAsync(
+        RobloxWindow window,
+        RobloxKeyboardKey key,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException(
+            "This automation backend does not support general keyboard input.");
 
     Task HoldLetterKeyAsync(
         RobloxWindow window,

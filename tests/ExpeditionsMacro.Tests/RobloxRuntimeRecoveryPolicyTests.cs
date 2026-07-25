@@ -15,6 +15,10 @@ public sealed class RobloxRuntimeRecoveryPolicyTests
                 new RobloxSessionUnavailableException("capture failed")));
         Assert.True(
             RobloxRuntimeRecoveryPolicy.IsRestartCandidate(
+                new RobloxUiUnavailableException(
+                    "verified team UI stopped responding")));
+        Assert.True(
+            RobloxRuntimeRecoveryPolicy.IsRestartCandidate(
                 new CameraWorldNotRenderedException(0.02, 1)));
         Assert.True(
             RobloxRuntimeRecoveryPolicy.IsRestartCandidate(

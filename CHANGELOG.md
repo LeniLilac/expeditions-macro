@@ -4,6 +4,34 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.21] - 2026-07-25
+
+### Added
+
+- Added the default Fast no-align workflow. **Placement Setup** now authors placements directly on native 808 by 611 map captures, stores Before Start and independently delayed After Start steps, owns the saved Team, supports right-click removal, and enforces seven-pixel point spacing.
+- Added shared Placement Setup categories for all Expedition maps and for each Story map, with exact route overrides and exact-only Raid acts.
+- Added compact `EMFAST1:` text import/export for Fast no-align plans and their resolved Placement Setups without camera models, run history, application settings, diagnostics, or secrets.
+- Added optional startup UI-scale and required-game-settings normalization, enabled by default, plus standalone UI Scale and Settings tools in Debug.
+
+### Changed
+
+- Macro Plan now owns route policy such as Challenge types, defeat retries, Story Hard mode, Expedition difficulty, extraction, and boss targets. Legacy preset and camera-model editors remain available only when Fast no align is disabled.
+- Fast no align prepares zoom and pitch once per Roblox process and reuses the preserved pose across repeat and post-match handoffs until Lobby or a Roblox restart invalidates it.
+- UI-scale calibration now measures the rendered Settings panel and adjusts from feedback instead of assuming the same numeric scale renders equally on every device.
+- The Macro Plan and Placement Setup workspaces use wider, grouped layouts with route categories collapsed by default and primary actions kept beside their owning controls.
+
+### Fixed
+
+- Saved-team scrolling now converges until the requested full Load Team action is stable, accepts a proven near-target Roblox snap, and routes an exhausted UI deadline through private-server recovery instead of a premature hard stop.
+- Recoverable Roblox UI and session failures preserve diagnostics, restart through the configured private server, and retry the same incomplete task without recording progress.
+- Accessibility navigation now waits for the Settings animation, uses physical paced key taps, and returns to the UI-scale input reliably across smaller and larger rendered layouts.
+- Deep Debug path serialization now removes the Windows profile name and other protected local values from archived settings, events, errors, and model metadata.
+
+### Tests
+
+- Added Fast placement authoring, category fallback, plan sharing, startup preflight, rendered-scale feedback, required-settings detection, physical keyboard, team-scroll, and recovery regressions.
+- Added privacy-reviewed canonical placement maps and Settings/UI-scale fixtures to packaged and golden-image validation.
+
 ## [1.3.0-beta.20] - 2026-07-25
 
 ### Added
@@ -716,7 +744,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.20...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.21...HEAD
+[1.3.0-beta.21]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.20...v1.3.0-beta.21
 [1.3.0-beta.20]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.19...v1.3.0-beta.20
 [1.3.0-beta.19]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.18...v1.3.0-beta.19
 [1.3.0-beta.18]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.17...v1.3.0-beta.18

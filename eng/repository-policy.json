@@ -20,7 +20,7 @@
   "lineDebt": [
     {
       "path": "src/ExpeditionsMacro.Automation/Challenges/ChallengeMacroRunner.cs",
-      "maxLines": 957,
+      "maxLines": 920,
       "reason": "Existing mode-runner orchestration debt; extract state-specific workflow services when touched."
     },
     {
@@ -30,12 +30,12 @@
     },
     {
       "path": "src/ExpeditionsMacro.Automation/Expeditions/ExpeditionMacroRunner.cs",
-      "maxLines": 1112,
+      "maxLines": 1092,
       "reason": "Existing mode-runner orchestration debt; extract state-specific workflow services when touched."
     },
     {
       "path": "src/ExpeditionsMacro.App/Pages/MacroPage.xaml.cs",
-      "maxLines": 767,
+      "maxLines": 621,
       "reason": "Existing page-controller debt; move scheduling, persistence, and operation coordination into focused services."
     },
     {
@@ -45,17 +45,17 @@
     },
     {
       "path": "src/ExpeditionsMacro.Automation/Stages/StageMacroRunner.cs",
-      "maxLines": 578,
+      "maxLines": 562,
       "reason": "Existing shared Story/Raid orchestration debt; extract navigation and terminal handoff services."
     },
     {
       "path": "src/ExpeditionsMacro.Automation/Diagnostics/DeepDebugSessionService.cs",
-      "maxLines": 679,
+      "maxLines": 569,
       "reason": "Existing diagnostic lifecycle debt; split archive writing, manifest capture, and retention."
     },
     {
       "path": "src/ExpeditionsMacro.App/Pages/ChallengesPage.xaml.cs",
-      "maxLines": 647,
+      "maxLines": 627,
       "reason": "Existing page-controller debt; extract preset editing and operation coordination."
     },
     {
@@ -65,7 +65,7 @@
     },
     {
       "path": "src/ExpeditionsMacro.App/Pages/ExpeditionsPage.xaml.cs",
-      "maxLines": 556,
+      "maxLines": 528,
       "reason": "Existing page-controller debt; extract preset editing and operation coordination."
     },
     {

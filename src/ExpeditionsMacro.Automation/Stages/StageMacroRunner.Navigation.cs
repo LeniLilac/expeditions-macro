@@ -69,6 +69,7 @@ public sealed partial class StageMacroRunner
 
                 if (stableRecovery == "lobby")
                 {
+                    _fastNoAlign.ObserveLobby(window);
                     await LobbyPlayNavigator.OpenWithVerificationAsync(
                         playMenuKey,
                         () => CaptureClient(window, detector),

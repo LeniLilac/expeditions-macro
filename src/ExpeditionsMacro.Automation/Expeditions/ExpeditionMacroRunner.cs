@@ -28,6 +28,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
 
     private readonly IRobloxAutomation _automation;
     private readonly CameraAlignmentEngine _camera;
+    private readonly FastNoAlignPreparationSession _fastNoAlign;
     private readonly PlacementService _placements;
     private readonly TeamSelectionService _teams;
     private readonly IDiscordNotifier _discord;
@@ -37,10 +38,14 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
         CameraAlignmentEngine camera,
         PlacementService placements,
         TeamSelectionService teams,
-        IDiscordNotifier discord)
+        IDiscordNotifier discord,
+        FastNoAlignPreparationSession? fastNoAlign = null)
     {
         _automation = automation;
         _camera = camera;
+        _fastNoAlign = fastNoAlign ??
+            new FastNoAlignPreparationSession(
+                new CameraPosePreparationService(automation));
         _placements = placements;
         _teams = teams;
         _discord = discord;
@@ -52,7 +57,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
 
     public async Task RunAsync(
         ExpeditionPreset preset,
-        CameraModel cameraModel,
+        CameraModel? cameraModel,
         PlacementModel placementModel,
         IDetectorPack detector,
         string webhookUrl,
@@ -71,7 +76,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
         if (maximumRuns is < 1) throw new ArgumentOutOfRangeException(nameof(maximumRuns));
         preset.Validate();
         playMenuKey = ValidatePlayMenuKey(playMenuKey);
-        cameraModel.Manifest.Validate();
+        cameraModel?.Manifest.Validate();
         placementModel.Validate();
         ValidateCompatibility(preset, cameraModel, placementModel, detector.Manifest);
         ValidateTeamKey(preset.TeamSlot > 0, unitMenuKey);
@@ -169,9 +174,26 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                         return;
                     }
 
-                    Report("Placement", 0, "Placing the recorded prestart units.");
-                    await PlaceStepsAsync(window, placementModel, placementModel.Steps, preset, Write, cancellationToken).ConfigureAwait(false);
-                    Write($"Preplace pass sent {placementModel.Steps.Count} placement(s).");
+                    IReadOnlyList<PlacementStep> beforeStart =
+                        PlacementExecutionPlan.BeforeStart(
+                            preset.CameraPreparationMode,
+                            placementModel);
+                    if (beforeStart.Count > 0)
+                    {
+                        Report(
+                            "Placement",
+                            0,
+                            "Placing the recorded prestart units.");
+                        await PlaceStepsAsync(
+                            window,
+                            placementModel,
+                            beforeStart,
+                            preset,
+                            Write,
+                            cancellationToken).ConfigureAwait(false);
+                        Write(
+                            $"Preplace pass sent {beforeStart.Count} placement(s).");
+                    }
                     await ThrowIfRecoveryAsync(window, detector, preset, cancellationToken).ConfigureAwait(false);
                     if (ExpeditionRunPolicy.StopDeadlineReached(DateTimeOffset.UtcNow, stopAfterCurrentRunUtc))
                     {
@@ -183,10 +205,16 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                     Stopwatch matchRuntime = Stopwatch.StartNew();
                     await ClickActionAsync(window, detector, "start", cancellationToken).ConfigureAwait(false);
                     await Task.Delay(2600, cancellationToken).ConfigureAwait(false);
+                    IReadOnlyList<PlacementStep> afterStart =
+                        PlacementExecutionPlan.AfterStart(
+                            preset.CameraPreparationMode,
+                            placementModel);
                     RunTerminal terminal = await MonitorUntilRunEndAsync(
                         window,
                         preset,
                         placementModel,
+                        beforeStart,
+                        afterStart,
                         detector,
                         matchRuntime,
                         value => { bossesSeen = value; PublishSummary(); },
@@ -403,7 +431,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
         bool found = await WaitForStateWithTimeoutAsync(window, detector, "extract_confirm", ExtractionTransitionTimeout, preset, report, cancellationToken).ConfigureAwait(false);
         if (!found)
         {
-            throw new InvalidOperationException(
+            throw new RobloxUiUnavailableException(
                 "Extraction confirmation did not appear within 30 seconds. The macro stopped without clicking Extract again to avoid a delayed duplicate action.");
         }
         await ConfirmExtractionAsync(window, detector, preset, transaction, clientImage: null, report, log, cancellationToken).ConfigureAwait(false);
@@ -479,50 +507,10 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                 scores["extract_confirm"]);
         }
 
-        throw new InvalidOperationException(
+        throw new RobloxUiUnavailableException(
             $"The Extraction confirmation remained visible after {ConfirmationDismissalState.MaximumAttempts} focused click attempts. " +
             "Roblox did not acknowledge the button; retry after the client is responsive.");
     }
-
-    private async Task RetryRemainingUnitsAsync(
-        RobloxWindow window,
-        PlacementModel placement,
-        ExpeditionPreset preset,
-        IDetectorPack detector,
-        ImageFrame frame,
-        Action<string, MacroEventLevel, string?, double?> log,
-        CancellationToken cancellationToken)
-    {
-        HashSet<int> keys = placement.Steps.Select(step => step.UnitKey).ToHashSet();
-        IReadOnlyList<int> remaining = detector.RemainingUnitKeys(frame, keys);
-        if (remaining.Count == 0)
-        {
-            log("Hotbar check: all recorded unit slots are empty.", MacroEventLevel.Success, null, null);
-            return;
-        }
-        log($"Hotbar check: retrying unit key(s) {string.Join(", ", remaining)}.", MacroEventLevel.Warning, null, null);
-        PlacementStep[] steps = placement.Steps.Where(step => remaining.Contains(step.UnitKey)).ToArray();
-        await PlaceStepsAsync(window, placement, steps, preset, log, cancellationToken).ConfigureAwait(false);
-    }
-
-    private Task PlaceStepsAsync(
-        RobloxWindow window,
-        PlacementModel placement,
-        IReadOnlyList<PlacementStep> steps,
-        ExpeditionPreset preset,
-        Action<string, MacroEventLevel, string?, double?> log,
-        CancellationToken cancellationToken) =>
-        _placements.PlayStepsAsync(
-            window,
-            placement,
-            steps,
-            useDefaultInterval: false,
-            defaultIntervalMilliseconds: 0,
-            preset.UnitKeyHoldMilliseconds,
-            preset.UnitSelectDelayMilliseconds,
-            stepSent: null,
-            status: message => log(message, MacroEventLevel.Information, null, null),
-            cancellationToken);
 
     private async Task RecoverToPrestartAsync(
         RobloxWindow window,
@@ -569,6 +557,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                     state = await WaitForRecoveryChangeAsync(window, detector, "disconnect", TimeSpan.FromSeconds(12), preset, report, log, cancellationToken).ConfigureAwait(false) ?? state;
                     break;
                 case "lobby":
+                    _fastNoAlign.ObserveLobby(window);
                     await LobbyPlayNavigator.OpenWithVerificationAsync(
                         playMenuKey,
                         () => CaptureClient(window, detector),
@@ -691,7 +680,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
             if (await WaitForSelectionAsync(window, detector, value => detector.SelectedDifficulty(value), preset.Difficulty, TimeSpan.FromSeconds(4.5), preset, cancellationToken).ConfigureAwait(false)) return;
             log($"Difficulty selection did not register (attempt {attempt}/3).", MacroEventLevel.Warning, "map_select", null);
         }
-        throw new InvalidOperationException($"Difficulty {preset.Difficulty} could not be selected.");
+        throw new RobloxUiUnavailableException($"Difficulty {preset.Difficulty} could not be selected.");
     }
 
     private async Task<bool> WaitForSelectionAsync(
@@ -929,7 +918,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                 scores["confirm"]);
         }
 
-        throw new InvalidOperationException(
+        throw new RobloxUiUnavailableException(
             $"The Continue Expedition confirmation remained visible after {ConfirmationDismissalState.MaximumAttempts} focused click attempts. " +
             "Roblox did not acknowledge the button; retry after the client is responsive.");
     }
@@ -962,7 +951,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
     {
         Focus(window);
         ClientBounds bounds = _automation.GetClientBounds(window);
-        if (bounds.Width != detector.Manifest.ClientWidth || bounds.Height != detector.Manifest.ClientHeight) throw new InvalidOperationException("Roblox no longer matches the detector pack client size.");
+        if (bounds.Width != detector.Manifest.ClientWidth || bounds.Height != detector.Manifest.ClientHeight) throw new RobloxSessionUnavailableException("Roblox no longer matches the detector pack client size.");
         return _automation.CaptureClient(window);
     }
 
@@ -1054,7 +1043,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
         ClientBounds actual = _automation.GetClientBounds(window);
         if (actual.Width != width || actual.Height != height)
         {
-            throw new InvalidOperationException($"Roblox did not accept the required {width} × {height} client size (actual: {actual.Width} × {actual.Height}).");
+            throw new RobloxSessionUnavailableException($"Roblox did not accept the required {width} × {height} client size (actual: {actual.Width} × {actual.Height}).");
         }
     }
 
@@ -1064,7 +1053,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
 
     private void Focus(RobloxWindow window)
     {
-        if (!_automation.Focus(window)) throw new InvalidOperationException("Windows could not focus Roblox.");
+        if (!_automation.Focus(window)) throw new RobloxSessionUnavailableException("Windows could not focus Roblox.");
     }
 
     private static char ValidatePlayMenuKey(char value)
@@ -1087,15 +1076,6 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
             throw new InvalidDataException(
                 "Set the Unit menu key under Settings > Controls so it matches Anime Expeditions' Units binding before using a saved team.");
         }
-    }
-
-    private static void ValidateCompatibility(ExpeditionPreset preset, CameraModel camera, PlacementModel placement, DetectorPackManifest detector)
-    {
-        if (!string.Equals(preset.CameraModelId, camera.Manifest.Id, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("The preset camera model does not match the loaded model.");
-        if (!string.Equals(preset.PlacementModelId, placement.Id, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("The preset placement model does not match the loaded model.");
-        if (!string.Equals(preset.DetectorPackId, detector.PackId, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("The preset detector pack does not match the loaded pack.");
-        if (camera.Manifest.ClientWidth != detector.ClientWidth || camera.Manifest.ClientHeight != detector.ClientHeight) throw new InvalidDataException("Camera model and detector pack use different Roblox client sizes.");
-        if (placement.ClientWidth != detector.ClientWidth || placement.ClientHeight != detector.ClientHeight) throw new InvalidDataException("Placement model and detector pack use different Roblox client sizes.");
     }
 
     private sealed record RunTerminal(string State, ImageFrame Frame);

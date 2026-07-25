@@ -4,8 +4,10 @@ using ExpeditionsMacro.Automation.Challenges;
 using ExpeditionsMacro.Automation.Diagnostics;
 using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Navigation;
+using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
+using ExpeditionsMacro.Vision.Packs;
 
 namespace ExpeditionsMacro.App.Pages;
 
@@ -56,7 +58,21 @@ public partial class MacroPage
                     webhook,
                     discordUserId,
                     error,
-                    token)).ConfigureAwait(false);
+                    token),
+                async token =>
+                {
+                    IDetectorPack startupDetector =
+                        await LoadDetectorAsync(
+                            AnimeExpeditionsDetectorSpec.PackId,
+                            token).ConfigureAwait(false);
+                    await _services.StartupPreflight.RunAsync(
+                        startupDetector,
+                        _services.Settings
+                            .AutoCheckGameSettingsOnStart,
+                        progress,
+                        entry => DispatchLog(entry),
+                        token).ConfigureAwait(false);
+                }).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

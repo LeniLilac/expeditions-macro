@@ -12,25 +12,96 @@ public sealed record MacroTaskDefinition
 {
     public required string Id { get; init; }
     public required MacroTaskKind Kind { get; init; }
-    public required string PresetId { get; init; }
+    public string PresetId { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
     public int Priority { get; init; } = 1;
     public bool Enabled { get; init; } = true;
     public int TargetVictories { get; init; } = 1;
     public int TargetRuntimeMinutes { get; init; } = 180;
     public bool CompleteOnRuntimeDefeat { get; init; }
+    public PlacementTarget? PlacementTarget { get; init; }
+    public int Difficulty { get; init; } = 1;
+    public bool HardMode { get; init; }
+    public int DefeatRetries { get; init; }
+    public bool RunTraitChallenge { get; init; } = true;
+    public bool RunStatChallenge { get; init; } = true;
+    public bool RunSpriteChallenge { get; init; } = true;
+    public bool ExtractAtCheckpoint { get; init; } = true;
+    public int BossesBeforeExtract { get; init; } = 1;
 
     public bool IsRecurring => Kind == MacroTaskKind.Challenge;
+    public bool UsesPlacementSetup =>
+        string.IsNullOrWhiteSpace(PresetId);
 
     public void Validate()
     {
         ValidateId(Id, "task");
-        ValidateId(PresetId, "preset");
         if (!Enum.IsDefined(Kind)) throw new InvalidDataException("Task type is invalid.");
         if (Priority is < 1 or > 9999) throw new InvalidDataException("Task priority must be 1 through 9999.");
         if (TargetVictories is < 1 or > 100000) throw new InvalidDataException("Victory target must be 1 through 100000.");
         if (CompleteOnRuntimeDefeat && Kind != MacroTaskKind.Story) throw new InvalidDataException("Only an Infinite Story task can use a runtime target.");
         if (TargetRuntimeMinutes is < 1 or > 10080) throw new InvalidDataException("Runtime target must be 1 minute through 7 days.");
+        if (DefeatRetries is < 0 or > 20) throw new InvalidDataException("Defeat retries must be 0 through 20.");
+        if (Difficulty is < 1 or > 3) throw new InvalidDataException("Difficulty must be 1 through 3.");
+        if (BossesBeforeExtract is < 0 or > 99) throw new InvalidDataException("Boss nodes before extraction must be 0 through 99.");
+        if (!UsesPlacementSetup)
+        {
+            ValidateId(PresetId, "preset");
+            return;
+        }
+
+        if (Kind == MacroTaskKind.Challenge)
+        {
+            if (PlacementTarget is not null)
+            {
+                throw new InvalidDataException(
+                    "Challenge rotation chooses its map automatically.");
+            }
+            if (!RunTraitChallenge &&
+                !RunStatChallenge &&
+                !RunSpriteChallenge)
+            {
+                throw new InvalidDataException(
+                    "Select at least one Challenge type.");
+            }
+            return;
+        }
+
+        if (PlacementTarget is null)
+        {
+            throw new InvalidDataException(
+                "Choose a map and act for this task.");
+        }
+        PlacementTarget.Validate();
+        PlacementTargetMode expected = Kind switch
+        {
+            MacroTaskKind.Expedition =>
+                PlacementTargetMode.Expedition,
+            MacroTaskKind.Story =>
+                PlacementTargetMode.Story,
+            MacroTaskKind.Raid =>
+                PlacementTargetMode.Raid,
+            _ => throw new InvalidDataException(
+                "The task route is invalid."),
+        };
+        if (PlacementTarget.Mode != expected)
+        {
+            throw new InvalidDataException(
+                "The selected placement route does not match the task mode.");
+        }
+        if (PlacementTarget.Mode == PlacementTargetMode.Expedition &&
+            PlacementTarget.MapNumber ==
+            PlacementSetupCatalog.SharedExpeditionMapNumber)
+        {
+            throw new InvalidDataException(
+                "Choose a specific Expedition map for this task.");
+        }
+        if (PlacementSetupCatalog.IsSharedStoryTarget(
+                PlacementTarget))
+        {
+            throw new InvalidDataException(
+                "Choose a specific Story run for this task.");
+        }
     }
 
     private static void ValidateId(string id, string label)

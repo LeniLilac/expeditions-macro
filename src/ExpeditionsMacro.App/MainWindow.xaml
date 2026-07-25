@@ -53,14 +53,19 @@
                     <TextBlock Margin="18,18,18,7" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource FaintBrush}" Text="WORKSPACE" />
                     <StackPanel Grid.Row="1">
                         <RadioButton x:Name="MacroNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" IsChecked="True" Tag="Macro" icons:Lucide.Icon="Workflow" Content="Macro" Checked="Navigation_Checked" />
-                        <TextBlock Margin="18,18,18,7" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource FaintBrush}" Text="PRESETS" />
+                        <TextBlock x:Name="PresetsHeader"
+                                   Margin="18,18,18,7"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource FaintBrush}"
+                                   Text="PRESETS" />
                         <RadioButton x:Name="ExpeditionsNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Expeditions" icons:Lucide.Icon="Compass" Content="Expeditions" Checked="Navigation_Checked" />
                         <RadioButton x:Name="ChallengesNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Challenges" icons:Lucide.Icon="Swords" Content="Challenges" Checked="Navigation_Checked" />
                         <RadioButton x:Name="StoryNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Story" icons:Lucide.Icon="BookOpen" Content="Story" Checked="Navigation_Checked" />
                         <RadioButton x:Name="RaidNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Raid" icons:Lucide.Icon="Shield" Content="Raid" Checked="Navigation_Checked" />
                         <TextBlock Margin="18,18,18,7" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource FaintBrush}" Text="TOOLS" />
                         <RadioButton x:Name="CameraNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Camera Models" icons:Lucide.Icon="Camera" Content="Camera Models" Checked="Navigation_Checked" />
-                        <RadioButton x:Name="PlacementNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Placement Models" icons:Lucide.Icon="MapPin" Content="Placement Models" Checked="Navigation_Checked" />
+                        <RadioButton x:Name="PlacementNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Placement Setup" icons:Lucide.Icon="MapPin" Content="Placement Setup" Checked="Navigation_Checked" />
                         <RadioButton x:Name="DebugNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Debug" icons:Lucide.Icon="Bug" Content="Debug" Visibility="Collapsed" Checked="Navigation_Checked" />
                         <RadioButton x:Name="SettingsNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Settings" icons:Lucide.Icon="Settings" Content="Settings" Checked="Navigation_Checked" />
                     </StackPanel>

@@ -1,76 +1,324 @@
 <UserControl x:Class="ExpeditionsMacro.App.Pages.PlacementModelsPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:icons="clr-namespace:ExpeditionsMacro.App.Controls">
+             xmlns:icons="clr-namespace:ExpeditionsMacro.App.Controls"
+             xmlns:models="clr-namespace:ExpeditionsMacro.App.Models">
+    <UserControl.Resources>
+        <DataTemplate x:Key="PlacementSetupNodeTemplate"
+                      DataType="{x:Type models:PlacementSetupNode}">
+            <Grid x:Name="SetupRoot"
+                  MinHeight="32">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="30" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <TextBlock x:Name="SetupName"
+                           Text="{Binding Name}"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock x:Name="SetupStatus"
+                           Grid.Row="1"
+                           Margin="0,2,0,0"
+                           FontSize="11"
+                           Foreground="{DynamicResource FaintBrush}"
+                           Text="{Binding Status}"
+                           TextTrimming="CharacterEllipsis" />
+                <Button x:Name="DisclosureButton"
+                        Grid.Column="1"
+                        Grid.RowSpan="2"
+                        Width="28"
+                        Height="28"
+                        MinWidth="28"
+                        Margin="4,0,0,0"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Focusable="False"
+                        Visibility="Collapsed"
+                        Style="{StaticResource IconButton}"
+                        icons:Lucide.Icon="ChevronRight"
+                        ToolTip="Show routes"
+                        Click="FastSetupDisclosure_Click" />
+            </Grid>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding IsGroup}"
+                             Value="True">
+                    <Setter TargetName="SetupName"
+                            Property="FontSize"
+                            Value="12" />
+                    <Setter TargetName="SetupName"
+                            Property="FontWeight"
+                            Value="SemiBold" />
+                    <Setter TargetName="SetupName"
+                            Property="Foreground"
+                            Value="{DynamicResource TextBrush}" />
+                    <Setter TargetName="DisclosureButton"
+                            Property="Visibility"
+                            Value="Visible" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsChild}"
+                             Value="True">
+                    <Setter TargetName="SetupRoot"
+                            Property="Margin"
+                            Value="18,0,0,0" />
+                </DataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsGroup}"
+                                   Value="True" />
+                        <Condition Binding="{Binding IsExpanded}"
+                                   Value="True" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter TargetName="DisclosureButton"
+                            Property="icons:Lucide.Icon"
+                            Value="ChevronDown" />
+                    <Setter TargetName="DisclosureButton"
+                            Property="ToolTip"
+                            Value="Hide routes" />
+                </MultiDataTrigger>
+                <DataTrigger Binding="{Binding IsGroup}"
+                             Value="True">
+                    <Setter TargetName="SetupRoot"
+                            Property="MinHeight"
+                            Value="38" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+    </UserControl.Resources>
     <Grid>
-        <Grid.ColumnDefinitions><ColumnDefinition Width="238" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-        <Border Grid.Column="0" Background="{DynamicResource SidebarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="320" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <Border Grid.Column="0"
+                Background="{DynamicResource SidebarBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,0,1,0">
             <Grid Margin="12,18,12,14">
-                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
                 <Grid Margin="6,0,6,10">
-                    <TextBlock VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource MutedBrush}" Text="PLACEMENT MODELS" />
-                    <Button HorizontalAlignment="Right" Style="{StaticResource IconButton}" Width="32" MinWidth="32" Height="32" icons:Lucide.Icon="Plus" ToolTip="New model" Click="NewModel_Click" />
+                    <TextBlock x:Name="ModelsHeaderText"
+                               VerticalAlignment="Center"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource MutedBrush}"
+                               Text="PLACEMENT MODELS" />
+                    <Button x:Name="NewModelButton"
+                            HorizontalAlignment="Right"
+                            Style="{StaticResource IconButton}"
+                            Width="32"
+                            MinWidth="32"
+                            Height="32"
+                            icons:Lucide.Icon="Plus"
+                            ToolTip="New model"
+                            Click="NewModel_Click" />
                 </Grid>
-                <ListBox x:Name="ModelsList" Grid.Row="1" DisplayMemberPath="Name" SelectionChanged="ModelsList_SelectionChanged" />
-                <Button Grid.Row="2" Style="{StaticResource DangerButton}" icons:Lucide.Icon="Trash2" Content="Delete selected" Click="DeleteModel_Click" />
+                <ListBox x:Name="ModelsList"
+                         Grid.Row="1"
+                         DisplayMemberPath="Name"
+                         SelectionChanged="ModelsList_SelectionChanged" />
+                <ListBox x:Name="FastSetupList"
+                         Grid.Row="1"
+                         ItemTemplate="{StaticResource PlacementSetupNodeTemplate}"
+                         SelectionChanged="FastSetupList_SelectionChanged"
+                         Visibility="Collapsed" />
+                <Button x:Name="DeleteModelButton"
+                        Grid.Row="2"
+                        Style="{StaticResource DangerButton}"
+                        icons:Lucide.Icon="Trash2"
+                        Content="Delete selected"
+                        Click="DeleteModel_Click" />
             </Grid>
         </Border>
+        <Grid Grid.Column="1"
+              Margin="24,20,28,24">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock x:Name="PageHeading"
+                       Margin="0,0,0,24"
+                       Style="{StaticResource PageTitle}"
+                       Text="Placement models" />
+            <Grid x:Name="LegacyEditorPanel"
+                  Grid.Row="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Border Style="{StaticResource SectionDivider}"
+                        Padding="0,0,0,18"
+                        Margin="0,0,0,18">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}"
+                                   Text="Model" />
+                        <TextBlock x:Name="RecordingDescription"
+                                   Margin="0,5,0,18"
+                                   MaxWidth="680"
+                                   HorizontalAlignment="Left"
+                                   Style="{StaticResource Caption}"
+                                   Text="Recording starts after F6 and ends when F6 is pressed again." />
+                        <Grid MaxWidth="680"
+                              HorizontalAlignment="Stretch">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="14" />
+                                <ColumnDefinition Width="150" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="64" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FieldLabel}"
+                                           Text="Model name" />
+                                <TextBox x:Name="ModelNameText"
+                                         Margin="0,7,0,0"
+                                         Text="Placement model" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Style="{StaticResource FieldLabel}"
+                                           Text="Default delay, ms" />
+                                <TextBox x:Name="DefaultDelayText"
+                                         Margin="0,7,0,0"
+                                         Text="900" />
+                            </StackPanel>
+                            <CheckBox x:Name="RecordedTimingCheck"
+                                      Grid.Row="1"
+                                      Grid.ColumnSpan="3"
+                                      VerticalAlignment="Center"
+                                      Content="Use recorded click-to-next-selection timing" />
+                            <CheckBox x:Name="PlaybackOverrideCheck"
+                                      Grid.Row="2"
+                                      Grid.ColumnSpan="3"
+                                      Margin="0,10,0,0"
+                                      VerticalAlignment="Center"
+                                      Content="Override playback with the default delay"
+                                      IsChecked="True" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
 
-        <Grid Grid.Column="1" Margin="34,28,42,30" MaxWidth="980" HorizontalAlignment="Left">
-            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-            <StackPanel Margin="0,0,0,24">
-                <TextBlock Style="{StaticResource PageTitle}" Text="Placement models" />
-            </StackPanel>
+                <Grid Grid.Row="1"
+                      Margin="0,0,0,10">
+                    <TextBlock VerticalAlignment="Center"
+                               Style="{StaticResource SectionTitle}"
+                               Text="Ordered placements" />
+                    <StackPanel HorizontalAlignment="Right"
+                                Orientation="Horizontal">
+                        <Button Height="34"
+                                MinWidth="68"
+                                icons:Lucide.Icon="Plus"
+                                Content="Add row"
+                                Click="AddRow_Click" />
+                        <Button Height="34"
+                                MinWidth="68"
+                                Margin="6,0,0,0"
+                                icons:Lucide.Icon="Trash2"
+                                Content="Remove"
+                                Click="RemoveRow_Click" />
+                        <Button Height="34"
+                                MinWidth="56"
+                                Margin="6,0,0,0"
+                                icons:Lucide.Icon="ArrowUp"
+                                Content="Up"
+                                Click="MoveUp_Click" />
+                        <Button Height="34"
+                                MinWidth="56"
+                                Margin="6,0,0,0"
+                                icons:Lucide.Icon="ArrowDown"
+                                Content="Down"
+                                Click="MoveDown_Click" />
+                    </StackPanel>
+                </Grid>
 
-            <Border Grid.Row="1" Style="{StaticResource SectionDivider}" Padding="0,0,0,18" Margin="0,0,0,18">
-                <StackPanel>
-                    <TextBlock Style="{StaticResource SectionTitle}" Text="Model" />
-                    <TextBlock x:Name="RecordingDescription" Margin="0,5,0,18" MaxWidth="680" HorizontalAlignment="Left" Style="{StaticResource Caption}" Text="Recording starts after F6 and ends when F6 is pressed again." />
-                    <Grid MaxWidth="680" HorizontalAlignment="Stretch">
-                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="14" /><ColumnDefinition Width="150" /></Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions><RowDefinition Height="64" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                        <StackPanel><TextBlock Style="{StaticResource FieldLabel}" Text="Model name" /><TextBox x:Name="ModelNameText" Margin="0,7,0,0" Text="Placement model" /></StackPanel>
-                        <StackPanel Grid.Column="2"><TextBlock Style="{StaticResource FieldLabel}" Text="Default delay, ms" /><TextBox x:Name="DefaultDelayText" Margin="0,7,0,0" Text="900" /></StackPanel>
-                        <CheckBox x:Name="RecordedTimingCheck" Grid.Row="1" Grid.ColumnSpan="3" VerticalAlignment="Center" Content="Use recorded click-to-next-selection timing" />
-                        <CheckBox x:Name="PlaybackOverrideCheck" Grid.Row="2" Grid.ColumnSpan="3" Margin="0,10,0,0" VerticalAlignment="Center" Content="Override playback with the default delay" IsChecked="True" />
-                    </Grid>
-                </StackPanel>
-            </Border>
+                <DataGrid x:Name="StepsGrid"
+                          Grid.Row="2"
+                          AutoGenerateColumns="False"
+                          AlternationCount="2"
+                          SelectionMode="Single">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="#"
+                                            Width="46"
+                                            IsReadOnly="True"
+                                            Binding="{Binding RelativeSource={RelativeSource AncestorType=DataGridRow}, Path=AlternationIndex}" />
+                        <DataGridTextColumn Header="Unit key"
+                                            Width="110"
+                                            Binding="{Binding UnitKey, UpdateSourceTrigger=PropertyChanged}" />
+                        <DataGridTextColumn Header="Client X"
+                                            Width="120"
+                                            Binding="{Binding X, UpdateSourceTrigger=PropertyChanged}" />
+                        <DataGridTextColumn Header="Client Y"
+                                            Width="120"
+                                            Binding="{Binding Y, UpdateSourceTrigger=PropertyChanged}" />
+                        <DataGridTextColumn Header="Delay after click, ms"
+                                            Width="*"
+                                            Binding="{Binding DelayAfterMilliseconds, UpdateSourceTrigger=PropertyChanged}" />
+                    </DataGrid.Columns>
+                </DataGrid>
 
-            <Grid Grid.Row="2" Margin="0,0,0,10">
-                <TextBlock VerticalAlignment="Center" Style="{StaticResource SectionTitle}" Text="Ordered placements" />
-                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-                    <Button Height="34" MinWidth="68" icons:Lucide.Icon="Plus" Content="Add row" Click="AddRow_Click" />
-                    <Button Height="34" MinWidth="68" Margin="6,0,0,0" icons:Lucide.Icon="Trash2" Content="Remove" Click="RemoveRow_Click" />
-                    <Button Height="34" MinWidth="56" Margin="6,0,0,0" icons:Lucide.Icon="ArrowUp" Content="Up" Click="MoveUp_Click" />
-                    <Button Height="34" MinWidth="56" Margin="6,0,0,0" icons:Lucide.Icon="ArrowDown" Content="Down" Click="MoveDown_Click" />
-                </StackPanel>
+                <Grid Grid.Row="3"
+                      Margin="0,18,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock x:Name="StatusText"
+                                   FontWeight="SemiBold"
+                                   Text="Ready to record or edit a model." />
+                        <TextBlock x:Name="DetailText"
+                                   Margin="0,4,0,0"
+                                   Style="{StaticResource Caption}"
+                                   Text="Coordinates are stored relative to the recorded Roblox client size." />
+                    </StackPanel>
+                    <WrapPanel Grid.Row="1"
+                               Margin="0,12,0,0"
+                               HorizontalAlignment="Right">
+                        <Button x:Name="SaveButton"
+                                icons:Lucide.Icon="Save"
+                                Content="Save changes"
+                                Click="Save_Click" />
+                        <Button x:Name="RecordButton"
+                                Margin="8,0,0,0"
+                                Style="{StaticResource PrimaryButton}"
+                                icons:Lucide.Icon="MousePointerClick"
+                                Content="Record placements"
+                                Click="Record_Click" />
+                        <Button x:Name="TestButton"
+                                Margin="8,0,0,0"
+                                icons:Lucide.Icon="Play"
+                                Content="Test playback"
+                                Click="Test_Click" />
+                        <Button x:Name="StopButton"
+                                Margin="8,0,0,0"
+                                Style="{StaticResource DangerButton}"
+                                icons:Lucide.Icon="Square"
+                                Content="Stop"
+                                IsEnabled="False"
+                                Click="Stop_Click" />
+                    </WrapPanel>
+                    <ProgressBar x:Name="OperationProgress"
+                                 Grid.Row="2"
+                                 Margin="0,16,0,0"
+                                 Minimum="0"
+                                 Maximum="100" />
+                </Grid>
             </Grid>
 
-            <DataGrid x:Name="StepsGrid" Grid.Row="3" AutoGenerateColumns="False" AlternationCount="2" SelectionMode="Single">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="#" Width="46" IsReadOnly="True" Binding="{Binding RelativeSource={RelativeSource AncestorType=DataGridRow}, Path=AlternationIndex}" />
-                    <DataGridTextColumn Header="Unit key" Width="110" Binding="{Binding UnitKey, UpdateSourceTrigger=PropertyChanged}" />
-                    <DataGridTextColumn Header="Client X" Width="120" Binding="{Binding X, UpdateSourceTrigger=PropertyChanged}" />
-                    <DataGridTextColumn Header="Client Y" Width="120" Binding="{Binding Y, UpdateSourceTrigger=PropertyChanged}" />
-                    <DataGridTextColumn Header="Delay after click, ms" Width="*" Binding="{Binding DelayAfterMilliseconds, UpdateSourceTrigger=PropertyChanged}" />
-                </DataGrid.Columns>
-            </DataGrid>
-
-            <Grid Grid.Row="4" Margin="0,18,0,0">
-                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                <StackPanel>
-                    <TextBlock x:Name="StatusText" FontWeight="SemiBold" Text="Ready to record or edit a model." />
-                    <TextBlock x:Name="DetailText" Margin="0,4,0,0" Style="{StaticResource Caption}" Text="Coordinates are stored relative to the recorded Roblox client size." />
-                </StackPanel>
-                <WrapPanel Grid.Row="1" Margin="0,12,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
-                    <Button x:Name="SaveButton" icons:Lucide.Icon="Save" Content="Save changes" Click="Save_Click" />
-                    <Button x:Name="RecordButton" Margin="8,0,0,0" Style="{StaticResource PrimaryButton}" icons:Lucide.Icon="MousePointerClick" Content="Record placements" Click="Record_Click" />
-                    <Button x:Name="TestButton" Margin="8,0,0,0" icons:Lucide.Icon="Play" Content="Test playback" Click="Test_Click" />
-                    <Button x:Name="StopButton" Margin="8,0,0,0" Style="{StaticResource DangerButton}" icons:Lucide.Icon="Square" Content="Stop" IsEnabled="False" Click="Stop_Click" />
-                </WrapPanel>
-                <ProgressBar x:Name="OperationProgress" Grid.Row="2" Margin="0,16,0,0" Minimum="0" Maximum="100" />
-            </Grid>
+            <icons:PlacementFastEditorView x:Name="FastEditorPanel"
+                                           Grid.Row="1"
+                                           Visibility="Collapsed" />
         </Grid>
     </Grid>
 </UserControl>

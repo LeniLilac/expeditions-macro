@@ -159,7 +159,28 @@ public sealed class MacroScheduler
         following is not null &&
         current.Kind is MacroTaskKind.Expedition or MacroTaskKind.Story or MacroTaskKind.Raid &&
         following.Kind == current.Kind &&
-        string.Equals(following.PresetId, current.PresetId, StringComparison.OrdinalIgnoreCase);
+        SameRoute(current, following);
+
+    private static bool SameRoute(
+        MacroTaskDefinition current,
+        MacroTaskDefinition following)
+    {
+        if (!current.UsesPlacementSetup ||
+            !following.UsesPlacementSetup)
+        {
+            return string.Equals(
+                following.PresetId,
+                current.PresetId,
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        return current.PlacementTarget is not null &&
+            following.PlacementTarget is not null &&
+            current.PlacementTarget.Matches(
+                following.PlacementTarget) &&
+            current.Difficulty == following.Difficulty &&
+            current.HardMode == following.HardMode;
+    }
 
     private static MacroPlan NormalizeProgress(MacroPlan plan) => plan with
     {

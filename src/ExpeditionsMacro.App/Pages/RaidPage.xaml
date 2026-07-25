@@ -82,7 +82,8 @@
                             <ComboBox x:Name="ActCombo"
                                       Grid.Row="1"
                                       Grid.Column="1"
-                                      DisplayMemberPath="Name" />
+                                      DisplayMemberPath="Name"
+                                      SelectionChanged="PlacementRoute_Changed" />
                         </Grid>
                     </StackPanel>
                 </Border>
@@ -97,36 +98,48 @@
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="54" />
+                                <RowDefinition x:Name="RaidCameraRow" Height="54" />
                                 <RowDefinition Height="54" />
-                                <RowDefinition Height="54" />
-                                <RowDefinition Height="54" />
+                                <RowDefinition x:Name="RaidDelayedRow" Height="54" />
+                                <RowDefinition x:Name="RaidDelayRow" Height="54" />
                                 <RowDefinition Height="54" />
                             </Grid.RowDefinitions>
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Camera model" />
-                            <ComboBox x:Name="CameraCombo"
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Camera preparation" />
+                            <ComboBox x:Name="CameraModeCombo"
                                       Grid.Column="1"
                                       DisplayMemberPath="Name"
-                                      SelectedValuePath="Id" />
-                            <TextBlock Grid.Row="1" Style="{StaticResource FieldLabel}" Text="Before-start placement" />
-                            <ComboBox x:Name="PrestartCombo"
+                                      SelectionChanged="CameraMode_Changed" />
+                            <TextBlock Grid.Row="1"
+                                       Style="{StaticResource FieldLabel}"
+                                       Text="Camera model" />
+                            <ComboBox x:Name="CameraCombo"
                                       Grid.Row="1"
                                       Grid.Column="1"
                                       DisplayMemberPath="Name"
                                       SelectedValuePath="Id" />
-                            <TextBlock Grid.Row="2" Style="{StaticResource FieldLabel}" Text="After-start placement" />
-                            <ComboBox x:Name="DelayedCombo"
+                            <TextBlock x:Name="PrimaryPlacementLabel"
+                                       Grid.Row="2"
+                                       Style="{StaticResource FieldLabel}"
+                                       Text="Before-start placement" />
+                            <ComboBox x:Name="PrestartCombo"
                                       Grid.Row="2"
                                       Grid.Column="1"
                                       DisplayMemberPath="Name"
                                       SelectedValuePath="Id" />
-                            <TextBlock Grid.Row="3" Style="{StaticResource FieldLabel}" Text="After-start delay, sec" />
+                            <TextBlock Grid.Row="3" Style="{StaticResource FieldLabel}" Text="After-start placement" />
+                            <ComboBox x:Name="DelayedCombo"
+                                      Grid.Row="3"
+                                      Grid.Column="1"
+                                      DisplayMemberPath="Name"
+                                      SelectedValuePath="Id" />
+                            <TextBlock Grid.Row="4" Style="{StaticResource FieldLabel}" Text="After-start delay, sec" />
                             <TextBox x:Name="DelayText"
-                                     Grid.Row="3"
+                                     Grid.Row="4"
                                      Grid.Column="1"
                                      Text="30" />
-                            <TextBlock Grid.Row="4" Style="{StaticResource FieldLabel}" Text="Team" />
+                            <TextBlock Grid.Row="5" Style="{StaticResource FieldLabel}" Text="Team" />
                             <ComboBox x:Name="TeamCombo"
-                                      Grid.Row="4"
+                                      Grid.Row="5"
                                       Grid.Column="1"
                                       DisplayMemberPath="Name" />
                         </Grid>

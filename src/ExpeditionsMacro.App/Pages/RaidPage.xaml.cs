@@ -16,6 +16,7 @@ public partial class RaidPage : UserControl, IAppPage
     private readonly ObservableCollection<RaidPreset> _presets = [];
     private readonly ObservableCollection<CameraModelManifest> _cameras = [];
     private readonly ObservableCollection<CatalogOption> _placements = [];
+    private IReadOnlyList<PlacementModel> _allPlacementModels = [];
     private bool _loading;
 
     public RaidPage(AppServices services)
@@ -24,6 +25,7 @@ public partial class RaidPage : UserControl, IAppPage
         InitializeComponent();
         PresetCombo.ItemsSource = _presets;
         CameraCombo.ItemsSource = _cameras;
+        CameraModeCombo.ItemsSource = CameraModeChoices();
         PrestartCombo.ItemsSource = _placements;
         DelayedCombo.ItemsSource = _placements;
         ActCombo.ItemsSource = new[] { new NamedChoice<RaidAct>(RaidAct.Act1, "Act 1"), new NamedChoice<RaidAct>(RaidAct.Act2, "Act 2"), new NamedChoice<RaidAct>(RaidAct.Act3, "Act 3") };
@@ -32,6 +34,10 @@ public partial class RaidPage : UserControl, IAppPage
     }
 
     public Func<Task>? IdleHotkeyAction => null;
+
+    internal void SetSnapshotFastMode() =>
+        SelectCameraMode(
+            CameraPreparationMode.FastNoAlign);
 
     public async Task OnShownAsync()
     {
@@ -117,7 +123,17 @@ public partial class RaidPage : UserControl, IAppPage
     private RaidPreset Build()
     {
         if (ActCombo.SelectedItem is not NamedChoice<RaidAct> act) throw new InvalidOperationException("Choose a Raid act.");
-        if (CameraCombo.SelectedItem is not CameraModelManifest camera) throw new InvalidOperationException("Choose a camera model.");
+        CameraPreparationMode cameraMode =
+            SelectedCameraMode();
+        CameraModelManifest? camera =
+            CameraCombo.SelectedItem as
+                CameraModelManifest;
+        if (cameraMode == CameraPreparationMode.CameraModel &&
+            camera is null)
+        {
+            throw new InvalidOperationException(
+                "Choose a camera model.");
+        }
         if (TeamCombo.SelectedItem is not TeamChoice team) throw new InvalidOperationException("Choose a team setting.");
         string name = NameText.Text.Trim();
         RaidPreset preset = new()
@@ -125,9 +141,13 @@ public partial class RaidPage : UserControl, IAppPage
             Id = ModelId.FromName(name),
             Name = name,
             Act = act.Value,
-            CameraModelId = camera.Id,
+            CameraPreparationMode = cameraMode,
+            CameraModelId = camera?.Id ?? string.Empty,
             PrestartPlacementModelId = SelectedPlacement(PrestartCombo),
-            DelayedPlacementModelId = SelectedPlacement(DelayedCombo),
+            DelayedPlacementModelId =
+                cameraMode == CameraPreparationMode.FastNoAlign
+                    ? string.Empty
+                    : SelectedPlacement(DelayedCombo),
             DelayedPlacementSeconds = ParseInt(DelayText, "After-start delay"),
             TeamSlot = team.Value,
             DefeatRetries = ParseInt(RetriesText, "Defeat retries"),
@@ -146,6 +166,10 @@ public partial class RaidPage : UserControl, IAppPage
     {
         NameText.Text = preset.Name;
         ActCombo.SelectedItem = ActCombo.Items.Cast<NamedChoice<RaidAct>>().First(value => value.Value == preset.Act);
+        SelectCameraMode(preset.CameraPreparationMode);
+        RefreshPlacementOptions(
+            preset.PrestartPlacementModelId,
+            preset.DelayedPlacementModelId);
         CameraCombo.SelectedItem = _cameras.FirstOrDefault(value => value.Id == preset.CameraModelId);
         SelectPlacement(PrestartCombo, preset.PrestartPlacementModelId);
         SelectPlacement(DelayedCombo, preset.DelayedPlacementModelId);
@@ -161,7 +185,12 @@ public partial class RaidPage : UserControl, IAppPage
 
     private void ApplyNew()
     {
-        NameText.Text = "Raid route"; ActCombo.SelectedIndex = 0; CameraCombo.SelectedIndex = _cameras.Count > 0 ? 0 : -1;
+        NameText.Text = "Raid route"; ActCombo.SelectedIndex = 0;
+        SelectCameraMode(
+            _services.Settings.FastNoAlignEnabled
+                ? CameraPreparationMode.FastNoAlign
+                : CameraPreparationMode.CameraModel);
+        CameraCombo.SelectedIndex = _cameras.Count > 0 ? 0 : -1;
         PrestartCombo.SelectedIndex = 0; DelayedCombo.SelectedIndex = 0; DelayText.Text = "30"; TeamCombo.SelectedIndex = 0;
         RetriesText.Text = "0"; AutoRecoverCheck.IsChecked = true; ZoomText.Text = "30"; PitchText.Text = "1800"; PollText.Text = "450"; StableText.Text = "2";
     }
@@ -169,8 +198,9 @@ public partial class RaidPage : UserControl, IAppPage
     private async Task RefreshCatalogsAsync()
     {
         _cameras.Clear(); foreach (CameraModelManifest camera in await _services.CameraModels.ListAsync()) _cameras.Add(camera);
-        _placements.Clear(); _placements.Add(new CatalogOption(string.Empty, "Don't place"));
-        foreach (PlacementModel placement in await _services.PlacementModels.ListAsync()) _placements.Add(new CatalogOption(placement.Id, placement.Name));
+        _allPlacementModels =
+            await _services.PlacementModels.ListAsync();
+        RefreshPlacementOptions();
     }
 
     private async Task RefreshPresetsAsync()
@@ -181,9 +211,135 @@ public partial class RaidPage : UserControl, IAppPage
     }
 
     private static string SelectedPlacement(ComboBox combo) => (combo.SelectedItem as CatalogOption)?.Id ?? string.Empty;
-    private void SelectPlacement(ComboBox combo, string id) => combo.SelectedItem = _placements.FirstOrDefault(value => value.Id == id) ?? _placements[0];
+    private void SelectPlacement(
+        ComboBox combo,
+        string id) =>
+        combo.SelectedItem =
+            _placements.FirstOrDefault(
+                value => value.Id == id) ??
+            _placements.FirstOrDefault();
     private static int ParseInt(TextBox box, string label) => int.TryParse(box.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) ? value : throw new InvalidDataException($"{label} must be a whole number.");
     private static IReadOnlyList<TeamChoice> TeamChoices() => [new(0, "Don't change"), .. Enumerable.Range(1, 8).Select(value => new TeamChoice(value, $"Team {value}"))];
+
+    private void CameraMode_Changed(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (CameraCombo is null ||
+            PrestartCombo is null)
+        {
+            return;
+        }
+        ApplyCameraModeLayout();
+        RefreshPlacementOptions();
+    }
+
+    private void PlacementRoute_Changed(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (!_loading &&
+            PrestartCombo is not null)
+        {
+            RefreshPlacementOptions();
+        }
+    }
+
+    private void ApplyCameraModeLayout()
+    {
+        bool fast =
+            SelectedCameraMode() ==
+            CameraPreparationMode.FastNoAlign;
+        RaidCameraRow.Height =
+            fast ? new GridLength(0) : new GridLength(54);
+        RaidDelayedRow.Height =
+            fast ? new GridLength(0) : new GridLength(54);
+        RaidDelayRow.Height =
+            fast ? new GridLength(0) : new GridLength(54);
+        PrimaryPlacementLabel.Text =
+            fast
+                ? "Placement model"
+                : "Before-start placement";
+    }
+
+    private void RefreshPlacementOptions(
+        string? primaryId = null,
+        string? delayedId = null)
+    {
+        if (ActCombo.SelectedItem is not
+            NamedChoice<RaidAct> act)
+        {
+            return;
+        }
+        primaryId ??=
+            (PrestartCombo.SelectedItem as
+                CatalogOption)?.Id;
+        delayedId ??=
+            (DelayedCombo.SelectedItem as
+                CatalogOption)?.Id;
+        PlacementTarget target = new()
+        {
+            Mode = PlacementTargetMode.Raid,
+            MapNumber = 1,
+            ActNumber = (int)act.Value,
+        };
+        CameraPreparationMode mode =
+            SelectedCameraMode();
+        _placements.Clear();
+        if (mode == CameraPreparationMode.CameraModel)
+        {
+            _placements.Add(
+                new CatalogOption(
+                    string.Empty,
+                    "Don't place"));
+        }
+        foreach (PlacementModel placement in
+                 _allPlacementModels.Where(
+                     model => model.IsCompatibleWith(
+                         mode,
+                         target)))
+        {
+            _placements.Add(
+                new CatalogOption(
+                    placement.Id,
+                    placement.Name));
+        }
+        SelectPlacement(PrestartCombo, primaryId ?? string.Empty);
+        if (mode == CameraPreparationMode.CameraModel)
+        {
+            SelectPlacement(
+                DelayedCombo,
+                delayedId ?? string.Empty);
+        }
+        else
+        {
+            DelayedCombo.SelectedItem = null;
+        }
+    }
+
+    private CameraPreparationMode SelectedCameraMode() =>
+        (CameraModeCombo.SelectedItem as
+            NamedChoice<CameraPreparationMode>)?.Value ??
+        CameraPreparationMode.CameraModel;
+
+    private void SelectCameraMode(
+        CameraPreparationMode mode) =>
+        CameraModeCombo.SelectedItem =
+            CameraModeCombo.Items
+                .Cast<NamedChoice<CameraPreparationMode>>()
+                .First(choice => choice.Value == mode);
+
+    private static IReadOnlyList<
+        NamedChoice<CameraPreparationMode>>
+        CameraModeChoices() =>
+        [
+            new(
+                CameraPreparationMode.FastNoAlign,
+                "Fast no align"),
+            new(
+                CameraPreparationMode.CameraModel,
+                "Camera model"),
+        ];
 
     private void UpdatePresetActions()
     {

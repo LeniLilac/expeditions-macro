@@ -1,3 +1,4 @@
+using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Stages;
 
 namespace ExpeditionsMacro.Automation.Stages;
@@ -20,14 +21,14 @@ internal static class StageNavigationPolicy
         recoveryTransitionPending && state != StageScreenState.GameModeSelector
             ? GameModeHandoffCommand.Wait
             : state switch
-        {
-            StageScreenState.GameModeSelector => GameModeHandoffCommand.Complete,
-            StageScreenState.Victory or StageScreenState.Defeat => GameModeHandoffCommand.PressPlayKey,
-            StageScreenState.PostMatchPreview when hasStageChangeModeAction => GameModeHandoffCommand.ChangeGamemode,
-            StageScreenState.PostMatchPreview => GameModeHandoffCommand.PressPlayKey,
-            StageScreenState.StorySelector or StageScreenState.RaidSelector or StageScreenState.PreviewReady => GameModeHandoffCommand.Back,
-            _ => GameModeHandoffCommand.PressPlayKey,
-        };
+            {
+                StageScreenState.GameModeSelector => GameModeHandoffCommand.Complete,
+                StageScreenState.Victory or StageScreenState.Defeat => GameModeHandoffCommand.PressPlayKey,
+                StageScreenState.PostMatchPreview when hasStageChangeModeAction => GameModeHandoffCommand.ChangeGamemode,
+                StageScreenState.PostMatchPreview => GameModeHandoffCommand.PressPlayKey,
+                StageScreenState.StorySelector or StageScreenState.RaidSelector or StageScreenState.PreviewReady => GameModeHandoffCommand.Back,
+                _ => GameModeHandoffCommand.PressPlayKey,
+            };
 
     public static bool MatchesExpectedState(
         StageScreenState expected,
@@ -42,7 +43,7 @@ internal static class StageNavigationPolicy
     {
         if (current.State != StageScreenState.Prestart)
         {
-            throw new InvalidOperationException(
+            throw new RobloxUiUnavailableException(
                 $"Team loading requires a confirmed prestart screen. Current state: {current.State} ({current.Confidence:P0}).");
         }
     }

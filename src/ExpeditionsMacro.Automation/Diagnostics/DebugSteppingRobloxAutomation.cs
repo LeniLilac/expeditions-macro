@@ -256,6 +256,19 @@ public sealed class DebugSteppingRobloxAutomation : IRobloxAutomation, IDisposab
                 cancellationToken),
             cancellationToken);
 
+    public Task TapKeyboardKeyAsync(
+        RobloxWindow window,
+        RobloxKeyboardKey key,
+        CancellationToken cancellationToken) =>
+        TraceAsync(
+            $"Press {key}",
+            $"Send the {key} key to Roblox.",
+            () => _inner.TapKeyboardKeyAsync(
+                window,
+                key,
+                cancellationToken),
+            cancellationToken);
+
     public Task HoldLetterKeyAsync(
         RobloxWindow window,
         char key,

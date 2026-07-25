@@ -22,6 +22,15 @@ public sealed partial class WindowsRobloxAutomation
             key,
             cancellationToken);
 
+    public Task TapKeyboardKeyAsync(
+        RobloxWindow window,
+        RobloxKeyboardKey key,
+        CancellationToken cancellationToken) =>
+        _keyboard.TapKeyboardKeyAsync(
+            window,
+            key,
+            cancellationToken);
+
     public Task HoldLetterKeyAsync(
         RobloxWindow window,
         char key,

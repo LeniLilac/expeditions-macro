@@ -121,6 +121,7 @@ public sealed partial class ChallengeMacroRunner
                 }
                 if (recovery == "lobby")
                 {
+                    _fastNoAlign.ObserveLobby(window);
                     await LobbyPlayNavigator.OpenWithVerificationAsync(
                         playMenuKey,
                         () => CaptureClient(window, detector),
@@ -160,7 +161,7 @@ public sealed partial class ChallengeMacroRunner
             report("Navigation", 0, "Waiting for a Challenge navigation screen.", null, null);
             await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
         }
-        throw new InvalidOperationException("Challenge navigation did not reach the selector within 90 seconds.");
+        throw new TimeoutException("Challenge navigation did not reach the selector within 90 seconds.");
     }
 
     internal static async Task<ChallengeScreenMatch> ReturnToChallengeSelectorWithVerificationAsync(
@@ -207,7 +208,7 @@ public sealed partial class ChallengeMacroRunner
             attemptMissed?.Invoke(attempt, last);
         }
 
-        throw new InvalidOperationException(
+        throw new RobloxUiUnavailableException(
             $"The Challenge detail remained open after {maximumAttempts} verified Back attempts.");
     }
 
@@ -226,7 +227,7 @@ public sealed partial class ChallengeMacroRunner
             timeout,
             report,
             cancellationToken).ConfigureAwait(false);
-        return observation ?? throw new InvalidOperationException("Timed out waiting for the Challenge selector.");
+        return observation ?? throw new TimeoutException("Timed out waiting for the Challenge selector.");
     }
 
     private async Task<ChallengeSelectorObservation?> TryWaitForChallengeSelectorAsync(
@@ -307,7 +308,7 @@ public sealed partial class ChallengeMacroRunner
                 party);
         if (changeMode is null)
         {
-            throw new InvalidOperationException(
+            throw new RobloxUiUnavailableException(
                 "Change Gamemode could not be located after leaving the unstarted Challenge.");
         }
         await ClickAsync(
@@ -329,7 +330,7 @@ public sealed partial class ChallengeMacroRunner
                 modes);
         if (challenge is null)
         {
-            throw new InvalidOperationException(
+            throw new RobloxUiUnavailableException(
                 "Challenges could not be located after leaving the unstarted match.");
         }
         await ClickAsync(

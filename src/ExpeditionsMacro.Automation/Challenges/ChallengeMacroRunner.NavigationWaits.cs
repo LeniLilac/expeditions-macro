@@ -92,7 +92,7 @@ public sealed partial class ChallengeMacroRunner
                 null,
                 null);
         }
-        throw new InvalidOperationException(
+        throw new RobloxUiUnavailableException(
             $"Challenge {Label(type)} could not be opened from the fixed selector row.");
     }
 

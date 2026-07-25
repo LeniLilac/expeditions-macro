@@ -23,6 +23,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
 
     private readonly IRobloxAutomation _automation;
     private readonly CameraAlignmentEngine _camera;
+    private readonly FastNoAlignPreparationSession _fastNoAlign;
     private readonly PlacementService _placements;
     private readonly TeamSelectionService _teams;
     private readonly IDiscordNotifier _discord;
@@ -32,10 +33,14 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         CameraAlignmentEngine camera,
         PlacementService placements,
         TeamSelectionService teams,
-        IDiscordNotifier discord)
+        IDiscordNotifier discord,
+        FastNoAlignPreparationSession? fastNoAlign = null)
     {
         _automation = automation;
         _camera = camera;
+        _fastNoAlign = fastNoAlign ??
+            new FastNoAlignPreparationSession(
+                new CameraPosePreparationService(automation));
         _placements = placements;
         _teams = teams;
         _discord = discord;
@@ -373,11 +378,11 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         ChallengeMapProfile profile = preset.Maps.Single(value => value.Map == map);
         ImageFrame available = CaptureClient(window, detector);
         (int X, int Y)? stage = ChallengeScreenDetector.ActionFor(ChallengeScreenState.ChallengeAvailable, available);
-        if (stage is null) throw new InvalidOperationException("The Challenge Select Stage button disappeared before it could be clicked.");
+        if (stage is null) throw new RobloxUiUnavailableException("The Challenge Select Stage button disappeared before it could be clicked.");
         await ClickAsync(window, stage.Value.X, stage.Value.Y, cancellationToken).ConfigureAwait(false);
         ImageFrame preview = await WaitForScreenAsync(window, preset, detector, ChallengeScreenState.PreviewReady, TimeSpan.FromSeconds(15), report, cancellationToken).ConfigureAwait(false);
         (int X, int Y)? startPreview = ChallengeScreenDetector.ActionFor(ChallengeScreenState.PreviewReady, preview);
-        if (startPreview is null) throw new InvalidOperationException("The Challenge preview Start button could not be located.");
+        if (startPreview is null) throw new RobloxUiUnavailableException("The Challenge preview Start button could not be located.");
         await ClickAsync(window, startPreview.Value.X, startPreview.Value.Y, cancellationToken).ConfigureAwait(false);
         bool attemptNotified = false;
         bool teamLoaded = profile.TeamSlot == 0;
@@ -398,13 +403,31 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
                     cancellationToken).ConfigureAwait(false);
             }
             report("Camera preparation", 20, $"Preparing {Label(map)} for {Label(type)}.", "prestart", null);
-            await PrepareCameraAsync(window, preset, models.Camera, report, log, cancellationToken).ConfigureAwait(false);
+            await PrepareCameraAsync(
+                window,
+                preset,
+                models.Camera,
+                report,
+                log,
+                cancellationToken).ConfigureAwait(false);
             ChallengePlacementPartition? prestartPlacements = null;
-            if (models.PrestartPlacement is not null)
+            IReadOnlyList<PlacementStep> configuredBeforeStart =
+                PlacementExecutionPlan.BeforeStart(
+                    preset.CameraPreparationMode,
+                    models.PrestartPlacement);
+            IReadOnlyList<PlacementStep> configuredAfterStart =
+                PlacementExecutionPlan.AfterStart(
+                    preset.CameraPreparationMode,
+                    models.PrestartPlacement,
+                    models.DelayedPlacement);
+            if (models.PrestartPlacement is not null &&
+                configuredBeforeStart.Count > 0)
             {
                 ScreenRegion dialogOcclusion = ChallengeScreenDetector.PrestartOcclusion(prestart)
-                    ?? throw new InvalidOperationException("The Challenge Start Game dialog could not be measured before placement.");
-                prestartPlacements = ChallengeRunPolicy.PartitionPrestartPlacements(models.PrestartPlacement.Steps, dialogOcclusion);
+                    ?? throw new RobloxUiUnavailableException("The Challenge Start Game dialog could not be measured before placement.");
+                prestartPlacements = ChallengeRunPolicy.PartitionPrestartPlacements(
+                    configuredBeforeStart,
+                    dialogOcclusion);
                 report("Placement", 45, "Placing units outside the Start Game dialog.", null, null);
                 if (prestartPlacements.BeforeStart.Count > 0)
                 {
@@ -427,7 +450,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
                 retryMilliseconds: 100,
                 maximumAttempts: 3,
                 cancellationToken).ConfigureAwait(false);
-            if (start is null) throw new InvalidOperationException("The Challenge Start Game button disappeared before it could be clicked.");
+            if (start is null) throw new RobloxUiUnavailableException("The Challenge Start Game button disappeared before it could be clicked.");
             Stopwatch matchRuntime = Stopwatch.StartNew();
             await ClickAsync(window, start.Value.X, start.Value.Y, cancellationToken).ConfigureAwait(false);
             if (!attemptNotified)
@@ -454,6 +477,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
                 preset,
                 profile,
                 models,
+                configuredAfterStart,
                 detector,
                 matchRuntime,
                 log,
@@ -529,7 +553,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
             report,
             cancellationToken).ConfigureAwait(false);
         (int X, int Y)? changeMode = ChallengeScreenDetector.ActionFor(ChallengeScreenState.PostMatchPreview, party);
-        if (changeMode is null) throw new InvalidOperationException("Change Gamemode could not be located after the match.");
+        if (changeMode is null) throw new RobloxUiUnavailableException("Change Gamemode could not be located after the match.");
         await ClickAsync(window, changeMode.Value.X, changeMode.Value.Y, cancellationToken).ConfigureAwait(false);
         ImageFrame modes = await WaitForScreenAsync(window, preset, detector, ChallengeScreenState.GameModeSelector, TimeSpan.FromSeconds(12), report, cancellationToken).ConfigureAwait(false);
         (int X, int Y)? challenge = ChallengeScreenDetector.ActionFor(ChallengeScreenState.GameModeSelector, modes);
@@ -608,11 +632,11 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
             ChallengeScreenMatch selector = await observeSelector(cancellationToken).ConfigureAwait(false);
             if (selector.State is not (ChallengeScreenState.ChallengeList or ChallengeScreenState.ChallengeListUnavailable))
             {
-                throw new InvalidOperationException($"Cannot hand off from the unexpected Challenge state {selector.State}.");
+                throw new RobloxUiUnavailableException($"Cannot hand off from the unexpected Challenge state {selector.State}.");
             }
             if (selector.ActionX is not int closeX || selector.ActionY is not int closeY)
             {
-                throw new InvalidOperationException("The Challenge selector close button could not be located.");
+                throw new RobloxUiUnavailableException("The Challenge selector close button could not be located.");
             }
 
             closeAttemptStarted?.Invoke(attempt, selector);
@@ -622,7 +646,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
             closeAttemptMissed?.Invoke(attempt, selector);
         }
 
-        throw new InvalidOperationException(
+        throw new RobloxUiUnavailableException(
             $"The Challenge selector remained open after {SchedulerHandoffMaximumAttempts} focused close attempts, so control was not returned to the task scheduler.");
     }
 
@@ -725,7 +749,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
             timeout,
             report,
             cancellationToken).ConfigureAwait(false);
-        return frame ?? throw new InvalidOperationException($"Timed out waiting for {Label(desired)}.");
+        return frame ?? throw new TimeoutException($"Timed out waiting for {Label(desired)}.");
     }
 
     private async Task<ImageFrame> WaitForPrestartAfterPreviewAsync(
@@ -795,51 +819,6 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         return teleportDeadline > currentDeadline ? teleportDeadline : currentDeadline;
     }
 
-    private async Task PrepareCameraAsync(
-        RobloxWindow window,
-        ChallengePreset preset,
-        CameraModel model,
-        Action<string, int, string, string?, double?> report,
-        Action<string, MacroEventLevel, string?, double?> log,
-        CancellationToken cancellationToken)
-    {
-        double score = await _camera.PrepareAndAlignAsync(
-            model,
-            window,
-            preset.ZoomTicks,
-            preset.PitchDragPixels,
-            progress: new Progress<MacroProgress>(value => report(value.Phase, value.Percent, value.Message, value.DetectedState, value.Confidence)),
-            cancellationToken: cancellationToken).ConfigureAwait(false);
-        log($"Camera alignment finished at {score:P0} confidence.", MacroEventLevel.Success, null, score);
-    }
-
-    private Task PlaceAsync(
-        RobloxWindow window,
-        ChallengePreset preset,
-        PlacementModel model,
-        Action<string, MacroEventLevel, string?, double?> log,
-        CancellationToken cancellationToken) =>
-        PlaceAsync(window, preset, model, model.Steps, log, cancellationToken);
-
-    private Task PlaceAsync(
-        RobloxWindow window,
-        ChallengePreset preset,
-        PlacementModel model,
-        IReadOnlyList<PlacementStep> steps,
-        Action<string, MacroEventLevel, string?, double?> log,
-        CancellationToken cancellationToken) =>
-        _placements.PlayStepsAsync(
-            window,
-            model,
-            steps,
-            useDefaultInterval: false,
-            defaultIntervalMilliseconds: 0,
-            preset.UnitKeyHoldMilliseconds,
-            preset.UnitSelectDelayMilliseconds,
-            stepSent: null,
-            status: message => log(message, MacroEventLevel.Information, null, null),
-            cancellationToken);
-
     private async Task EnsureClientSizeAsync(RobloxWindow window, int width, int height, CancellationToken cancellationToken)
     {
         ClientBounds current = _automation.GetClientBounds(window);
@@ -851,7 +830,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         ClientBounds actual = _automation.GetClientBounds(window);
         if (actual.Width != width || actual.Height != height)
         {
-            throw new InvalidOperationException($"Roblox did not accept the required {width} by {height} client size (actual: {actual.Width} by {actual.Height}).");
+            throw new RobloxSessionUnavailableException($"Roblox did not accept the required {width} by {height} client size (actual: {actual.Width} by {actual.Height}).");
         }
     }
 
@@ -867,30 +846,14 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         ClientBounds bounds = _automation.GetClientBounds(window);
         if (bounds.Width != detector.Manifest.ClientWidth || bounds.Height != detector.Manifest.ClientHeight)
         {
-            throw new InvalidOperationException("Roblox no longer matches the detector pack client size.");
+            throw new RobloxSessionUnavailableException("Roblox no longer matches the detector pack client size.");
         }
         return _automation.CaptureClient(window);
     }
 
     private void Focus(RobloxWindow window)
     {
-        if (!_automation.Focus(window)) throw new InvalidOperationException("Windows could not focus Roblox.");
-    }
-
-    private static void ValidateRuntimeModels(
-        ChallengePreset preset,
-        IReadOnlyDictionary<ChallengeMapId, ChallengeMapRuntimeModels> mapModels,
-        DetectorPackManifest detector)
-    {
-        foreach (ChallengeMapProfile profile in preset.Maps)
-        {
-            if (!mapModels.TryGetValue(profile.Map, out ChallengeMapRuntimeModels? models)) throw new InvalidDataException($"Models for {Label(profile.Map)} were not loaded.");
-            if (models.Camera.Manifest.ClientWidth != detector.ClientWidth || models.Camera.Manifest.ClientHeight != detector.ClientHeight) throw new InvalidDataException($"The {Label(profile.Map)} camera model uses a different Roblox client size.");
-            foreach (PlacementModel placement in new[] { models.PrestartPlacement, models.DelayedPlacement }.Where(model => model is not null).Cast<PlacementModel>())
-            {
-                if (placement.ClientWidth != detector.ClientWidth || placement.ClientHeight != detector.ClientHeight) throw new InvalidDataException($"A {Label(profile.Map)} placement model uses a different Roblox client size.");
-            }
-        }
+        if (!_automation.Focus(window)) throw new RobloxSessionUnavailableException("Windows could not focus Roblox.");
     }
 
     private static string FormatRemaining(TimeSpan remaining) => remaining.TotalHours >= 1

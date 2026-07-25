@@ -21,6 +21,7 @@ public sealed partial class StageMacroRunner
     private static readonly TimeSpan RecoveryTimeout = TimeSpan.FromSeconds(90);
     private readonly IRobloxAutomation _automation;
     private readonly CameraAlignmentEngine _camera;
+    private readonly FastNoAlignPreparationSession _fastNoAlign;
     private readonly PlacementService _placements;
     private readonly TeamSelectionService _teams;
     private readonly IDiscordNotifier _discord;
@@ -30,10 +31,14 @@ public sealed partial class StageMacroRunner
         CameraAlignmentEngine camera,
         PlacementService placements,
         TeamSelectionService teams,
-        IDiscordNotifier discord)
+        IDiscordNotifier discord,
+        FastNoAlignPreparationSession? fastNoAlign = null)
     {
         _automation = automation;
         _camera = camera;
+        _fastNoAlign = fastNoAlign ??
+            new FastNoAlignPreparationSession(
+                new CameraPosePreparationService(automation));
         _placements = placements;
         _teams = teams;
         _discord = discord;
@@ -114,10 +119,19 @@ public sealed partial class StageMacroRunner
 
         story?.Validate(requireModels: true);
         raid?.Validate(requireModels: true);
-        models.Camera.Manifest.Validate();
+        CameraPreparationMode cameraMode =
+            story?.CameraPreparationMode ??
+            raid!.CameraPreparationMode;
+        models.Camera?.Manifest.Validate();
         models.PrestartPlacement?.Validate();
         models.DelayedPlacement?.Validate();
-        ValidateCompatibility(models, detector.Manifest);
+        ValidateCompatibility(
+            mode,
+            story,
+            raid,
+            cameraMode,
+            models,
+            detector.Manifest);
         if (!char.IsAsciiLetter(playMenuKey)) throw new InvalidDataException(AppSettings.PlayMenuKeySetupInstructions);
 
         int teamSlot = story?.TeamSlot ?? raid!.TeamSlot;
@@ -204,23 +218,44 @@ public sealed partial class StageMacroRunner
                     Write,
                     cancellationToken).ConfigureAwait(false);
 
-                if (models.PrestartPlacement is not null)
+                IReadOnlyList<PlacementStep> beforeStart =
+                    PlacementExecutionPlan.BeforeStart(
+                        cameraMode,
+                        models.PrestartPlacement);
+                if (beforeStart.Count > 0 &&
+                    models.PrestartPlacement is not null)
                 {
                     Report("Placement", 45, "Placing before-start units.");
-                    await PlayPlacementAsync(window, models.PrestartPlacement, story, raid, cancellationToken).ConfigureAwait(false);
+                    await PlayPlacementAsync(
+                        window,
+                        models.PrestartPlacement,
+                        beforeStart,
+                        story,
+                        raid,
+                        cancellationToken).ConfigureAwait(false);
                 }
 
                 ImageFrame prestart = CaptureClient(window, detector);
                 StageScreenMatch prestartMatch = StageScreenDetector.Detect(prestart);
                 if (prestartMatch.State != StageScreenState.Prestart || prestartMatch.ActionX is null || prestartMatch.ActionY is null)
                 {
-                    throw new InvalidOperationException($"The {Label(mode)} Start Game button disappeared before it could be clicked.");
+                    throw new RobloxUiUnavailableException($"The {Label(mode)} Start Game button disappeared before it could be clicked.");
                 }
                 Stopwatch matchRuntime = Stopwatch.StartNew();
                 await ClickAsync(window, prestartMatch.ActionX.Value, prestartMatch.ActionY.Value, cancellationToken).ConfigureAwait(false);
                 await Task.Delay(1800, cancellationToken).ConfigureAwait(false);
 
-                TerminalObservation terminal = await RunMatchAsync(window, models.DelayedPlacement, story, raid, detector, matchRuntime, stableDetections, cancellationToken).ConfigureAwait(false);
+                TerminalObservation terminal =
+                    await RunConfiguredMatchAsync(
+                        window,
+                        models,
+                        cameraMode,
+                        story,
+                        raid,
+                        detector,
+                        matchRuntime,
+                        stableDetections,
+                        cancellationToken).ConfigureAwait(false);
                 StageRunOutcome outcome = terminal.State == StageScreenState.Victory ? StageRunOutcome.Victory : StageRunOutcome.Defeat;
                 matchCompleted = true;
                 matchRuntimeTotal += matchRuntime.Elapsed;
@@ -251,7 +286,7 @@ public sealed partial class StageMacroRunner
                         (int X, int Y)? repeat = StageScreenDetector.RepeatStageAction(terminal.Frame, terminal.State);
                         if (repeat is null)
                         {
-                            throw new InvalidOperationException($"The {Label(mode)} Repeat Stage button could not be located.");
+                            throw new RobloxUiUnavailableException($"The {Label(mode)} Repeat Stage button could not be located.");
                         }
                         Report("Handoff", 100, $"The same {Label(mode)} preset is next. Repeating the stage.", "repeat_stage", terminal.Confidence);
                         Write($"The scheduler kept the same {Label(mode)} route; using Repeat Stage instead of reopening Play.", MacroEventLevel.Success, "repeat_stage", terminal.Confidence);
@@ -346,8 +381,8 @@ public sealed partial class StageMacroRunner
                 }
                 catch (Exception handoffError)
                 {
-                    throw new InvalidOperationException(
-                        $"{Label(mode)} camera alignment failed and shared navigation could not be restored, so the task scheduler was stopped.",
+                    throw new RobloxUiUnavailableException(
+                        $"{Label(mode)} camera alignment failed and shared navigation could not be restored.",
                         new AggregateException(alignment, handoffError));
                 }
                 throw;
@@ -449,47 +484,13 @@ public sealed partial class StageMacroRunner
             cancellationToken).ConfigureAwait(false);
         if (detailMatch.ActionX is null || detailMatch.ActionY is null)
         {
-            throw new InvalidOperationException($"The {Label(mode)} Select Stage button could not be located.");
+            throw new RobloxUiUnavailableException($"The {Label(mode)} Select Stage button could not be located.");
         }
         await ClickAsync(window, detailMatch.ActionX.Value, detailMatch.ActionY.Value, cancellationToken).ConfigureAwait(false);
         StageScreenMatch preview = await WaitForStateAsync(window, StageScreenState.PreviewReady, NavigationTimeout, detector, stableDetections, cancellationToken).ConfigureAwait(false);
-        if (preview.ActionX is not int previewX || preview.ActionY is not int previewY) throw new InvalidOperationException($"The {Label(mode)} preview Start button could not be located.");
+        if (preview.ActionX is not int previewX || preview.ActionY is not int previewY) throw new RobloxUiUnavailableException($"The {Label(mode)} preview Start button could not be located.");
         await ClickAsync(window, previewX, previewY, cancellationToken).ConfigureAwait(false);
         await WaitForStateAsync(window, StageScreenState.Prestart, TimeSpan.FromSeconds(45), detector, stableDetections, cancellationToken).ConfigureAwait(false);
-    }
-
-    private Task PlayPlacementAsync(
-        RobloxWindow window,
-        PlacementModel model,
-        StoryPreset? story,
-        RaidPreset? raid,
-        CancellationToken cancellationToken) =>
-        _placements.PlayStepsAsync(
-            window,
-            model,
-            model.Steps,
-            useDefaultInterval: false,
-            defaultIntervalMilliseconds: 0,
-            story?.UnitKeyHoldMilliseconds ?? raid!.UnitKeyHoldMilliseconds,
-            story?.UnitSelectDelayMilliseconds ?? raid!.UnitSelectDelayMilliseconds,
-            stepSent: null,
-            status: null,
-            cancellationToken);
-
-    private async Task EnsureClientSizeAsync(RobloxWindow window, int width, int height, CancellationToken cancellationToken)
-    {
-        Focus(window);
-        ClientBounds bounds = _automation.GetClientBounds(window);
-        if (bounds.Width != width || bounds.Height != height)
-        {
-            await _automation.ResizeClientAsync(window, width, height, cancellationToken).ConfigureAwait(false);
-            await Task.Delay(250, cancellationToken).ConfigureAwait(false);
-        }
-        ClientBounds actual = _automation.GetClientBounds(window);
-        if (actual.Width != width || actual.Height != height)
-        {
-            throw new InvalidOperationException($"Roblox did not accept the required {width} by {height} client size.");
-        }
     }
 
     private async Task ClickAsync(RobloxWindow window, int x, int y, CancellationToken cancellationToken)
@@ -504,31 +505,14 @@ public sealed partial class StageMacroRunner
         ClientBounds bounds = _automation.GetClientBounds(window);
         if (bounds.Width != detector.Manifest.ClientWidth || bounds.Height != detector.Manifest.ClientHeight)
         {
-            throw new InvalidOperationException("Roblox no longer matches the detector pack client size.");
+            throw new RobloxSessionUnavailableException("Roblox no longer matches the detector pack client size.");
         }
         return _automation.CaptureClient(window);
     }
 
-    private static void ValidateCompatibility(StageRuntimeModels models, DetectorPackManifest detector)
-    {
-        int width = models.Camera.Manifest.ClientWidth;
-        int height = models.Camera.Manifest.ClientHeight;
-        if (width != detector.ClientWidth || height != detector.ClientHeight)
-        {
-            throw new InvalidDataException("The camera model and detector pack use different Roblox client sizes.");
-        }
-        foreach (PlacementModel? placement in new[] { models.PrestartPlacement, models.DelayedPlacement })
-        {
-            if (placement is not null && (placement.ClientWidth != width || placement.ClientHeight != height))
-            {
-                throw new InvalidDataException("A selected placement model uses a different Roblox client size.");
-            }
-        }
-    }
-
     private void Focus(RobloxWindow window)
     {
-        if (!_automation.Focus(window)) throw new InvalidOperationException("Windows could not focus Roblox.");
+        if (!_automation.Focus(window)) throw new RobloxSessionUnavailableException("Windows could not focus Roblox.");
     }
 
     private static string Label(StageMode mode) => mode == StageMode.Story ? "Story" : "Raid";

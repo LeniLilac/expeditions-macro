@@ -2,6 +2,7 @@ using ExpeditionsMacro.Automation.Teams;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
+using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Infrastructure;
 using ExpeditionsMacro.Vision.Teams;
 
@@ -73,7 +74,7 @@ public sealed class TeamSelectionServiceTests
         };
         TeamSelectionService service = new(automation);
 
-        InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(
+        RobloxSessionUnavailableException error = await Assert.ThrowsAsync<RobloxSessionUnavailableException>(
             () => service.SelectAsync(automation.Window, teamSlot: 1, unitMenuKey: 'u'));
 
         Assert.Contains("808 by 611", error.Message, StringComparison.Ordinal);
@@ -165,12 +166,44 @@ public sealed class TeamSelectionServiceTests
             automation.Actions);
     }
 
+    [Fact]
+    public async Task Select_AcceptsAStableNearTargetScrollbarUndershoot()
+    {
+        FakeAutomation automation = new(
+            teamSlot: 3,
+            equipmentFixture:
+                "TeamEquipmentConfirm_01.png",
+            settledDragFixtures:
+            [
+                "TeamList_Aligned_Team2_01.png",
+                "TeamList_Aligned_Team3_Undershoot_01.png",
+            ]);
+        TeamSelectionService service = new(automation);
+
+        await service.SelectAsync(
+            automation.Window,
+            teamSlot: 3,
+            unitMenuKey: 'u');
+
+        Assert.Equal(
+            2,
+            automation.Actions.Count(action =>
+                action.StartsWith(
+                    "drag:",
+                    StringComparison.Ordinal)));
+        Assert.Contains(
+            "click:579,288",
+            automation.Actions);
+    }
+
     private sealed class FakeAutomation : IRobloxAutomation
     {
         private readonly IReadOnlyDictionary<TeamScreenState, ImageFrame> _frames;
         private readonly IReadOnlyList<ImageFrame> _openingFrames;
         private readonly int _teamSlot;
         private readonly ImageFrame _topTeamFrame;
+        private readonly Queue<ImageFrame>
+            _settledDragFrames;
         private Queue<ImageFrame> _pendingOpeningFrames = [];
 
         private ImageFrame _teamFrame;
@@ -180,10 +213,16 @@ public sealed class TeamSelectionServiceTests
             string equipmentFixture,
             IReadOnlyList<string>? openingFixtures = null,
             string initialTeamFixture =
-                "TeamList_Aligned_Team1_Current_01.png")
+                "TeamList_Aligned_Team1_Current_01.png",
+            IReadOnlyList<string>?
+                settledDragFixtures = null)
         {
             _teamSlot = teamSlot;
             _openingFrames = openingFixtures?.Select(Load).ToArray() ?? [];
+            _settledDragFrames = new Queue<ImageFrame>(
+                settledDragFixtures?
+                    .Select(Load) ??
+                []);
             _topTeamFrame =
                 Load("TeamList_Aligned_Team1_Current_01.png");
             InitialTeamFrame = Load(initialTeamFixture);
@@ -305,6 +344,11 @@ public sealed class TeamSelectionServiceTests
             if (endY == TeamScreenDetector.TopScrollbarDragLimitY)
             {
                 _teamFrame = _topTeamFrame;
+            }
+            else if (_settledDragFrames.Count > 0)
+            {
+                _teamFrame =
+                    _settledDragFrames.Dequeue();
             }
             else if (_teamSlot >= 7)
             {

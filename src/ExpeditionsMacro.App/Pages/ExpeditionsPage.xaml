@@ -79,7 +79,11 @@
                             <TextBlock Style="{StaticResource FieldLabel}" Text="Preset name" />
                             <TextBox x:Name="PresetNameText" Grid.Column="1" Text="Expedition route" />
                             <TextBlock Grid.Row="1" Style="{StaticResource FieldLabel}" Text="Map" />
-                            <ComboBox x:Name="MapCombo" Grid.Row="1" Grid.Column="1" SelectedIndex="0">
+                            <ComboBox x:Name="MapCombo"
+                                      Grid.Row="1"
+                                      Grid.Column="1"
+                                      SelectedIndex="0"
+                                      SelectionChanged="PlacementRoute_Changed">
                                 <ComboBoxItem Tag="1" Content="Map 1 · School Grounds" />
                                 <ComboBoxItem Tag="2" Content="Map 2 · Flower Forest" />
                                 <ComboBoxItem Tag="3" Content="Map 3 · Rose Kingdom" />
@@ -104,21 +108,32 @@
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="54" />
+                                <RowDefinition x:Name="ExpeditionCameraRow"
+                                               Height="54" />
                                 <RowDefinition Height="54" />
                                 <RowDefinition Height="54" />
                             </Grid.RowDefinitions>
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Camera model" />
-                            <ComboBox x:Name="CameraCombo"
+                            <TextBlock Style="{StaticResource FieldLabel}" Text="Camera preparation" />
+                            <ComboBox x:Name="CameraModeCombo"
                                       Grid.Column="1"
-                                      DisplayMemberPath="Name" />
-                            <TextBlock Grid.Row="1" Style="{StaticResource FieldLabel}" Text="Placement model" />
-                            <ComboBox x:Name="PlacementCombo"
+                                      DisplayMemberPath="Name"
+                                      SelectionChanged="CameraMode_Changed" />
+                            <TextBlock x:Name="CameraLabel"
+                                       Grid.Row="1"
+                                       Style="{StaticResource FieldLabel}"
+                                       Text="Camera model" />
+                            <ComboBox x:Name="CameraCombo"
                                       Grid.Row="1"
                                       Grid.Column="1"
                                       DisplayMemberPath="Name" />
-                            <TextBlock Grid.Row="2" Style="{StaticResource FieldLabel}" Text="Team" />
-                            <ComboBox x:Name="TeamCombo"
+                            <TextBlock Grid.Row="2" Style="{StaticResource FieldLabel}" Text="Placement model" />
+                            <ComboBox x:Name="PlacementCombo"
                                       Grid.Row="2"
+                                      Grid.Column="1"
+                                      DisplayMemberPath="Name" />
+                            <TextBlock Grid.Row="3" Style="{StaticResource FieldLabel}" Text="Team" />
+                            <ComboBox x:Name="TeamCombo"
+                                      Grid.Row="3"
                                       Grid.Column="1"
                                       DisplayMemberPath="Name" />
                         </Grid>

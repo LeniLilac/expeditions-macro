@@ -40,13 +40,36 @@ public sealed record ChallengeMapProfile
         ValidateOptionalId(DelayedPlacementModelId, "delayed placement model");
     }
 
-    public void ValidateReady()
+    public void ValidateReady(
+        CameraPreparationMode cameraPreparationMode)
     {
         Validate();
-        if (string.IsNullOrWhiteSpace(CameraModelId)) throw new InvalidDataException($"Choose a camera model for {Map}.");
-        if (string.IsNullOrWhiteSpace(PrestartPlacementModelId) && string.IsNullOrWhiteSpace(DelayedPlacementModelId))
+        if (cameraPreparationMode ==
+            CameraPreparationMode.CameraModel)
         {
-            throw new InvalidDataException($"Choose at least one placement model for {Map}.");
+            if (string.IsNullOrWhiteSpace(CameraModelId))
+            {
+                throw new InvalidDataException(
+                    $"Choose a camera model for {Map}.");
+            }
+            if (string.IsNullOrWhiteSpace(PrestartPlacementModelId) &&
+                string.IsNullOrWhiteSpace(DelayedPlacementModelId))
+            {
+                throw new InvalidDataException(
+                    $"Choose at least one placement model for {Map}.");
+            }
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(PrestartPlacementModelId))
+        {
+            throw new InvalidDataException(
+                $"Choose a Fast no align placement model for {Map}.");
+        }
+        if (!string.IsNullOrWhiteSpace(DelayedPlacementModelId))
+        {
+            throw new InvalidDataException(
+                $"Fast no align stores before-start and after-start placements together for {Map}.");
         }
     }
 
@@ -73,6 +96,8 @@ public sealed record ChallengePreset
     public bool RunStatChallenge { get; init; } = true;
 
     public bool RunSpriteChallenge { get; init; } = true;
+
+    public CameraPreparationMode CameraPreparationMode { get; init; }
 
     public required IReadOnlyList<ChallengeMapProfile> Maps { get; init; }
 
@@ -113,6 +138,7 @@ public sealed record ChallengePreset
         if (string.IsNullOrWhiteSpace(Id) || string.IsNullOrWhiteSpace(Name)) throw new InvalidDataException("Challenge preset identity is missing.");
         if (EnabledTypes.Count == 0) throw new InvalidDataException("Select at least one regular Challenge type.");
         if (string.IsNullOrWhiteSpace(DetectorPackId)) throw new InvalidDataException("Choose a detector pack.");
+        if (!Enum.IsDefined(CameraPreparationMode)) throw new InvalidDataException("Camera preparation mode is invalid.");
         if (Maps.Count != Enum.GetValues<ChallengeMapId>().Length || Maps.Select(profile => profile.Map).Distinct().Count() != Maps.Count)
         {
             throw new InvalidDataException("Configure each Challenge map exactly once.");
@@ -127,7 +153,10 @@ public sealed record ChallengePreset
     public void ValidateReady()
     {
         Validate();
-        foreach (ChallengeMapProfile profile in Maps) profile.ValidateReady();
+        foreach (ChallengeMapProfile profile in Maps)
+        {
+            profile.ValidateReady(CameraPreparationMode);
+        }
     }
 
     public static IReadOnlyList<ChallengeMapProfile> EmptyMapProfiles() =>

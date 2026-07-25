@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using ExpeditionsMacro.Automation.Activity;
 using ExpeditionsMacro.Automation.Expeditions;
+using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Automation.Runtime;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Imaging;
@@ -18,13 +19,19 @@ public sealed partial class ChallengeMacroRunner
         ChallengePreset preset,
         ChallengeMapProfile profile,
         ChallengeMapRuntimeModels models,
+        IReadOnlyList<PlacementStep> fastAfterStartSteps,
         IDetectorPack detector,
         Stopwatch matchRuntime,
         Action<string, MacroEventLevel, string?, double?> log,
         Action<string, int, string, string?, double?> report,
         CancellationToken cancellationToken)
     {
-        bool delayedPlaced = models.DelayedPlacement is null;
+        bool fast = preset.CameraPreparationMode ==
+            CameraPreparationMode.FastNoAlign;
+        int nextFastStep = 0;
+        bool delayedPlaced = fast
+            ? fastAfterStartSteps.Count == 0
+            : models.DelayedPlacement is null;
         StableStateTracker<ChallengeScreenState> terminalTracker =
             new(preset.StableDetections);
         StableStateTracker<string> recoveryTracker =
@@ -77,7 +84,40 @@ public sealed partial class ChallengeMacroRunner
                     MatchRuntimePolicy.ChallengeLimit(),
                     "Challenge match");
             }
-            if (!delayedPlaced &&
+            if (candidate == ChallengeScreenState.None &&
+                recovery is null &&
+                fast &&
+                !delayedPlaced &&
+                PlacementExecutionPlan.IsAfterStartDue(
+                    fastAfterStartSteps[nextFastStep],
+                    matchRuntime.Elapsed))
+            {
+                PlacementStep step =
+                    fastAfterStartSteps[nextFastStep];
+                report(
+                    "Placement",
+                    65,
+                    $"Placing Unit {step.UnitKey} at " +
+                    $"{matchRuntime.Elapsed.TotalSeconds:F1}s " +
+                    "after Start.",
+                    null,
+                    null);
+                await PlaceAsync(
+                    window,
+                    preset,
+                    models.PrestartPlacement!,
+                    [step],
+                    log,
+                    cancellationToken).ConfigureAwait(false);
+                nextFastStep++;
+                delayedPlaced =
+                    nextFastStep >=
+                    fastAfterStartSteps.Count;
+            }
+            else if (candidate == ChallengeScreenState.None &&
+                recovery is null &&
+                !fast &&
+                !delayedPlaced &&
                 ChallengeRunPolicy.IsDelayedPlacementDue(
                     profile,
                     matchRuntime.Elapsed))

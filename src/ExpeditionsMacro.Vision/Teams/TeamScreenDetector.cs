@@ -38,7 +38,7 @@ public static class TeamScreenDetector
     ];
     private static readonly ScreenRegion[] AlignedLoadButtonRows =
     [
-        new(530, 238, 116, 56),
+        new(530, 238, 116, 68),
         new(530, 298, 116, 68),
         new(530, 385, 116, 55),
     ];
@@ -48,6 +48,7 @@ public static class TeamScreenDetector
     // strip, so color and minimum length alone do not identify the live thumb.
     private const int MinimumScrollThumbHeight = 60;
     private const int MaximumScrollThumbHeight = 95;
+    public const int NearTargetThumbTolerancePixels = 8;
 
     public static TeamScreenMatch Detect(ImageFrame image)
     {
@@ -100,6 +101,14 @@ public static class TeamScreenDetector
     public static bool IsScrollbarAtBottom(TeamScrollbarThumb thumb) =>
         thumb.CenterY is >= 390 and <= 405;
 
+    public static bool IsScrollbarNearTarget(
+        TeamScrollbarThumb thumb,
+        int targetCenterY) =>
+        Math.Abs(
+            thumb.CenterY -
+            targetCenterY) <=
+        NearTargetThumbTolerancePixels;
+
     public static TeamScrollbarThumb? FindScrollbarThumb(ImageFrame image)
     {
         Validate(image);
@@ -147,7 +156,9 @@ public static class TeamScreenDetector
         bool aligned = thumb is TeamScrollbarThumb found &&
             (teamSlot >= 7
                 ? IsScrollbarAtBottom(found)
-                : Math.Abs(found.CenterY - targetThumbCenterY) <= 4);
+                : IsScrollbarNearTarget(
+                    found,
+                    targetThumbCenterY));
         if (!aligned)
         {
             return null;

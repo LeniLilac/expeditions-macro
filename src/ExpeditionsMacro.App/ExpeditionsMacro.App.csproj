@@ -23,6 +23,9 @@
     <Resource Include="..\..\assets\app.ico"><Link>Resources\app.ico</Link></Resource>
     <Resource Include="..\..\assets\app-preview.png"><Link>Resources\app-preview.png</Link></Resource>
     <Resource Include="..\..\assets\standard-ui-overlay.png"><Link>Resources\standard-ui-overlay.png</Link></Resource>
+    <Resource Include="..\..\assets\placement-maps\*.png">
+      <Link>Resources\PlacementMaps\%(Filename)%(Extension)</Link>
+    </Resource>
     <Resource Include="..\..\assets\fonts\Fredoka-Light.ttf"><Link>Resources\Fonts\Fredoka-Light.ttf</Link></Resource>
     <Resource Include="..\..\assets\fonts\Fredoka-Regular.ttf"><Link>Resources\Fonts\Fredoka-Regular.ttf</Link></Resource>
     <Resource Include="..\..\assets\fonts\Fredoka-Medium.ttf"><Link>Resources\Fonts\Fredoka-Medium.ttf</Link></Resource>

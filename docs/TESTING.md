@@ -42,4 +42,7 @@ The golden corpus is intentionally slower and is sharded in GitHub Actions. Loca
 - For deep-debug archives, generate timestamped contact sheets with `scripts/New-DiagnosticContactSheet.ps1` before examining singleton frames.
 - Encode the confirmed state/action sequence as a policy, workflow, or detector test.
 - Every detector fix requires a representative privacy-reviewed 808 by 611 fixture plus positive and relevant negative coverage.
+- Startup settings work must cover the Lobby gate, the opening-animation negative, UI Scale 0.80/1.00/1.20, device-dependent rendered-scale feedback, all required pages, both Units scrollbar boundaries, physical accessibility-navigation scan codes, and unknown-control safe stops.
+- Runtime-recovery changes must prove typed restart-candidate classification, diagnostics before restart, stable-Lobby preflight after restart, unchanged incomplete-task progress, and circuit-breaker exhaustion. Do not make generic `InvalidOperationException` recoverable.
+- Fast share-code tests must round-trip the plan, exact route overrides or resolved category fallbacks, Teams, placement phases, and delays while proving task progress, camera models, app settings, and secrets are absent.
 - When manual user input is paired with passive capture, label the input as user reported rather than claiming it came from the event log.

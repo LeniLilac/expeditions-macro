@@ -305,7 +305,7 @@ public sealed class CameraPosePreparationService
         if (resized.Width != RobloxClientProfile.Width ||
             resized.Height != RobloxClientProfile.Height)
         {
-            throw new InvalidOperationException(
+            throw new RobloxSessionUnavailableException(
                 $"Roblox did not accept the standard {RobloxClientProfile.Width} × {RobloxClientProfile.Height} client size.");
         }
     }
@@ -334,7 +334,7 @@ public sealed class CameraPosePreparationService
     {
         if (!_automation.Focus(window))
         {
-            throw new InvalidOperationException(
+            throw new RobloxSessionUnavailableException(
                 "Windows could not focus the Roblox window.");
         }
     }

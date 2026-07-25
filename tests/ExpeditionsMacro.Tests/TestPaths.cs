@@ -52,6 +52,12 @@ internal static class TestPaths
         "anime-expeditions",
         "refuel");
 
+    public static string SettingsDatasets => Path.Combine(
+        RepositoryRoot,
+        "datasets",
+        "anime-expeditions",
+        "settings");
+
     public static string NewTemporaryDirectory()
     {
         string path = Path.Combine(Path.GetTempPath(), "ExpeditionsMacro.Tests", Guid.NewGuid().ToString("N"));

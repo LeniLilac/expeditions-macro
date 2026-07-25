@@ -22,6 +22,7 @@ public partial class ExpeditionsPage : UserControl, IAppPage
     private readonly ObservableCollection<ExpeditionPreset> _presets = [];
     private readonly ObservableCollection<CameraModelManifest> _cameraModels = [];
     private readonly ObservableCollection<PlacementModel> _placementModels = [];
+    private IReadOnlyList<PlacementModel> _allPlacementModels = [];
     private readonly ObservableCollection<DetectorPackManifest> _detectorPacks = [];
     private readonly DispatcherTimer _runtimeTimer;
     private DateTimeOffset? _runStarted;
@@ -36,6 +37,7 @@ public partial class ExpeditionsPage : UserControl, IAppPage
         PresetCombo.ItemsSource = _presets;
         CameraCombo.ItemsSource = _cameraModels;
         PlacementCombo.ItemsSource = _placementModels;
+        CameraModeCombo.ItemsSource = CameraModeChoices();
         TeamCombo.ItemsSource = TeamChoices();
         _runtimeTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => UpdateRuntime(), Dispatcher);
         _runtimeTimer.Stop();
@@ -67,7 +69,6 @@ public partial class ExpeditionsPage : UserControl, IAppPage
     public Task StartFromHotkeyAsync() => StartMacroAsync();
 
     private async void Start_Click(object sender, RoutedEventArgs e) => await StartMacroAsync();
-
     private void Stop_Click(object sender, RoutedEventArgs e) => _services.Coordinator.Cancel();
 
     private void UpdateHotkeyText()
@@ -112,7 +113,14 @@ public partial class ExpeditionsPage : UserControl, IAppPage
             return;
         }
 
-        CameraModel camera = await _services.CameraModels.LoadAsync(preset.CameraModelId) ?? throw new InvalidOperationException("The selected camera model could not be loaded.");
+        CameraModel? camera =
+            preset.CameraPreparationMode ==
+                CameraPreparationMode.CameraModel
+                ? await _services.CameraModels.LoadAsync(
+                    preset.CameraModelId) ??
+                    throw new InvalidOperationException(
+                        "The selected camera model could not be loaded.")
+                : null;
         PlacementModel placement = await _services.PlacementModels.LoadAsync(preset.PlacementModelId) ?? throw new InvalidOperationException("The selected placement model could not be loaded.");
         IDetectorPack detector = _services.TraceDetector(
             await _services.DetectorPacks.LoadAsync(preset.DetectorPackId)
@@ -135,6 +143,7 @@ public partial class ExpeditionsPage : UserControl, IAppPage
                 if (value.DetectedState is not null) DetectionText.Text = $"Last detection: {Label(value.DetectedState)}{(value.Confidence is null ? string.Empty : $" ({value.Confidence:P0})")}";
             });
         });
+        _services.FastNoAlign.Invalidate();
         await _services.Coordinator.RunNowAsync("Expeditions macro", token => RunWithFailureHandlingAsync(
             "Expeditions Macro",
             webhook,
@@ -175,8 +184,18 @@ public partial class ExpeditionsPage : UserControl, IAppPage
 
     private async Task<ExpeditionPreset> SavePresetInternalAsync()
     {
-        if (CameraCombo.SelectedItem is not CameraModelManifest camera) throw new InvalidOperationException("Create and select a camera model.");
         if (PlacementCombo.SelectedItem is not PlacementModel placement) throw new InvalidOperationException("Create and select a placement model.");
+        CameraPreparationMode cameraMode =
+            SelectedCameraMode();
+        CameraModelManifest? camera =
+            CameraCombo.SelectedItem as
+                CameraModelManifest;
+        if (cameraMode == CameraPreparationMode.CameraModel &&
+            camera is null)
+        {
+            throw new InvalidOperationException(
+                "Create and select a camera model.");
+        }
         DetectorPackManifest detector = CurrentDetectorPack();
         string name = PresetNameText.Text.Trim();
         string id = ModelId.FromName(name);
@@ -186,7 +205,8 @@ public partial class ExpeditionsPage : UserControl, IAppPage
             Name = name,
             MapNumber = SelectedTag(MapCombo),
             Difficulty = SelectedTag(DifficultyCombo),
-            CameraModelId = camera.Id,
+            CameraPreparationMode = cameraMode,
+            CameraModelId = camera?.Id ?? string.Empty,
             PlacementModelId = placement.Id,
             TeamSlot = (TeamCombo.SelectedItem as TeamChoice)?.Value ?? 0,
             DetectorPackId = detector.PackId,
@@ -266,26 +286,6 @@ public partial class ExpeditionsPage : UserControl, IAppPage
         }
     }
 
-    private void ApplyPreset(ExpeditionPreset preset)
-    {
-        PresetNameText.Text = preset.Name;
-        MapCombo.SelectedIndex = preset.MapNumber - 1;
-        DifficultyCombo.SelectedIndex = preset.Difficulty - 1;
-        CameraPresetSelection.Apply(CameraCombo, PhaseText, _cameraModels, preset.CameraModelId);
-        PlacementCombo.SelectedItem = _placementModels.FirstOrDefault(model => model.Id == preset.PlacementModelId);
-        TeamCombo.SelectedItem = TeamChoices().First(value => value.Value == preset.TeamSlot);
-        ExtractCheck.IsChecked = preset.ExtractAtCheckpoint;
-        BossTargetText.Text = preset.BossesBeforeExtract.ToString(CultureInfo.InvariantCulture);
-        AutoRecoverCheck.IsChecked = preset.AutoRecover;
-        ZoomTicksText.Text = preset.ZoomTicks.ToString(CultureInfo.InvariantCulture);
-        PitchPixelsText.Text = preset.PitchDragPixels.ToString(CultureInfo.InvariantCulture);
-        PollText.Text = preset.PollMilliseconds.ToString(CultureInfo.InvariantCulture);
-        StableText.Text = preset.StableDetections.ToString(CultureInfo.InvariantCulture);
-        KeyHoldText.Text = preset.UnitKeyHoldMilliseconds.ToString(CultureInfo.InvariantCulture);
-        KeyDelayText.Text = preset.UnitSelectDelayMilliseconds.ToString(CultureInfo.InvariantCulture);
-        ExtractCheck_Changed(this, new RoutedEventArgs());
-    }
-
     private void NewPreset_Click(object sender, RoutedEventArgs e)
     {
         PresetCombo.SelectedItem = null;
@@ -293,38 +293,10 @@ public partial class ExpeditionsPage : UserControl, IAppPage
         UpdateDeleteAvailability();
     }
 
-    private void ApplyNewPreset()
-    {
-        PresetNameText.Text = "Expedition route";
-        MapCombo.SelectedIndex = 0;
-        DifficultyCombo.SelectedIndex = 0;
-        ExtractCheck.IsChecked = true;
-        BossTargetText.Text = "1";
-        AutoRecoverCheck.IsChecked = true;
-        TeamCombo.SelectedIndex = 0;
-        SelectCatalogDefaults();
-    }
-
-    private async Task RefreshCatalogsAsync()
-    {
-        IReadOnlyList<CameraModelManifest> cameras = await _services.CameraModels.ListAsync();
-        IReadOnlyList<PlacementModel> placements = await _services.PlacementModels.ListAsync();
-        IReadOnlyList<DetectorPackManifest> detectors = await _services.DetectorPacks.ListAsync();
-        _cameraModels.Clear(); foreach (CameraModelManifest model in cameras) _cameraModels.Add(model);
-        _placementModels.Clear(); foreach (PlacementModel model in placements) _placementModels.Add(model);
-        _detectorPacks.Clear(); foreach (DetectorPackManifest pack in detectors) _detectorPacks.Add(pack);
-    }
-
     private async Task RefreshPresetsAsync()
     {
         IReadOnlyList<ExpeditionPreset> presets = await _services.Presets.ListAsync();
         _presets.Clear(); foreach (ExpeditionPreset preset in presets) _presets.Add(preset);
-    }
-
-    private void SelectCatalogDefaults()
-    {
-        CameraCombo.SelectedItem ??= _cameraModels.FirstOrDefault();
-        PlacementCombo.SelectedItem ??= _placementModels.FirstOrDefault();
     }
 
     private void ApplySummary(ExpeditionRunSummary summary)
@@ -353,7 +325,7 @@ public partial class ExpeditionsPage : UserControl, IAppPage
 
     private void SetConfigurationEnabled(bool enabled)
     {
-        foreach (Control control in new Control[] { PresetCombo, SavePresetButton, NewPresetButton, PresetNameText, MapCombo, DifficultyCombo, CameraCombo, PlacementCombo, TeamCombo, BossTargetText, WebhookPassword, WebhookVisible, DiscordErrorUserIdText, ZoomTicksText, PitchPixelsText, PollText, StableText, KeyHoldText, KeyDelayText }) control.IsEnabled = enabled;
+        foreach (Control control in new Control[] { PresetCombo, SavePresetButton, NewPresetButton, PresetNameText, MapCombo, DifficultyCombo, CameraModeCombo, CameraCombo, PlacementCombo, TeamCombo, BossTargetText, WebhookPassword, WebhookVisible, DiscordErrorUserIdText, ZoomTicksText, PitchPixelsText, PollText, StableText, KeyHoldText, KeyDelayText }) control.IsEnabled = enabled;
         ExtractCheck.IsEnabled = enabled;
         AutoRecoverCheck.IsEnabled = enabled;
         ShowWebhookCheck.IsEnabled = enabled;

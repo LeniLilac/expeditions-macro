@@ -44,7 +44,6 @@ internal static class PlayMenuNavigator
             attemptMissed?.Invoke(attempt);
         }
 
-        throw new InvalidOperationException(
-            $"The Play menu did not open after {MaximumAttempts} {key}-key attempts. Confirm Anime Expeditions' Toggle Play Menu binding is also set to {key}.");
+        throw new PlayMenuBindingException(key);
     }
 }

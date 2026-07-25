@@ -22,6 +22,7 @@ public partial class ChallengesPage : UserControl, IAppPage
     private readonly AppServices _services;
     private readonly ObservableCollection<ChallengePreset> _presets = [];
     private readonly ObservableCollection<DetectorPackManifest> _detectorPacks = [];
+    private IReadOnlyList<PlacementModel> _allPlacementModels = [];
     private readonly DispatcherTimer _resetTimer;
     private readonly DispatcherTimer _runtimeTimer;
     private DateTimeOffset? _runStarted;
@@ -36,6 +37,7 @@ public partial class ChallengesPage : UserControl, IAppPage
         InitializeComponent();
         DataContext = this;
         PresetCombo.ItemsSource = _presets;
+        CameraModeCombo.ItemsSource = CameraModeChoices();
         _resetTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => UpdateResetCountdown(), Dispatcher);
         _resetTimer.Start();
         _runtimeTimer = new DispatcherTimer(TimeSpan.FromSeconds(1), DispatcherPriority.Background, (_, _) => UpdateRuntime(), Dispatcher);
@@ -87,7 +89,6 @@ public partial class ChallengesPage : UserControl, IAppPage
     public Task StartFromHotkeyAsync() => StartMacroAsync();
 
     private async void Start_Click(object sender, RoutedEventArgs e) => await StartMacroAsync();
-
     private void UpdateHotkeyText()
     {
         string hotkey = _services.Hotkey.DisplayName;
@@ -156,6 +157,7 @@ public partial class ChallengesPage : UserControl, IAppPage
                 if (value.DetectedState is not null) DetectionText.Text = $"Last detection: {Label(value.DetectedState)}{(value.Confidence is null ? string.Empty : $" ({value.Confidence:P0})")}";
             });
         });
+        _services.FastNoAlign.Invalidate();
         await _services.Coordinator.RunNowAsync("Challenge macro", token => RunWithFailureHandlingAsync(
             "Challenge Macro",
             webhook,
@@ -239,6 +241,8 @@ public partial class ChallengesPage : UserControl, IAppPage
             RunTraitChallenge = TraitCheck.IsChecked == true,
             RunStatChallenge = StatCheck.IsChecked == true,
             RunSpriteChallenge = SpriteCheck.IsChecked == true,
+            CameraPreparationMode =
+                SelectedCameraMode(),
             Maps = MapRows.Select(row => row.ToProfile()).ToArray(),
             DetectorPackId = detector.PackId,
             AutoRecover = AutoRecoverCheck.IsChecked == true,
@@ -306,6 +310,7 @@ public partial class ChallengesPage : UserControl, IAppPage
         TraitCheck.IsChecked = preset.RunTraitChallenge;
         StatCheck.IsChecked = preset.RunStatChallenge;
         SpriteCheck.IsChecked = preset.RunSpriteChallenge;
+        SelectCameraMode(preset.CameraPreparationMode);
         AutoRecoverCheck.IsChecked = preset.AutoRecover;
         DefeatRetriesText.Text = preset.DefeatRetries.ToString(CultureInfo.InvariantCulture);
         ZoomTicksText.Text = preset.ZoomTicks.ToString(CultureInfo.InvariantCulture);
@@ -319,6 +324,7 @@ public partial class ChallengesPage : UserControl, IAppPage
             ChallengeMapProfile profile = preset.Maps.Single(value => value.Map == row.Map);
             row.Apply(profile);
         }
+        PopulateFastPlacementOptions();
     }
 
     private void NewPreset_Click(object sender, RoutedEventArgs e)
@@ -332,6 +338,10 @@ public partial class ChallengesPage : UserControl, IAppPage
     {
         PresetNameText.Text = "Challenge rotation";
         TraitCheck.IsChecked = StatCheck.IsChecked = SpriteCheck.IsChecked = true;
+        SelectCameraMode(
+            _services.Settings.FastNoAlignEnabled
+                ? CameraPreparationMode.FastNoAlign
+                : CameraPreparationMode.CameraModel);
         AutoRecoverCheck.IsChecked = true;
         DefeatRetriesText.Text = "0";
         ZoomTicksText.Text = "30";
@@ -341,24 +351,9 @@ public partial class ChallengesPage : UserControl, IAppPage
         KeyHoldText.Text = "110";
         KeyDelayText.Text = "250";
         foreach (ChallengeMapRow row in MapRows) row.Apply(new ChallengeMapProfile { Map = row.Map });
+        PopulateFastPlacementOptions();
         StatusText.Text = string.Empty;
         DetectionText.Text = string.Empty;
-    }
-
-    private async Task RefreshCatalogsAsync()
-    {
-        IReadOnlyList<CameraModelManifest> cameras = await _services.CameraModels.ListAsync();
-        IReadOnlyList<PlacementModel> placements = await _services.PlacementModels.ListAsync();
-        IReadOnlyList<DetectorPackManifest> detectorPacks = await _services.DetectorPacks.ListAsync();
-
-        CameraOptions.Clear();
-        CameraOptions.Add(new CatalogOption(string.Empty, "Choose model"));
-        foreach (CameraModelManifest camera in cameras) CameraOptions.Add(new CatalogOption(camera.Id, camera.Name));
-        PlacementOptions.Clear();
-        PlacementOptions.Add(new CatalogOption(string.Empty, "None"));
-        foreach (PlacementModel placement in placements) PlacementOptions.Add(new CatalogOption(placement.Id, placement.Name));
-        _detectorPacks.Clear();
-        foreach (DetectorPackManifest pack in detectorPacks) _detectorPacks.Add(pack);
     }
 
     private async Task RefreshPresetsAsync()
@@ -404,6 +399,8 @@ public partial class ChallengesPage : UserControl, IAppPage
         ShowWebhookCheck.IsEnabled = enabled;
         TestWebhookButton.IsEnabled = enabled && !_testingWebhook;
         MapItems.IsEnabled = enabled;
+        FastMapModelsPanel.IsEnabled = enabled;
+        CameraModeCombo.IsEnabled = enabled;
         StartButton.IsEnabled = enabled;
         UpdateDeleteAvailability();
         if (enabled && _macroOwned && _runStarted is not null)
@@ -424,23 +421,6 @@ public partial class ChallengesPage : UserControl, IAppPage
         DateTimeOffset next = ChallengeRunPolicy.NextGlobalReset(now);
         TimeSpan remaining = next - now;
         NextResetText.Text = $"Next reset in {(int)remaining.TotalMinutes}m {remaining.Seconds:00}s";
-    }
-
-    private async Task<IReadOnlyDictionary<ChallengeMapId, ChallengeMapRuntimeModels>> LoadMapModelsAsync(ChallengePreset preset)
-    {
-        Dictionary<ChallengeMapId, ChallengeMapRuntimeModels> result = [];
-        foreach (ChallengeMapProfile profile in preset.Maps)
-        {
-            CameraModel camera = await _services.CameraModels.LoadAsync(profile.CameraModelId) ?? throw new InvalidOperationException($"The {Label(profile.Map)} camera model could not be loaded.");
-            PlacementModel? prestart = string.IsNullOrWhiteSpace(profile.PrestartPlacementModelId)
-                ? null
-                : await _services.PlacementModels.LoadAsync(profile.PrestartPlacementModelId) ?? throw new InvalidOperationException($"The {Label(profile.Map)} before-start placement model could not be loaded.");
-            PlacementModel? delayed = string.IsNullOrWhiteSpace(profile.DelayedPlacementModelId)
-                ? null
-                : await _services.PlacementModels.LoadAsync(profile.DelayedPlacementModelId) ?? throw new InvalidOperationException($"The {Label(profile.Map)} delayed placement model could not be loaded.");
-            result[profile.Map] = new ChallengeMapRuntimeModels(camera, prestart, delayed);
-        }
-        return result;
     }
 
     private void ApplySummary(ChallengeRunSummary summary)

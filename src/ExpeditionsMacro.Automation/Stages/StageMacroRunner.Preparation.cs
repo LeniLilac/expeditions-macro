@@ -76,6 +76,31 @@ public sealed partial class StageMacroRunner
 
         int zoomTicks = story?.ZoomTicks ?? raid!.ZoomTicks;
         int pitchDragPixels = story?.PitchDragPixels ?? raid!.PitchDragPixels;
+        CameraPreparationMode cameraMode =
+            story?.CameraPreparationMode ??
+            raid!.CameraPreparationMode;
+        if (cameraMode == CameraPreparationMode.FastNoAlign)
+        {
+            bool prepared =
+                await _fastNoAlign.EnsurePreparedAsync(
+                    window,
+                    zoomTicks,
+                    pitchDragPixels,
+                    progress,
+                    cancellationToken).ConfigureAwait(false);
+            preparation.MarkCameraAligned();
+            log(
+                prepared
+                    ? "Fast no align prepared zoom and pitch without changing yaw."
+                    : "Fast no align reused the camera pose preserved from the previous match.",
+                MacroEventLevel.Success,
+                prepared
+                    ? "fast_no_align"
+                    : "fast_no_align_reused",
+                null);
+            return;
+        }
+
         report(
             "Camera",
             20,
@@ -83,7 +108,9 @@ public sealed partial class StageMacroRunner
             null,
             null);
         double confidence = await _camera.PrepareAndAlignAsync(
-            models.Camera,
+            models.Camera ??
+                throw new InvalidDataException(
+                    $"Choose a camera model for {Label(mode)}."),
             window,
             zoomTicks,
             pitchDragPixels,

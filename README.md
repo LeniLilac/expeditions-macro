@@ -11,14 +11,15 @@ It uses screen capture and ordinary Windows input. It does not inject into Roblo
 ## What it does
 
 - Starts and stops with one configurable global hotkey; **F6** is the default, with letters, digits, punctuation, numpad keys, and supported function keys available.
-- Can begin from the Roblox lobby and navigate to the configured Expeditions map and difficulty.
+- Starts only from the fully loaded Roblox lobby, then navigates to the configured mode, map, and difficulty.
+- By default, checks Anime Expeditions' required Gameplay, Graphics, Units, and Misc settings before the first task and corrects mismatches after normalizing UI Scale to 1.00.
 - Runs any enabled Trait, Stat, and Sprite Challenges on the global half-hour reset, recognizes five rotating maps, and loads the matching camera and placement models.
 - Supports separate prestart and delayed in-match Challenge placements and configurable defeat retries; while Challenges are unavailable, the Macro scheduler selects the next eligible task by priority.
 - Navigates Story Acts 1-5, Infinite, and Mastery across five maps, plus Spirit City Raid Acts 1-3.
 - Saves prioritized Macro plans that can rotate Challenge, Expedition, Story, and Raid presets while preserving progress between launches.
 - Optionally opens Units and loads Team 1-8 before a configured run.
-- Fully zooms out with Roblox's `O` key (with mouse-wheel input retained as a fallback), toggles shift lock with the configured physical key, sets a top-down pitch, and aligns yaw against a learned full-turn camera model.
-- Records, edits, saves, and tests Roblox-relative unit placements in one tool.
+- Defaults to **Fast no align**, which fully zooms out, temporarily enables Shift Lock, sets a top-down pitch, and deliberately preserves the map's deterministic starting yaw. Learned camera models remain available for presets that need a custom yaw.
+- Creates Roblox-relative unit placements directly on bundled 808 by 611 map screenshots, including an ordered before-Start or after-Start phase and an independent after-Start offset for every point. Fast placements must remain at least 7 client pixels apart. The legacy live recorder remains available with camera-model mode.
 - Detects start, checkpoint, continue, confirmation, reward, victory, defeat, lobby, disconnect, and AFK Chamber screens.
 - Captures the Roblox window directly instead of reading overlapping desktop windows, and normalizes HDR/Auto HDR pixels to SDR before detection.
 - Detects reward cards from the stable reward overlay and available Select Upgrade controls, including layouts where a card is still collapsed or moving and regardless of rarity color.
@@ -49,11 +50,19 @@ The instructions below refer to the **macro hotkey**. It defaults to **F6** and 
 
 Before starting a macro, assign Anime Expeditions' **Toggle Play Menu** action to one letter from A through Z. Under **Settings > Controls**, click **Play menu key** and press that same letter. This setting intentionally starts empty, so the app shows an immediate setup popup and refuses to start until it is configured. Keep it different from the macro start/stop hotkey. The same key opens Play from the lobby as well as from Victory, Defeat, or an unstarted match, avoiding the small on-screen Play button. If three verified presses do not open Play, the macro stops with a setup popup instead of continuing through an unreliable click path.
 
-If a preset should load a saved Team, also assign the game's **Toggle Units** action to a letter and record it as **Unit menu key** under Settings. Leave a preset's Team setting at **Don't change** when the active team should remain untouched.
+Start every Macro plan from the fully loaded lobby with Play, Areas, Units, and the game Settings panel closed. **Check and fix game settings at macro start** is enabled by default under the app's Settings page. It first opens the in-game Settings panel and normalizes UI Scale to 1.00 through Roblox accessibility navigation before performing scale-dependent Lobby detection. After the canonical-scale Lobby is verified, it reopens Settings and verifies every required toggle before navigation begins. The standalone Debug UI Scale action can run from any fully loaded game state and does not require Lobby. Controls without a required state are left untouched. The macro stops before sending route input if the lobby, panel, page, scrollbar, or a required toggle cannot be verified. You can disable the automatic correction, but the stable-lobby start requirement still applies.
+
+If a Fast Placement Setup should load a saved Team, also assign the game's **Toggle Units** action to a letter and record it as **Unit menu key** under Settings. Leave the setup's Team at **Don't change** when the active team should remain untouched. Legacy camera-model presets retain their own Team fields.
 
 The **Shift Lock key** defaults to **Left Ctrl**. If Anime Expeditions uses a different Shift Lock binding, click that key under **Settings > Controls** and press the matching physical key. Left and right Shift/Ctrl are stored separately; letters, numbers, symbols, numpad keys, function keys, and common control keys are also supported. Keep it different from the macro hotkey, Play menu key, and Unit menu key.
 
-### 1. Create a camera model
+### 1. Choose a camera workflow
+
+**Fast no align is enabled by default.** It uses each map's repeatable starting yaw, so no Camera Model is required. Camera Models and the four legacy preset editors stay hidden. **Placement Setup** organizes routes into collapsed map categories. Select an Expeditions or Story-map category to create one shared fallback, then add a child route only when that map, act, or mode needs an override. Macro Plan owns route policy such as Challenge types, difficulty, extraction, boss count, Hard mode, and defeat retries.
+
+Fast no-align and camera-model placement files are intentionally incompatible. Fast no align resolves an exact route first, then its supported category fallback. Existing camera-model presets remain unchanged and continue to run. Turn off **Fast no align placement workflow** in Settings when you need to create or edit the legacy workflow.
+
+For a custom per-map yaw, disable Fast no align and create a camera model:
 
 1. Open **Camera Models** and choose **New model**.
 2. Put Roblox at the repeatable world position and goal yaw. Leave shift lock off.
@@ -66,20 +75,42 @@ Camera regions are saved relative to the Roblox client and shown as colored outl
 
 ### 2. Create a placement model
 
+With Fast no align enabled:
+
+1. Open **Placement Setup**. Select a category header to configure its shared fallback, or expand it and choose a child route to create an exact override. Raid acts remain direct routes because their maps differ.
+2. Choose the saved Team for that category or route, or leave it at **Don't change**.
+3. Choose a unit slot and **Before Start** or **After Start**.
+4. Set each after-Start point's delay in seconds, then click the ordered placement points directly on the native 808 by 611 map screenshot. Points must be at least 7 client pixels apart; right-click a marker to remove it.
+5. Save the setup. **Test playback** prepares Fast no align, then replays the points through the production input path.
+
+Each marker is labeled with its unit slot and `B` or `A` phase. Before-Start rows play before the runner deliberately clicks Start; After-Start rows play immediately after the match begins.
+
+With Fast no align disabled, the legacy live recorder remains available:
+
 1. Open **Placement Models** and choose **New model**.
 2. Enter a name and choose recorded delays or a default interval.
 3. Choose **Record placements**, focus Roblox, then press the macro hotkey.
 4. For each unit, press its top-row number and click the placement location.
 5. Press the macro hotkey again to finish and save.
 
-Recording uses the same 808 by 611 Roblox client size as the detector pack. Every row can be edited afterward: unit key, client-relative X/Y, and delay. **Test playback** replays the model through the same input path used during an Expedition run.
+Recording uses the same 808 by 611 Roblox client size as the detector pack. Every row can be edited afterward: unit key, client-relative X/Y, and delay. **Test playback** replays the model through the same input path used during a macro run.
 
 Saving the same name replaces the previous model.
 
-### 3. Configure Expeditions
+### 3. Configure a Fast no align Macro plan
+
+1. Open **Macro**, create a plan, and choose a route directly.
+2. Configure its victory/runtime target and route policy. Challenge tasks own enabled Challenge types and defeat retries; Expeditions own difficulty, extraction, and boss nodes before extraction; Story owns Hard mode and defeat retries; Raid owns defeat retries.
+3. Add and order tasks. The first enabled, eligible row always runs next.
+4. Use **Export code** to copy the plan plus the exact overrides and category fallbacks it resolves to, including Placement Setup coordinates and Teams, as a compact `EMFAST1:` Base64 string. **Import code** validates and restores that same secret-free bundle on another device. Camera models, app settings, webhooks, private-server links, diagnostics, and task progress are never included.
+5. Save the plan and press the macro hotkey.
+
+The legacy sections below apply only after disabling Fast no align.
+
+### 4. Configure legacy Expeditions
 
 1. Open **Expeditions**.
-2. Choose map, difficulty, camera model, and placement model.
+2. Choose map, difficulty, camera preparation, and a compatible placement model. Fast no align is selected for new presets by default.
 3. Enable checkpoint extraction and set **Boss nodes before extract**:
    - `0`: extract at the first real in-run checkpoint.
    - `1`: extract at the first checkpoint after one boss node.
@@ -90,10 +121,10 @@ Saving the same name replaces the previous model.
 
 The app waits for the difficulty carousel animation to settle and verifies the active difficulty before continuing.
 
-### 4. Configure Challenges
+### 5. Configure legacy Challenges
 
 1. Open **Challenges** and enable any combination of Trait, Stat, and Sprite Challenges.
-2. For each of the five maps, choose a camera model, a before-start placement model, an optional after-start placement model, and its elapsed-time delay.
+2. Choose camera preparation. In Fast no align, select one exact-map placement model per map; it contains both placement phases. In Camera model mode, choose a camera model, a before-start placement model, and an optional delayed placement model for each map.
 3. Set how many times a Challenge may retry after defeat. The default is zero; a failed entry becomes eligible again at the next global reset.
 4. Optionally enter a Discord webhook and numeric user ID for five error alerts, save the Challenge preset, and press the macro hotkey.
 
@@ -101,17 +132,17 @@ The selector order is fixed by Challenge type. The macro recognizes the current 
 
 Before-start coordinates that fall beneath the centered Start Game dialog cannot reach the map. The Challenge runner automatically places unobstructed rows first, clicks Start deliberately, then immediately plays only the covered rows. A placement point therefore cannot accidentally start the match.
 
-### 5. Configure Story or Raid
+### 6. Configure legacy Story or Raid
 
 1. Open **Story** or **Raid** and create a named preset.
 2. For Story, choose one of the five maps and an Act, Infinite, or Mastery route. Act routes can use Normal or Hard difficulty.
 3. For Raid, choose Spirit City Act 1, 2, or 3.
-4. Choose a camera model and at least one before-start or after-start placement model.
+4. Choose camera preparation and a compatible placement model. Fast no align uses one route-specific model containing both phases; Camera model mode retains separate before-start and delayed placement models.
 5. Optionally choose Team 1-8, set defeat retries, and save the preset.
 
-Story and Raid pages edit presets. Add the saved preset to a Macro plan to run it. A before-start model plays in the countdown; an after-start model runs after its configured delay. Victory completes one scheduled attempt, while the preset's retry limit controls immediate retries after defeat.
+Story and Raid pages edit presets. Add the saved preset to a Macro plan to run it. Fast no-align phases play around the Start action; legacy before-start and delayed models retain their configured timing. Victory completes one scheduled attempt, while the preset's retry limit controls immediate retries after defeat.
 
-### 6. Build a Macro plan
+### 7. Build a legacy Macro plan
 
 1. Open **Macro**, create a plan, and add saved Challenge, Expedition, Story, or Raid presets.
 2. Order tasks with **Up** and **Down**. The first enabled, eligible row always runs next.
@@ -125,15 +156,17 @@ The scheduler never interrupts a live match. It updates saved task progress only
 
 Under **Macro > Roblox reconnect**, paste either a modern Roblox private-server share link or a legacy `privateServerLinkCode` link, then enable restart recovery. The link is global to the app rather than part of an individual plan.
 
-Normal lobby, disconnect, AFK, party, and blue-void recovery remains the first path. If that bounded recovery errors or times out, the app:
+Normal in-client lobby, disconnect, AFK, party, and blue-void recovery remains the first path. Verified runtime/session failures—including a missing or resized Roblox window, startup Lobby/settings stalls, ignored UI transitions, team-scroll alignment failure, and navigation timeout—then use private-server recovery:
 
 1. verifies the visible Roblox window belongs to a supported Roblox player process;
 2. closes only that process;
 3. launches the private server through Windows' registered `roblox://` protocol;
 4. waits for a new verified Roblox PID; and
-5. reloads the saved plan and retries the same incomplete task.
+5. reruns the stable-Lobby startup check, reloads the saved plan, and retries the same incomplete task without adding progress.
 
-This launch does not use a browser, stored account credentials, cookies, or process injection. The current Windows user must already be signed into the installed Roblox client. To prevent a restart loop, automatic process recovery stops after three restarts within ten minutes. The private-server link grants access to that server, so it is protected with Windows DPAPI and excluded from logs and diagnostics.
+An automatic diagnostic is saved before each restart. Recoverable errors do not emit the terminal Discord “stopped unexpectedly” ping. Invalid plans/models, unsupported detector layouts, a bad Play key binding, malformed private-server links, and the three-restarts-per-ten-minutes circuit remain hard stops. Without restart recovery enabled and a valid private-server link, a recoverable runtime exception must still stop because the app has no authorized rejoin destination.
+
+This launch does not use a browser, stored account credentials, cookies, or process injection. The current Windows user must already be signed into the installed Roblox client. The private-server link grants access to that server, so it is protected with Windows DPAPI and excluded from logs and diagnostics.
 
 ## Runtime behavior
 

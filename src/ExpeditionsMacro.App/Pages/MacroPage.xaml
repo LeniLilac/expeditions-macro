@@ -67,7 +67,7 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Margin="12,0,6,0" VerticalAlignment="Center" Style="{StaticResource Caption}" Text="#" />
                                 <TextBlock Grid.Column="1" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Caption}" Text="Mode" />
-                                <TextBlock Grid.Column="2" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Caption}" Text="Preset" />
+                                <TextBlock Grid.Column="2" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Caption}" Text="Route" />
                                 <TextBlock Grid.Column="3" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Caption}" Text="Target" />
                                 <TextBlock Grid.Column="4" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Caption}" Text="Progress" />
                                 <TextBlock Grid.Column="5" Margin="6,0" VerticalAlignment="Center" Style="{StaticResource Caption}" Text="Actions" />
@@ -101,48 +101,233 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-                            <TextBlock x:Name="EmptyTasksText" Margin="12" Style="{StaticResource Caption}" Text="No tasks yet. Add a preset below." />
+                            <TextBlock x:Name="EmptyTasksText" Margin="12" Style="{StaticResource Caption}" Text="No tasks yet. Add a route below." />
                         </StackPanel>
                     </Border>
 
-                    <Grid Margin="0,16,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="130" />
-                            <ColumnDefinition Width="16" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="16" />
-                            <ColumnDefinition Width="130" />
-                            <ColumnDefinition Width="16" />
-                            <ColumnDefinition Width="112" />
-                            <ColumnDefinition Width="10" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="10" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
+                    <Border Margin="0,16,0,0"
+                            Padding="14"
+                            Background="{DynamicResource SurfaceBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="4">
                         <StackPanel>
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Mode" />
-                            <ComboBox x:Name="TaskKindCombo" Margin="0,7,0,0" DisplayMemberPath="Name" SelectionChanged="TaskKindCombo_SelectionChanged" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="16" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="136" />
+                                        <ColumnDefinition x:Name="TaskSelectionGapColumn"
+                                                          Width="16" />
+                                        <ColumnDefinition x:Name="TaskSelectionColumn"
+                                                          Width="*" />
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="132" />
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="124" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Style="{StaticResource FieldLabel}"
+                                                   Text="Mode" />
+                                        <ComboBox x:Name="TaskKindCombo"
+                                                  Margin="0,7,0,0"
+                                                  DisplayMemberPath="Name"
+                                                  SelectionChanged="TaskKindCombo_SelectionChanged" />
+                                    </StackPanel>
+                                    <StackPanel x:Name="TaskSelectionPanel"
+                                                Grid.Column="2">
+                                        <TextBlock x:Name="TaskSelectionLabel"
+                                                   Style="{StaticResource FieldLabel}"
+                                                   Text="Preset" />
+                                        <Grid Margin="0,7,0,0">
+                                            <ComboBox x:Name="TaskPresetCombo"
+                                                      DisplayMemberPath="DisplayName"
+                                                      SelectionChanged="TaskPresetCombo_SelectionChanged" />
+                                            <ComboBox x:Name="TaskRouteCombo"
+                                                      DisplayMemberPath="Name"
+                                                      Visibility="Collapsed"
+                                                      SelectionChanged="TaskRouteCombo_SelectionChanged" />
+                                        </Grid>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock x:Name="TaskTargetLabel"
+                                                   Style="{StaticResource FieldLabel}"
+                                                   Text="Victories" />
+                                        <TextBox x:Name="TaskTargetText"
+                                                 Margin="0,7,0,0"
+                                                 Text="1" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="6">
+                                        <TextBlock Style="{StaticResource FieldLabel}"
+                                                   Text="State" />
+                                        <CheckBox x:Name="TaskEnabledCheck"
+                                                  Margin="0,7,0,0"
+                                                  IsChecked="True"
+                                                  Content="Enabled" />
+                                    </StackPanel>
+                                </Grid>
+                                <StackPanel Grid.Column="2"
+                                            Margin="0,21,0,0"
+                                            VerticalAlignment="Top"
+                                            Orientation="Horizontal">
+                                    <Button x:Name="AddTaskButton"
+                                            Style="{StaticResource PrimaryButton}"
+                                            icons:Lucide.Icon="Plus"
+                                            Content="Add task"
+                                            Click="AddOrUpdateTask_Click" />
+                                    <Button x:Name="CancelTaskEditButton"
+                                            Height="40"
+                                            Margin="8,0,0,0"
+                                            Visibility="Collapsed"
+                                            icons:Lucide.Icon="X"
+                                            Content="Cancel"
+                                            Click="CancelTaskEdit_Click" />
+                                </StackPanel>
+                            </Grid>
+                            <Border x:Name="FastTaskOptionsPanel"
+                                    Margin="0,16,0,0"
+                                    Padding="0,14,0,0"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="0,1,0,0"
+                                    Visibility="Collapsed">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="112" />
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Margin="0,2,0,0"
+                                               VerticalAlignment="Top"
+                                               Style="{StaticResource FieldLabel}"
+                                               Text="Mode options" />
+                                    <WrapPanel Grid.Column="2">
+                                        <StackPanel x:Name="TaskDefeatRetriesPanel"
+                                                    Width="124"
+                                                    Margin="0,0,16,0">
+                                            <TextBlock Style="{StaticResource FieldLabel}"
+                                                       Text="Defeat retries" />
+                                            <TextBox x:Name="TaskDefeatRetriesText"
+                                                     Margin="0,7,0,0"
+                                                     Text="0" />
+                                        </StackPanel>
+                                        <StackPanel x:Name="TaskChallengeTypesPanel"
+                                                    Margin="0,0,16,0">
+                                            <TextBlock Style="{StaticResource FieldLabel}"
+                                                       Text="Challenge types" />
+                                            <StackPanel Margin="0,7,0,0"
+                                                        Orientation="Horizontal">
+                                                <CheckBox x:Name="TaskTraitCheck"
+                                                          Margin="0"
+                                                          IsChecked="True"
+                                                          Content="Trait" />
+                                                <CheckBox x:Name="TaskStatCheck"
+                                                          Margin="14,0,0,0"
+                                                          IsChecked="True"
+                                                          Content="Stat" />
+                                                <CheckBox x:Name="TaskSpriteCheck"
+                                                          Margin="14,0,0,0"
+                                                          IsChecked="True"
+                                                          Content="Sprite" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <StackPanel x:Name="TaskExpeditionOptionsPanel"
+                                                    Orientation="Horizontal">
+                                            <StackPanel Width="110"
+                                                        Margin="0,0,16,0">
+                                                <TextBlock Style="{StaticResource FieldLabel}"
+                                                           Text="Difficulty" />
+                                                <ComboBox x:Name="TaskDifficultyCombo"
+                                                          Margin="0,7,0,0" />
+                                            </StackPanel>
+                                            <StackPanel Width="174"
+                                                        Margin="0,0,16,0">
+                                                <TextBlock Style="{StaticResource FieldLabel}"
+                                                           Text="Extraction" />
+                                                <CheckBox x:Name="TaskExtractCheck"
+                                                          Margin="0,7,0,0"
+                                                          IsChecked="True"
+                                                          Content="Extract at checkpoint" />
+                                            </StackPanel>
+                                            <StackPanel Width="164">
+                                                <TextBlock Style="{StaticResource FieldLabel}"
+                                                           Text="Boss nodes before extract" />
+                                                <TextBox x:Name="TaskBossNodesText"
+                                                         Margin="0,7,0,0"
+                                                         Text="1" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <StackPanel x:Name="TaskStoryOptionsPanel"
+                                                    Width="150">
+                                            <TextBlock Style="{StaticResource FieldLabel}"
+                                                       Text="Story options" />
+                                            <CheckBox x:Name="TaskHardModeCheck"
+                                                      Margin="0,7,0,0"
+                                                      Content="Hard mode" />
+                                        </StackPanel>
+                                    </WrapPanel>
+                                </Grid>
+                            </Border>
+                            <TextBlock x:Name="TaskEditorStatusText"
+                                       Margin="0,8,0,0"
+                                       Style="{StaticResource Caption}"
+                                       TextWrapping="Wrap" />
                         </StackPanel>
-                        <StackPanel Grid.Column="2">
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="Preset" />
-                            <ComboBox x:Name="TaskPresetCombo" Margin="0,7,0,0" DisplayMemberPath="DisplayName" SelectionChanged="TaskPresetCombo_SelectionChanged" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="4">
-                            <TextBlock x:Name="TaskTargetLabel" Style="{StaticResource FieldLabel}" Text="Victories" />
-                            <TextBox x:Name="TaskTargetText" Margin="0,7,0,0" Text="1" />
-                        </StackPanel>
-                        <StackPanel Grid.Column="6">
-                            <TextBlock Style="{StaticResource FieldLabel}" Text="State" />
-                            <CheckBox x:Name="TaskEnabledCheck" Margin="0,7,0,0" IsChecked="True" Content="Enabled" />
-                        </StackPanel>
-                        <Button x:Name="AddTaskButton" Grid.Column="8" Margin="0,21,0,0" VerticalAlignment="Top" Style="{StaticResource PrimaryButton}" icons:Lucide.Icon="Plus" Content="Add task" Click="AddOrUpdateTask_Click" />
-                        <Button x:Name="CancelTaskEditButton" Grid.Column="10" Margin="0,21,0,0" Height="40" VerticalAlignment="Top" Visibility="Collapsed" icons:Lucide.Icon="X" Content="Cancel" Click="CancelTaskEdit_Click" />
-                    </Grid>
-                    <TextBlock x:Name="TaskEditorStatusText" Margin="0,8,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" />
+                    </Border>
                 </StackPanel>
             </Border>
 
-            <Border Grid.Row="3" Style="{StaticResource FormCard}">
+            <Border x:Name="SharePlanCard"
+                    Grid.Row="3"
+                    Margin="0,0,0,14"
+                    Style="{StaticResource FormCard}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Style="{StaticResource SectionTitle}"
+                               Text="Share Fast no align plan" />
+                    <TextBox x:Name="ShareCodeText"
+                             Grid.Row="1"
+                             Height="68"
+                             Margin="0,14,0,0"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto" />
+                    <Grid Grid.Row="2" Margin="0,10,0,0">
+                        <TextBlock x:Name="SharePlanStatusText"
+                                   Margin="0,0,16,0"
+                                   VerticalAlignment="Center"
+                                   Style="{StaticResource Caption}"
+                                   TextWrapping="Wrap" />
+                        <StackPanel HorizontalAlignment="Right"
+                                    Orientation="Horizontal">
+                            <Button x:Name="ExportPlanCodeButton"
+                                    icons:Lucide.Icon="Send"
+                                    Content="Export code"
+                                    Click="ExportPlanCode_Click" />
+                            <Button x:Name="CopyPlanCodeButton"
+                                    Margin="8,0,0,0"
+                                    icons:Lucide.Icon="Copy"
+                                    Content="Copy"
+                                    Click="CopyPlanCode_Click" />
+                            <Button x:Name="ImportPlanCodeButton"
+                                    Margin="8,0,0,0"
+                                    Style="{StaticResource PrimaryButton}"
+                                    icons:Lucide.Icon="FolderOpen"
+                                    Content="Import code"
+                                    Click="ImportPlanCode_Click" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="4" Style="{StaticResource FormCard}">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -195,7 +380,7 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Row="4"
+            <Border Grid.Row="5"
                     Margin="0,14,0,0"
                     Style="{StaticResource FormCard}">
                 <StackPanel>
@@ -239,7 +424,7 @@
                 </StackPanel>
             </Border>
 
-            <Border Grid.Row="5" Margin="0,22,0,0">
+            <Border Grid.Row="6" Margin="0,22,0,0">
                 <StackPanel>
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>

@@ -24,6 +24,35 @@ public sealed class StagePresetTests
     }
 
     [Fact]
+    public void FastPresets_UseOneCombinedPlacementWithoutCamera()
+    {
+        StoryPreset story = Story() with
+        {
+            CameraPreparationMode =
+                CameraPreparationMode.FastNoAlign,
+            PrestartPlacementModelId =
+                "story-fast-placement",
+        };
+        RaidPreset raid = Raid() with
+        {
+            CameraPreparationMode =
+                CameraPreparationMode.FastNoAlign,
+            PrestartPlacementModelId =
+                "raid-fast-placement",
+        };
+
+        story.Validate(requireModels: true);
+        raid.Validate(requireModels: true);
+
+        Assert.Throws<InvalidDataException>(
+            () => (story with
+            {
+                DelayedPlacementModelId =
+                    "legacy-delayed-placement",
+            }).Validate(requireModels: true));
+    }
+
+    [Fact]
     public async Task Repositories_RoundTripStoryAndRaidPresets()
     {
         string root = TestPaths.NewTemporaryDirectory();

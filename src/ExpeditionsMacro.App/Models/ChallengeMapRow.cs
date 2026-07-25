@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using ExpeditionsMacro.Core.Models;
@@ -22,6 +23,10 @@ public sealed class ChallengeMapRow : INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ChallengeMapId Map { get; }
+
+    public ObservableCollection<CatalogOption>
+        FastPlacementOptions
+    { get; } = [];
 
     public string MapName => Map switch
     {

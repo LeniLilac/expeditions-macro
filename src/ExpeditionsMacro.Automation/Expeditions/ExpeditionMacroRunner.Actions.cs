@@ -1,6 +1,7 @@
 using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Imaging;
+using ExpeditionsMacro.Core.Runtime;
 
 namespace ExpeditionsMacro.Automation.Expeditions;
 
@@ -54,7 +55,7 @@ public sealed partial class ExpeditionMacroRunner
                 cancellationToken).ConfigureAwait(false);
         }
 
-        throw new InvalidOperationException(
+        throw new RobloxUiUnavailableException(
             $"The {state} action did not settle before it could be clicked.");
     }
 }

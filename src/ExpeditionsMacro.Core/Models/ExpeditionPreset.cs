@@ -14,6 +14,8 @@ public sealed record ExpeditionPreset
 
     public int Difficulty { get; init; } = 1;
 
+    public CameraPreparationMode CameraPreparationMode { get; init; }
+
     public string CameraModelId { get; init; } = string.Empty;
 
     public string PlacementModelId { get; init; } = string.Empty;
@@ -48,7 +50,13 @@ public sealed record ExpeditionPreset
         if (string.IsNullOrWhiteSpace(Id) || string.IsNullOrWhiteSpace(Name)) throw new InvalidDataException("Preset identity is missing.");
         if (MapNumber is < 1 or > 3) throw new InvalidDataException("Map must be 1, 2, or 3.");
         if (Difficulty is < 1 or > 3) throw new InvalidDataException("Difficulty must be 1, 2, or 3.");
-        if (string.IsNullOrWhiteSpace(CameraModelId) || string.IsNullOrWhiteSpace(PlacementModelId)) throw new InvalidDataException("Choose both a camera and placement model.");
+        if (!Enum.IsDefined(CameraPreparationMode)) throw new InvalidDataException("Camera preparation mode is invalid.");
+        if (string.IsNullOrWhiteSpace(PlacementModelId)) throw new InvalidDataException("Choose a placement model.");
+        if (CameraPreparationMode == CameraPreparationMode.CameraModel &&
+            string.IsNullOrWhiteSpace(CameraModelId))
+        {
+            throw new InvalidDataException("Choose a camera model.");
+        }
         if (TeamSlot is < 0 or > 8) throw new InvalidDataException("Team must be Don't change or Team 1 through 8.");
         if (BossesBeforeExtract is < 0 or > 99) throw new InvalidDataException("Boss checkpoint target must be 0 through 99.");
         if (ZoomTicks is < 5 or > 80 || PitchDragPixels is < 300 or > 5000) throw new InvalidDataException("Camera preparation settings are out of range.");

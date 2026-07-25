@@ -25,6 +25,7 @@ public sealed record StoryPreset
     public StoryRunKind RunKind { get; init; } = StoryRunKind.Act;
     public int ActNumber { get; init; } = 1;
     public bool HardMode { get; init; }
+    public CameraPreparationMode CameraPreparationMode { get; init; }
     public string CameraModelId { get; init; } = string.Empty;
     public string PrestartPlacementModelId { get; init; } = string.Empty;
     public string DelayedPlacementModelId { get; init; } = string.Empty;
@@ -46,12 +47,28 @@ public sealed record StoryPreset
         if (!Enum.IsDefined(Map) || !Enum.IsDefined(RunKind)) throw new InvalidDataException("Story map or run type is invalid.");
         if (ActNumber is < 1 or > 5) throw new InvalidDataException("Story act must be 1 through 5.");
         ValidateRuntimeSettings(DelayedPlacementSeconds, TeamSlot, DefeatRetries, ZoomTicks, PitchDragPixels, PollMilliseconds, StableDetections, UnitKeyHoldMilliseconds, UnitSelectDelayMilliseconds);
-        ValidateModelId(CameraModelId, "camera model", requireModels);
+        if (!Enum.IsDefined(CameraPreparationMode)) throw new InvalidDataException("Camera preparation mode is invalid.");
+        ValidateModelId(
+            CameraModelId,
+            "camera model",
+            requireModels &&
+            CameraPreparationMode == CameraPreparationMode.CameraModel);
         ValidateModelId(PrestartPlacementModelId, "before-start placement model", false);
         ValidateModelId(DelayedPlacementModelId, "after-start placement model", false);
-        if (requireModels && string.IsNullOrWhiteSpace(PrestartPlacementModelId) && string.IsNullOrWhiteSpace(DelayedPlacementModelId))
+        if (requireModels &&
+            CameraPreparationMode == CameraPreparationMode.CameraModel &&
+            string.IsNullOrWhiteSpace(PrestartPlacementModelId) &&
+            string.IsNullOrWhiteSpace(DelayedPlacementModelId))
         {
             throw new InvalidDataException("Choose at least one Story placement model.");
+        }
+        if (requireModels &&
+            CameraPreparationMode == CameraPreparationMode.FastNoAlign)
+        {
+            RequireCombinedFastPlacement(
+                PrestartPlacementModelId,
+                DelayedPlacementModelId,
+                "Story");
         }
     }
 
@@ -82,6 +99,23 @@ public sealed record StoryPreset
         string name = Path.GetFileName(id);
         if (name != id || id is "." or "..") throw new InvalidDataException($"The selected {label} is invalid.");
     }
+
+    internal static void RequireCombinedFastPlacement(
+        string placementModelId,
+        string delayedPlacementModelId,
+        string label)
+    {
+        if (string.IsNullOrWhiteSpace(placementModelId))
+        {
+            throw new InvalidDataException(
+                $"Choose a Fast no align placement model for {label}.");
+        }
+        if (!string.IsNullOrWhiteSpace(delayedPlacementModelId))
+        {
+            throw new InvalidDataException(
+                $"Fast no align stores {label} before-start and after-start placements together.");
+        }
+    }
 }
 
 public sealed record RaidPreset
@@ -92,6 +126,7 @@ public sealed record RaidPreset
     public required string Id { get; init; }
     public required string Name { get; init; }
     public RaidAct Act { get; init; } = RaidAct.Act1;
+    public CameraPreparationMode CameraPreparationMode { get; init; }
     public string CameraModelId { get; init; } = string.Empty;
     public string PrestartPlacementModelId { get; init; } = string.Empty;
     public string DelayedPlacementModelId { get; init; } = string.Empty;
@@ -112,12 +147,28 @@ public sealed record RaidPreset
         StoryPreset.ValidateIdentity(SchemaVersion, Id, Name, "Raid");
         if (!Enum.IsDefined(Act)) throw new InvalidDataException("Raid act is invalid.");
         StoryPreset.ValidateRuntimeSettings(DelayedPlacementSeconds, TeamSlot, DefeatRetries, ZoomTicks, PitchDragPixels, PollMilliseconds, StableDetections, UnitKeyHoldMilliseconds, UnitSelectDelayMilliseconds);
-        StoryPreset.ValidateModelId(CameraModelId, "camera model", requireModels);
+        if (!Enum.IsDefined(CameraPreparationMode)) throw new InvalidDataException("Camera preparation mode is invalid.");
+        StoryPreset.ValidateModelId(
+            CameraModelId,
+            "camera model",
+            requireModels &&
+            CameraPreparationMode == CameraPreparationMode.CameraModel);
         StoryPreset.ValidateModelId(PrestartPlacementModelId, "before-start placement model", false);
         StoryPreset.ValidateModelId(DelayedPlacementModelId, "after-start placement model", false);
-        if (requireModels && string.IsNullOrWhiteSpace(PrestartPlacementModelId) && string.IsNullOrWhiteSpace(DelayedPlacementModelId))
+        if (requireModels &&
+            CameraPreparationMode == CameraPreparationMode.CameraModel &&
+            string.IsNullOrWhiteSpace(PrestartPlacementModelId) &&
+            string.IsNullOrWhiteSpace(DelayedPlacementModelId))
         {
             throw new InvalidDataException("Choose at least one Raid placement model.");
+        }
+        if (requireModels &&
+            CameraPreparationMode == CameraPreparationMode.FastNoAlign)
+        {
+            StoryPreset.RequireCombinedFastPlacement(
+                PrestartPlacementModelId,
+                DelayedPlacementModelId,
+                "Raid");
         }
     }
 }

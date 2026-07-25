@@ -59,6 +59,10 @@ public partial class SettingsPage : UserControl, IAppPage
         IncludeLogsCheck.IsChecked = _services.Settings.IncludeLogsInDiagnosticArchives;
         DeepDebugCheck.IsChecked = _services.Settings.DeepDebugEnabled;
         DebugModeCheck.IsChecked = _services.Settings.DebugModeEnabled;
+        AutoGameSettingsCheck.IsChecked =
+            _services.Settings.AutoCheckGameSettingsOnStart;
+        FastNoAlignCheck.IsChecked =
+            _services.Settings.FastNoAlignEnabled;
         _loading = false;
         VersionText.Text = ProductVersion.Current;
         RobloxText.Text = _services.Automation.FindWindow() is { } window
@@ -116,6 +120,66 @@ public partial class SettingsPage : UserControl, IAppPage
             _loading = true;
             DebugModeCheck.IsChecked =
                 _services.Settings.DebugModeEnabled;
+            _loading = false;
+            throw;
+        }
+        finally
+        {
+            UpdateCaptureState();
+        }
+    }
+
+    private async void FastNoAlignCheck_Changed(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_loading) return;
+        FastNoAlignCheck.IsEnabled = false;
+        try
+        {
+            await _services.UpdateSettingsAsync(
+                settings => settings with
+                {
+                    FastNoAlignEnabled =
+                        FastNoAlignCheck.IsChecked == true,
+                });
+        }
+        catch
+        {
+            _loading = true;
+            FastNoAlignCheck.IsChecked =
+                _services.Settings.FastNoAlignEnabled;
+            _loading = false;
+            throw;
+        }
+        finally
+        {
+            UpdateCaptureState();
+        }
+    }
+
+    private async void AutoGameSettingsCheck_Changed(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_loading) return;
+        AutoGameSettingsCheck.IsEnabled = false;
+        try
+        {
+            await _services.UpdateSettingsAsync(
+                settings => settings with
+                {
+                    AutoCheckGameSettingsOnStart =
+                        AutoGameSettingsCheck.IsChecked ==
+                        true,
+                });
+        }
+        catch
+        {
+            _loading = true;
+            AutoGameSettingsCheck.IsChecked =
+                _services.Settings
+                    .AutoCheckGameSettingsOnStart;
             _loading = false;
             throw;
         }
@@ -337,6 +401,8 @@ public partial class SettingsPage : UserControl, IAppPage
         IncludeLogsCheck.IsEnabled = !busy;
         DeepDebugCheck.IsEnabled = !busy;
         DebugModeCheck.IsEnabled = !busy;
+        AutoGameSettingsCheck.IsEnabled = !busy;
+        FastNoAlignCheck.IsEnabled = !busy;
         KeyBindingsPanel.UpdateBusyState(busy);
         CaptureStopButton.IsEnabled = _captureOperationActive && busy;
         CaptureStopButton.Content = _services.Coordinator.State == OperationState.Armed ? "Cancel" : "Stop and save";

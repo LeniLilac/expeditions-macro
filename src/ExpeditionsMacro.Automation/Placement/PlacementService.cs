@@ -31,7 +31,7 @@ public sealed class PlacementService
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Enter a placement model name.", nameof(name));
-        RobloxWindow window = _automation.FindWindow() ?? throw new InvalidOperationException("No visible Roblox window was found.");
+        RobloxWindow window = _automation.FindWindow() ?? throw new RobloxSessionUnavailableException("No visible Roblox window was found.");
         ClientBounds initial = _automation.GetClientBounds(window);
         bool resized = initial.Width != RobloxClientProfile.Width || initial.Height != RobloxClientProfile.Height;
         (int width, int height, IReadOnlyList<PlacementCapture> captures) recording;
@@ -45,7 +45,7 @@ public sealed class PlacementService
         ClientBounds client = _automation.GetClientBounds(window);
         if (client.Width != RobloxClientProfile.Width || client.Height != RobloxClientProfile.Height)
         {
-            throw new InvalidOperationException($"Roblox did not accept the standard {RobloxClientProfile.Width} × {RobloxClientProfile.Height} client size.");
+            throw new RobloxSessionUnavailableException($"Roblox did not accept the standard {RobloxClientProfile.Width} × {RobloxClientProfile.Height} client size.");
         }
         recording = await _capture.RecordAsync(window, captured, status, cancellationToken).ConfigureAwait(false);
         (int width, int height, IReadOnlyList<PlacementCapture> captures) = recording;
@@ -78,7 +78,7 @@ public sealed class PlacementService
         CancellationToken cancellationToken = default)
     {
         model.Validate();
-        RobloxWindow window = _automation.FindWindow() ?? throw new InvalidOperationException("No visible Roblox window was found.");
+        RobloxWindow window = _automation.FindWindow() ?? throw new RobloxSessionUnavailableException("No visible Roblox window was found.");
         await PlayStepsAsync(window, model, model.Steps, useDefaultInterval, defaultIntervalMilliseconds, keyHoldMilliseconds, afterKeyMilliseconds, stepSent, status, cancellationToken).ConfigureAwait(false);
     }
 
@@ -124,11 +124,11 @@ public sealed class PlacementService
             await Task.Delay(250, cancellationToken).ConfigureAwait(false);
         }
         ClientBounds actual = _automation.GetClientBounds(window);
-        if (actual.Width != width || actual.Height != height) throw new InvalidOperationException("Roblox did not accept the placement model's client size.");
+        if (actual.Width != width || actual.Height != height) throw new RobloxSessionUnavailableException("Roblox did not accept the placement model's client size.");
     }
 
     private void EnsureFocus(RobloxWindow window)
     {
-        if (!_automation.Focus(window)) throw new InvalidOperationException("Windows could not focus Roblox.");
+        if (!_automation.Focus(window)) throw new RobloxSessionUnavailableException("Windows could not focus Roblox.");
     }
 }

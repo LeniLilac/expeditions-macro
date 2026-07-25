@@ -385,7 +385,7 @@ public sealed class ChallengeMacroRunnerTests
         ChallengeScreenMatch selector = ChallengeScreenDetector.Detect(cooldown);
         int clicks = 0;
 
-        InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        RobloxUiUnavailableException error = await Assert.ThrowsAsync<RobloxUiUnavailableException>(() =>
             ChallengeMacroRunner.CloseChallengeSelectorForHandoffAsync(
                 _ => Task.FromResult(selector),
                 (_, _, _) =>

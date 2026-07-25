@@ -53,7 +53,8 @@ public sealed class RecoveringMacroSchedulerTests
                         executions++;
                         return executions == 1
                             ? Task.FromException<ScheduledTaskResult>(
-                                new TimeoutException("navigation stalled"))
+                                new RobloxUiUnavailableException(
+                                    "Team list did not reach its verified row."))
                             : Task.FromResult(
                                 new ScheduledTaskResult(
                                     1,
@@ -81,6 +82,128 @@ public sealed class RecoveringMacroSchedulerTests
                 await plans.LoadAsync(plan.Id) ??
                 throw new InvalidOperationException("Saved plan missing.");
             Assert.True(saved.ProgressFor(task.Id).Completed);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task StartupUiFailure_RestartsAndRepeatsPreflightBeforeTask()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            AppPaths paths = new(root);
+            MacroPlanRepository plans = new(paths);
+            MacroTaskDefinition task = new()
+            {
+                Id = "story-1",
+                Kind = MacroTaskKind.Story,
+                PresetId = "story",
+                Name = "Story",
+                Priority = 1,
+                TargetVictories = 1,
+            };
+            MacroPlan plan = new()
+            {
+                Id = "preflight-recovery",
+                Name = "Preflight recovery",
+                Tasks = [task],
+            };
+            FakeRecovery recovery = new();
+            RecoveringMacroScheduler scheduler = new(
+                new MacroScheduler(plans),
+                plans,
+                recovery);
+            RobloxPrivateServerLaunchTarget target =
+                RobloxPrivateServerLaunchTarget.Parse(
+                    "https://www.roblox.com/share?code=Test_Server_123&type=Server");
+            using CancellationTokenSource cancellation = new();
+            int preflights = 0;
+            int executions = 0;
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                scheduler.RunAsync(
+                    plan,
+                    target,
+                    (_, _, _) =>
+                    {
+                        executions++;
+                        return Task.FromResult(
+                            new ScheduledTaskResult(
+                                1,
+                                0,
+                                TimeSpan.FromMinutes(2)));
+                    },
+                    planChanged: saved =>
+                    {
+                        if (saved.ProgressFor(task.Id).Completed)
+                        {
+                            cancellation.Cancel();
+                        }
+                    },
+                    cancellationToken: cancellation.Token,
+                    prepareSession: _ =>
+                    {
+                        preflights++;
+                        return preflights == 1
+                            ? Task.FromException(
+                                new RobloxUiUnavailableException(
+                                    "Settings panel did not settle."))
+                            : Task.CompletedTask;
+                    }));
+
+            Assert.Equal(2, preflights);
+            Assert.Equal(1, executions);
+            Assert.Equal(1, recovery.Restarts);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task UiFailureWithoutConfiguredRejoinTarget_StopsSafely()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            AppPaths paths = new(root);
+            MacroPlan plan = new()
+            {
+                Id = "no-target",
+                Name = "No target",
+                Tasks =
+                [
+                    new MacroTaskDefinition
+                    {
+                        Id = "raid",
+                        Kind = MacroTaskKind.Raid,
+                        PresetId = "raid",
+                        Name = "Raid",
+                    },
+                ],
+            };
+            FakeRecovery recovery = new();
+            RecoveringMacroScheduler scheduler = new(
+                new MacroScheduler(
+                    new MacroPlanRepository(paths)),
+                new MacroPlanRepository(paths),
+                recovery);
+
+            await Assert.ThrowsAsync<RobloxUiUnavailableException>(
+                () => scheduler.RunAsync(
+                    plan,
+                    restartTarget: null,
+                    (_, _, _) =>
+                        Task.FromException<ScheduledTaskResult>(
+                            new RobloxUiUnavailableException(
+                                "Raid panel stopped responding."))));
+
+            Assert.Equal(0, recovery.Restarts);
         }
         finally
         {

@@ -13,6 +13,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <StackPanel Margin="0,0,0,28">
                 <TextBlock Style="{StaticResource PageTitle}" Text="Settings" />
@@ -35,10 +36,42 @@
             </Border>
 
             <Border Grid.Row="2" Style="{StaticResource SectionDivider}">
-                <icons:SettingsKeyBindingsPanel x:Name="KeyBindingsPanel" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="420" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}"
+                                   Text="Macro preparation" />
+                        <TextBlock Margin="0,5,24,0"
+                                   Style="{StaticResource Caption}"
+                                   TextWrapping="Wrap"
+                                   Text="Startup checks and camera preparation for each Macro plan." />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <CheckBox x:Name="AutoGameSettingsCheck"
+                                  Content="Check and fix game settings at macro start"
+                                  Checked="AutoGameSettingsCheck_Changed"
+                                  Unchecked="AutoGameSettingsCheck_Changed" />
+                        <CheckBox x:Name="FastNoAlignCheck"
+                                  Margin="0,14,0,0"
+                                  Content="Use Fast no align placement workflow"
+                                  Checked="FastNoAlignCheck_Changed"
+                                  Unchecked="FastNoAlignCheck_Changed" />
+                        <TextBlock Margin="50,5,0,0"
+                                   Style="{StaticResource Caption}"
+                                   TextWrapping="Wrap"
+                                   Text="Hides Camera Models and opens the map-image placement editor. Existing camera-model presets remain unchanged; turn this off when you need to edit them." />
+                    </StackPanel>
+                </Grid>
             </Border>
 
             <Border Grid.Row="3" Style="{StaticResource SectionDivider}">
+                <icons:SettingsKeyBindingsPanel x:Name="KeyBindingsPanel" />
+            </Border>
+
+            <Border Grid.Row="4" Style="{StaticResource SectionDivider}">
                 <StackPanel Width="640" HorizontalAlignment="Left">
                     <TextBlock Style="{StaticResource SectionTitle}" Text="UI scale calibration" />
                     <TextBlock Margin="0,5,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Compare Roblox's rendered interface with the standard detector scale. The overlay stays click-through while you adjust UI Scale in Roblox settings." />
@@ -50,7 +83,7 @@
                 </StackPanel>
             </Border>
 
-            <Border Grid.Row="4" Style="{StaticResource SectionDivider}">
+            <Border Grid.Row="5" Style="{StaticResource SectionDivider}">
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
                     <StackPanel>
@@ -67,7 +100,7 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Row="5" Style="{StaticResource SectionDivider}">
+            <Border Grid.Row="6" Style="{StaticResource SectionDivider}">
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
                     <StackPanel>
@@ -89,7 +122,7 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Row="6" Style="{StaticResource SectionDivider}">
+            <Border Grid.Row="7" Style="{StaticResource SectionDivider}">
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
                     <StackPanel>
@@ -118,7 +151,7 @@
                 </Grid>
             </Border>
 
-            <StackPanel Grid.Row="7" Width="640" HorizontalAlignment="Left">
+            <StackPanel Grid.Row="8" Width="640" HorizontalAlignment="Left">
                 <TextBlock Style="{StaticResource SectionTitle}" Text="Debug capture" />
                 <CheckBox x:Name="DebugModeCheck"
                           Margin="0,14,0,0"

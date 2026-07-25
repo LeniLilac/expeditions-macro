@@ -1,0 +1,493 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using ExpeditionsMacro.Automation.Placement;
+using ExpeditionsMacro.Core.Models;
+using ExpeditionsMacro.Core.Persistence;
+
+namespace ExpeditionsMacro.Tests;
+
+public sealed class PlacementAuthoringTests
+{
+    [Fact]
+    public void LegacyPlacementJson_DefaultsToCameraModelBeforeStart()
+    {
+        PlacementModel current = Placement(
+            CameraPreparationMode.CameraModel,
+            target: null,
+            Step(PlacementPhase.BeforeStart, 1));
+        JsonObject json = SerializeObject(current);
+        json.Remove("camera_preparation_mode");
+        json.Remove("target");
+        json["steps"]!.AsArray()[0]!
+            .AsObject()
+            .Remove("phase");
+        json["steps"]!.AsArray()[0]!
+            .AsObject()
+            .Remove("delay_after_start_milliseconds");
+
+        PlacementModel legacy = Deserialize<PlacementModel>(json);
+
+        Assert.Equal(
+            CameraPreparationMode.CameraModel,
+            legacy.CameraPreparationMode);
+        Assert.Null(legacy.Target);
+        Assert.Equal(
+            PlacementPhase.BeforeStart,
+            Assert.Single(legacy.Steps).Phase);
+        Assert.Equal(
+            0,
+            Assert.Single(legacy.Steps)
+                .DelayAfterStartMilliseconds);
+        legacy.Validate();
+    }
+
+    [Fact]
+    public void LegacyPresetJson_DefaultsToCameraModel()
+    {
+        ExpeditionPreset expedition = DeserializeWithoutMode(
+            new ExpeditionPreset
+            {
+                Id = "expedition",
+                Name = "Expedition",
+                CameraModelId = "camera",
+                PlacementModelId = "placement",
+            });
+        ChallengePreset challenge = DeserializeWithoutMode(
+            new ChallengePreset
+            {
+                Id = "challenge",
+                Name = "Challenge",
+                Maps = ChallengePreset.EmptyMapProfiles(),
+            });
+        StoryPreset story = DeserializeWithoutMode(
+            new StoryPreset
+            {
+                Id = "story",
+                Name = "Story",
+            });
+        RaidPreset raid = DeserializeWithoutMode(
+            new RaidPreset
+            {
+                Id = "raid",
+                Name = "Raid",
+            });
+
+        Assert.Equal(
+            CameraPreparationMode.CameraModel,
+            expedition.CameraPreparationMode);
+        Assert.Equal(
+            CameraPreparationMode.CameraModel,
+            challenge.CameraPreparationMode);
+        Assert.Equal(
+            CameraPreparationMode.CameraModel,
+            story.CameraPreparationMode);
+        Assert.Equal(
+            CameraPreparationMode.CameraModel,
+            raid.CameraPreparationMode);
+    }
+
+    [Fact]
+    public void FastPlacement_RequiresAnExactRoute()
+    {
+        PlacementTarget schoolStory = new()
+        {
+            Mode = PlacementTargetMode.Story,
+            MapNumber = 1,
+            StoryRunKind = StoryRunKind.Act,
+            ActNumber = 3,
+        };
+        PlacementModel model = Placement(
+            CameraPreparationMode.FastNoAlign,
+            schoolStory,
+            Step(PlacementPhase.BeforeStart, 1));
+
+        model.ValidateCompatibility(
+            CameraPreparationMode.FastNoAlign,
+            schoolStory);
+
+        PlacementTarget otherAct =
+            schoolStory with { ActNumber = 4 };
+        Assert.Throws<InvalidDataException>(
+            () => model.ValidateCompatibility(
+                CameraPreparationMode.FastNoAlign,
+                otherAct));
+        Assert.Throws<InvalidDataException>(
+            () => model.ValidateCompatibility(
+                CameraPreparationMode.CameraModel,
+                schoolStory));
+    }
+
+    [Fact]
+    public void NonActStoryTarget_UsesTheSharedVariantIdentity()
+    {
+        StoryPreset mastery = new()
+        {
+            Id = "mastery",
+            Name = "Mastery",
+            Map = ChallengeMapId.FlowerForest,
+            RunKind = StoryRunKind.Mastery,
+            ActNumber = 5,
+        };
+
+        PlacementTarget target =
+            PlacementTarget.ForStory(mastery);
+
+        Assert.Equal(1, target.ActNumber);
+        target.Validate();
+        Assert.Throws<InvalidDataException>(
+            () => (target with { ActNumber = 2 }).Validate());
+    }
+
+    [Fact]
+    public void ExecutionPlan_SplitsFastPhasesAndPreservesLegacyModels()
+    {
+        PlacementStep before =
+            Step(PlacementPhase.BeforeStart, 1);
+        PlacementStep after =
+            Step(PlacementPhase.AfterStart, 2);
+        PlacementModel fast = Placement(
+            CameraPreparationMode.FastNoAlign,
+            new PlacementTarget
+            {
+                Mode = PlacementTargetMode.Raid,
+                MapNumber = 1,
+                ActNumber = 2,
+            },
+            before,
+            after);
+        PlacementModel legacyPrimary = Placement(
+            CameraPreparationMode.CameraModel,
+            null,
+            before);
+        PlacementModel legacyDelayed = Placement(
+            CameraPreparationMode.CameraModel,
+            null,
+            after);
+
+        Assert.Equal(
+            [before],
+            PlacementExecutionPlan.BeforeStart(
+                CameraPreparationMode.FastNoAlign,
+                fast));
+        Assert.Equal(
+            [after],
+            PlacementExecutionPlan.AfterStart(
+                CameraPreparationMode.FastNoAlign,
+                fast));
+        Assert.Equal(
+            legacyPrimary.Steps,
+            PlacementExecutionPlan.BeforeStart(
+                CameraPreparationMode.CameraModel,
+                legacyPrimary));
+        Assert.Equal(
+            legacyDelayed.Steps,
+            PlacementExecutionPlan.AfterStart(
+                CameraPreparationMode.CameraModel,
+                legacyPrimary,
+                legacyDelayed));
+    }
+
+    [Fact]
+    public void AfterStartSchedule_UsesEachPlacementOffset()
+    {
+        PlacementStep step =
+            Step(PlacementPhase.AfterStart, 2) with
+            {
+                DelayAfterStartMilliseconds = 5000,
+            };
+
+        Assert.False(
+            PlacementExecutionPlan.IsAfterStartDue(
+                step,
+                TimeSpan.FromMilliseconds(4999)));
+        Assert.True(
+            PlacementExecutionPlan.IsAfterStartDue(
+                step,
+                TimeSpan.FromSeconds(5)));
+        Assert.True(
+            PlacementExecutionPlan.IsAfterStartDue(
+                step,
+                TimeSpan.FromSeconds(20)));
+    }
+
+    [Fact]
+    public void AfterStartSchedule_OrdersIndependentOffsets()
+    {
+        PlacementStep late =
+            Step(PlacementPhase.AfterStart, 1) with
+            {
+                DelayAfterStartMilliseconds = 9000,
+            };
+        PlacementStep early =
+            Step(PlacementPhase.AfterStart, 2) with
+            {
+                DelayAfterStartMilliseconds = 2000,
+            };
+        PlacementStep sameTime =
+            Step(PlacementPhase.AfterStart, 3) with
+            {
+                DelayAfterStartMilliseconds = 2000,
+            };
+        PlacementModel model = Placement(
+            CameraPreparationMode.FastNoAlign,
+            new PlacementTarget
+            {
+                Mode = PlacementTargetMode.Raid,
+                MapNumber = 1,
+                ActNumber = 1,
+            },
+            late,
+            early,
+            sameTime);
+
+        IReadOnlyList<PlacementStep> schedule =
+            PlacementExecutionPlan.AfterStart(
+                CameraPreparationMode.FastNoAlign,
+                model);
+
+        Assert.Equal(
+            [early, sameTime, late],
+            schedule);
+    }
+
+    [Fact]
+    public void FastPlacement_RequiresSevenPixelSpacing()
+    {
+        PlacementModel tooClose = Placement(
+            CameraPreparationMode.FastNoAlign,
+            new PlacementTarget
+            {
+                Mode = PlacementTargetMode.Expedition,
+                MapNumber = 1,
+                ActNumber = 0,
+            },
+            Step(PlacementPhase.BeforeStart, 1) with
+            {
+                X = 100,
+                Y = 100,
+            },
+            Step(PlacementPhase.AfterStart, 2) with
+            {
+                X = 106,
+                Y = 100,
+            });
+        PlacementModel allowed =
+            tooClose with
+            {
+                Steps =
+                [
+                    tooClose.Steps[0],
+                    tooClose.Steps[1] with
+                    {
+                        X = 107,
+                    },
+                ],
+            };
+
+        InvalidDataException error =
+            Assert.Throws<InvalidDataException>(
+                tooClose.Validate);
+        Assert.Contains(
+            "at least 7 client pixels",
+            error.Message,
+            StringComparison.Ordinal);
+        allowed.Validate();
+    }
+
+    [Fact]
+    public void FastPlacement_SharedExpeditionSetupCoversEveryExpeditionMap()
+    {
+        PlacementTarget shared = new()
+        {
+            Mode = PlacementTargetMode.Expedition,
+            MapNumber =
+                PlacementSetupCatalog.SharedExpeditionMapNumber,
+            ActNumber = 0,
+        };
+        PlacementModel model = Placement(
+            CameraPreparationMode.FastNoAlign,
+            shared,
+            Step(PlacementPhase.BeforeStart, 1));
+
+        for (int map = 1; map <= 3; map++)
+        {
+            model.ValidateCompatibility(
+                CameraPreparationMode.FastNoAlign,
+                shared with { MapNumber = map });
+        }
+
+        Assert.Throws<InvalidDataException>(
+            () => model.ValidateCompatibility(
+                CameraPreparationMode.FastNoAlign,
+                new PlacementTarget
+                {
+                    Mode = PlacementTargetMode.Challenge,
+                    MapNumber = 1,
+                    ActNumber = 0,
+                }));
+    }
+
+    [Fact]
+    public void FastPlacement_SharedStoryMapCoversStoryAndChallengeOnlyOnThatMap()
+    {
+        PlacementTarget shared = new()
+        {
+            Mode = PlacementTargetMode.Story,
+            MapNumber = 2,
+            StoryRunKind = StoryRunKind.Act,
+            ActNumber =
+                PlacementSetupCatalog.SharedStoryActNumber,
+        };
+        PlacementModel model = Placement(
+            CameraPreparationMode.FastNoAlign,
+            shared,
+            Step(PlacementPhase.BeforeStart, 1));
+
+        foreach (PlacementSetupRoute route in
+                 PlacementSetupCatalog.All.Where(
+                     route =>
+                         route.Target.MapNumber == 2 &&
+                         route.Target.Mode is
+                             PlacementTargetMode.Story or
+                             PlacementTargetMode.Challenge &&
+                         !PlacementSetupCatalog
+                             .IsSharedStoryTarget(
+                                 route.Target)))
+        {
+            model.ValidateCompatibility(
+                CameraPreparationMode.FastNoAlign,
+                route.Target);
+        }
+
+        Assert.Throws<InvalidDataException>(
+            () => model.ValidateCompatibility(
+                CameraPreparationMode.FastNoAlign,
+                new PlacementTarget
+                {
+                    Mode = PlacementTargetMode.Story,
+                    MapNumber = 3,
+                    StoryRunKind = StoryRunKind.Act,
+                    ActNumber = 1,
+                }));
+        Assert.Throws<InvalidDataException>(
+            () => model.ValidateCompatibility(
+                CameraPreparationMode.FastNoAlign,
+                new PlacementTarget
+                {
+                    Mode = PlacementTargetMode.Raid,
+                    MapNumber = 1,
+                    ActNumber = 2,
+                }));
+    }
+
+    [Fact]
+    public void PlacementSetupCatalog_PrefersExactRouteBeforeSharedStoryMap()
+    {
+        PlacementTarget exact = new()
+        {
+            Mode = PlacementTargetMode.Challenge,
+            MapNumber = 4,
+        };
+
+        PlacementSetupRoute[] candidates =
+            PlacementSetupCatalog.CandidatesFor(exact)
+                .ToArray();
+
+        Assert.Equal(2, candidates.Length);
+        Assert.True(
+            candidates[0].Target.Matches(exact));
+        Assert.True(
+            PlacementSetupCatalog.IsSharedStoryTarget(
+                candidates[1].Target));
+        Assert.Equal(4, candidates[1].Target.MapNumber);
+    }
+
+    [Fact]
+    public void PlacementSetupCatalog_CoversEverySupportedFastRoute()
+    {
+        IReadOnlyList<PlacementSetupRoute> routes =
+            PlacementSetupCatalog.All;
+
+        Assert.Equal(52, routes.Count);
+        Assert.Equal(
+            routes.Count,
+            routes.Select(route => route.ModelId)
+                .Distinct(StringComparer.Ordinal)
+                .Count());
+        Assert.Equal(
+            routes.Count,
+            routes.Select(route => route.Target)
+                .Distinct()
+                .Count());
+        Assert.Equal(
+            4,
+            routes.Count(route =>
+                route.Target.Mode ==
+                PlacementTargetMode.Expedition));
+        Assert.Equal(
+            5,
+            routes.Count(route =>
+                route.Target.Mode ==
+                PlacementTargetMode.Challenge));
+        Assert.Equal(
+            40,
+            routes.Count(route =>
+                route.Target.Mode ==
+                PlacementTargetMode.Story));
+        Assert.Equal(
+            5,
+            routes.Count(route =>
+                PlacementSetupCatalog
+                    .IsSharedStoryTarget(
+                        route.Target)));
+    }
+
+    private static PlacementModel Placement(
+        CameraPreparationMode mode,
+        PlacementTarget? target,
+        params PlacementStep[] steps) =>
+        new()
+        {
+            Id = $"placement-{Guid.NewGuid():N}",
+            Name = "Placement",
+            ClientWidth = 808,
+            ClientHeight = 611,
+            Steps = steps,
+            CameraPreparationMode = mode,
+            Target = target,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+
+    private static PlacementStep Step(
+        PlacementPhase phase,
+        int unit) =>
+        new()
+        {
+            UnitKey = unit,
+            X = 320 + unit * 20,
+            Y = 280 + unit * 20,
+            DelayAfterMilliseconds = 900,
+            Phase = phase,
+        };
+
+    private static T DeserializeWithoutMode<T>(T value)
+    {
+        JsonObject json = SerializeObject(value);
+        json.Remove("camera_preparation_mode");
+        return Deserialize<T>(json);
+    }
+
+    private static JsonObject SerializeObject<T>(T value) =>
+        JsonNode.Parse(
+            JsonSerializer.Serialize(
+                value,
+                JsonFileStore.Options))!
+            .AsObject();
+
+    private static T Deserialize<T>(JsonObject value) =>
+        JsonSerializer.Deserialize<T>(
+            value.ToJsonString(),
+            JsonFileStore.Options) ??
+        throw new InvalidDataException(
+            $"Could not deserialize {typeof(T).Name}.");
+}

@@ -1,5 +1,6 @@
 using ExpeditionsMacro.Automation.Stages;
 using ExpeditionsMacro.Core.Imaging;
+using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Infrastructure;
 using ExpeditionsMacro.Vision.Stages;
 
@@ -12,7 +13,7 @@ public sealed class StageScreenDetectorTests
     {
         StageNavigationPolicy.RequirePrestartForTeamLoad(new StageScreenMatch(StageScreenState.Prestart, 0.98));
 
-        InvalidOperationException error = Assert.Throws<InvalidOperationException>(() =>
+        RobloxUiUnavailableException error = Assert.Throws<RobloxUiUnavailableException>(() =>
             StageNavigationPolicy.RequirePrestartForTeamLoad(new StageScreenMatch(StageScreenState.GameModeSelector, 0.99)));
 
         Assert.Contains("requires a confirmed prestart screen", error.Message, StringComparison.Ordinal);

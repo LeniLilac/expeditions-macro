@@ -13,6 +13,7 @@ public sealed class TeamScreenDetectorTests
     [InlineData("TeamList_Aligned_Team1_Current_01.png", TeamScreenState.Teams)]
     [InlineData("TeamList_Aligned_Team2_01.png", TeamScreenState.Teams)]
     [InlineData("TeamList_Aligned_Team3_01.png", TeamScreenState.Teams)]
+    [InlineData("TeamList_Aligned_Team3_Undershoot_01.png", TeamScreenState.Teams)]
     [InlineData("TeamList_Aligned_Team4_01.png", TeamScreenState.Teams)]
     [InlineData("TeamList_Aligned_Team5_01.png", TeamScreenState.Teams)]
     [InlineData("TeamList_Aligned_Team6_01.png", TeamScreenState.Teams)]
@@ -150,6 +151,34 @@ public sealed class TeamScreenDetectorTests
             image,
             teamSlot: 3,
             targetThumbCenterY: 299));
+    }
+
+    [Fact]
+    public void NearTargetUndershoot_MapsTheFullyVisibleRequestedTeam()
+    {
+        ImageFrame image = Load(
+            "TeamList_Aligned_Team3_Undershoot_01.png");
+        TeamScrollbarThumb thumb =
+            TeamScreenDetector.FindScrollbarThumb(image)!.Value;
+
+        (int X, int Y)? teamThree =
+            TeamScreenDetector.AlignedLoadTeamAction(
+                image,
+                teamSlot: 3,
+                targetThumbCenterY: 299);
+
+        Assert.Equal(292, thumb.CenterY);
+        Assert.Equal((579, 288), teamThree);
+        Assert.Null(
+            TeamScreenDetector.AlignedLoadTeamAction(
+                image,
+                teamSlot: 2,
+                targetThumbCenterY: 270));
+        Assert.Null(
+            TeamScreenDetector.AlignedLoadTeamAction(
+                image,
+                teamSlot: 4,
+                targetThumbCenterY: 329));
     }
 
     [Fact]

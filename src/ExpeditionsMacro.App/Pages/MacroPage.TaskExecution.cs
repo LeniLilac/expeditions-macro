@@ -85,19 +85,36 @@ public partial class MacroPage
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken)
     {
-        ChallengePreset preset = await _services.ChallengePresets
-            .LoadAsync(task.PresetId, cancellationToken)
-            .ConfigureAwait(false)
-            ?? throw new InvalidOperationException(
-                $"Challenge preset '{task.PresetId}' could not be loaded.");
-        preset.ValidateReady();
+        ChallengePreset preset;
+        IReadOnlyDictionary<
+            ChallengeMapId,
+            ChallengeMapRuntimeModels> models;
+        if (task.UsesPlacementSetup)
+        {
+            (preset, models) =
+                await BuildChallengeSetupAsync(
+                    task,
+                    cancellationToken)
+                    .ConfigureAwait(false);
+        }
+        else
+        {
+            preset = await _services.ChallengePresets
+                .LoadAsync(
+                    task.PresetId,
+                    cancellationToken)
+                .ConfigureAwait(false)
+                ?? throw new InvalidOperationException(
+                    $"Challenge preset '{task.PresetId}' could not be loaded.");
+            preset.ValidateReady();
+            models = await LoadChallengeModelsAsync(
+                preset,
+                cancellationToken)
+                .ConfigureAwait(false);
+        }
         IDetectorPack detector = await LoadDetectorAsync(
             preset.DetectorPackId,
             cancellationToken).ConfigureAwait(false);
-        IReadOnlyDictionary<ChallengeMapId, ChallengeMapRuntimeModels> models =
-            await LoadChallengeModelsAsync(
-                preset,
-                cancellationToken).ConfigureAwait(false);
         ChallengeRunSummary? summary = null;
         await _services.Challenges.RunAsync(
             preset,
@@ -149,21 +166,46 @@ public partial class MacroPage
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken)
     {
-        ExpeditionPreset preset = await _services.Presets
-            .LoadAsync(task.PresetId, cancellationToken)
-            .ConfigureAwait(false)
-            ?? throw new InvalidOperationException(
-                $"Expedition preset '{task.PresetId}' could not be loaded.");
-        CameraModel camera = await _services.CameraModels
-            .LoadAsync(preset.CameraModelId, cancellationToken)
-            .ConfigureAwait(false)
-            ?? throw new InvalidOperationException(
-                "The selected Expedition camera model could not be loaded.");
-        PlacementModel placement = await _services.PlacementModels
-            .LoadAsync(preset.PlacementModelId, cancellationToken)
-            .ConfigureAwait(false)
-            ?? throw new InvalidOperationException(
-                "The selected Expedition placement model could not be loaded.");
+        ExpeditionPreset preset;
+        CameraModel? camera;
+        PlacementModel placement;
+        if (task.UsesPlacementSetup)
+        {
+            (preset, placement) =
+                await BuildExpeditionSetupAsync(
+                    task,
+                    cancellationToken)
+                    .ConfigureAwait(false);
+            camera = null;
+        }
+        else
+        {
+            preset = await _services.Presets
+                .LoadAsync(
+                    task.PresetId,
+                    cancellationToken)
+                .ConfigureAwait(false)
+                ?? throw new InvalidOperationException(
+                    $"Expedition preset '{task.PresetId}' could not be loaded.");
+            camera =
+                preset.CameraPreparationMode ==
+                    CameraPreparationMode.CameraModel
+                    ? await _services.CameraModels
+                        .LoadAsync(
+                            preset.CameraModelId,
+                            cancellationToken)
+                        .ConfigureAwait(false)
+                        ?? throw new InvalidOperationException(
+                            "The selected Expedition camera model could not be loaded.")
+                    : null;
+            placement = await _services.PlacementModels
+                .LoadAsync(
+                    preset.PlacementModelId,
+                    cancellationToken)
+                .ConfigureAwait(false)
+                ?? throw new InvalidOperationException(
+                    "The selected Expedition placement model could not be loaded.");
+        }
         IDetectorPack detector = await LoadDetectorAsync(
             preset.DetectorPackId,
             cancellationToken).ConfigureAwait(false);
@@ -230,16 +272,33 @@ public partial class MacroPage
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken)
     {
-        StoryPreset preset = await _services.StoryPresets
-            .LoadAsync(task.PresetId, cancellationToken)
-            .ConfigureAwait(false)
-            ?? throw new InvalidOperationException(
-                $"Story preset '{task.PresetId}' could not be loaded.");
-        StageRuntimeModels models = await LoadStageModelsAsync(
-            preset.CameraModelId,
-            preset.PrestartPlacementModelId,
-            preset.DelayedPlacementModelId,
-            cancellationToken).ConfigureAwait(false);
+        StoryPreset preset;
+        StageRuntimeModels models;
+        if (task.UsesPlacementSetup)
+        {
+            (preset, models) =
+                await BuildStorySetupAsync(
+                    task,
+                    cancellationToken)
+                    .ConfigureAwait(false);
+        }
+        else
+        {
+            preset = await _services.StoryPresets
+                .LoadAsync(
+                    task.PresetId,
+                    cancellationToken)
+                .ConfigureAwait(false)
+                ?? throw new InvalidOperationException(
+                    $"Story preset '{task.PresetId}' could not be loaded.");
+            models = await LoadStageModelsAsync(
+                preset.CameraPreparationMode,
+                preset.CameraModelId,
+                preset.PrestartPlacementModelId,
+                preset.DelayedPlacementModelId,
+                cancellationToken)
+                .ConfigureAwait(false);
+        }
         IDetectorPack detector = await LoadDetectorAsync(
             AnimeExpeditionsDetectorSpec.PackId,
             cancellationToken).ConfigureAwait(false);
@@ -304,16 +363,33 @@ public partial class MacroPage
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken)
     {
-        RaidPreset preset = await _services.RaidPresets
-            .LoadAsync(task.PresetId, cancellationToken)
-            .ConfigureAwait(false)
-            ?? throw new InvalidOperationException(
-                $"Raid preset '{task.PresetId}' could not be loaded.");
-        StageRuntimeModels models = await LoadStageModelsAsync(
-            preset.CameraModelId,
-            preset.PrestartPlacementModelId,
-            preset.DelayedPlacementModelId,
-            cancellationToken).ConfigureAwait(false);
+        RaidPreset preset;
+        StageRuntimeModels models;
+        if (task.UsesPlacementSetup)
+        {
+            (preset, models) =
+                await BuildRaidSetupAsync(
+                    task,
+                    cancellationToken)
+                    .ConfigureAwait(false);
+        }
+        else
+        {
+            preset = await _services.RaidPresets
+                .LoadAsync(
+                    task.PresetId,
+                    cancellationToken)
+                .ConfigureAwait(false)
+                ?? throw new InvalidOperationException(
+                    $"Raid preset '{task.PresetId}' could not be loaded.");
+            models = await LoadStageModelsAsync(
+                preset.CameraPreparationMode,
+                preset.CameraModelId,
+                preset.PrestartPlacementModelId,
+                preset.DelayedPlacementModelId,
+                cancellationToken)
+                .ConfigureAwait(false);
+        }
         IDetectorPack detector = await LoadDetectorAsync(
             AnimeExpeditionsDetectorSpec.PackId,
             cancellationToken).ConfigureAwait(false);

@@ -35,7 +35,7 @@ public partial class MainWindow : Window
             ["Story"] = new StoryPage(services),
             ["Raid"] = new RaidPage(services),
             ["Camera Models"] = new CameraModelsPage(services),
-            ["Placement Models"] = new PlacementModelsPage(services),
+            ["Placement Setup"] = new PlacementModelsPage(services),
             ["Debug"] = new DebugPage(services),
             ["Settings"] = new SettingsPage(services),
         };
@@ -43,7 +43,7 @@ public partial class MainWindow : Window
         _services.Coordinator.OperationFailed += Coordinator_OperationFailed;
         _services.Hotkey.BindingChanged += Hotkey_BindingChanged;
         _services.SettingsChanged += Services_SettingsChanged;
-        UpdateDebugNavigation();
+        UpdateNavigationAvailability();
         UpdateProductFooter();
         if (!snapshotMode)
         {
@@ -69,6 +69,47 @@ public partial class MainWindow : Window
         TitleContext.Text = key;
         _services.Coordinator.DefaultIdleHotkeyAction = page.IdleHotkeyAction;
         await page.OnShownAsync();
+        EnsurePlacementWorkspaceSize(key);
+    }
+
+    private void EnsurePlacementWorkspaceSize(string key)
+    {
+        if (_snapshotMode ||
+            WindowState != WindowState.Normal ||
+            !string.Equals(
+                key,
+                "Placement Setup",
+                StringComparison.OrdinalIgnoreCase) ||
+            !_services.Settings.FastNoAlignEnabled)
+        {
+            return;
+        }
+
+        Rect workArea = SystemParameters.WorkArea;
+        double targetWidth = Math.Min(
+            1660,
+            workArea.Width);
+        double targetHeight = Math.Min(
+            1040,
+            workArea.Height);
+        if (Width >= targetWidth &&
+            Height >= targetHeight)
+        {
+            return;
+        }
+
+        double centerX = Left + ActualWidth / 2;
+        double centerY = Top + ActualHeight / 2;
+        Width = Math.Max(Width, targetWidth);
+        Height = Math.Max(Height, targetHeight);
+        Left = Math.Clamp(
+            centerX - Width / 2,
+            workArea.Left,
+            workArea.Right - Width);
+        Top = Math.Clamp(
+            centerY - Height / 2,
+            workArea.Top,
+            workArea.Bottom - Height);
     }
 
     internal async Task SelectPageForSnapshotAsync(
@@ -84,7 +125,7 @@ public partial class MainWindow : Window
             "Story" => StoryNav,
             "Raid" => RaidNav,
             "Camera Models" => CameraNav,
-            "Placement Models" => PlacementNav,
+            "Placement Setup" => PlacementNav,
             "Debug" => DebugNav,
             "Settings" => SettingsNav,
             _ => throw new ArgumentOutOfRangeException(nameof(key), key, "Unknown snapshot page."),
@@ -101,6 +142,11 @@ public partial class MainWindow : Window
         }
 
         await ShowPageAsync(key);
+        if (_pages[key] is ExpeditionsPage expeditions) expeditions.SetSnapshotFastMode();
+        if (_pages[key] is ChallengesPage challengePresets) challengePresets.SetSnapshotFastMode();
+        if (_pages[key] is StoryPage story) story.SetSnapshotFastMode();
+        if (_pages[key] is RaidPage raid) raid.SetSnapshotFastMode();
+        if (_pages[key] is PlacementModelsPage placement) placement.SetSnapshotState();
         if (_pages[key] is MacroPage macro) macro.SetSnapshotScroll(showPageEnd);
         if (_pages[key] is SettingsPage settings) settings.SetSnapshotScroll(showPageEnd);
         if (_pages[key] is ChallengesPage challenges) challenges.SetSnapshotScroll(showPageEnd);
@@ -119,7 +165,7 @@ public partial class MainWindow : Window
         // does not retain the WPF synchronization context. Exercise that exact
         // boundary in the repeatable UI snapshot check.
         await Task.Run(() => ((CameraModelsPage)_pages["Camera Models"]).RefreshModelsAsync());
-        await Task.Run(() => ((PlacementModelsPage)_pages["Placement Models"]).RefreshModelsAsync());
+        await Task.Run(() => ((PlacementModelsPage)_pages["Placement Setup"]).RefreshModelsAsync());
     }
 
     private void Coordinator_StateChanged(object? sender, EventArgs e)
@@ -160,20 +206,66 @@ public partial class MainWindow : Window
     private void Services_SettingsChanged(
         object? sender,
         EventArgs e) =>
-        Dispatcher.BeginInvoke(UpdateDebugNavigation);
+        Dispatcher.BeginInvoke(UpdateNavigationAvailability);
 
-    private void UpdateDebugNavigation()
+    private void UpdateNavigationAvailability()
     {
-        bool visible =
+        bool debugVisible =
             _snapshotMode ||
             _services.Settings.DebugModeEnabled;
-        DebugNav.Visibility = visible
+        DebugNav.Visibility = debugVisible
             ? Visibility.Visible
             : Visibility.Collapsed;
-        if (!visible &&
+        if (!debugVisible &&
             ReferenceEquals(
                 PageHost.Content,
                 _pages["Debug"]))
+        {
+            MacroNav.IsChecked = true;
+        }
+
+        bool cameraVisible =
+            _snapshotMode ||
+            !_services.Settings.FastNoAlignEnabled;
+        CameraNav.Visibility = cameraVisible
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        if (!cameraVisible &&
+            ReferenceEquals(
+                PageHost.Content,
+                _pages["Camera Models"]))
+        {
+            PlacementNav.IsChecked = true;
+        }
+
+        bool legacyPresetsVisible =
+            _snapshotMode ||
+            !_services.Settings.FastNoAlignEnabled;
+        PresetsHeader.Visibility =
+            legacyPresetsVisible
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        ExpeditionsNav.Visibility =
+            legacyPresetsVisible
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        ChallengesNav.Visibility =
+            legacyPresetsVisible
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        StoryNav.Visibility =
+            legacyPresetsVisible
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        RaidNav.Visibility =
+            legacyPresetsVisible
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        if (!legacyPresetsVisible &&
+            PageHost.Content is ExpeditionsPage or
+                ChallengesPage or
+                StoryPage or
+                RaidPage)
         {
             MacroNav.IsChecked = true;
         }

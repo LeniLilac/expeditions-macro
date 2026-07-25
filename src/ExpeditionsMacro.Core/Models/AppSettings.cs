@@ -56,6 +56,10 @@ public sealed record AppSettings
 
     public bool DebugModeEnabled { get; init; }
 
+    public bool AutoCheckGameSettingsOnStart { get; init; } = true;
+
+    public bool FastNoAlignEnabled { get; init; } = true;
+
     public bool CheckDetectorUpdates { get; init; } = true;
 
     public DateTimeOffset? LastDetectorUpdateCheck { get; init; }
