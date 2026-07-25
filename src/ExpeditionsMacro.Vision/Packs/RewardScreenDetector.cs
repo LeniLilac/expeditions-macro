@@ -55,6 +55,13 @@ internal static class RewardScreenDetector
                     double verticalScore = Plateau(verticalSpread, 0, 0, 5, 12);
                     double centerScore = Plateau(Math.Abs(middle.X - 353), 0, 0, 35, 75);
                     double rowScore = Plateau(Math.Abs(middle.Y - 388), 0, 0, 24, 40);
+                    double scale = ((middle.X - left.X) + (right.X - middle.X)) / 420d;
+                    if (ActionRailScore(image, left, scale) == 0 ||
+                        ActionRailScore(image, middle, scale) == 0 ||
+                        ActionRailScore(image, right, scale) == 0)
+                    {
+                        continue;
+                    }
                     double score = Math.Clamp(
                         0.20 * header.Score +
                         0.23 * gapScore +
@@ -64,7 +71,6 @@ internal static class RewardScreenDetector
                         0.11 * rowScore,
                         0,
                         1);
-                    double scale = ((middle.X - left.X) + (right.X - middle.X)) / 420d;
                     if (best is null || score > best.Value.Score) best = new RewardMatch(score, left, scale);
                 }
             }
@@ -84,6 +90,12 @@ internal static class RewardScreenDetector
                 double rowOffset = ((left.Y + right.Y) / 2) - header.ProgressY;
                 if (gap is < 120 or > 290 || verticalSpread > 18 || rowOffset is < 145 or > 250) continue;
 
+                double scale = Math.Clamp(gap / 210d, 0.75, 1.15);
+                if (ActionRailScore(image, left, scale) == 0 ||
+                    ActionRailScore(image, right, scale) == 0)
+                {
+                    continue;
+                }
                 double gapScore = Plateau(gap, 120, 165, 255, 290);
                 double verticalScore = Plateau(verticalSpread, 0, 0, 7, 18);
                 double rowScore = Plateau(rowOffset, 145, 165, 225, 250);
@@ -92,15 +104,52 @@ internal static class RewardScreenDetector
                     0.30 * gapScore +
                     0.15 * verticalScore +
                     0.10 * rowScore,
-                    0,
-                    1);
+                        0,
+                        1);
                 double score = 0.78 + 0.22 * quality;
-                double scale = Math.Clamp(gap / 210d, 0.75, 1.15);
                 if (best is null || score > best.Value.Score) best = new RewardMatch(score, left, scale);
             }
         }
 
         return best is RewardMatch match && match.Score >= 0.76 ? match : null;
+    }
+
+    private static double ActionRailScore(
+        ImageFrame image,
+        RedMark mark,
+        double scale)
+    {
+        scale = Math.Clamp(scale, 0.75, 1.25);
+        int left = (int)Math.Round(mark.X - 8 * scale);
+        int top = (int)Math.Round(mark.Y - 6 * scale);
+        int right = (int)Math.Round(mark.X + 108 * scale);
+        int bottom = (int)Math.Round(mark.Y + 8 * scale);
+        if (left < 0 || top < 0 || right > image.Width || bottom > image.Height ||
+            right <= left || bottom <= top)
+        {
+            return 0;
+        }
+
+        int dark = 0;
+        int total = checked((right - left) * (bottom - top));
+        for (int y = top; y < bottom; y++)
+        {
+            for (int x = left; x < right; x++)
+            {
+                int pixel = (y * image.Width + x) * 3;
+                if (image.Pixels[pixel] +
+                    image.Pixels[pixel + 1] +
+                    image.Pixels[pixel + 2] <= 210)
+                {
+                    dark++;
+                }
+            }
+        }
+
+        double darkFraction = (double)dark / total;
+        return darkFraction < 0.52
+            ? 0
+            : 0.75 + 0.25 * Ramp(darkFraction, 0.52, 0.82);
     }
 
     private static HeaderMatch? FindHeader(ImageFrame image)

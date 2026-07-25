@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using ExpeditionsMacro.Automation.Activity;
 using ExpeditionsMacro.Automation.Camera;
 using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Expeditions;
@@ -450,7 +449,16 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
                 await PlaceAsync(window, preset, models.PrestartPlacement, prestartPlacements.AfterStart, log, cancellationToken).ConfigureAwait(false);
             }
             await Task.Delay(2200, cancellationToken).ConfigureAwait(false);
-            MatchTerminal terminal = await MonitorMatchAsync(window, preset, profile, models, detector, log, report, cancellationToken).ConfigureAwait(false);
+            MatchTerminal terminal = await MonitorMatchAsync(
+                window,
+                preset,
+                profile,
+                models,
+                detector,
+                matchRuntime,
+                log,
+                report,
+                cancellationToken).ConfigureAwait(false);
             if (terminal.State == ChallengeScreenState.Victory)
             {
                 victories++;
@@ -501,66 +509,6 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
             log("Defeat retry limit reached. This Challenge will not be attempted again until the next global reset.", MacroEventLevel.Information, null, null);
             await ReturnFromTerminalAsync(window, preset, detector, playMenuKey, report, cancellationToken).ConfigureAwait(false);
             return new ChallengeTerminal(victories, defeats);
-        }
-    }
-
-    private async Task<MatchTerminal> MonitorMatchAsync(
-        RobloxWindow window,
-        ChallengePreset preset,
-        ChallengeMapProfile profile,
-        ChallengeMapRuntimeModels models,
-        IDetectorPack detector,
-        Action<string, MacroEventLevel, string?, double?> log,
-        Action<string, int, string, string?, double?> report,
-        CancellationToken cancellationToken)
-    {
-        Stopwatch elapsed = Stopwatch.StartNew();
-        bool delayedPlaced = models.DelayedPlacement is null;
-        StableStateTracker<ChallengeScreenState> terminalTracker = new(preset.StableDetections);
-        StableStateTracker<string> recoveryTracker = new(Math.Max(2, preset.StableDetections));
-        StableStateTracker<string> rewardTracker = new(preset.StableDetections);
-        InactivityKeepAlive keepAlive = new();
-
-        report("Gameplay", 55, delayedPlaced ? "Match active. Watching for Victory or Defeat." : "Match active. Waiting for delayed placement.", null, null);
-        while (true)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            if (!delayedPlaced && ChallengeRunPolicy.IsDelayedPlacementDue(profile, elapsed.Elapsed))
-            {
-                report("Placement", 65, $"Running delayed placements after {elapsed.Elapsed.TotalSeconds:F0} seconds.", null, null);
-                await PlaceAsync(window, preset, models.DelayedPlacement!, log, cancellationToken).ConfigureAwait(false);
-                delayedPlaced = true;
-            }
-
-            ImageFrame frame = CaptureClient(window, detector);
-            ChallengeScreenMatch match = ChallengeScreenDetector.Detect(frame);
-            ChallengeScreenState candidate = match.State is ChallengeScreenState.Victory or ChallengeScreenState.Defeat
-                ? match.State
-                : ChallengeScreenState.None;
-            ChallengeScreenState? stable = terminalTracker.Update(candidate);
-            if (stable is ChallengeScreenState.Victory or ChallengeScreenState.Defeat)
-            {
-                return new MatchTerminal(stable.Value, match.Confidence, frame.Clone());
-            }
-
-            string? recovery = detector.RecoveryState(frame);
-            if (recoveryTracker.Update(recovery ?? string.Empty) is string stableRecovery && !string.IsNullOrEmpty(stableRecovery))
-            {
-                throw new ChallengeRecoveryException(stableRecovery);
-            }
-
-            IReadOnlyDictionary<string, double> scores = detector.ScoreStates(frame);
-            string? detectorState = detector.Classify(scores);
-            if (rewardTracker.Update(detectorState == "reward" ? detectorState : string.Empty) == "reward")
-            {
-                (int x, int y) = detector.ActionFor("reward", frame);
-                report("Reward", 70, "Selecting the first available upgrade.", "reward", scores.GetValueOrDefault("reward"));
-                await ClickAsync(window, x, y, cancellationToken).ConfigureAwait(false);
-                await Task.Delay(4300, cancellationToken).ConfigureAwait(false);
-                rewardTracker.Reset();
-            }
-            await keepAlive.TryPulseAsync((key, token) => _automation.TapLetterKeyAsync(window, key, token), cancellationToken).ConfigureAwait(false);
-            await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -792,11 +740,13 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         StableStateTracker<ChallengeScreenState> prestartTracker = new(preset.StableDetections);
         StableStateTracker<string> recoveryTracker = new(preset.StableDetections);
         bool teleportingSeen = false;
+        ChallengeScreenState lastObservedState = ChallengeScreenState.None;
         while (DateTimeOffset.UtcNow < deadline)
         {
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = CaptureClient(window, detector);
             ChallengeScreenMatch match = ChallengeScreenDetector.Detect(frame);
+            lastObservedState = match.State;
             DateTimeOffset extendedDeadline = ExtendPrestartDeadline(startedAt, deadline, match.State);
             if (extendedDeadline > deadline)
             {
@@ -830,10 +780,9 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
             await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
         }
 
-        throw new InvalidOperationException(
-            teleportingSeen
-                ? "Roblox remained on the Teleporting screen for three minutes and did not reach the Challenge prestart screen. The server or connection did not finish loading the stage."
-                : "Timed out waiting for Prestart.");
+        throw ChallengePrestartTimeoutPolicy.CreateException(
+            teleportingSeen,
+            lastObservedState);
     }
 
     internal static DateTimeOffset ExtendPrestartDeadline(

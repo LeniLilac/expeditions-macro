@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using ExpeditionsMacro.Automation.Activity;
+using ExpeditionsMacro.Automation.Runtime;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
@@ -13,6 +15,7 @@ public sealed partial class ExpeditionMacroRunner
         ExpeditionPreset preset,
         PlacementModel placement,
         IDetectorPack detector,
+        Stopwatch matchRuntime,
         Action<int> bossesChanged,
         Action<string, int, string, string?, double?> report,
         Action<string, MacroEventLevel, string?, double?> log,
@@ -52,6 +55,14 @@ public sealed partial class ExpeditionMacroRunner
             string? state = stateTracker.Update(candidate);
             if (state is null)
             {
+                if (candidate is not "defeat" and not "victory")
+                {
+                    MatchRuntimePolicy.ThrowIfExceeded(
+                        matchRuntime.Elapsed,
+                        MatchRuntimePolicy.ExpeditionLimit(preset),
+                        $"Expedition map {preset.MapNumber}, difficulty " +
+                        $"{preset.Difficulty}");
+                }
                 await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
                 continue;
             }
@@ -60,6 +71,11 @@ public sealed partial class ExpeditionMacroRunner
             double score = scores[state];
             log($"Recognized {state} at {score:P0} confidence.", MacroEventLevel.Success, state, score);
             if (state is "defeat" or "victory") return new RunTerminal(state, frame.Clone());
+            MatchRuntimePolicy.ThrowIfExceeded(
+                matchRuntime.Elapsed,
+                MatchRuntimePolicy.ExpeditionLimit(preset),
+                $"Expedition map {preset.MapNumber}, difficulty " +
+                $"{preset.Difficulty}");
             if (state == "reward")
             {
                 report("Reward", 0, "Selecting the first available reward card.", state, score);

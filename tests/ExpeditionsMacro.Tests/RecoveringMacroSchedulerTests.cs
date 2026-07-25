@@ -42,6 +42,7 @@ public sealed class RecoveringMacroSchedulerTests
                     "https://www.roblox.com/share?code=Test_Server_123&type=Server");
             using CancellationTokenSource cancellation = new();
             int executions = 0;
+            int recoverableFailures = 0;
 
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
                 scheduler.RunAsync(
@@ -66,10 +67,16 @@ public sealed class RecoveringMacroSchedulerTests
                             cancellation.Cancel();
                         }
                     },
-                    cancellationToken: cancellation.Token));
+                    cancellationToken: cancellation.Token,
+                    recoverableFailure: (_, _) =>
+                    {
+                        recoverableFailures++;
+                        return Task.CompletedTask;
+                    }));
 
             Assert.Equal(2, executions);
             Assert.Equal(1, recovery.Restarts);
+            Assert.Equal(1, recoverableFailures);
             MacroPlan saved =
                 await plans.LoadAsync(plan.Id) ??
                 throw new InvalidOperationException("Saved plan missing.");

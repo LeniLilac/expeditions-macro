@@ -4,6 +4,25 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.20] - 2026-07-25
+
+### Added
+
+- Added a Debug **Fast no align** utility that prepares a standardized Roblox camera by zooming fully out, temporarily enabling Shift Lock, and clamping the pitch straight down without changing yaw.
+- Added bounded match-runtime watchdogs that preserve diagnostic evidence and route impossible-duration Challenge, Story Act/Mastery, Raid, and checkpoint-targeted Expedition runs through the existing private-server recovery path.
+- Added safe rare-unit-drop dismissal for Spirit City Raid Acts 2 and 3 after all configured placement work completes.
+
+### Fixed
+
+- Private-server recovery now waits for three consecutive stable Lobby detections before returning control to the scheduler, so teleport, loading, selector, or other intermediate frames cannot consume Play-key attempts or navigation input.
+- Expedition reward-card detection now requires the live **Select Upgrade** action rails and is no longer evaluated by Challenge, Story, or Raid, preventing a colorful Flower Forest prestart from being mistaken for a reward chooser.
+- Recoverable match-runtime failures now save configured diagnostics before Roblox is restarted and retry the same incomplete task without recording Victory, Defeat, or task progress.
+
+### Tests
+
+- Added privacy-reviewed Flower Forest prestart and Spirit City rare-unit-drop fixtures plus cross-mode negatives.
+- Added stable-Lobby recovery, match-runtime policy, scheduler recovery, Raid drop-dismissal, and gameplay-HUD regressions.
+
 ## [1.3.0-beta.19] - 2026-07-24
 
 ### Changed
@@ -697,7 +716,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.19...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.20...HEAD
+[1.3.0-beta.20]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.19...v1.3.0-beta.20
 [1.3.0-beta.19]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.18...v1.3.0-beta.19
 [1.3.0-beta.18]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.17...v1.3.0-beta.18
 [1.3.0-beta.17]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.16...v1.3.0-beta.17

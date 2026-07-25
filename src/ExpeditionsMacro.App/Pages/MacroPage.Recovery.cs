@@ -50,7 +50,13 @@ public partial class MacroPage
                 progress,
                 changed => Dispatcher.BeginInvoke(() => ApplyPlanProgress(changed)),
                 entry => DispatchLog(entry),
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                (error, token) => HandleRecoverableFailureAsync(
+                    "Macro Plan",
+                    webhook,
+                    discordUserId,
+                    error,
+                    token)).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

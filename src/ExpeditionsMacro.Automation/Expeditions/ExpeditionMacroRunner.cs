@@ -20,14 +20,6 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
     private static readonly TimeSpan ConfirmationDismissalTimeout = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan GameModeHandoffTimeout = TimeSpan.FromSeconds(90);
 
-    internal enum GameModeHandoffCommand
-    {
-        Complete,
-        ChangeGamemode,
-        PressPlayKey,
-        Wait,
-    }
-
     private static readonly HashSet<string> RecoveryStates = new(StringComparer.OrdinalIgnoreCase)
     {
         "afk", "disconnect", "lobby", "play", "map_select", "map_preview",
@@ -196,6 +188,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                         preset,
                         placementModel,
                         detector,
+                        matchRuntime,
                         value => { bossesSeen = value; PublishSummary(); },
                         Report,
                         Write,

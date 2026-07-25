@@ -1,6 +1,6 @@
 # Story, Raid, and team fixtures
 
-This directory contains 43 reviewed 808 by 611 Roblox client-area frames used by the Story, Raid, and saved-team detectors. The retained PNGs contain no account names, chat, notifications, desktop chrome, or secrets. Captured UI pixels remain unscaled and unmodified except for the documented account-name redactions; the three Story wide-button fixtures use documented black padding outside their supplied panel crops.
+This directory contains 44 reviewed 808 by 611 Roblox client-area frames used by the Story, Raid, and saved-team detectors. The retained PNGs contain no account names, chat, notifications, desktop chrome, or secrets. Captured UI pixels remain unscaled and unmodified except for the documented account-name redactions; the three Story wide-button fixtures use documented black padding outside their supplied panel crops.
 
 Sources:
 
@@ -21,5 +21,6 @@ Sources:
 - Two beta.15 Debug Team Swap runs contributed the settled Team 7 and Team 8 Load Team confirmation frames. Both actions used the verified bottom scrollbar limit; the clicked/current row's dimmed green button fell just below the former modal background threshold. The retained frames are unmodified 808 by 611 client captures with no account name, chat, desktop chrome, notification, or secret.
 - A beta.16 Debug Team 8 failure contributed one settled top-list frame containing both the real thumb beside the detected panel Close control and a second valid-height neutral-gray run in the surrounding Roblox scenery. The retained frame is an unmodified 808 by 611 Roblox client capture with no account name, chat, desktop chrome, notification, or secret.
 - Two beta.13 Raid failures contributed the current Spirit City detail panel with Roblox's custom and default fonts. In both variants, the red Close circle connects to the panel border while the independently detected Select Stage action remains live. The retained frames are unmodified 808 by 611 Roblox client captures with no account name, chat, desktop chrome, notification, or secret.
+- `diagnostic-capture.zip`: a beta.17 passive capture of the rare Spirit City Act 3 unit-drop presentation that hides both the unit hotbar and the ordinary right-side gameplay actions until the player clicks. The retained frame is an unmodified 808 by 611 Roblox client capture with no account name, chat, desktop chrome, notification, or secret.
 
 The full bursts remain local diagnostic artifacts. Only structurally distinct frames needed for detector and cross-state regression are retained here.

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using ExpeditionsMacro.Automation.Activity;
+using ExpeditionsMacro.Automation.Runtime;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
@@ -24,10 +25,11 @@ public sealed partial class StageMacroRunner
         bool placed = delayedPlacement is null;
         StableStateTracker<string> terminalTracker = new(stableDetections);
         StableStateTracker<string> recoveryTracker = new(stableDetections);
-        StableStateTracker<string> rewardTracker = new(stableDetections);
+        RaidDropDismissalTracker dropDismissal = new(raid);
         InactivityKeepAlive keepAlive = new();
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + MatchTimeout;
-        while (DateTimeOffset.UtcNow < deadline)
+        TimeSpan? matchLimit =
+            MatchRuntimePolicy.StageLimit(story, raid);
+        while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = CaptureClient(window, detector);
@@ -53,28 +55,47 @@ public sealed partial class StageMacroRunner
                 throw new StageRecoveryException(stableRecovery);
             }
 
-            IReadOnlyDictionary<string, double> scores = detector.ScoreStates(frame);
-            string? detectorState = detector.Classify(scores);
-            string? reward = detectorState?.Equals("reward", StringComparison.OrdinalIgnoreCase) == true ? "reward" : null;
-            if (rewardTracker.Update(reward) is not null)
+            if (terminalCandidate is null)
             {
-                (int rewardX, int rewardY) = detector.ActionFor("reward", frame);
-                await ClickAsync(window, rewardX, rewardY, cancellationToken).ConfigureAwait(false);
-                await Task.Delay(3600, cancellationToken).ConfigureAwait(false);
-                rewardTracker.Reset();
-                continue;
+                MatchRuntimePolicy.ThrowIfExceeded(
+                    matchRuntime.Elapsed,
+                    matchLimit,
+                    story is null ? "Raid match" : "Story match");
             }
             await keepAlive.TryPulseAsync((key, token) => _automation.TapLetterKeyAsync(window, key, token), cancellationToken).ConfigureAwait(false);
 
-            if (!placed && matchRuntime.Elapsed >= TimeSpan.FromSeconds(delaySeconds))
+            bool placementCompletedThisIteration = false;
+            if (!placed &&
+                matchRuntime.Elapsed >= TimeSpan.FromSeconds(delaySeconds))
             {
                 placed = true;
-                await PlayPlacementAsync(window, delayedPlacement!, story, raid, cancellationToken).ConfigureAwait(false);
+                await PlayPlacementAsync(
+                    window,
+                    delayedPlacement!,
+                    story,
+                    raid,
+                    cancellationToken).ConfigureAwait(false);
+                placementCompletedThisIteration = true;
+            }
+
+            if (dropDismissal.Enabled &&
+                placed &&
+                !placementCompletedThisIteration &&
+                dropDismissal.Observe(
+                    afterStartPlacementComplete: true,
+                    gameplayHudVisible:
+                        StageGameplayHudDetector.Detect(frame).Visible,
+                    terminalCandidateVisible: terminalCandidate is not null,
+                    DateTimeOffset.UtcNow))
+            {
+                await ClickAsync(
+                    window,
+                    RaidDropDismissalTracker.ActionX,
+                    RaidDropDismissalTracker.ActionY,
+                    cancellationToken).ConfigureAwait(false);
             }
 
             await Task.Delay(Math.Max(200, story?.PollMilliseconds ?? raid!.PollMilliseconds), cancellationToken).ConfigureAwait(false);
         }
-
-        throw new TimeoutException($"Timed out waiting for the {RouteLabel(story is null ? StageMode.Raid : StageMode.Story, story, raid)} result.");
     }
 }

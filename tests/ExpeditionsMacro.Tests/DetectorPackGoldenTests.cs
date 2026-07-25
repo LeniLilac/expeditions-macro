@@ -290,6 +290,26 @@ public sealed class DetectorPackGoldenTests
 
     [Fact]
     [Trait("Category", "Golden")]
+    public void RewardSelection_RequiresLiveActionRailsOverColorfulScenery()
+    {
+        if (!DatasetsAvailable()) return;
+        CompiledDetectorPack pack = Pack.Value;
+        string file = Path.Combine(
+            TestPaths.ChallengeDatasets,
+            "Prestart_FlowerForest",
+            "Prestart_FlowerForest_03.png");
+        IReadOnlyDictionary<string, double> scores =
+            pack.ScoreStates(ImageCodec.Load(file));
+        double rewardThreshold = pack.Manifest.States
+            .Single(value => value.Name == "reward")
+            .Threshold;
+
+        Assert.True(scores["reward"] < rewardThreshold);
+        Assert.Equal("start", pack.Classify(scores));
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
     public void PauseButtonDetectors_DoNotMatchOtherCapturedUiStates()
     {
         if (!DatasetsAvailable()) return;

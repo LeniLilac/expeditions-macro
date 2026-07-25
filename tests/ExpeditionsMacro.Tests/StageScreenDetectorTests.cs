@@ -151,6 +151,28 @@ public sealed class StageScreenDetectorTests
         Assert.Null(match.ActionY);
     }
 
+    [Theory]
+    [InlineData("Expedition_Reward_Select")]
+    [InlineData("Expedition_Reward_Select2")]
+    [InlineData("Expedition_Reward_Select3")]
+    [InlineData("Expedition_Reward_Select4")]
+    [InlineData("Expedition_Reward_Select5")]
+    [InlineData("Expedition_Reward_Transition")]
+    public void ExpeditionRewardCards_AreNotStoryOrRaidStates(string dataset)
+    {
+        string directory = Path.Combine(TestPaths.Datasets, dataset);
+        if (!Directory.Exists(directory)) return;
+
+        foreach (string file in Directory.EnumerateFiles(directory, "*.png"))
+        {
+            StageScreenMatch match = StageScreenDetector.Detect(ImageCodec.Load(file));
+
+            Assert.Equal(StageScreenState.None, match.State);
+            Assert.Null(match.ActionX);
+            Assert.Null(match.ActionY);
+        }
+    }
+
     [Fact]
     public void SelectorBackAction_UsesTheStableBottomLeftControl()
     {

@@ -116,6 +116,37 @@ public partial class DebugPage
             });
     }
 
+    private async void FastNoAlign_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        CameraCalibrationSettings settings = new();
+        DeepDebugOperationContext context = new()
+        {
+            DebugTool = "fast-no-align",
+            DebugStepMode = SelectedStepMode().ToString(),
+            OperationSettings = new
+            {
+                StartState = "Shift Lock off",
+                EndState = "Zoomed out and top-down",
+                Yaw = "Preserved",
+                settings.ZoomTicks,
+                settings.PitchDragPixels,
+                settings.SettleMilliseconds,
+            },
+        };
+        await RunDebugOperationAsync(
+            "Debug fast no align",
+            "fast-no-align",
+            context,
+            token => _services.CameraPose.PrepareWithoutYawAsync(
+                zoomTicks: settings.ZoomTicks,
+                pitchDragPixels: settings.PitchDragPixels,
+                settleMilliseconds: settings.SettleMilliseconds,
+                progress: CreateProgressReporter(),
+                cancellationToken: token));
+    }
+
     private async Task RunDebugOperationAsync(
         string description,
         string tool,

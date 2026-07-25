@@ -132,11 +132,13 @@ This ledger records Anime Expeditions behavior that has been established from re
   3. Select the eligible Challenge type and configured challenge row, then verify its detail panel.
   4. Click the detected **Select Stage** action and verify a launch-ready Challenge party preview as described in GB-011.
   5. Click the detected **Start** action and wait through teleport/loading until the Challenge prestart screen is verified.
+- State-ownership rule: upgrade reward cards exist only in Expedition matches. Challenge, Story, and Raid never classify or act on the Expedition `reward` state. A complete reward overlay remains negative cross-mode evidence because it can leave the underlying Start Game dialog visibly rendered but non-interactive; that exclusion requires the real dark **Select Upgrade** action rails, so colorful map scenery cannot suppress a valid Start dialog.
+- Load-failure rule: if the bounded wait expires after a Teleporting transition, report the last current state rather than claiming Roblox is still teleporting. Treat the exhausted stage load as a session-level failure so configured private-server recovery can restart Roblox and retry the same incomplete task without progress.
 - Unavailable rule: when all configured Challenge types are on cooldown or exhausted, leave the selector through its verified close action before returning control to the scheduler or waiting.
 - Daily-limit rule: retain unavailable-rotation evidence across scheduler handoffs for the full Macro operation. If every regular Challenge remains unavailable after a complete global half-hour reset, treat the account's daily limits as exhausted until the next `00:00 UTC`; run the next eligible task instead of probing Challenges every half hour.
 - Detail-return rule: after clicking **Back** from an available or cooldown detail, wait for a stable Challenge selector before clicking again. The detail can remain visible while the first click is transitioning; a second immediate Back can land on the restored list and reopen a challenge.
-- Evidence: a 16-frame passive diagnostic capture reviewed on 2026-07-22 using v1.3.0-beta.6 shows the successful route. A 61-frame beta.9 deep-debug run reviewed on 2026-07-23 records the delayed detail-to-selector transition and the second Back click reopening the detail. A beta.14 Deep Debug run reviewed on 2026-07-24 records all regular Challenges unavailable across multiple reset epochs while invocation-local state incorrectly scheduled another half-hour probe.
-- Protected by: Challenge selector, cooldown, preview, handoff, and scheduler tests, including `ChallengeMacroRunnerTests.ChallengeDetailBack_WaitsThroughStaleFramesBeforeAnotherClick` and `ChallengeRunPolicyTests.SeparateScheduledInvocations_SharedStateInfersDailyLimitUntilMidnightUtc`.
+- Evidence: a 16-frame passive diagnostic capture reviewed on 2026-07-22 using v1.3.0-beta.6 shows the successful route. A 61-frame beta.9 deep-debug run reviewed on 2026-07-23 records the delayed detail-to-selector transition and the second Back click reopening a challenge. A beta.14 Deep Debug run reviewed on 2026-07-24 records all regular Challenges unavailable across multiple reset epochs while invocation-local state incorrectly scheduled another half-hour probe. A beta.18 Deep Debug run reviewed on 2026-07-25 records one valid Teleporting frame followed by 270 stable Flower Forest prestart observations whose colorful scenery falsely satisfied an Expedition-only reward-card heuristic inherited by the Challenge path.
+- Protected by: Challenge selector, cooldown, preview, handoff, and scheduler tests, including `ChallengeMacroRunnerTests.ChallengeDetailBack_WaitsThroughStaleFramesBeforeAnotherClick`, `ChallengeMacroRunnerTests.LoadedUnknownScreen_AfterTeleportUsesRuntimeRecovery`, `ChallengeScreenDetectorTests.ColorfulFlowerForestScenery_DoesNotSuppressTheStartDialog`, `DetectorPackGoldenTests.RewardSelection_RequiresLiveActionRailsOverColorfulScenery`, and `ChallengeRunPolicyTests.SeparateScheduledInvocations_SharedStateInfersDailyLimitUntilMidnightUtc`.
 
 ### GB-010: Mode details differ between lobby and post-match party contexts
 
@@ -233,16 +235,17 @@ This ledger records Anime Expeditions behavior that has been established from re
 - Evidence: the Unit Teams opening sequence reviewed on 2026-07-24 retains the `Teams` state while its real scrollbar is still moving. Earlier field captures also establish vertically shifted Story/Raid party and Challenge dialog families whose live action locations differ.
 - Protected by: `StableNavigationActionTrackerTests`, `ChallengeMacroRunnerTests.PlayMenuKey_LateTransitionBeforeRetry_IsAcceptedWithoutAnotherPress`, `LobbyPlayKey_LateKeyTransition_IsAcceptedWithoutAnotherPress`, and the Stage/Challenge/Expedition navigation suites.
 
-### GB-018: Isolated Debug navigation and team tests
+### GB-018: Isolated Debug operations
 
 - Status: **Product contract** built on the field-confirmed navigation states above.
 - Navigation start: the user explicitly chooses either a verified lobby with Play closed or a verified post-match result/party state. An already-open unrelated selector is rejected instead of being treated as the requested start.
 - Navigation end: enter the chosen Expedition, Challenge, Story, or Raid route and stop at stable prestart. Do not align the camera, load a team, place units, or click Start Game.
 - Team start/end: begin with Units closed, open Units through the configured key, load Team 1–8 through the production scrollbar/action verifier, and close Units before completing.
+- Fast no align: begin with Shift Lock off and a visible supported Roblox window. Standardize the client to 808 by 611, clamp maximum zoom, temporarily enable the configured Shift Lock key, use only vertical relative camera drags to clamp top-down pitch, then restore Shift Lock. Arrow pulses and horizontal relative movement are forbidden so yaw remains unchanged.
 - Step semantics: a detection checkpoint may pause after a detector observation; an action checkpoint pauses before input. Previous/Next only review captured history. Step authorizes one pending live boundary, while Run resumes without additional gates.
 - Ownership: every Debug tool uses the exclusive operation coordinator. When Deep Debug is enabled, the archive includes the selected tool/preset, step mode, ordered checkpoints, frames, detector traces, and resulting input events.
 - Do not: interpret rewind as an attempt to reverse already-sent Roblox input, or maintain separate Debug-only click coordinates.
-- Protected by: `DebugCheckpointControllerTests`, the existing mode navigation suites, saved-team tests, Deep Debug archive tests, and both-theme Debug page snapshots.
+- Protected by: `CameraPosePreparationServiceTests`, `DebugCheckpointControllerTests`, the existing mode navigation suites, saved-team tests, Deep Debug archive tests, and both-theme Debug page snapshots.
 
 ### GB-019: Experimental resource-refuel route tests
 
@@ -268,6 +271,38 @@ This ledger records Anime Expeditions behavior that has been established from re
 - Do not: reject the chooser merely because a color/HDR profile makes the full header band cyan, click a card from the overlay color alone, or wait for Roblox's automatic selection timer.
 - Evidence: three consecutive beta.16 Deep Debug frames reviewed on 2026-07-24. The complete chooser remained visible for about 24 seconds with a reward score of zero and no macro input; Roblox eventually auto-selected the right card. The affected profile made all 55 rows of the old broad cyan search band pass, while the actual bright progress bar remained a distinct seven-row structure.
 - Protected by: `DetectorPackGoldenTests.RewardDetector_IsRarityIndependentAcrossAllCapturedCardDatasets`, the complete cross-state corpus, and `Expedition_Reward_Select5`.
+
+### GB-021: Recover a match that exceeds its possible runtime
+
+- Status: **User-confirmed product contract** based on observed match ceilings.
+- Entry: the macro has clicked Start Game and no Victory, Defeat, or root recovery state has completed the active match.
+- Fifteen-wave limit: Story Acts 1-5, Story Mastery, every Regular Challenge, and Raid Acts 1-3 must reach Victory or Defeat within 12 minutes. This deliberately exceeds the observed two-to-eight-minute range so slow and debuff-heavy teams remain valid.
+- Infinite rule: Story Infinite has no match-runtime watchdog because its valid duration is indeterminate.
+- Expedition limit: when checkpoint extraction is enabled, a zero-boss target has a 10-minute limit; positive targets have 15 minutes per requested boss (`1 = 15`, `2 = 30`, `3 = 45`, and so on). An Expedition with extraction disabled has no target-derived watchdog.
+- Failure rule: emit a recoverable timeout before any task progress is recorded. Save configured failure diagnostics, close only the verified Roblox process, relaunch the configured private server, reload the saved plan, and retry the same incomplete task. The existing three-restarts-per-ten-minutes circuit breaker remains authoritative.
+- Do not: count a watchdog timeout as Victory, Defeat, a defeat retry, or completed task progress; impose the 12-minute limit on Story Infinite; or restart without a configured private-server target.
+- Protected by: `MatchRuntimePolicyTests`, `RecoveringMacroSchedulerTests.RuntimeFailure_RestartsRobloxAndRetriesTheIncompleteTask`, and the mode-monitor suites.
+
+### GB-022: Dismiss rare Raid unit drops after placement
+
+- Status: **Field confirmed** for Spirit City Acts 2 and 3.
+- Entry: Start Game has been clicked and every configured after-start placement step has returned successfully. The monitor has then observed the ordinary unit hotbar, Unit Manager action, and Stage Info action in consecutive settled frames.
+- Trigger: while no Victory or Defeat candidate is visible, the established gameplay HUD disappears in consecutive frames. The rare unit-drop presentation hides all three signals and requires a click anywhere to close; its unit, rarity, and artwork can vary.
+- Action: click the bottom-right client resting area at `(783, 586)` through the acknowledged client-relative click path. If the HUD remains hidden, retry no more than once per second until gameplay or a terminal candidate returns.
+- Scope: enable this behavior only for Raid Acts 2 and 3. Story, Challenge, Expedition, and Raid Act 1 do not own this unit-drop rule.
+- Do not: inspect for the overlay before after-start placement completes, click continuously during placement playback, recognize one specific unit or shiny variant, or click after a Victory or Defeat candidate appears.
+- Evidence: a five-frame beta.17 passive capture reviewed on 2026-07-25 shows the stable 8th Sword drop presentation for five seconds with the hotbar and both right-side gameplay actions absent.
+- Protected by: `RaidDropDismissalTrackerTests` and `StageGameplayHudDetectorTests`.
+
+### GB-023: Resume a private-server restart only from stable Lobby
+
+- Status: **Product contract**.
+- Entry: process-level recovery has closed the verified Roblox PID, launched the configured private-server URI, and discovered a different supported Roblox player PID.
+- Readiness: standardize the new client to 808 by 611, then require three consecutive detector observations whose recovery state is exactly `lobby`.
+- Intermediate rule: unknown, splash, teleport, loading, Play, selector, prestart, result, AFK, Disconnect, capture-error, and wrong-size observations reset Lobby stability and send no Roblox input.
+- Exit: return control to the scheduler only after stable Lobby, reload the saved plan, and retry the same incomplete task.
+- Failure rule: if the new process never reaches stable Lobby before the bounded recovery deadline, surface a session-level recovery failure. Do not consume Play-key attempts or route clicks during that wait.
+- Protected by: `RobloxLobbyReadinessGateTests`.
 
 ## Reusable evidence workflow
 

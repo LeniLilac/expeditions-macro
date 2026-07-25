@@ -32,7 +32,9 @@ public sealed class RecoveringMacroScheduler
         IProgress<MacroProgress>? progress = null,
         Action<MacroPlan>? planChanged = null,
         Action<MacroEvent>? log = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Func<Exception, CancellationToken, Task>?
+            recoverableFailure = null)
     {
         MacroPlan plan = initialPlan;
         RobloxRestartCircuitBreaker circuitBreaker = new();
@@ -69,6 +71,29 @@ public sealed class RecoveringMacroScheduler
                     MacroEventLevel.Warning,
                     $"Roblox runtime recovery was required: {error.Message}",
                     "roblox_restart"));
+                if (recoverableFailure is not null)
+                {
+                    try
+                    {
+                        await recoverableFailure(
+                            error,
+                            cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                        when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception diagnosticError)
+                    {
+                        log?.Invoke(new MacroEvent(
+                            DateTimeOffset.Now,
+                            MacroEventLevel.Warning,
+                            "Recoverable-failure diagnostics could not " +
+                            $"finish before Roblox restart: {diagnosticError.Message}",
+                            "roblox_restart_diagnostics"));
+                    }
+                }
                 try
                 {
                     await _recovery.RestartAsync(

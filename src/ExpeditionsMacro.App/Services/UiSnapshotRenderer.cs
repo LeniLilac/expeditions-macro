@@ -9,21 +9,26 @@ namespace ExpeditionsMacro.App.Services;
 
 internal static class UiSnapshotRenderer
 {
-    private static readonly (string Key, string File, bool ShowPageEnd)[] Pages =
+    private static readonly (
+        string Key,
+        string File,
+        bool ShowPageEnd,
+        bool ShowDebugUtilities)[] Pages =
     [
-        ("Macro", "macro", false),
-        ("Macro", "macro-status", true),
-        ("Expeditions", "expeditions", false),
-        ("Challenges", "challenges", false),
-        ("Challenges", "challenges-status", true),
-        ("Story", "story", false),
-        ("Raid", "raid", false),
-        ("Camera Models", "camera-models", false),
-        ("Placement Models", "placement-models", false),
-        ("Debug", "debug", false),
-        ("Debug", "debug-refuel", true),
-        ("Settings", "settings", false),
-        ("Settings", "settings-debug", true),
+        ("Macro", "macro", false, false),
+        ("Macro", "macro-status", true, false),
+        ("Expeditions", "expeditions", false, false),
+        ("Challenges", "challenges", false, false),
+        ("Challenges", "challenges-status", true, false),
+        ("Story", "story", false, false),
+        ("Raid", "raid", false, false),
+        ("Camera Models", "camera-models", false, false),
+        ("Placement Models", "placement-models", false, false),
+        ("Debug", "debug", false, false),
+        ("Debug", "debug-refuel", true, false),
+        ("Debug", "debug-utilities", false, true),
+        ("Settings", "settings", false, false),
+        ("Settings", "settings-debug", true, false),
     ];
 
     public static async Task RenderAsync(AppServices services, string outputDirectory)
@@ -50,9 +55,16 @@ internal static class UiSnapshotRenderer
             foreach (AppTheme theme in new[] { AppTheme.Dark, AppTheme.Light })
             {
                 ThemeService.Apply(theme);
-                foreach ((string key, string file, bool showPageEnd) in Pages)
+                foreach ((
+                    string key,
+                    string file,
+                    bool showPageEnd,
+                    bool showDebugUtilities) in Pages)
                 {
-                    await window.SelectPageForSnapshotAsync(key, showPageEnd);
+                    await window.SelectPageForSnapshotAsync(
+                        key,
+                        showPageEnd,
+                        showDebugUtilities);
                     await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
                     if (window.Content is not FrameworkElement root) throw new InvalidOperationException("The main window has no renderable content.");
                     Size size = new(1200, 780);

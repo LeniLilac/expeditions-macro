@@ -278,10 +278,16 @@ public sealed class ChallengeScreenDetectorTests
         }
     }
 
-    [Fact]
-    public void BlueFlowerForestScenery_DoesNotSuppressTheStartDialog()
+    [Theory]
+    [InlineData("Prestart_FlowerForest_02.png")]
+    [InlineData("Prestart_FlowerForest_03.png")]
+    public void ColorfulFlowerForestScenery_DoesNotSuppressTheStartDialog(
+        string fileName)
     {
-        string file = Path.Combine(TestPaths.ChallengeDatasets, "Prestart_FlowerForest", "Prestart_FlowerForest_02.png");
+        string file = Path.Combine(
+            TestPaths.ChallengeDatasets,
+            "Prestart_FlowerForest",
+            fileName);
 
         ChallengeScreenMatch match = ChallengeScreenDetector.Detect(ImageCodec.Load(file));
 

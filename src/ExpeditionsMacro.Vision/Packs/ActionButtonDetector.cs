@@ -9,6 +9,7 @@ internal static class ActionButtonDetector
     {
         Green,
         ChallengeGreen,
+        Blue,
         Purple,
         Red,
         Yellow,
@@ -87,6 +88,8 @@ internal static class ActionButtonDetector
         // action beside Next Stage and View Party. It is narrower and farther
         // right than the legacy terminal action used by Expeditions.
         ["stage_victory_repeat"] = new(new ScreenRegion(225, 390, 165, 90), ButtonColor.Yellow, 304, 437, 65, 42, 80, 135, 18, 48, 0.36),
+        ["gameplay_unit_manager"] = new(new ScreenRegion(685, 285, 123, 100), ButtonColor.Blue, 757, 335, 58, 45, 65, 105, 17, 38, 0.34),
+        ["gameplay_stage_info"] = new(new ScreenRegion(685, 330, 123, 90), ButtonColor.Yellow, 757, 364, 58, 38, 65, 105, 17, 38, 0.30),
         ["challenge_victory_party"] = new(new ScreenRegion(125, 395, 365, 80), ButtonColor.Purple, 304, 437, 100, 35, 250, 350, 16, 42, 0.25),
         ["challenge_victory_close"] = new(new ScreenRegion(625, 125, 90, 80), ButtonColor.Red, 670, 155, 48, 35, 14, 34, 14, 34, 0.35, 0.40),
         ["team_close"] = new(new ScreenRegion(610, 100, 110, 110), ButtonColor.Red, 660, 150, 55, 65, 14, 36, 14, 36, 0.35, 0.40),
@@ -227,6 +230,7 @@ internal static class ActionButtonDetector
     {
         ButtonColor.Green => green >= 110 && green - red >= 35 && green - blue >= 25 && green * 4 >= red * 5,
         ButtonColor.ChallengeGreen => green >= 65 && green - red >= 22 && green - blue >= 15 && green * 5 >= red * 6,
+        ButtonColor.Blue => blue >= 90 && blue - red >= 28 && blue - green >= 8,
         ButtonColor.Purple => blue >= 100 && red >= 65 && blue - green >= 35 && red - green >= 25,
         ButtonColor.Red => red >= 105 && red - green >= 30 && red - blue >= 20 && red * 4 >= green * 5,
         ButtonColor.Yellow => red >= 130 && green >= 85 && red - blue >= 60 && green - blue >= 45,

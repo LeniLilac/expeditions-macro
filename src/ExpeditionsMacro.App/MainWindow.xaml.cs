@@ -71,7 +71,10 @@ public partial class MainWindow : Window
         await page.OnShownAsync();
     }
 
-    internal async Task SelectPageForSnapshotAsync(string key, bool showPageEnd = false)
+    internal async Task SelectPageForSnapshotAsync(
+        string key,
+        bool showPageEnd = false,
+        bool showDebugUtilities = false)
     {
         RadioButton navigation = key switch
         {
@@ -104,7 +107,9 @@ public partial class MainWindow : Window
         if (_pages[key] is DebugPage debug)
         {
             debug.SetSnapshotState();
-            debug.SetSnapshotScroll(showPageEnd);
+            debug.SetSnapshotScroll(
+                showPageEnd,
+                showDebugUtilities);
         }
     }
 

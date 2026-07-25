@@ -19,8 +19,6 @@ public sealed partial class StageMacroRunner
 {
     private static readonly TimeSpan NavigationTimeout = TimeSpan.FromSeconds(12);
     private static readonly TimeSpan RecoveryTimeout = TimeSpan.FromSeconds(90);
-    private static readonly TimeSpan MatchTimeout = TimeSpan.FromHours(12);
-
     private readonly IRobloxAutomation _automation;
     private readonly CameraAlignmentEngine _camera;
     private readonly PlacementService _placements;

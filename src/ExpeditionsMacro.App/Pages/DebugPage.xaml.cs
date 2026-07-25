@@ -136,15 +136,19 @@ public partial class DebugPage : UserControl, IAppPage
             null));
     }
 
-    internal void SetSnapshotScroll(bool showRefuel)
+    internal void SetSnapshotScroll(
+        bool showRefuel,
+        bool showUtilities = false)
     {
         UpdateLayout();
-        DebugToolsScroll.ScrollToVerticalOffset(
-            showRefuel
-                ? RefuelCard.TranslatePoint(
-                    new Point(),
-                    DebugToolsStack).Y
-                : 0);
+        FrameworkElement? target = showUtilities
+            ? UtilitiesCard
+            : showRefuel
+                ? RefuelCard
+                : null;
+        DebugToolsScroll.ScrollToVerticalOffset(target?.TranslatePoint(
+            new Point(),
+            DebugToolsStack).Y ?? 0);
     }
 
     private async Task RefreshPresetsAsync()

@@ -9,6 +9,14 @@ namespace ExpeditionsMacro.Automation.Expeditions;
 
 public sealed partial class ExpeditionMacroRunner
 {
+    internal enum GameModeHandoffCommand
+    {
+        Complete,
+        ChangeGamemode,
+        PressPlayKey,
+        Wait,
+    }
+
     private Task OpenPlayMenuForModeSwitchAsync(
         RobloxWindow window,
         IDetectorPack detector,

@@ -142,6 +142,7 @@ public partial class DebugPage
         SaveRefuelRouteButton.IsEnabled = !busy;
         InspectScreenButton.IsEnabled = !busy;
         NormalizeClientButton.IsEnabled = !busy;
+        FastNoAlignButton.IsEnabled = !busy;
         NavigationStartCombo.IsEnabled = !busy;
         NavigationModeCombo.IsEnabled = !busy;
         NavigationPresetCombo.IsEnabled = !busy;

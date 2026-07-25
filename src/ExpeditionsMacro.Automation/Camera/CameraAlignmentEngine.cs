@@ -13,8 +13,6 @@ namespace ExpeditionsMacro.Automation.Camera;
 public sealed partial class CameraAlignmentEngine
 {
     private const int MaximumRuntimeAlignmentAttempts = 3;
-    private const double PoseClampSimilarity = 0.975;
-    private const int MaximumPoseClampProbes = 4;
     private const int FinalVerificationFrames = 3;
     private const double FineInputConsistencyThreshold = 0.80;
 
@@ -22,19 +20,23 @@ public sealed partial class CameraAlignmentEngine
     private readonly ICameraModelRepository _models;
     private readonly CameraSceneStabilizer _sceneStabilizer;
     private readonly CameraSpawnShortcutService? _spawnShortcuts;
-    private readonly Func<int> _shiftLockVirtualKey;
+    private readonly CameraPosePreparationService _posePreparation;
 
     public CameraAlignmentEngine(
         IRobloxAutomation automation,
         ICameraModelRepository models,
         ICameraSpawnShortcutRepository? spawnShortcuts = null,
-        Func<int>? shiftLockVirtualKey = null)
+        Func<int>? shiftLockVirtualKey = null,
+        CameraPosePreparationService? posePreparation = null)
     {
         _automation = automation;
         _models = models;
         _sceneStabilizer = new CameraSceneStabilizer(automation);
         _spawnShortcuts = spawnShortcuts is null ? null : new CameraSpawnShortcutService(automation, spawnShortcuts);
-        _shiftLockVirtualKey = shiftLockVirtualKey ?? (() => AppSettings.DefaultShiftLockVirtualKey);
+        _posePreparation = posePreparation ??
+            new CameraPosePreparationService(
+                automation,
+                shiftLockVirtualKey);
     }
 
     public async Task<CameraModel> CalibrateAsync(
@@ -69,7 +71,7 @@ public sealed partial class CameraAlignmentEngine
             {
                 throw new InvalidOperationException($"Roblox did not accept the standard {RobloxClientProfile.Width} × {RobloxClientProfile.Height} client size.");
             }
-            await ClampZoomAsync(
+            await _posePreparation.ClampZoomAsync(
                 window,
                 settings.ZoomTicks,
                 settings.SettleMilliseconds,
@@ -78,8 +80,13 @@ public sealed partial class CameraAlignmentEngine
                 2,
                 progress,
                 setupToken).ConfigureAwait(false);
-            shiftLockKey = await EnableShiftLockAsync(window, "Camera setup", 3, progress, setupToken).ConfigureAwait(false);
-            await ClampPitchAsync(
+            shiftLockKey = await _posePreparation.EnableShiftLockAsync(
+                window,
+                "Camera setup",
+                3,
+                progress,
+                setupToken).ConfigureAwait(false);
+            await _posePreparation.ClampPitchAsync(
                 window,
                 settings.PitchDragPixels,
                 settings.SettleMilliseconds,
@@ -229,7 +236,12 @@ public sealed partial class CameraAlignmentEngine
         }
         finally
         {
-            if (shiftLockKey is int key) await DisableShiftLockAsync(window, key).ConfigureAwait(false);
+            if (shiftLockKey is int key)
+            {
+                await _posePreparation.DisableShiftLockAsync(
+                    window,
+                    key).ConfigureAwait(false);
+            }
         }
     }
 
@@ -273,7 +285,13 @@ public sealed partial class CameraAlignmentEngine
             }
             if (manageShiftLock)
             {
-                shiftLockKey = await EnableShiftLockAsync(window, "Camera alignment", 6, progress, cancellationToken).ConfigureAwait(false);
+                shiftLockKey =
+                    await _posePreparation.EnableShiftLockAsync(
+                        window,
+                        "Camera alignment",
+                        6,
+                        progress,
+                        cancellationToken).ConfigureAwait(false);
             }
 
             int phase = Math.Max(model.Manifest.FineStepPixels, model.Manifest.FineSearchPixels / 2);
@@ -361,7 +379,12 @@ public sealed partial class CameraAlignmentEngine
         }
         finally
         {
-            if (shiftLockKey is int key) await DisableShiftLockAsync(window, key).ConfigureAwait(false);
+            if (shiftLockKey is int key)
+            {
+                await _posePreparation.DisableShiftLockAsync(
+                    window,
+                    key).ConfigureAwait(false);
+            }
         }
     }
 
@@ -379,7 +402,7 @@ public sealed partial class CameraAlignmentEngine
         Focus(window);
         await EnsureClientSizeAsync(window, model.Manifest, progress, cancellationToken).ConfigureAwait(false);
         await _automation.MoveCursorToClientCenterAsync(window, cancellationToken).ConfigureAwait(false);
-        await ClampZoomAsync(
+        await _posePreparation.ClampZoomAsync(
             window,
             zoomTicks,
             model.Manifest.SettleMilliseconds,
@@ -396,8 +419,14 @@ public sealed partial class CameraAlignmentEngine
         int? shiftLockKey = null;
         try
         {
-            shiftLockKey = await EnableShiftLockAsync(window, "Camera preparation", 6, progress, cancellationToken).ConfigureAwait(false);
-            await ClampPitchAsync(
+            shiftLockKey =
+                await _posePreparation.EnableShiftLockAsync(
+                    window,
+                    "Camera preparation",
+                    6,
+                    progress,
+                    cancellationToken).ConfigureAwait(false);
+            await _posePreparation.ClampPitchAsync(
                 window,
                 pitchDragPixels,
                 model.Manifest.SettleMilliseconds,
@@ -416,7 +445,12 @@ public sealed partial class CameraAlignmentEngine
         }
         finally
         {
-            if (shiftLockKey is int key) await DisableShiftLockAsync(window, key).ConfigureAwait(false);
+            if (shiftLockKey is int key)
+            {
+                await _posePreparation.DisableShiftLockAsync(
+                    window,
+                    key).ConfigureAwait(false);
+            }
         }
     }
 
@@ -451,30 +485,6 @@ public sealed partial class CameraAlignmentEngine
             $"Attempt {attempt}/{MaximumRuntimeAlignmentAttempts} fast alignment reached only {refined:P0} (target {model.Manifest.SuccessThreshold:P0}). Scanning one full yaw turn {DirectionLabel(plan.ScanDirection)} with a {plan.ScanPhasePixels:+#;-#;0}-px sampling phase.",
             Confidence: refined));
         return await ScanFullTurnAsync(window, model, refined, plan, attempt, progress, cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task<int> EnableShiftLockAsync(
-        RobloxWindow window,
-        string operation,
-        int percent,
-        IProgress<MacroProgress>? progress,
-        CancellationToken cancellationToken)
-    {
-        int virtualKey = _shiftLockVirtualKey();
-        if (!KeyboardKey.IsSupportedShiftLockKey(virtualKey)) throw new InvalidDataException("The configured Shift Lock key is not supported.");
-        progress?.Report(new MacroProgress(operation, percent, $"Enabling shift lock with {KeyboardKey.GetDisplayName(virtualKey)} for stable camera movement."));
-        await _automation.MoveCursorToClientCenterAsync(window, cancellationToken).ConfigureAwait(false);
-        await Task.Delay(120, cancellationToken).ConfigureAwait(false);
-        cancellationToken.ThrowIfCancellationRequested();
-        await _automation.TapShiftLockKeyAsync(window, virtualKey, CancellationToken.None).ConfigureAwait(false);
-        await Task.Delay(250, CancellationToken.None).ConfigureAwait(false);
-        return virtualKey;
-    }
-
-    private async Task DisableShiftLockAsync(RobloxWindow window, int virtualKey)
-    {
-        Focus(window);
-        await _automation.TapShiftLockKeyAsync(window, virtualKey, CancellationToken.None).ConfigureAwait(false);
     }
 
     private async Task<(int FullYawSteps, IReadOnlyList<double> Scores, IReadOnlyList<ImageFrame> Atlas)> LearnFullTurnAsync(
@@ -1080,80 +1090,6 @@ public sealed partial class CameraAlignmentEngine
         {
             throw new InvalidOperationException("Roblox does not match the client size stored by the camera model.");
         }
-    }
-
-    private async Task ClampZoomAsync(
-        RobloxWindow window,
-        int zoomTicks,
-        int settleMilliseconds,
-        IReadOnlyList<ScreenRegion>? regions,
-        string operation,
-        int percent,
-        IProgress<MacroProgress>? progress,
-        CancellationToken cancellationToken)
-    {
-        int batch = Math.Clamp(zoomTicks, 5, 80);
-        progress?.Report(new MacroProgress(operation, percent, "Zooming out until the rendered view stops changing."));
-        Focus(window);
-        await _automation.ZoomOutFullyAsync(window, batch, cancellationToken).ConfigureAwait(false);
-        await Task.Delay(Math.Max(75, settleMilliseconds), cancellationToken).ConfigureAwait(false);
-        ImageFrame previous = CapturePoseThumbnail(window, regions);
-        double similarity = 0;
-        for (int probe = 1; probe <= MaximumPoseClampProbes; probe++)
-        {
-            await _automation.ZoomOutFullyAsync(window, batch, cancellationToken).ConfigureAwait(false);
-            await Task.Delay(Math.Max(75, settleMilliseconds), cancellationToken).ConfigureAwait(false);
-            ImageFrame current = CapturePoseThumbnail(window, regions);
-            similarity = CameraRegisteredScorer.Score(previous, current, maximumTranslation: 2).Score;
-            if (similarity >= PoseClampSimilarity)
-            {
-                progress?.Report(new MacroProgress(operation, percent, $"Zoom clamp verified at {similarity:P0} frame agreement.", Confidence: similarity));
-                return;
-            }
-            previous = current;
-        }
-        progress?.Report(new MacroProgress(operation, percent, $"Zoom received the maximum extra zoom passes; the scene remained animated ({similarity:P0}).", Confidence: similarity));
-    }
-
-    private async Task ClampPitchAsync(
-        RobloxWindow window,
-        int pitchDragPixels,
-        int settleMilliseconds,
-        IReadOnlyList<ScreenRegion>? regions,
-        string operation,
-        int percent,
-        IProgress<MacroProgress>? progress,
-        CancellationToken cancellationToken)
-    {
-        int initial = Math.Clamp(pitchDragPixels, 300, 5000);
-        int probePixels = Math.Clamp(initial / 3, 450, 900);
-        progress?.Report(new MacroProgress(operation, percent, "Dragging downward until the top-down pitch stops changing."));
-        Focus(window);
-        await _automation.DragCameraAsync(window, 0, initial, 90, cancellationToken).ConfigureAwait(false);
-        await Task.Delay(Math.Max(75, settleMilliseconds), cancellationToken).ConfigureAwait(false);
-        ImageFrame previous = CapturePoseThumbnail(window, regions);
-        double similarity = 0;
-        for (int probe = 1; probe <= MaximumPoseClampProbes; probe++)
-        {
-            await _automation.DragCameraAsync(window, 0, probePixels, 90, cancellationToken).ConfigureAwait(false);
-            await Task.Delay(Math.Max(75, settleMilliseconds), cancellationToken).ConfigureAwait(false);
-            ImageFrame current = CapturePoseThumbnail(window, regions);
-            similarity = CameraRegisteredScorer.Score(previous, current, maximumTranslation: 2).Score;
-            if (similarity >= PoseClampSimilarity)
-            {
-                progress?.Report(new MacroProgress(operation, percent, $"Top-down pitch clamp verified at {similarity:P0} frame agreement.", Confidence: similarity));
-                return;
-            }
-            previous = current;
-        }
-        progress?.Report(new MacroProgress(operation, percent, $"Pitch received the maximum extra downward drags; the scene remained animated ({similarity:P0}).", Confidence: similarity));
-    }
-
-    private ImageFrame CapturePoseThumbnail(RobloxWindow window, IReadOnlyList<ScreenRegion>? regions)
-    {
-        ImageFrame frame = _automation.CaptureClient(window);
-        if (regions is null) return VisionScorer.PrepareGray(frame, 160, 101);
-        return VisionScorer.MakeThumbnail(CameraRegionAnalyzer.BuildComposite(frame, regions), 160);
     }
 
     private static double GoalEvidence(CameraModel model, ImageFrame fullClient)

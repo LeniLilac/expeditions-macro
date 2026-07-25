@@ -1,8 +1,10 @@
 using ExpeditionsMacro.Automation.Challenges;
 using ExpeditionsMacro.Automation.Navigation;
+using ExpeditionsMacro.Automation.Recovery;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
+using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Challenges;
 using ExpeditionsMacro.Vision.Infrastructure;
 
@@ -112,6 +114,19 @@ public sealed class ChallengeMacroRunnerTests
 
         Assert.Equal(initialDeadline, unchanged);
         Assert.Equal(startedAt + TimeSpan.FromMinutes(3), extended);
+    }
+
+    [Fact]
+    public void LoadedUnknownScreen_AfterTeleportUsesRuntimeRecovery()
+    {
+        RobloxSessionUnavailableException error =
+            ChallengePrestartTimeoutPolicy.CreateException(
+                teleportingSeen: true,
+                ChallengeScreenState.None);
+
+        Assert.Contains("left the Teleporting screen", error.Message);
+        Assert.DoesNotContain("remained on the Teleporting screen", error.Message);
+        Assert.True(RobloxRuntimeRecoveryPolicy.IsRestartCandidate(error));
     }
 
     [Fact]

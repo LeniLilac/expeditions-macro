@@ -56,7 +56,8 @@ public sealed class RobloxPrivateServerLinkTests
         RecordingProcessController processes = new();
         RobloxPrivateServerRecoveryService recovery = new(
             automation: null!,
-            processes);
+            processes,
+            static _ => Task.FromResult<IDetectorPack>(null!));
         RobloxPrivateServerLaunchTarget target =
             RobloxPrivateServerLaunchTarget.Parse(
                 "https://www.roblox.com/share?code=Share_Code-123&type=Server");

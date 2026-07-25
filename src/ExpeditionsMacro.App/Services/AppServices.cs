@@ -88,19 +88,32 @@ public sealed class AppServices : IDisposable
         placementCapture.TraceEnabled = () => DeepDebug.IsActive;
         PlacementCapture = placementCapture;
         Placement = new PlacementService(Automation, PlacementCapture, PlacementModels);
-        Camera = new CameraAlignmentEngine(
+        CameraPose = new CameraPosePreparationService(
             Automation,
-            CameraModels,
-            CameraShortcuts,
             () => AppSettings.ParseShiftLockKey(
                 Settings.ShiftLockVirtualKey,
                 Settings.MacroHotkeyVirtualKey,
                 Settings.PlayMenuKey,
                 Settings.UnitMenuKey,
                 Settings.AreasMenuKey));
+        Camera = new CameraAlignmentEngine(
+            Automation,
+            CameraModels,
+            CameraShortcuts,
+            posePreparation: CameraPose);
         RobloxRecovery = new RobloxPrivateServerRecoveryService(
             Automation,
-            new WindowsRobloxProcessController());
+            new WindowsRobloxProcessController(),
+            async cancellationToken =>
+            {
+                IDetectorPack detector =
+                    await DetectorPacks.LoadAsync(
+                        AnimeExpeditionsDetectorSpec.PackId,
+                        cancellationToken).ConfigureAwait(false) ??
+                    throw new InvalidOperationException(
+                        "The Anime Expeditions detector pack is unavailable for Roblox restart recovery.");
+                return TraceDetector(detector);
+            });
         ResourceRefuel = new ResourceRefuelService(
             Automation,
             RobloxRecovery);
@@ -145,6 +158,7 @@ public sealed class AppServices : IDisposable
     public DiagnosticCaptureService DiagnosticCapture { get; }
     public IPlacementCaptureService PlacementCapture { get; }
     public PlacementService Placement { get; }
+    public CameraPosePreparationService CameraPose { get; }
     public CameraAlignmentEngine Camera { get; }
     public RobloxPrivateServerRecoveryService RobloxRecovery { get; }
     public ResourceRefuelService ResourceRefuel { get; }

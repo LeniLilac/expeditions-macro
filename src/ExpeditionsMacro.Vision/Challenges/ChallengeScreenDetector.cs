@@ -109,7 +109,13 @@ public static class ChallengeScreenDetector
         double victoryParty = ActionButtonDetector.Score(image, "challenge_victory_party");
         double victoryClose = ActionButtonDetector.Score(image, "challenge_victory_close");
         double defeat = TerminalScreenDetector.Score(image, "defeat");
-        double prestart = RewardScreenDetector.HasHeader(image) ? 0 : StartDialogDetector.Score(image);
+        // Expedition rewards can leave the underlying Start Game dialog visibly
+        // rendered. Reward is not a Challenge/Story/Raid state, but a complete
+        // reward overlay makes that underlying action non-interactive and must
+        // remain negative cross-mode evidence.
+        double prestart = RewardScreenDetector.Score(image) > 0
+            ? 0
+            : StartDialogDetector.Score(image);
         double challengeList = ChallengeListScore(image, panel);
         double challengeListUnavailable = ChallengeListUnavailableScore(image, panel);
         double availability = Math.Max(selectStage, enterMatchmaking);
