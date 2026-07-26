@@ -112,6 +112,29 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
             new { Window = WindowData(window) },
             () => _inner.MoveCursorToClientCenterAsync(window, cancellationToken));
 
+    public Task MoveCursorToClientAsync(
+        RobloxWindow window,
+        int x,
+        int y,
+        int jitterCycles,
+        CancellationToken cancellationToken) =>
+        TraceAsync(
+            "automation",
+            "move_cursor_to_client",
+            new
+            {
+                Window = WindowData(window),
+                X = x,
+                Y = y,
+                JitterCycles = jitterCycles,
+            },
+            () => _inner.MoveCursorToClientAsync(
+                window,
+                x,
+                y,
+                jitterCycles,
+                cancellationToken));
+
     public Task ParkCursorAsync(RobloxWindow window, CancellationToken cancellationToken) =>
         TraceAsync(
             "automation",

@@ -1,5 +1,6 @@
 using System.Windows;
 using ExpeditionsMacro.Automation.Diagnostics;
+using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
@@ -145,6 +146,50 @@ public partial class DebugPage
                 settleMilliseconds: settings.SettleMilliseconds,
                 progress: CreateProgressReporter(),
                 cancellationToken: token));
+    }
+
+    private async void TeleportLobby_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        DeepDebugOperationContext context = new()
+        {
+            DebugTool = "teleport-to-lobby",
+            DebugStepMode = SelectedStepMode().ToString(),
+            OperationSettings = new
+            {
+                StartState = "Loaded match",
+                EndState = "Verified lobby",
+                Route = "Roblox accessibility navigation",
+            },
+        };
+        await RunDebugOperationAsync(
+            "Debug teleport to lobby",
+            "teleport-to-lobby",
+            context,
+            async token =>
+            {
+                IDetectorPack detector =
+                    await LoadDetectorAsync(token)
+                        .ConfigureAwait(false);
+                var window = RequireRobloxWindow();
+                RequireFocus(window);
+                await EnsureCanonicalClientAsync(
+                    window,
+                    token).ConfigureAwait(false);
+                _services.DebugCheckpoints.RecordStatus(
+                    "Returning to lobby",
+                    "Opening and confirming Roblox Back to Lobby.");
+                await _services.MatchLobby
+                    .ReturnAsync(
+                        window,
+                        detector,
+                        token)
+                    .ConfigureAwait(false);
+                _services.DebugCheckpoints.RecordStatus(
+                    "Lobby verified",
+                    "Roblox reached the fully loaded lobby.");
+            });
     }
 
     private async Task RunDebugOperationAsync(

@@ -7,7 +7,8 @@ internal readonly record struct GameSettingLayoutEntry(
     GameSettingsPage Page,
     int X,
     int Y,
-    bool UnitsBottom = false);
+    bool UnitsBottom = false,
+    int? AlternateY = null);
 
 internal static class GameSettingsLayout
 {
@@ -98,8 +99,16 @@ internal static class GameSettingsLayout
             [RequiredGameSetting.AutoAbilitiesOnPlacement] =
                 new(GameSettingsPage.Units, 638, 351, true),
             [RequiredGameSetting.DisplayUpdateLogOnLogin] =
-                new(GameSettingsPage.Miscellaneous, 436, 364),
+                new(
+                    GameSettingsPage.Miscellaneous,
+                    436,
+                    364,
+                    AlternateY: 350),
             [RequiredGameSetting.AutoSprint] =
-                new(GameSettingsPage.Miscellaneous, 638, 364),
+                new(
+                    GameSettingsPage.Miscellaneous,
+                    638,
+                    364,
+                    AlternateY: 350),
         };
 }

@@ -50,6 +50,9 @@ public sealed class GameSettingsScreenDetectorTests
     [InlineData(
         "MiscellaneousPageCurrent.png",
         GameSettingsPage.Miscellaneous)]
+    [InlineData(
+        "MiscellaneousPageEventUpdate.png",
+        GameSettingsPage.Miscellaneous)]
     public void CanonicalPages_ReportTheirSelectedTab(
         string fileName,
         GameSettingsPage expected)
@@ -188,6 +191,29 @@ public sealed class GameSettingsScreenDetectorTests
             autoSprint.State);
         Assert.Equal(364, updateLog.ActionY);
         Assert.Equal(364, autoSprint.ActionY);
+    }
+
+    [Fact]
+    public void EventUpdateMiscellaneous_UsesCompactRequiredRow()
+    {
+        GameSettingToggleMatch updateLog =
+            GameSettingsScreenDetector.DetectToggle(
+                Load("MiscellaneousPageEventUpdate.png"),
+                RequiredGameSetting
+                    .DisplayUpdateLogOnLogin);
+        GameSettingToggleMatch autoSprint =
+            GameSettingsScreenDetector.DetectToggle(
+                Load("MiscellaneousPageEventUpdate.png"),
+                RequiredGameSetting.AutoSprint);
+
+        Assert.Equal(
+            GameSettingToggleState.Disabled,
+            updateLog.State);
+        Assert.Equal(
+            GameSettingToggleState.Enabled,
+            autoSprint.State);
+        Assert.Equal(350, updateLog.ActionY);
+        Assert.Equal(350, autoSprint.ActionY);
     }
 
     [Fact]

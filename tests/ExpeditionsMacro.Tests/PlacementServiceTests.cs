@@ -33,6 +33,69 @@ public sealed class PlacementServiceTests
         }
     }
 
+    [Fact]
+    public async Task Playback_PrimesTargetTwiceThenSettlesBeforeClick()
+    {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            $"expeditions-placement-{Guid.NewGuid():N}");
+        try
+        {
+            FakeAutomation automation = new();
+            PlacementService service = new(
+                automation,
+                new FakeCaptureService(automation),
+                new PlacementModelRepository(
+                    new AppPaths(root)));
+            PlacementModel model = new()
+            {
+                Id = "playback",
+                Name = "Playback",
+                ClientWidth = 808,
+                ClientHeight = 611,
+                Steps =
+                [
+                    new PlacementStep
+                    {
+                        UnitKey = 4,
+                        X = 320,
+                        Y = 280,
+                        DelayAfterMilliseconds = 0,
+                    },
+                ],
+                CreatedAt = DateTimeOffset.UtcNow,
+            };
+
+            await service.PlayAsync(
+                model,
+                useDefaultInterval: true,
+                defaultIntervalMilliseconds: 0,
+                keyHoldMilliseconds: 0,
+                afterKeyMilliseconds: 0);
+
+            Assert.Equal(
+                [
+                    "key:4",
+                    "hover:320,280:2",
+                    "click:320,280",
+                ],
+                automation.InputActions);
+            Assert.NotNull(automation.TargetPrimedAt);
+            Assert.NotNull(automation.ClickedAt);
+            Assert.True(
+                automation.ClickedAt -
+                automation.TargetPrimedAt >=
+                TimeSpan.FromMilliseconds(180));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
     private sealed class FakeCaptureService(FakeAutomation automation) : IPlacementCaptureService
     {
         public (int Width, int Height)? ClientSizeAtCapture { get; private set; }
@@ -60,6 +123,12 @@ public sealed class PlacementServiceTests
 
         public WindowBounds? RestoredBounds { get; private set; }
 
+        public List<string> InputActions { get; } = [];
+
+        public DateTimeOffset? TargetPrimedAt { get; private set; }
+
+        public DateTimeOffset? ClickedAt { get; private set; }
+
         public RobloxWindow? FindWindow(string titleFragment = "Roblox") => _window;
 
         public RobloxWindow? ForegroundWindow() => _window;
@@ -85,9 +154,31 @@ public sealed class PlacementServiceTests
 
         public Task MoveCursorToClientCenterAsync(RobloxWindow window, CancellationToken cancellationToken) => Task.CompletedTask;
 
+        public Task MoveCursorToClientAsync(
+            RobloxWindow window,
+            int x,
+            int y,
+            int jitterCycles,
+            CancellationToken cancellationToken)
+        {
+            InputActions.Add(
+                $"hover:{x},{y}:{jitterCycles}");
+            TargetPrimedAt = DateTimeOffset.UtcNow;
+            return Task.CompletedTask;
+        }
+
         public Task ParkCursorAsync(RobloxWindow window, CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task ClickClientAsync(RobloxWindow window, int x, int y, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task ClickClientAsync(
+            RobloxWindow window,
+            int x,
+            int y,
+            CancellationToken cancellationToken)
+        {
+            InputActions.Add($"click:{x},{y}");
+            ClickedAt = DateTimeOffset.UtcNow;
+            return Task.CompletedTask;
+        }
 
         public Task DragClientAsync(
             RobloxWindow window,
@@ -109,6 +200,14 @@ public sealed class PlacementServiceTests
 
         public Task TapLetterKeyAsync(RobloxWindow window, char key, CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task TapUnitKeyAsync(RobloxWindow window, int unitKey, int holdMilliseconds, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task TapUnitKeyAsync(
+            RobloxWindow window,
+            int unitKey,
+            int holdMilliseconds,
+            CancellationToken cancellationToken)
+        {
+            InputActions.Add($"key:{unitKey}");
+            return Task.CompletedTask;
+        }
     }
 }

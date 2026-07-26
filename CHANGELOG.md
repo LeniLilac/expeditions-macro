@@ -4,6 +4,27 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.25] - 2026-07-25
+
+### Added
+
+- Added a Debug **Teleport to lobby** action that exercises the production accessibility-navigation and Lobby-readiness path with full Deep Debug coverage.
+- Placement Setup now accepts the `1` through `6` number-row and numpad keys to select a unit slot while preserving ordinary numeric text entry.
+
+### Changed
+
+- Placement playback now primes each target with two acknowledged one-pixel cursor passes, settles for 200 milliseconds, then uses the existing jittered click to place the unit.
+
+### Fixed
+
+- Startup settings normalization now supports both observed Miscellaneous page row positions after the Event update while retaining strict toggle-state verification.
+- Registered the Debug lobby action's Lucide icon locally so the app cannot fail during WPF startup while resolving that button.
+
+### Tests
+
+- Added a privacy-reviewed compact Event-update Miscellaneous settings fixture and retained legacy-layout coverage.
+- Revalidated all 824 application and detector tests, all 5 Deep Debug Viewer tests, and 28 dark/light UI snapshots from both current source and the packaged application.
+
 ## [1.3.0-beta.24] - 2026-07-25
 
 ### Added
@@ -794,7 +815,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.24...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.25...HEAD
+[1.3.0-beta.25]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.24...v1.3.0-beta.25
 [1.3.0-beta.24]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.23...v1.3.0-beta.24
 [1.3.0-beta.23]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.22...v1.3.0-beta.23
 [1.3.0-beta.22]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.21...v1.3.0-beta.22

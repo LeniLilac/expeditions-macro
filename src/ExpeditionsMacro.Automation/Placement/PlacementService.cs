@@ -8,6 +8,9 @@ namespace ExpeditionsMacro.Automation.Placement;
 
 public sealed class PlacementService
 {
+    private const int PlacementHoverJitterCycles = 2;
+    private const int PlacementHoverSettleMilliseconds = 200;
+
     private readonly IRobloxAutomation _automation;
     private readonly IPlacementCaptureService _capture;
     private readonly PlacementModelRepository _models;
@@ -106,6 +109,21 @@ public sealed class PlacementService
             await _automation.TapUnitKeyAsync(window, step.UnitKey, keyHoldMilliseconds, cancellationToken).ConfigureAwait(false);
             await Task.Delay(afterKeyMilliseconds, cancellationToken).ConfigureAwait(false);
             await EnsureSizeAsync(window, model.ClientWidth, model.ClientHeight, cancellationToken).ConfigureAwait(false);
+            EnsureFocus(window);
+            status?.Invoke(
+                $"Step {index + 1}/{steps.Count}: priming relative ({step.X}, {step.Y}) with two cursor jitters.");
+            await _automation.MoveCursorToClientAsync(
+                    window,
+                    step.X,
+                    step.Y,
+                    PlacementHoverJitterCycles,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await Task.Delay(
+                    PlacementHoverSettleMilliseconds,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            EnsureFocus(window);
             status?.Invoke($"Step {index + 1}/{steps.Count}: clicking relative ({step.X}, {step.Y}).");
             await _automation.ClickClientAsync(window, step.X, step.Y, cancellationToken).ConfigureAwait(false);
             stepSent?.Invoke(index + 1, steps.Count, step);

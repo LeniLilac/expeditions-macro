@@ -191,8 +191,39 @@ public static class GameSettingsScreenDetector
                     layout.Y));
         }
 
+        GameSettingToggleMatch[] candidates =
+            CandidateRows(layout)
+                .Select(y =>
+                    DetectToggleAt(
+                        image,
+                        setting,
+                        layout.X,
+                        y))
+                .OrderByDescending(
+                    candidate => candidate.Confidence)
+                .ToArray();
+        return TraceToggle(candidates[0]);
+    }
+
+    private static IEnumerable<int> CandidateRows(
+        GameSettingLayoutEntry layout)
+    {
+        yield return layout.Y;
+        if (layout.AlternateY is int alternate &&
+            alternate != layout.Y)
+        {
+            yield return alternate;
+        }
+    }
+
+    private static GameSettingToggleMatch DetectToggleAt(
+        ImageFrame image,
+        RequiredGameSetting setting,
+        int x,
+        int y)
+    {
         ScreenRegion sample =
-            new(layout.X - 8, layout.Y - 8, 17, 17);
+            new(x - 8, y - 8, 17, 17);
         double enabled =
             GameSettingsVisionMetrics.ColorFraction(
                 image,
@@ -239,13 +270,12 @@ public static class GameSettingsScreenDetector
             confidence = Math.Max(enabled, disabled);
         }
 
-        return TraceToggle(
-            new GameSettingToggleMatch(
-                setting,
-                state,
-                confidence,
-                layout.X,
-                layout.Y));
+        return new GameSettingToggleMatch(
+            setting,
+            state,
+            confidence,
+            x,
+            y);
     }
 
     public static GameSettingsScrollbarThumb?

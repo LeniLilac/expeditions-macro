@@ -73,6 +73,15 @@ public interface IRobloxAutomation
 
     Task MoveCursorToClientCenterAsync(RobloxWindow window, CancellationToken cancellationToken);
 
+    Task MoveCursorToClientAsync(
+        RobloxWindow window,
+        int x,
+        int y,
+        int jitterCycles,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException(
+            "This automation backend does not support acknowledged client cursor movement.");
+
     Task ParkCursorAsync(RobloxWindow window, CancellationToken cancellationToken);
 
     Task ClickClientAsync(RobloxWindow window, int x, int y, CancellationToken cancellationToken);

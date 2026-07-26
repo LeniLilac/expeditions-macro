@@ -144,6 +144,7 @@ public partial class DebugPage
         NormalizeClientButton.IsEnabled = !busy;
         RunUiScaleButton.IsEnabled = !busy;
         RunGameSettingsButton.IsEnabled = !busy;
+        TeleportLobbyButton.IsEnabled = !busy;
         FastNoAlignButton.IsEnabled = !busy;
         KeyPressKeyButton.IsEnabled = !busy;
         KeyPressDurationText.IsEnabled = !busy;

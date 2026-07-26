@@ -6,6 +6,38 @@ namespace ExpeditionsMacro.Windows;
 
 public sealed partial class WindowsRobloxAutomation
 {
+    public Task MoveCursorToClientAsync(
+        RobloxWindow window,
+        int x,
+        int y,
+        int jitterCycles,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (jitterCycles is < 1 or > 8)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(jitterCycles));
+        }
+        if (!Focus(window))
+        {
+            throw new InvalidOperationException(
+                "Windows could not focus Roblox.");
+        }
+
+        ClientBounds bounds = GetClientBounds(window);
+        ValidateClientPoint(bounds, x, y);
+        for (int cycle = 0; cycle < jitterCycles; cycle++)
+        {
+            MoveCursorWithRegisteredMotion(
+                bounds.X + x,
+                bounds.Y + y,
+                -1,
+                "Windows could not move the cursor to the Roblox coordinate.");
+        }
+        return Task.CompletedTask;
+    }
+
     public async Task DragClientAsync(
         RobloxWindow window,
         int startX,

@@ -304,6 +304,12 @@
                                     icons:Lucide.Icon="Settings"
                                     Content="Test game settings"
                                     Click="RunGameSettings_Click" />
+                            <Button x:Name="TeleportLobbyButton"
+                                    Margin="0,8,0,0"
+                                    HorizontalAlignment="Stretch"
+                                    icons:Lucide.Icon="LogOut"
+                                    Content="Teleport to lobby"
+                                    Click="TeleportLobby_Click" />
                             <Button x:Name="FastNoAlignButton"
                                     Margin="0,8,0,0"
                                     HorizontalAlignment="Stretch"

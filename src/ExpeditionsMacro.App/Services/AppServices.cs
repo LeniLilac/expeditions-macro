@@ -6,6 +6,7 @@ using ExpeditionsMacro.Automation.Diagnostics;
 using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Events;
 using ExpeditionsMacro.Automation.Expeditions;
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Automation.Recovery;
 using ExpeditionsMacro.Automation.Refuel;
@@ -126,6 +127,7 @@ public sealed class AppServices : IDisposable
             RobloxRecovery);
         StartupPreflight =
             new MacroStartupPreflightService(Automation);
+        MatchLobby = new MatchLobbyNavigator(Automation);
         _discord = new DiscordWebhookClient();
         Teams = new TeamSelectionService(Automation);
         Stages = new StageMacroRunner(
@@ -198,6 +200,7 @@ public sealed class AppServices : IDisposable
     public RobloxPrivateServerRecoveryService RobloxRecovery { get; }
     public ResourceRefuelService ResourceRefuel { get; }
     public MacroStartupPreflightService StartupPreflight { get; }
+    public MatchLobbyNavigator MatchLobby { get; }
     public TeamSelectionService Teams { get; }
     public StageMacroRunner Stages { get; }
     public MacroScheduler Scheduler { get; }

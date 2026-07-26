@@ -84,6 +84,23 @@ public sealed class DebugSteppingRobloxAutomation : IRobloxAutomation, IDisposab
                 cancellationToken),
             cancellationToken);
 
+    public Task MoveCursorToClientAsync(
+        RobloxWindow window,
+        int x,
+        int y,
+        int jitterCycles,
+        CancellationToken cancellationToken) =>
+        TraceAsync(
+            "Prime placement target",
+            $"Move over ({x}, {y}) with {jitterCycles} acknowledged jitter cycles.",
+            () => _inner.MoveCursorToClientAsync(
+                window,
+                x,
+                y,
+                jitterCycles,
+                cancellationToken),
+            cancellationToken);
+
     public Task ParkCursorAsync(
         RobloxWindow window,
         CancellationToken cancellationToken) =>

@@ -28,6 +28,7 @@ public enum LucideIconKind
     FolderOpen,
     FastForward,
     Keyboard,
+    LogOut,
     MapPin,
     MessagesSquare,
     Minus,
@@ -183,6 +184,10 @@ public sealed class LucideIcon : Control
             Path("m13 19 9-7-9-7z"),
             Path("m2 19 9-7-9-7z")),
         [LucideIconKind.Keyboard] = Group(Path("M10 8h.01"), Path("M12 12h.01"), Path("M14 8h.01"), Path("M16 12h.01"), Path("M18 8h.01"), Path("M6 8h.01"), Path("M7 16h10"), Path("M8 12h.01"), Rectangle(2, 4, 20, 16, 2)),
+        [LucideIconKind.LogOut] = Group(
+            Path("M10 17l5-5-5-5"),
+            Path("M15 12H3"),
+            Path("M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4")),
         [LucideIconKind.MapPin] = Group(Path("M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"), Circle(12, 10, 3)),
         [LucideIconKind.MessagesSquare] = Group(Path("M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"), Path("M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1")),
         [LucideIconKind.Minus] = Path("M5 12h14"),
