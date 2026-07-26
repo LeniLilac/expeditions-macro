@@ -14,6 +14,8 @@ public sealed record PlacementStep
 
     public int DelayAfterStartMilliseconds { get; init; }
 
+    public UnitTargetingPriority TargetingPriority { get; init; }
+
     public void Validate(int clientWidth, int clientHeight)
     {
         if (UnitKey is < 0 or > 9) throw new InvalidDataException("Unit key must be 0 through 9.");
@@ -21,6 +23,11 @@ public sealed record PlacementStep
         if (DelayAfterMilliseconds < 0) throw new InvalidDataException("Placement delay cannot be negative.");
         if (DelayAfterStartMilliseconds < 0) throw new InvalidDataException("After-start placement delay cannot be negative.");
         if (!Enum.IsDefined(Phase)) throw new InvalidDataException("Placement phase is invalid.");
+        if (!Enum.IsDefined(TargetingPriority))
+        {
+            throw new InvalidDataException(
+                "Unit targeting priority is invalid.");
+        }
     }
 }
 

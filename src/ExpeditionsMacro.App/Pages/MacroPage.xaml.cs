@@ -39,12 +39,12 @@ public partial class MacroPage : UserControl, IAppPage
     private bool _loading;
     private bool _macroOwned;
     private bool _testingWebhook;
-
     public MacroPage(AppServices services)
     {
         _services = services;
         InitializeComponent();
         DataContext = this;
+        LoopEditor.SetTasks(TaskRows);
         PlanCombo.ItemsSource = _plans;
         TaskKindCombo.ItemsSource = Enum.GetValues<MacroTaskKind>()
             .Where(kind =>
@@ -207,6 +207,7 @@ public partial class MacroPage : UserControl, IAppPage
         AddTaskButton.IsEnabled = !busy;
         CancelTaskEditButton.IsEnabled = !busy;
         ResetProgressButton.IsEnabled = !busy;
+        LoopEditor.SetInteractionEnabled(!busy);
         WebhookPassword.IsEnabled = !busy;
         WebhookVisible.IsEnabled = !busy;
         ShowWebhookCheck.IsEnabled = !busy;

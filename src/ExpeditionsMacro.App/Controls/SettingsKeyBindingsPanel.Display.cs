@@ -33,6 +33,9 @@ public partial class SettingsKeyBindingsPanel
             char key = AppSettings.ParsePlayMenuKey(
                 services.Settings.PlayMenuKey,
                 services.Hotkey.VirtualKey);
+            AppSettings.ValidateControlKeySet(
+                services.Settings,
+                requireUnitActionKeys: false);
             if (_captureTarget != BindingTarget.Play)
             {
                 PlayButton.Content = key.ToString();
@@ -70,12 +73,15 @@ public partial class SettingsKeyBindingsPanel
                 services.Hotkey.VirtualKey,
                 services.Settings.PlayMenuKey,
                 services.Settings.AreasMenuKey);
+            AppSettings.ValidateControlKeySet(
+                services.Settings,
+                requireUnitActionKeys: false);
             if (_captureTarget != BindingTarget.Unit)
             {
                 UnitButton.Content = key.ToString();
             }
             UnitStatusText.Text =
-                $"{key} must match Anime Expeditions' Toggle Units binding.";
+                $"{key} must match Anime Expeditions' Toggle Unit Inventory binding.";
             UnitDiagnostic = key.ToString();
         }
         catch (InvalidDataException error)
@@ -107,12 +113,15 @@ public partial class SettingsKeyBindingsPanel
                 services.Hotkey.VirtualKey,
                 services.Settings.PlayMenuKey,
                 services.Settings.UnitMenuKey);
+            AppSettings.ValidateControlKeySet(
+                services.Settings,
+                requireUnitActionKeys: false);
             if (_captureTarget != BindingTarget.Areas)
             {
                 AreasButton.Content = key.ToString();
             }
             AreasStatusText.Text =
-                $"{key} must match Anime Expeditions' Toggle Areas binding.";
+                $"{key} must match Anime Expeditions' Toggle Areas Menu binding.";
             AreasDiagnostic = key.ToString();
         }
         catch (InvalidDataException error)
@@ -148,6 +157,9 @@ public partial class SettingsKeyBindingsPanel
                     services.Settings.AreasMenuKey,
                     services.Settings
                         .ShiftLockVirtualKey);
+            AppSettings.ValidateControlKeySet(
+                services.Settings,
+                requireUnitActionKeys: false);
             if (_captureTarget !=
                 BindingTarget.CancelPlacement)
             {
@@ -155,7 +167,7 @@ public partial class SettingsKeyBindingsPanel
                     key.ToString();
             }
             CancelPlacementStatusText.Text =
-                $"{key} must match Anime Expeditions' Cancel Placement binding.";
+                $"{key} must match Anime Expeditions' Toggle Cancel Unit Placement binding.";
             CancelPlacementDiagnostic =
                 key.ToString();
         }
@@ -175,6 +187,82 @@ public partial class SettingsKeyBindingsPanel
         }
     }
 
+    private void UpdateTargetingDisplay() =>
+        UpdateRequiredUnitActionDisplay(
+            BindingTarget.Targeting,
+            Services.Settings.ChangeUnitTargetingKey,
+            "Change Unit Targeting",
+            TargetingButton,
+            TargetingStatusText,
+            value => TargetingDiagnostic = value);
+
+    private void UpdateUpgradeDisplay() =>
+        UpdateRequiredUnitActionDisplay(
+            BindingTarget.Upgrade,
+            Services.Settings.UpgradeUnitKey,
+            "Upgrade Unit",
+            UpgradeButton,
+            UpgradeStatusText,
+            value => UpgradeDiagnostic = value);
+
+    private void UpdateAutoUpgradeDisplay() =>
+        UpdateRequiredUnitActionDisplay(
+            BindingTarget.AutoUpgrade,
+            Services.Settings.ToggleAutoUpgradeUnitKey,
+            "Toggle Auto Upgrade Unit",
+            AutoUpgradeButton,
+            AutoUpgradeStatusText,
+            value => AutoUpgradeDiagnostic = value);
+
+    private void UpdateRequiredUnitActionDisplay(
+        BindingTarget target,
+        string configuredValue,
+        string bindingName,
+        System.Windows.Controls.Button button,
+        System.Windows.Controls.TextBlock status,
+        Action<string> setDiagnostic)
+    {
+        string candidate = configuredValue.Trim();
+        try
+        {
+            if (candidate.Length != 1 ||
+                !char.IsAsciiLetter(candidate[0]))
+            {
+                throw new InvalidDataException(
+                    $"Set the {bindingName} key under Settings > Controls.");
+            }
+            AppSettings.ValidateControlKeySet(
+                Services.Settings,
+                requireUnitActionKeys: false);
+            string key =
+                char.ToUpperInvariant(candidate[0])
+                    .ToString();
+            if (_captureTarget != target)
+            {
+                button.Content = key;
+            }
+            status.Text =
+                $"{key} must match Anime Expeditions' {bindingName} binding.";
+            setDiagnostic(key);
+        }
+        catch (InvalidDataException error)
+        {
+            bool empty = candidate.Length == 0;
+            if (_captureTarget != target)
+            {
+                button.Content = empty
+                    ? "Set key"
+                    : configuredValue;
+            }
+            status.Text = empty
+                ? "Required before a macro can start."
+                : error.Message;
+            setDiagnostic(empty
+                ? "Not set"
+                : "Conflict");
+        }
+    }
+
     private void UpdateShiftLockDisplay()
     {
         AppServices services = Services;
@@ -189,12 +277,15 @@ public partial class SettingsKeyBindingsPanel
                 services.Settings.UnitMenuKey,
                 services.Settings.AreasMenuKey,
                 services.Settings.CancelPlacementKey);
+            AppSettings.ValidateControlKeySet(
+                services.Settings,
+                requireUnitActionKeys: false);
             if (_captureTarget != BindingTarget.ShiftLock)
             {
                 ShiftLockButton.Content = display;
             }
             ShiftLockStatusText.Text =
-                $"{display} must match Anime Expeditions' Shift Lock binding.";
+                $"{display} must match Anime Expeditions' Toggle Shift Lock binding.";
             ShiftLockDiagnostic = display;
         }
         catch (InvalidDataException error)

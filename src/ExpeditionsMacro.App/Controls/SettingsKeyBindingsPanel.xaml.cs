@@ -1,4 +1,3 @@
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -28,6 +27,12 @@ public partial class SettingsKeyBindingsPanel : UserControl
 
     public string CancelPlacementDiagnostic { get; private set; } = "Z";
 
+    public string TargetingDiagnostic { get; private set; } = "Not set";
+
+    public string UpgradeDiagnostic { get; private set; } = "Not set";
+
+    public string AutoUpgradeDiagnostic { get; private set; } = "Not set";
+
     public string ShiftLockDiagnostic { get; private set; } = "Left Ctrl";
 
     public string HotkeyDisplayName => _services?.Hotkey.DisplayName ?? "F6";
@@ -54,6 +59,9 @@ public partial class SettingsKeyBindingsPanel : UserControl
         UpdateUnitDisplay();
         UpdateAreasDisplay();
         UpdateCancelPlacementDisplay();
+        UpdateTargetingDisplay();
+        UpdateUpgradeDisplay();
+        UpdateAutoUpgradeDisplay();
         UpdateShiftLockDisplay();
         UpdateButtons();
     }
@@ -83,6 +91,27 @@ public partial class SettingsKeyBindingsPanel : UserControl
             BindingTarget.CancelPlacement,
             CancelPlacementButton);
 
+    private void TargetingButton_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        BeginCapture(
+            BindingTarget.Targeting,
+            TargetingButton);
+
+    private void UpgradeButton_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        BeginCapture(
+            BindingTarget.Upgrade,
+            UpgradeButton);
+
+    private void AutoUpgradeButton_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        BeginCapture(
+            BindingTarget.AutoUpgrade,
+            AutoUpgradeButton);
+
     private void ShiftLockButton_Click(object sender, RoutedEventArgs e) => BeginCapture(BindingTarget.ShiftLock, ShiftLockButton);
 
     private void BeginCapture(BindingTarget target, Button button)
@@ -93,17 +122,23 @@ public partial class SettingsKeyBindingsPanel : UserControl
             BindingTarget.Play or
             BindingTarget.Unit or
             BindingTarget.Areas or
-            BindingTarget.CancelPlacement
+            BindingTarget.CancelPlacement or
+            BindingTarget.Targeting or
+            BindingTarget.Upgrade or
+            BindingTarget.AutoUpgrade
                 ? "Press a letter..."
                 : "Press a key...";
         StatusFor(target).Text = target switch
         {
             BindingTarget.Macro => "Press a letter, number, punctuation, numpad, or function key. Escape cancels; F12 is reserved.",
             BindingTarget.Play => "Press the letter assigned to Toggle Play Menu. Escape cancels.",
-            BindingTarget.Unit => "Press the letter assigned to Toggle Units. Escape cancels.",
-            BindingTarget.Areas => "Press the letter assigned to Toggle Areas. Escape cancels.",
-            BindingTarget.CancelPlacement => "Press the letter assigned to Cancel Placement. Escape cancels.",
-            _ => "Press the key assigned to Shift Lock, including left/right Shift or Ctrl. Escape cancels.",
+            BindingTarget.Unit => "Press the letter assigned to Toggle Unit Inventory. Escape cancels.",
+            BindingTarget.Areas => "Press the letter assigned to Toggle Areas Menu. Escape cancels.",
+            BindingTarget.CancelPlacement => "Press the letter assigned to Toggle Cancel Unit Placement. Escape cancels.",
+            BindingTarget.Targeting => "Press the letter assigned to Change Unit Targeting. Escape cancels.",
+            BindingTarget.Upgrade => "Press the letter assigned to Upgrade Unit. Escape cancels.",
+            BindingTarget.AutoUpgrade => "Press the letter assigned to Toggle Auto Upgrade Unit. Escape cancels.",
+            _ => "Press the key assigned to Toggle Shift Lock, including left/right Shift or Ctrl. Escape cancels.",
         };
         Keyboard.Focus(button);
         UpdateButtons();
@@ -126,7 +161,10 @@ public partial class SettingsKeyBindingsPanel : UserControl
             BindingTarget.Play or
             BindingTarget.Unit or
             BindingTarget.Areas or
-            BindingTarget.CancelPlacement)
+            BindingTarget.CancelPlacement or
+            BindingTarget.Targeting or
+            BindingTarget.Upgrade or
+            BindingTarget.AutoUpgrade)
         {
             if (virtualKey is < 0x41 or > 0x5A)
             {
@@ -173,6 +211,18 @@ public partial class SettingsKeyBindingsPanel : UserControl
                     await ApplyCancelPlacementAsync(
                         (char)virtualKey);
                     break;
+                case BindingTarget.Targeting:
+                    await ApplyTargetingAsync(
+                        (char)virtualKey);
+                    break;
+                case BindingTarget.Upgrade:
+                    await ApplyUpgradeAsync(
+                        (char)virtualKey);
+                    break;
+                case BindingTarget.AutoUpgrade:
+                    await ApplyAutoUpgradeAsync(
+                        (char)virtualKey);
+                    break;
                 case BindingTarget.ShiftLock:
                     await ApplyShiftLockAsync(virtualKey);
                     break;
@@ -190,224 +240,6 @@ public partial class SettingsKeyBindingsPanel : UserControl
             _saving = false;
             UpdateButtons();
         }
-    }
-
-    private async Task ApplyMacroAsync(int virtualKey)
-    {
-        AppServices services = Services;
-        ValidateBindings(
-            virtualKey,
-            services.Settings.PlayMenuKey,
-            services.Settings.UnitMenuKey,
-            services.Settings.AreasMenuKey,
-            services.Settings.CancelPlacementKey,
-            services.Settings.ShiftLockVirtualKey);
-        int previous = services.Hotkey.VirtualKey;
-        string display = KeyboardKey.GetDisplayName(virtualKey);
-        MacroButton.Content = display;
-        MacroStatusText.Text = $"Registering {display} globally...";
-        try
-        {
-            await Task.Run(() => services.Hotkey.Rebind(virtualKey));
-            await services.UpdateSettingsAsync(settings => settings with { MacroHotkeyVirtualKey = virtualKey });
-            MacroStatusText.Text = $"{display} is now the macro start and stop key.";
-        }
-        catch
-        {
-            if (services.Hotkey.VirtualKey != previous)
-            {
-                try { await Task.Run(() => services.Hotkey.Rebind(previous)); } catch { }
-            }
-            throw;
-        }
-    }
-
-    private async Task ApplyPlayAsync(char key)
-    {
-        AppServices services = Services;
-        _ = AppSettings.ParsePlayMenuKey(key.ToString(), services.Hotkey.VirtualKey);
-        if (!string.IsNullOrWhiteSpace(services.Settings.UnitMenuKey))
-        {
-            _ = AppSettings.ParseUnitMenuKey(
-                services.Settings.UnitMenuKey,
-                services.Hotkey.VirtualKey,
-                key.ToString(),
-                services.Settings.AreasMenuKey);
-        }
-        if (!string.IsNullOrWhiteSpace(
-                services.Settings.AreasMenuKey))
-        {
-            _ = AppSettings.ParseAreasMenuKey(
-                services.Settings.AreasMenuKey,
-                services.Hotkey.VirtualKey,
-                key.ToString(),
-                services.Settings.UnitMenuKey);
-        }
-        _ = AppSettings.ParseShiftLockKey(
-            services.Settings.ShiftLockVirtualKey,
-            services.Hotkey.VirtualKey,
-            key.ToString(),
-            services.Settings.UnitMenuKey,
-            services.Settings.AreasMenuKey,
-            services.Settings.CancelPlacementKey);
-        _ = AppSettings.ParseCancelPlacementKey(
-            services.Settings.CancelPlacementKey,
-            services.Hotkey.VirtualKey,
-            key.ToString(),
-            services.Settings.UnitMenuKey,
-            services.Settings.AreasMenuKey,
-            services.Settings.ShiftLockVirtualKey);
-        await services.UpdateSettingsAsync(settings => settings with { PlayMenuKey = key.ToString() });
-    }
-
-    private async Task ApplyUnitAsync(char key)
-    {
-        AppServices services = Services;
-        _ = AppSettings.ParseUnitMenuKey(
-            key.ToString(),
-            services.Hotkey.VirtualKey,
-            services.Settings.PlayMenuKey,
-            services.Settings.AreasMenuKey);
-        if (!string.IsNullOrWhiteSpace(
-                services.Settings.AreasMenuKey))
-        {
-            _ = AppSettings.ParseAreasMenuKey(
-                services.Settings.AreasMenuKey,
-                services.Hotkey.VirtualKey,
-                services.Settings.PlayMenuKey,
-                key.ToString());
-        }
-        _ = AppSettings.ParseShiftLockKey(
-            services.Settings.ShiftLockVirtualKey,
-            services.Hotkey.VirtualKey,
-            services.Settings.PlayMenuKey,
-            key.ToString(),
-            services.Settings.AreasMenuKey,
-            services.Settings.CancelPlacementKey);
-        _ = AppSettings.ParseCancelPlacementKey(
-            services.Settings.CancelPlacementKey,
-            services.Hotkey.VirtualKey,
-            services.Settings.PlayMenuKey,
-            key.ToString(),
-            services.Settings.AreasMenuKey,
-            services.Settings.ShiftLockVirtualKey);
-        await services.UpdateSettingsAsync(settings => settings with { UnitMenuKey = key.ToString() });
-    }
-
-    private async Task ApplyAreasAsync(char key)
-    {
-        AppServices services = Services;
-        _ = AppSettings.ParseAreasMenuKey(
-            key.ToString(),
-            services.Hotkey.VirtualKey,
-            services.Settings.PlayMenuKey,
-            services.Settings.UnitMenuKey);
-        if (!string.IsNullOrWhiteSpace(
-                services.Settings.UnitMenuKey))
-        {
-            _ = AppSettings.ParseUnitMenuKey(
-                services.Settings.UnitMenuKey,
-                services.Hotkey.VirtualKey,
-                services.Settings.PlayMenuKey,
-                key.ToString());
-        }
-        _ = AppSettings.ParseShiftLockKey(
-            services.Settings.ShiftLockVirtualKey,
-            services.Hotkey.VirtualKey,
-            services.Settings.PlayMenuKey,
-            services.Settings.UnitMenuKey,
-            key.ToString(),
-            services.Settings.CancelPlacementKey);
-        _ = AppSettings.ParseCancelPlacementKey(
-            services.Settings.CancelPlacementKey,
-            services.Hotkey.VirtualKey,
-            services.Settings.PlayMenuKey,
-            services.Settings.UnitMenuKey,
-            key.ToString(),
-            services.Settings.ShiftLockVirtualKey);
-        await services.UpdateSettingsAsync(settings =>
-            settings with { AreasMenuKey = key.ToString() });
-    }
-
-    private async Task ApplyCancelPlacementAsync(
-        char key)
-    {
-        AppServices services = Services;
-        _ = AppSettings.ParseCancelPlacementKey(
-            key.ToString(),
-            services.Hotkey.VirtualKey,
-            services.Settings.PlayMenuKey,
-            services.Settings.UnitMenuKey,
-            services.Settings.AreasMenuKey,
-            services.Settings.ShiftLockVirtualKey);
-        await services.UpdateSettingsAsync(
-            settings =>
-                settings with
-                {
-                    CancelPlacementKey =
-                        key.ToString(),
-                });
-    }
-
-    private async Task ApplyShiftLockAsync(int virtualKey)
-    {
-        AppServices services = Services;
-        _ = AppSettings.ParseShiftLockKey(
-            virtualKey,
-            services.Hotkey.VirtualKey,
-            services.Settings.PlayMenuKey,
-            services.Settings.UnitMenuKey,
-            services.Settings.AreasMenuKey,
-            services.Settings.CancelPlacementKey);
-        _ = AppSettings.ParseCancelPlacementKey(
-            services.Settings.CancelPlacementKey,
-            services.Hotkey.VirtualKey,
-            services.Settings.PlayMenuKey,
-            services.Settings.UnitMenuKey,
-            services.Settings.AreasMenuKey,
-            virtualKey);
-        await services.UpdateSettingsAsync(settings => settings with { ShiftLockVirtualKey = virtualKey });
-    }
-
-    private void ValidateBindings(
-        int macroKey,
-        string playKey,
-        string unitKey,
-        string areasKey,
-        string cancelPlacementKey,
-        int shiftLockKey)
-    {
-        if (!string.IsNullOrWhiteSpace(playKey)) _ = AppSettings.ParsePlayMenuKey(playKey, macroKey);
-        if (!string.IsNullOrWhiteSpace(unitKey))
-        {
-            _ = AppSettings.ParseUnitMenuKey(
-                unitKey,
-                macroKey,
-                playKey,
-                areasKey);
-        }
-        if (!string.IsNullOrWhiteSpace(areasKey))
-        {
-            _ = AppSettings.ParseAreasMenuKey(
-                areasKey,
-                macroKey,
-                playKey,
-                unitKey);
-        }
-        _ = AppSettings.ParseShiftLockKey(
-            shiftLockKey,
-            macroKey,
-            playKey,
-            unitKey,
-            areasKey,
-            cancelPlacementKey);
-        _ = AppSettings.ParseCancelPlacementKey(
-            cancelPlacementKey,
-            macroKey,
-            playKey,
-            unitKey,
-            areasKey,
-            shiftLockKey);
     }
 
     private void CancelForActiveMacroHotkey()
@@ -439,6 +271,15 @@ public partial class SettingsKeyBindingsPanel : UserControl
         CancelPlacementButton.IsEnabled = enabled &&
             _captureTarget is BindingTarget.None or
                 BindingTarget.CancelPlacement;
+        TargetingButton.IsEnabled = enabled &&
+            _captureTarget is BindingTarget.None or
+                BindingTarget.Targeting;
+        UpgradeButton.IsEnabled = enabled &&
+            _captureTarget is BindingTarget.None or
+                BindingTarget.Upgrade;
+        AutoUpgradeButton.IsEnabled = enabled &&
+            _captureTarget is BindingTarget.None or
+                BindingTarget.AutoUpgrade;
         ShiftLockButton.IsEnabled = enabled && _captureTarget is BindingTarget.None or BindingTarget.ShiftLock;
     }
 
@@ -450,6 +291,9 @@ public partial class SettingsKeyBindingsPanel : UserControl
         BindingTarget.Areas => AreasStatusText,
         BindingTarget.CancelPlacement =>
             CancelPlacementStatusText,
+        BindingTarget.Targeting => TargetingStatusText,
+        BindingTarget.Upgrade => UpgradeStatusText,
+        BindingTarget.AutoUpgrade => AutoUpgradeStatusText,
         BindingTarget.ShiftLock => ShiftLockStatusText,
         _ => throw new ArgumentOutOfRangeException(nameof(target)),
     };
@@ -464,6 +308,9 @@ public partial class SettingsKeyBindingsPanel : UserControl
         Unit,
         Areas,
         CancelPlacement,
+        Targeting,
+        Upgrade,
+        AutoUpgrade,
         ShiftLock,
     }
 }

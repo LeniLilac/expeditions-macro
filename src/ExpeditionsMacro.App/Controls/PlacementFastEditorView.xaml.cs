@@ -6,6 +6,16 @@ namespace ExpeditionsMacro.App.Controls;
 
 public partial class PlacementFastEditorView : UserControl
 {
+    private const double MinimumZoom = 0.5;
+    private const double MaximumZoom = 2.0;
+    private const double ZoomStep = 0.25;
+    private const double WheelZoomStep = 0.1;
+    private double _placementZoom = 1;
+    private bool _isPlacementPanning;
+    private Point _panStartPoint;
+    private double _panStartHorizontalOffset;
+    private double _panStartVerticalOffset;
+
     public PlacementFastEditorView()
     {
         InitializeComponent();
@@ -43,6 +53,22 @@ public partial class PlacementFastEditorView : UserControl
 
     public void CloseTimingSettings() =>
         FastTimingPopup.IsOpen = false;
+
+    public void SetStepsInteractionEnabled(bool enabled)
+    {
+        FastStepsList.IsHitTestVisible = enabled;
+        FastStepsList.Focusable = enabled;
+        KeyboardNavigation.SetTabNavigation(
+            FastStepsList,
+            enabled
+                ? KeyboardNavigationMode.Continue
+                : KeyboardNavigationMode.None);
+
+        if (!enabled)
+        {
+            FastStopButton.Focus();
+        }
+    }
 
     private void Save_Click(
         object sender,
@@ -128,4 +154,146 @@ public partial class PlacementFastEditorView : UserControl
         object sender,
         MouseButtonEventArgs e) =>
         MarkerRemoved?.Invoke(sender, e);
+
+    private void ZoomOut_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        SetZoom(_placementZoom - ZoomStep);
+
+    private void ZoomIn_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        SetZoom(_placementZoom + ZoomStep);
+
+    private void ResetZoom_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        SetZoom(1);
+        PlacementScrollViewer.ScrollToHorizontalOffset(0);
+        PlacementScrollViewer.ScrollToVerticalOffset(0);
+    }
+
+    private void PlacementScrollViewer_PreviewMouseWheel(
+        object sender,
+        MouseWheelEventArgs e)
+    {
+        Point viewportPoint =
+            e.GetPosition(PlacementScrollViewer);
+        Point imagePoint =
+            e.GetPosition(PlacementSurface);
+        ZoomAt(
+            _placementZoom +
+            (e.Delta > 0
+                ? WheelZoomStep
+                : -WheelZoomStep),
+            viewportPoint,
+            imagePoint);
+        e.Handled = true;
+    }
+
+    private void PlacementScrollViewer_PreviewMouseDown(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Middle)
+        {
+            return;
+        }
+
+        _isPlacementPanning = true;
+        _panStartPoint =
+            e.GetPosition(PlacementScrollViewer);
+        _panStartHorizontalOffset =
+            PlacementScrollViewer.HorizontalOffset;
+        _panStartVerticalOffset =
+            PlacementScrollViewer.VerticalOffset;
+        PlacementScrollViewer.Cursor =
+            Cursors.ScrollAll;
+        Mouse.Capture(
+            PlacementScrollViewer,
+            CaptureMode.Element);
+        e.Handled = true;
+    }
+
+    private void PlacementScrollViewer_PreviewMouseMove(
+        object sender,
+        MouseEventArgs e)
+    {
+        if (!_isPlacementPanning ||
+            e.MiddleButton != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        Point current =
+            e.GetPosition(PlacementScrollViewer);
+        PlacementScrollViewer.ScrollToHorizontalOffset(
+            _panStartHorizontalOffset -
+            (current.X - _panStartPoint.X));
+        PlacementScrollViewer.ScrollToVerticalOffset(
+            _panStartVerticalOffset -
+            (current.Y - _panStartPoint.Y));
+        e.Handled = true;
+    }
+
+    private void PlacementScrollViewer_PreviewMouseUp(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Middle)
+        {
+            return;
+        }
+
+        EndPlacementPan();
+        e.Handled = true;
+    }
+
+    private void PlacementScrollViewer_LostMouseCapture(
+        object sender,
+        MouseEventArgs e) =>
+        EndPlacementPan();
+
+    private void EndPlacementPan()
+    {
+        _isPlacementPanning = false;
+        PlacementScrollViewer.ClearValue(
+            CursorProperty);
+        if (ReferenceEquals(
+                Mouse.Captured,
+                PlacementScrollViewer))
+        {
+            Mouse.Capture(null);
+        }
+    }
+
+    private void ZoomAt(
+        double value,
+        Point viewportPoint,
+        Point imagePoint)
+    {
+        SetZoom(value);
+        PlacementScrollViewer.UpdateLayout();
+        PlacementScrollViewer.ScrollToHorizontalOffset(
+            (imagePoint.X * _placementZoom) -
+            viewportPoint.X);
+        PlacementScrollViewer.ScrollToVerticalOffset(
+            (imagePoint.Y * _placementZoom) -
+            viewportPoint.Y);
+    }
+
+    private void SetZoom(double value)
+    {
+        _placementZoom = Math.Clamp(
+            value,
+            MinimumZoom,
+            MaximumZoom);
+        PlacementZoomTransform.ScaleX =
+            _placementZoom;
+        PlacementZoomTransform.ScaleY =
+            _placementZoom;
+        PlacementZoomButton.Content =
+            $"{_placementZoom:P0}";
+    }
 }

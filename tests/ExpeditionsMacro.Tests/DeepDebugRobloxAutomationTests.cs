@@ -45,10 +45,18 @@ public sealed class DeepDebugRobloxAutomationTests
                         120,
                         240,
                         token);
+                    await automation.MoveCursorBetweenClientPointsAsync(
+                        inner.Window,
+                        70,
+                        240,
+                        120,
+                        240,
+                        200,
+                        token);
                 },
                 CancellationToken.None);
 
-            Assert.Equal(4, inner.CaptureCount);
+            Assert.Equal(6, inner.CaptureCount);
             string archivePath = Assert.Single(
                 Directory.EnumerateFiles(
                     paths.Diagnostics,
@@ -56,7 +64,7 @@ public sealed class DeepDebugRobloxAutomationTests
             using ZipArchive archive =
                 ZipFile.OpenRead(archivePath);
             Assert.Equal(
-                4,
+                6,
                 archive.Entries.Count(entry =>
                     entry.FullName.StartsWith(
                         "frames/",
@@ -67,6 +75,8 @@ public sealed class DeepDebugRobloxAutomationTests
                     ("tap_keyboard_key", "after"),
                     ("click_client", "before"),
                     ("click_client", "after"),
+                    ("move_cursor_between_client_points", "before"),
+                    ("move_cursor_between_client_points", "after"),
                 ],
                 await ReadActionFramesAsync(archive));
         }
@@ -219,6 +229,16 @@ public sealed class DeepDebugRobloxAutomationTests
 
         public Task MoveCursorToClientCenterAsync(
             RobloxWindow window,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task MoveCursorBetweenClientPointsAsync(
+            RobloxWindow window,
+            int startX,
+            int startY,
+            int endX,
+            int endY,
+            int durationMilliseconds,
             CancellationToken cancellationToken) =>
             Task.CompletedTask;
 

@@ -4,6 +4,33 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.29] - 2026-07-26
+
+### Added
+
+- Added contiguous Macro-plan loops with selectable start/stop tasks, a finite run amount or Forever mode, persisted loop progress, and share-code support.
+- Added 50–200% visual zoom, direct mouse-wheel zoom, middle-button drag panning, and per-placement targeting priority to Fast no-align Placement Setup.
+- Added required Change Unit Targeting, Upgrade Unit, and Toggle Auto Upgrade Unit bindings, and renamed every existing binding to match its in-game action.
+- Added a Debug performance benchmark that separates capture, mode detection, root recovery, and total production-path latency.
+- Added a strict selected-unit panel detector using the red Close and blue Priority/First anchors.
+- Added a default-on option to close a verified Roblox process and join the configured private server once at Macro startup.
+
+### Changed
+
+- Placement playback selects the slot, cancels it, then taps the slot three times to force a deterministic select/deselect/reselect state. Each of up to eight bounded attempts then approaches from 50 client pixels away over 200 milliseconds and clicks the same coordinate until the selected-unit panel is stable; it never repeats the key/cancel normalization for one placement.
+- Live-match monitoring uses exact mode-owned state subsets, per-frame detector/action caches, and root-only recovery checks. Deep Debug avoids capture stack-trace work while disabled.
+
+### Fixed
+
+- Challenge-to-Event handoff now closes the shared selector and retained Challenge party through their detected Back actions before Event attempts Lobby navigation.
+- Ordinary unit hover cards can no longer count as proof that a placement succeeded.
+- Selected-unit confirmation now includes the final timeout-boundary sample instead of issuing an unnecessary retry.
+- Placement steps preserve the active theme while playback temporarily locks editing.
+
+### Tests
+
+- Added Macro-loop, startup restart, current keybinding, selected-unit, placement retry, Challenge-to-Event recovery, detector-equivalence, and performance-benchmark coverage.
+
 ## [1.3.0-beta.28] - 2026-07-26
 
 ### Added

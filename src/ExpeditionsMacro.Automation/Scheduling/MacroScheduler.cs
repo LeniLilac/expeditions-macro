@@ -37,14 +37,25 @@ public sealed class MacroScheduler
         CancellationToken cancellationToken = default)
     {
         initialPlan.Validate();
-        MacroPlan plan = NormalizeProgress(initialPlan);
+        MacroPlan plan =
+            MacroPlanLoopPolicy.Normalize(
+                NormalizeProgress(initialPlan));
         await SaveAsync(plan, planChanged, cancellationToken).ConfigureAwait(false);
 
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
             DateTimeOffset now = DateTimeOffset.UtcNow;
-            MacroTaskDefinition? next = SelectNext(plan, now);
+            plan = await PrepareLoopAsync(
+                    plan,
+                    now,
+                    progress,
+                    planChanged,
+                    log,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            MacroTaskDefinition? next =
+                SelectNextPrepared(plan, now);
             if (next is null)
             {
                 DateTimeOffset? wake = NextWake(plan, now);
@@ -83,7 +94,18 @@ public sealed class MacroScheduler
                 await SaveAsync(plan, planChanged, recordCancellationToken).ConfigureAwait(false);
                 LogResult(activeTask, result, log);
 
-                MacroTaskDefinition? following = SelectNext(plan, DateTimeOffset.UtcNow);
+                plan = await PrepareLoopAsync(
+                        plan,
+                        DateTimeOffset.UtcNow,
+                        progress,
+                        planChanged,
+                        log,
+                        recordCancellationToken)
+                    .ConfigureAwait(false);
+                MacroTaskDefinition? following =
+                    SelectNextPrepared(
+                        plan,
+                        DateTimeOffset.UtcNow);
                 if (!CanRepeatStage(activeTask, following, result))
                 {
                     return following?.Kind == MacroTaskKind.Event
@@ -114,8 +136,21 @@ public sealed class MacroScheduler
         return reset;
     }
 
-    public static MacroTaskDefinition? SelectNext(MacroPlan plan, DateTimeOffset now) =>
-        plan.Tasks
+    public static MacroTaskDefinition? SelectNext(
+        MacroPlan plan,
+        DateTimeOffset now) =>
+        SelectNextPrepared(
+            MacroPlanLoopPolicy
+                .Prepare(plan, now)
+                .Plan,
+            now);
+
+    private static MacroTaskDefinition?
+        SelectNextPrepared(
+        MacroPlan plan,
+        DateTimeOffset now) =>
+        MacroPlanLoopPolicy
+            .ActiveTasks(plan)
             .Select((task, index) => new { Task = task, Index = index, Progress = plan.ProgressFor(task.Id) })
             .Where(value => value.Task.Enabled)
             .Where(value => value.Task.IsRecurring || !value.Progress.Completed)
@@ -134,12 +169,20 @@ public sealed class MacroScheduler
         int victories = before.Victories + Math.Max(0, result.Victories);
         int defeats = before.Defeats + Math.Max(0, result.Defeats);
         long runtime = before.RuntimeSeconds + Math.Max(0, (long)Math.Ceiling(result.Runtime.TotalSeconds));
+        int targetVictories =
+            victories -
+            before.TargetVictoryBaseline;
+        long targetRuntime =
+            runtime -
+            before.TargetRuntimeBaselineSeconds;
         bool completed = task.Kind switch
         {
             MacroTaskKind.Challenge => false,
             MacroTaskKind.Story when task.CompleteOnRuntimeDefeat =>
-                result.Defeats > 0 && runtime >= task.TargetRuntimeMinutes * 60L,
-            _ => victories >= task.TargetVictories,
+                result.Defeats > 0 &&
+                targetRuntime >=
+                    task.TargetRuntimeMinutes * 60L,
+            _ => targetVictories >= task.TargetVictories,
         };
         return before with
         {
@@ -197,12 +240,48 @@ public sealed class MacroScheduler
     };
 
     private static DateTimeOffset? NextWake(MacroPlan plan, DateTimeOffset now) =>
-        plan.Tasks
+        MacroPlanLoopPolicy
+            .ActiveTasks(plan)
             .Where(task => task.Enabled && (task.IsRecurring || !plan.ProgressFor(task.Id).Completed))
             .Select(task => plan.ProgressFor(task.Id).NextEligibleAtUtc)
             .Where(value => value > now)
             .OrderBy(value => value)
             .FirstOrDefault();
+
+    private async Task<MacroPlan> PrepareLoopAsync(
+        MacroPlan plan,
+        DateTimeOffset now,
+        IProgress<MacroProgress>? progress,
+        Action<MacroPlan>? planChanged,
+        Action<MacroEvent>? log,
+        CancellationToken cancellationToken)
+    {
+        MacroPlanLoopEvaluation evaluation =
+            MacroPlanLoopPolicy.Prepare(plan, now);
+        if (!evaluation.Changed)
+        {
+            return plan;
+        }
+        await SaveAsync(
+                evaluation.Plan,
+                planChanged,
+                cancellationToken)
+            .ConfigureAwait(false);
+        foreach (string message in evaluation.Messages)
+        {
+            progress?.Report(new MacroProgress(
+                "Loop",
+                0,
+                message,
+                "scheduler_loop"));
+            log?.Invoke(new MacroEvent(
+                DateTimeOffset.Now,
+                MacroEventLevel.Information,
+                message,
+                "scheduler_loop"));
+        }
+        return evaluation.Plan;
+    }
 
     private async Task SaveAsync(MacroPlan plan, Action<MacroPlan>? changed, CancellationToken cancellationToken)
     {

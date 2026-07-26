@@ -71,6 +71,8 @@ public sealed class AppServices : IDisposable
         Automation = new DebugSteppingRobloxAutomation(
             tracedAutomation,
             DebugCheckpoints);
+        DetectionBenchmark =
+            new DetectionBenchmarkService(Automation);
         DebugCheckpoints.CheckpointAdded += checkpoint =>
             DeepDebug.RecordEvent(
                 "debug_checkpoint",
@@ -113,7 +115,13 @@ public sealed class AppServices : IDisposable
         placementCapture.InputTrace += DeepDebug.RecordPlacementInput;
         placementCapture.TraceEnabled = () => DeepDebug.IsActive;
         PlacementCapture = placementCapture;
-        Placement = new PlacementService(Automation, PlacementCapture, PlacementModels);
+        Placement = new PlacementService(
+            Automation,
+            PlacementCapture,
+            PlacementModels,
+            () => AppSettings
+                .ParseRequiredUnitActionKeys(Settings)
+                .ChangeTargeting);
         CameraPose = new CameraPosePreparationService(
             Automation,
             () => AppSettings.ParseShiftLockKey(
@@ -211,6 +219,7 @@ public sealed class AppServices : IDisposable
     public DeepDebugSessionService DeepDebug { get; }
     public DebugCheckpointController DebugCheckpoints { get; }
     public IRobloxAutomation Automation { get; }
+    public DetectionBenchmarkService DetectionBenchmark { get; }
     public ISecretProtector SecretProtector { get; }
     public GlobalHotkeyService Hotkey { get; }
     public OperationCoordinator Coordinator { get; }

@@ -156,7 +156,7 @@ public sealed class CoreModelTests
             "2. Go to the Keybinds section in settings\n" +
             "3. Find the Toggle Play Menu keybind\n" +
             "4. Set the keybind to a letter in game\n" +
-            "5. Set fill in the keybind letter in the macro settings",
+            "5. Enter the same keybind letter in the macro settings",
             error.Message);
     }
 
@@ -188,7 +188,7 @@ public sealed class CoreModelTests
             () => AppSettings.ParseUnitMenuKey("u", AppSettings.DefaultMacroHotkeyVirtualKey, "U"));
 
         Assert.Contains("start/stop hotkey", macroConflict.Message, StringComparison.Ordinal);
-        Assert.Contains("Play menu key", playConflict.Message, StringComparison.Ordinal);
+        Assert.Contains("Toggle Play Menu key", playConflict.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -256,6 +256,121 @@ public sealed class CoreModelTests
                     "H",
                     "U",
                     KeyboardKey.LeftControl));
+    }
+
+    [Fact]
+    public void AppSettings_RequiredUnitActionKeysDefaultEmpty()
+    {
+        AppSettings settings = new();
+
+        Assert.Equal(
+            string.Empty,
+            settings.ChangeUnitTargetingKey);
+        Assert.Equal(
+            string.Empty,
+            settings.UpgradeUnitKey);
+        Assert.Equal(
+            string.Empty,
+            settings.ToggleAutoUpgradeUnitKey);
+        InvalidDataException error =
+            Assert.Throws<InvalidDataException>(
+                () => AppSettings
+                    .ParseRequiredUnitActionKeys(
+                        settings));
+        Assert.Contains(
+            "Change Unit Targeting",
+            error.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AppSettings_RequiredUnitActionKeysNormalizeDistinctLetters()
+    {
+        AppSettings settings = new()
+        {
+            PlayMenuKey = "P",
+            UnitMenuKey = "H",
+            AreasMenuKey = "U",
+            ChangeUnitTargetingKey = " t ",
+            UpgradeUnitKey = "y",
+            ToggleAutoUpgradeUnitKey = "g",
+        };
+
+        UnitActionKeys keys =
+            AppSettings.ParseRequiredUnitActionKeys(
+                settings);
+
+        Assert.Equal('T', keys.ChangeTargeting);
+        Assert.Equal('Y', keys.Upgrade);
+        Assert.Equal('G', keys.ToggleAutoUpgrade);
+    }
+
+    [Theory]
+    [InlineData("P", "Y", "G")]
+    [InlineData("T", "T", "G")]
+    [InlineData("T", "Y", "Z")]
+    public void AppSettings_RequiredUnitActionKeysRejectEveryControlConflict(
+        string targeting,
+        string upgrade,
+        string autoUpgrade)
+    {
+        AppSettings settings = new()
+        {
+            PlayMenuKey = "P",
+            UnitMenuKey = "H",
+            AreasMenuKey = "U",
+            ChangeUnitTargetingKey = targeting,
+            UpgradeUnitKey = upgrade,
+            ToggleAutoUpgradeUnitKey = autoUpgrade,
+        };
+
+        Assert.Throws<InvalidDataException>(
+            () => AppSettings
+                .ParseRequiredUnitActionKeys(
+                    settings));
+    }
+
+    [Theory]
+    [InlineData(0x54, 0xA2)]
+    [InlineData(0x75, 0x54)]
+    public void AppSettings_RequiredUnitActionKeysRejectMacroAndShiftLockConflicts(
+        int macroHotkey,
+        int shiftLockKey)
+    {
+        AppSettings settings = new()
+        {
+            MacroHotkeyVirtualKey = macroHotkey,
+            ShiftLockVirtualKey = shiftLockKey,
+            ChangeUnitTargetingKey = "T",
+            UpgradeUnitKey = "Y",
+            ToggleAutoUpgradeUnitKey = "G",
+        };
+
+        Assert.Throws<InvalidDataException>(
+            () => AppSettings
+                .ParseRequiredUnitActionKeys(
+                    settings));
+    }
+
+    [Fact]
+    public void AppSettings_OptionalActionKeyValidationAllowsUnsetValuesButRejectsConflicts()
+    {
+        AppSettings.ValidateControlKeySet(
+            new AppSettings
+            {
+                PlayMenuKey = "P",
+            },
+            requireUnitActionKeys: false);
+
+        Assert.Throws<InvalidDataException>(
+            () => AppSettings
+                .ValidateControlKeySet(
+                    new AppSettings
+                    {
+                        PlayMenuKey = "P",
+                        ChangeUnitTargetingKey = "P",
+                    },
+                    requireUnitActionKeys: false));
     }
 
     [Fact]

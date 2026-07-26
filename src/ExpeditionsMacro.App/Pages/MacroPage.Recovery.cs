@@ -17,7 +17,8 @@ public partial class MacroPage
 
     private sealed record PrivateServerRecoverySelection(
         string Link,
-        RobloxPrivateServerLaunchTarget? Target);
+        RobloxPrivateServerLaunchTarget? RecoveryTarget,
+        RobloxPrivateServerLaunchTarget? StartupTarget);
 
     private async Task RunPlanWithFailureHandlingAsync(
         MacroPlan plan,
@@ -27,6 +28,7 @@ public partial class MacroPage
         char? unitMenuKey,
         char cancelPlacementKey,
         RobloxPrivateServerLaunchTarget? restartTarget,
+        RobloxPrivateServerLaunchTarget? startupRestartTarget,
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken)
     {
@@ -74,7 +76,8 @@ public partial class MacroPage
                         progress,
                         entry => DispatchLog(entry),
                         token).ConfigureAwait(false);
-                }).ConfigureAwait(false);
+                },
+                startupRestartTarget).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -84,7 +87,7 @@ public partial class MacroPage
         {
             await Dispatcher.InvokeAsync(() =>
             {
-                PhaseText.Text = "Play menu key setup is required.";
+                PhaseText.Text = "Toggle Play Menu key setup is required.";
                 AppendLog($"ERROR: {error.Message}");
             });
             throw;
@@ -128,6 +131,8 @@ public partial class MacroPage
         PrivateServerLinkVisible.Text = link;
         RestartRobloxCheck.IsChecked =
             _services.Settings.RestartRobloxWithPrivateServer;
+        RestartRobloxAtStartCheck.IsChecked =
+            _services.Settings.RestartRobloxAtMacroStart;
     }
 
     private void ClearPrivateServerRecoverySnapshot()
@@ -135,6 +140,7 @@ public partial class MacroPage
         PrivateServerLinkPassword.Password = string.Empty;
         PrivateServerLinkVisible.Text = string.Empty;
         RestartRobloxCheck.IsChecked = false;
+        RestartRobloxAtStartCheck.IsChecked = false;
         PrivateServerStatusText.Text = string.Empty;
     }
 
@@ -146,7 +152,16 @@ public partial class MacroPage
         {
             target = RobloxPrivateServerLaunchTarget.Parse(link);
         }
-        if (RestartRobloxCheck.IsChecked == true && target is null)
+        bool restartForRecovery =
+            RestartRobloxCheck.IsChecked == true;
+        bool restartAtStart =
+            RestartRobloxAtStartCheck.IsChecked == true;
+        if (restartAtStart && target is null)
+        {
+            throw new InvalidOperationException(
+                "Enter a valid Roblox private-server link before starting a Macro plan with startup restart enabled.");
+        }
+        if (restartForRecovery && target is null)
         {
             throw new InvalidOperationException(
                 "Enter a valid Roblox private-server link before enabling restart recovery.");
@@ -159,7 +174,8 @@ public partial class MacroPage
                 : "Legacy Roblox private-server link recognized.";
         return new PrivateServerRecoverySelection(
             link,
-            RestartRobloxCheck.IsChecked == true ? target : null);
+            restartForRecovery ? target : null,
+            restartAtStart ? target : null);
     }
 
     private Task SavePrivateServerRecoverySettingsAsync(
@@ -168,7 +184,10 @@ public partial class MacroPage
         {
             EncryptedPrivateServerLink =
                 _services.SecretProtector.Protect(selection.Link),
-            RestartRobloxWithPrivateServer = selection.Target is not null,
+            RestartRobloxWithPrivateServer =
+                selection.RecoveryTarget is not null,
+            RestartRobloxAtMacroStart =
+                selection.StartupTarget is not null,
         });
 
     private void ShowPrivateServerLink_Changed(
@@ -195,6 +214,7 @@ public partial class MacroPage
         PrivateServerLinkVisible.IsEnabled = enabled;
         ShowPrivateServerLinkCheck.IsEnabled = enabled;
         RestartRobloxCheck.IsEnabled = enabled;
+        RestartRobloxAtStartCheck.IsEnabled = enabled;
         TestPrivateServerButton.IsEnabled = enabled && !_testingPrivateServer;
     }
 

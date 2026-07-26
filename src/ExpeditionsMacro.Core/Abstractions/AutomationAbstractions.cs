@@ -82,6 +82,17 @@ public interface IRobloxAutomation
         throw new NotSupportedException(
             "This automation backend does not support acknowledged client cursor movement.");
 
+    Task MoveCursorBetweenClientPointsAsync(
+        RobloxWindow window,
+        int startX,
+        int startY,
+        int endX,
+        int endY,
+        int durationMilliseconds,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException(
+            "This automation backend does not support timed client cursor movement.");
+
     Task ParkCursorAsync(RobloxWindow window, CancellationToken cancellationToken);
 
     Task ClickClientAsync(RobloxWindow window, int x, int y, CancellationToken cancellationToken);

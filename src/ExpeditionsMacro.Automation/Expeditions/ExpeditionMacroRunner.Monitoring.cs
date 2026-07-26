@@ -11,6 +11,18 @@ namespace ExpeditionsMacro.Automation.Expeditions;
 
 public sealed partial class ExpeditionMacroRunner
 {
+    private static readonly string[] ActiveRunStates =
+    [
+        "defeat",
+        "victory",
+        "extract_confirm",
+        "confirm",
+        "checkpoint",
+        "continue",
+        "start",
+        "reward",
+    ];
+
     private async Task<RunTerminal> MonitorUntilRunEndAsync(
         RobloxWindow window,
         ExpeditionPreset preset,
@@ -54,10 +66,47 @@ public sealed partial class ExpeditionMacroRunner
                 }
             }
 
-            IReadOnlyDictionary<string, double> scores = detector.ScoreStates(frame);
-            string? candidate = ExpeditionRunPolicy.PreferActiveState(detector.Manifest, scores, detector.Classify(scores));
+            IReadOnlyDictionary<string, double> scores =
+                detector.ScoreStates(
+                    frame,
+                    ActiveRunStates);
+            string? activeCandidate =
+                ExpeditionRunPolicy.PreferActiveState(
+                    detector.Manifest,
+                    scores,
+                    detector.Classify(scores));
+            string? candidate =
+                activeCandidate ??
+                detector.RootRecoveryState(frame);
             ThrowForStableRecovery(recoveryTracker, candidate, activeRunOnly: true);
-            if (candidate is not null) report("Gameplay", 0, $"Detected {Label(candidate)}.", candidate, scores[candidate]);
+            if (ExpeditionRunPolicy.CanEnterRecoveryDuringRun(
+                    candidate))
+            {
+                stateTracker.Reset();
+                report(
+                    "Recovery",
+                    0,
+                    $"Detected {Label(candidate!)}; waiting for stable recovery confirmation.",
+                    candidate,
+                    null);
+                await Task.Delay(
+                    preset.PollMilliseconds,
+                    cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+            if (candidate is not null)
+            {
+                report(
+                    "Gameplay",
+                    0,
+                    $"Detected {Label(candidate)}.",
+                    candidate,
+                    scores.TryGetValue(
+                        candidate,
+                        out double candidateScore)
+                        ? candidateScore
+                        : null);
+            }
             if (candidate is null &&
                 nextAfterStartStep <
                     afterStartSteps.Count &&

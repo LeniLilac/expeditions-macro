@@ -83,7 +83,8 @@ public sealed partial class StageMacroRunner
         {
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = CaptureClient(window, detector);
-            StageScreenMatch state = StageScreenDetector.Detect(frame);
+            StageScreenMatch state =
+                StageScreenDetector.DetectMatchState(frame);
             string? terminalCandidate = state.State switch
             {
                 StageScreenState.Victory => "victory",
@@ -98,8 +99,16 @@ public sealed partial class StageMacroRunner
                     frame.Clone());
             }
 
-            string? recovery = detector.RecoveryState(frame);
-            if (state.State == StageScreenState.GameModeSelector) recovery = "play";
+            string? recovery =
+                terminalCandidate is null
+                    ? detector.RootRecoveryState(frame)
+                    : null;
+            if (terminalCandidate is null &&
+                state.State ==
+                    StageScreenState.GameModeSelector)
+            {
+                recovery = "play";
+            }
             if (recoveryTracker.Update(IsRootRecovery(recovery) || recovery == "play" ? recovery : null) is string stableRecovery)
             {
                 throw new StageRecoveryException(stableRecovery);

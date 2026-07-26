@@ -24,7 +24,7 @@ Selector rows are clicked through their map artwork, away from reward icons that
 
 The Start Game dialog occludes part of the map. Before placement begins, the runner measures the live dialog from its detected green action and partitions the model by client-relative click position. Rows outside the dialog remain true preplacements. Covered rows retain their order but run only after the macro deliberately clicks Start, preventing a placement click from activating the button or disappearing into the modal.
 
-The Play-menu key is required under **Settings > Controls**. Click its button and press one A-Z letter that matches the in-game **Toggle Play Menu** binding. It must differ from the global macro start/stop hotkey. Challenge recovery also uses this key to open Play from the lobby instead of clicking the left navigation. If Play remains closed after three verified presses, recovery stops and tells the user to correct the in-game binding; it does not click the visible Play button and continue with an unverified control setup.
+The **Toggle Play Menu key** is required under **Settings > Controls**. Click its button and press one A-Z letter that matches the in-game **Toggle Play Menu** binding. It must differ from the global macro start/stop hotkey. Challenge recovery also uses this key to open Play from the lobby instead of clicking the left navigation. If Play remains closed after three verified presses, recovery stops and tells the user to correct the in-game binding; it does not click the visible Play button and continue with an unverified control setup.
 
 ## Regression dataset
 

@@ -59,6 +59,11 @@ public partial class MacroPage
     {
         ReindexRows();
         string name = PlanNameText.Text.Trim();
+        MacroPlanLoopDefinition? loop =
+            LoopEditor.ReadDefinition(
+                TaskRows
+                    .Select(row => row.Definition)
+                    .ToArray());
         MacroPlan plan = new()
         {
             Id = ModelId.FromName(name),
@@ -69,6 +74,9 @@ public partial class MacroPage
             Progress = TaskRows
                 .Select(row => row.Progress)
                 .ToArray(),
+            Loop = loop,
+            LoopProgress =
+                LoopEditor.ProgressFor(loop),
             UpdatedAt = DateTimeOffset.UtcNow,
         };
         plan.Validate();
@@ -107,6 +115,7 @@ public partial class MacroPage
         TaskRows.Clear();
         EmptyTasksText.Visibility =
             Visibility.Visible;
+        LoopEditor.Apply(null, new());
         ResetTaskEditor();
         ApplyTotals();
     }
@@ -127,6 +136,9 @@ public partial class MacroPage
             });
         }
         ReindexRows();
+        LoopEditor.Apply(
+            plan.Loop,
+            plan.LoopProgress);
         ResetTaskEditor();
         ApplyTotals();
     }
@@ -134,6 +146,8 @@ public partial class MacroPage
     private void ApplyPlanProgress(
         MacroPlan plan)
     {
+        LoopEditor.UpdateProgress(
+            plan.LoopProgress);
         Dictionary<string, MacroTaskProgress>
             progress = plan.Progress.ToDictionary(
                 value => value.TaskId,

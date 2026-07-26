@@ -975,7 +975,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
         if (!char.IsAsciiLetter(normalized))
         {
             throw new InvalidDataException(
-                "Set the Play menu key under Settings > Controls so it matches Anime Expeditions' Toggle Play Menu binding.");
+                "Set the Toggle Play Menu key under Settings > Controls so it matches Anime Expeditions' Toggle Play Menu binding.");
         }
 
         return normalized;
@@ -987,7 +987,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
         if (value is null || !char.IsAsciiLetter(value.Value))
         {
             throw new InvalidDataException(
-                "Set the Unit menu key under Settings > Controls so it matches Anime Expeditions' Units binding before using a saved team.");
+                "Set the Toggle Unit Inventory key under Settings > Controls so it matches Anime Expeditions' Toggle Unit Inventory binding before using a saved team.");
         }
     }
 

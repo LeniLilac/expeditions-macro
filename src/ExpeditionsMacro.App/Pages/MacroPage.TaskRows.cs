@@ -85,6 +85,10 @@ public partial class MacroPage
 
     private void ReindexRows()
     {
+        string? loopStartTaskId =
+            LoopEditor.StartTaskId;
+        string? loopStopTaskId =
+            LoopEditor.StopTaskId;
         MacroTaskRow[] rows = TaskRows
             .Select((row, index) =>
                 new MacroTaskRow
@@ -102,6 +106,9 @@ public partial class MacroPage
         {
             TaskRows.Add(row);
         }
+        LoopEditor.RestoreSelections(
+            loopStartTaskId,
+            loopStopTaskId);
         EmptyTasksText.Visibility =
             TaskRows.Count == 0
                 ? Visibility.Visible

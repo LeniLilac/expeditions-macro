@@ -8,7 +8,7 @@
         <TextBlock Margin="0,5,0,0"
                    Style="{StaticResource Caption}"
                    TextWrapping="Wrap"
-                   Text="Choose the macro hotkey, then match the Play Menu, Units, Areas, Cancel Placement, and Shift Lock bindings configured in Anime Expeditions." />
+                   Text="Match every control below to the same binding configured in Anime Expeditions." />
 
         <Grid Margin="0,16,0,0">
             <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
@@ -29,7 +29,7 @@
 
         <Grid Margin="0,14,0,0">
             <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
-                <TextBlock Style="{StaticResource FieldLabel}" Text="Play menu key" />
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Toggle Play Menu key" />
                 <TextBlock x:Name="PlayStatusText"
                            Margin="0,5,0,0"
                            Style="{StaticResource Caption}"
@@ -46,7 +46,7 @@
 
         <Grid Margin="0,14,0,0">
             <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
-                <TextBlock Style="{StaticResource FieldLabel}" Text="Unit menu key" />
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Toggle Unit Inventory key" />
                 <TextBlock x:Name="UnitStatusText"
                            Margin="0,5,0,0"
                            Style="{StaticResource Caption}"
@@ -63,7 +63,7 @@
 
         <Grid Margin="0,14,0,0">
             <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
-                <TextBlock Style="{StaticResource FieldLabel}" Text="Areas menu key" />
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Toggle Areas Menu key" />
                 <TextBlock x:Name="AreasStatusText"
                            Margin="0,5,0,0"
                            Style="{StaticResource Caption}"
@@ -80,12 +80,12 @@
 
         <Grid Margin="0,14,0,0">
             <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
-                <TextBlock Style="{StaticResource FieldLabel}" Text="Placement cancel key" />
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Toggle Cancel Unit Placement key" />
                 <TextBlock x:Name="CancelPlacementStatusText"
                            Margin="0,5,0,0"
                            Style="{StaticResource Caption}"
                            TextWrapping="Wrap"
-                           Text="Defaults to Z. Match Anime Expeditions' Cancel Placement binding." />
+                           Text="Defaults to Z. Match Anime Expeditions' Toggle Cancel Unit Placement binding." />
             </StackPanel>
             <Button x:Name="CancelPlacementButton"
                     Width="160"
@@ -97,12 +97,63 @@
 
         <Grid Margin="0,14,0,0">
             <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
-                <TextBlock Style="{StaticResource FieldLabel}" Text="Shift Lock key" />
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Change Unit Targeting key" />
+                <TextBlock x:Name="TargetingStatusText"
+                           Margin="0,5,0,0"
+                           Style="{StaticResource Caption}"
+                           TextWrapping="Wrap"
+                           Text="Required before a macro can start." />
+            </StackPanel>
+            <Button x:Name="TargetingButton"
+                    Width="160"
+                    HorizontalAlignment="Right"
+                    controls:Lucide.Icon="Keyboard"
+                    Content="Set key"
+                    Click="TargetingButton_Click" />
+        </Grid>
+
+        <Grid Margin="0,14,0,0">
+            <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Upgrade Unit key" />
+                <TextBlock x:Name="UpgradeStatusText"
+                           Margin="0,5,0,0"
+                           Style="{StaticResource Caption}"
+                           TextWrapping="Wrap"
+                           Text="Required before a macro can start." />
+            </StackPanel>
+            <Button x:Name="UpgradeButton"
+                    Width="160"
+                    HorizontalAlignment="Right"
+                    controls:Lucide.Icon="Keyboard"
+                    Content="Set key"
+                    Click="UpgradeButton_Click" />
+        </Grid>
+
+        <Grid Margin="0,14,0,0">
+            <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Toggle Auto Upgrade Unit key" />
+                <TextBlock x:Name="AutoUpgradeStatusText"
+                           Margin="0,5,0,0"
+                           Style="{StaticResource Caption}"
+                           TextWrapping="Wrap"
+                           Text="Required before a macro can start." />
+            </StackPanel>
+            <Button x:Name="AutoUpgradeButton"
+                    Width="160"
+                    HorizontalAlignment="Right"
+                    controls:Lucide.Icon="Keyboard"
+                    Content="Set key"
+                    Click="AutoUpgradeButton_Click" />
+        </Grid>
+
+        <Grid Margin="0,14,0,0">
+            <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Toggle Shift Lock key" />
                 <TextBlock x:Name="ShiftLockStatusText"
                            Margin="0,5,0,0"
                            Style="{StaticResource Caption}"
                            TextWrapping="Wrap"
-                           Text="Defaults to Left Ctrl. Match Anime Expeditions' Shift Lock binding." />
+                           Text="Defaults to Left Ctrl. Match Anime Expeditions' Toggle Shift Lock binding." />
             </StackPanel>
             <Button x:Name="ShiftLockButton"
                     Width="160"

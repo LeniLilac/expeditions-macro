@@ -39,6 +39,11 @@ public sealed record FastNoAlignShareBundle
             throw new InvalidDataException(
                 "Shared plans cannot contain run history.");
         }
+        if (!Plan.LoopProgress.IsEmpty)
+        {
+            throw new InvalidDataException(
+                "Shared plans cannot contain loop history.");
+        }
         if (Plan.Tasks.Any(task =>
                 !task.UsesPlacementSetup))
         {

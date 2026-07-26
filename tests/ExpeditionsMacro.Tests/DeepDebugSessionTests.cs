@@ -51,10 +51,14 @@ public sealed class DeepDebugSessionTests
             EncryptedPrivateServerLink =
                 "protected-private-server-value",
             RestartRobloxWithPrivateServer = true,
+            RestartRobloxAtMacroStart = true,
             DiscordErrorUserId = userId,
             PlayMenuKey = "P",
             UnitMenuKey = "U",
             AreasMenuKey = "G",
+            ChangeUnitTargetingKey = "T",
+            UpgradeUnitKey = "Y",
+            ToggleAutoUpgradeUnitKey = "V",
             ShiftLockVirtualKey = KeyboardKey.RightControl,
             ResourceRefuelDebug =
                 new ResourceRefuelDebugSettings
@@ -107,6 +111,23 @@ public sealed class DeepDebugSessionTests
                 .GetProperty("areas_menu_key")
                 .GetString());
         Assert.Equal(
+            "T",
+            sanitized.RootElement
+                .GetProperty(
+                    "change_unit_targeting_key")
+                .GetString());
+        Assert.Equal(
+            "Y",
+            sanitized.RootElement
+                .GetProperty("upgrade_unit_key")
+                .GetString());
+        Assert.Equal(
+            "V",
+            sanitized.RootElement
+                .GetProperty(
+                    "toggle_auto_upgrade_unit_key")
+                .GetString());
+        Assert.Equal(
             2468,
             sanitized.RootElement
                 .GetProperty("resource_refuel_debug")
@@ -119,6 +140,10 @@ public sealed class DeepDebugSessionTests
         Assert.True(
             sanitized.RootElement
                 .GetProperty("private_server_link_configured")
+                .GetBoolean());
+        Assert.True(
+            sanitized.RootElement
+                .GetProperty("restart_roblox_at_macro_start")
                 .GetBoolean());
         using JsonDocument operationContext = JsonDocument.Parse(
             await ReadEntryAsync(

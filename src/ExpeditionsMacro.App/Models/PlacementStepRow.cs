@@ -6,12 +6,18 @@ namespace ExpeditionsMacro.App.Models;
 
 public sealed class PlacementStepRow : INotifyPropertyChanged
 {
+    public static IReadOnlyList<UnitTargetingPriority>
+        TargetingPriorities
+    { get; } =
+        Enum.GetValues<UnitTargetingPriority>();
+
     private int _unitKey;
     private int _x;
     private int _y;
     private int _delayAfterMilliseconds;
     private int _delayAfterStartMilliseconds;
     private PlacementPhase _phase;
+    private UnitTargetingPriority _targetingPriority;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -60,6 +66,16 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         }
     }
 
+    public UnitTargetingPriority TargetingPriority
+    {
+        get => _targetingPriority;
+        set
+        {
+            if (!Set(ref _targetingPriority, value)) return;
+            Raise(nameof(TargetingPriorityLabel));
+        }
+    }
+
     public string PhaseLabel =>
         Phase == PlacementPhase.BeforeStart
             ? "Before Start"
@@ -76,6 +92,9 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
             ? "Before Start"
             : $"{DelayAfterStartMilliseconds / 1000d:0.###}s after Start";
 
+    public string TargetingPriorityLabel =>
+        TargetingPriority.ToString();
+
     public PlacementStep ToModel() => new()
     {
         UnitKey = UnitKey,
@@ -85,6 +104,7 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         Phase = Phase,
         DelayAfterStartMilliseconds =
             DelayAfterStartMilliseconds,
+        TargetingPriority = TargetingPriority,
     };
 
     public static PlacementStepRow FromModel(PlacementStep step) => new()
@@ -96,6 +116,7 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         Phase = step.Phase,
         DelayAfterStartMilliseconds =
             step.DelayAfterStartMilliseconds,
+        TargetingPriority = step.TargetingPriority,
     };
 
     private bool Set<T>(

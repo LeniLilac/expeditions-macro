@@ -23,6 +23,7 @@ public sealed class FastNoAlignShareService
         MacroPlan portable = plan with
         {
             Progress = [],
+            LoopProgress = new(),
         };
         portable.Validate();
 
@@ -102,6 +103,7 @@ public sealed class FastNoAlignShareService
                 bundle.Plan with
                 {
                     Progress = [],
+                    LoopProgress = new(),
                     UpdatedAt = DateTimeOffset.UtcNow,
                 },
                 cancellationToken)

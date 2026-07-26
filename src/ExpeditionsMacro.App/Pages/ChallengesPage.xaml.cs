@@ -430,7 +430,7 @@ public partial class ChallengesPage : UserControl, IAppPage
         {
             await Dispatcher.InvokeAsync(() =>
             {
-                StatusText.Text = "Play menu key setup is required.";
+                StatusText.Text = "Toggle Play Menu key setup is required.";
                 AppendLog($"ERROR: {error.Message}");
             });
             throw;

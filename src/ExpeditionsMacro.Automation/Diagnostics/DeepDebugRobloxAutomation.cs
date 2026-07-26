@@ -105,22 +105,28 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
     public ImageFrame CaptureScreen(ScreenRegion region)
     {
         ImageFrame frame = _inner.CaptureScreen(region);
-        _debug.RecordFrame(frame, "capture_screen", new
+        if (_debug.IsActive)
         {
-            Region = region,
-            CallSite = CaptureCallSite(),
-        });
+            _debug.RecordFrame(frame, "capture_screen", new
+            {
+                Region = region,
+                CallSite = CaptureCallSite(),
+            });
+        }
         return frame;
     }
 
     public ImageFrame CaptureClient(RobloxWindow window)
     {
         ImageFrame frame = _inner.CaptureClient(window);
-        _debug.RecordFrame(frame, "capture_client", new
+        if (_debug.IsActive)
         {
-            Window = WindowData(window),
-            CallSite = CaptureCallSite(),
-        });
+            _debug.RecordFrame(frame, "capture_client", new
+            {
+                Window = WindowData(window),
+                CallSite = CaptureCallSite(),
+            });
+        }
         return frame;
     }
 
@@ -154,6 +160,37 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
                 x,
                 y,
                 jitterCycles,
+                cancellationToken));
+
+    public Task MoveCursorBetweenClientPointsAsync(
+        RobloxWindow window,
+        int startX,
+        int startY,
+        int endX,
+        int endY,
+        int durationMilliseconds,
+        CancellationToken cancellationToken) =>
+        TraceAsync(
+            window,
+            "automation",
+            "move_cursor_between_client_points",
+            new
+            {
+                Window = WindowData(window),
+                StartX = startX,
+                StartY = startY,
+                EndX = endX,
+                EndY = endY,
+                DurationMilliseconds =
+                    durationMilliseconds,
+            },
+            () => _inner.MoveCursorBetweenClientPointsAsync(
+                window,
+                startX,
+                startY,
+                endX,
+                endY,
+                durationMilliseconds,
                 cancellationToken));
 
     public Task ParkCursorAsync(RobloxWindow window, CancellationToken cancellationToken) =>

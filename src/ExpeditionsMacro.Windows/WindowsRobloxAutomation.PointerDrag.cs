@@ -38,6 +38,64 @@ public sealed partial class WindowsRobloxAutomation
         return Task.CompletedTask;
     }
 
+    public async Task MoveCursorBetweenClientPointsAsync(
+        RobloxWindow window,
+        int startX,
+        int startY,
+        int endX,
+        int endY,
+        int durationMilliseconds,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (durationMilliseconds is < 1 or > 5000)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(durationMilliseconds));
+        }
+        if (!Focus(window))
+        {
+            throw new InvalidOperationException(
+                "Windows could not focus Roblox.");
+        }
+
+        ClientBounds bounds = GetClientBounds(window);
+        ValidateClientPoint(bounds, startX, startY);
+        ValidateClientPoint(bounds, endX, endY);
+        MoveCursorWithRegisteredMotion(
+            bounds.X + startX,
+            bounds.Y + startY,
+            startX < bounds.Width - 1 ? 1 : -1,
+            "Windows could not move the cursor to the placement approach point.");
+
+        int steps = Math.Max(
+            1,
+            (int)Math.Ceiling(
+                durationMilliseconds / 20d));
+        int stepDelay = Math.Max(
+            1,
+            durationMilliseconds / steps);
+        for (int step = 1; step <= steps; step++)
+        {
+            await Task.Delay(
+                stepDelay,
+                cancellationToken).ConfigureAwait(false);
+            int x = startX +
+                (int)Math.Round(
+                    (endX - startX) *
+                    (step / (double)steps));
+            int y = startY +
+                (int)Math.Round(
+                    (endY - startY) *
+                    (step / (double)steps));
+            MoveCursorWithRegisteredMotion(
+                bounds.X + x,
+                bounds.Y + y,
+                x < bounds.Width - 1 ? 1 : -1,
+                "Windows could not move the cursor to the placement coordinate.");
+        }
+    }
+
     public async Task DragClientAsync(
         RobloxWindow window,
         int startX,

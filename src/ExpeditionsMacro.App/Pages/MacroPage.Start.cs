@@ -71,6 +71,8 @@ public partial class MacroPage
                     _services.Settings.AreasMenuKey,
                     _services.Settings
                         .ShiftLockVirtualKey);
+            _ = AppSettings.ParseRequiredUnitActionKeys(
+                _services.Settings);
             ValidateDiscord(
                 webhook,
                 discordUserId);
@@ -131,7 +133,8 @@ public partial class MacroPage
                     playMenuKey,
                     unitMenuKey,
                     cancelPlacementKey,
-                    privateServerRecovery.Target,
+                    privateServerRecovery.RecoveryTarget,
+                    privateServerRecovery.StartupTarget,
                     progress,
                     token),
             new DeepDebugOperationContext

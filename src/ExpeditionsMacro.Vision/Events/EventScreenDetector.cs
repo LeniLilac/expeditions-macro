@@ -122,6 +122,43 @@ public static class EventScreenDetector
                         actSelector)));
     }
 
+    public static EventScreenMatch DetectMatchState(
+        ImageFrame image)
+    {
+        ValidateClient(image);
+        StageScreenMatch shared =
+            StageScreenDetector.DetectMatchState(image);
+        EventScreenMatch result =
+            shared.State switch
+            {
+                StageScreenState.Victory =>
+                    new EventScreenMatch(
+                        EventScreenState.Victory,
+                        shared.Confidence),
+                StageScreenState.Defeat =>
+                    new EventScreenMatch(
+                        EventScreenState.Defeat,
+                        shared.Confidence),
+                StageScreenState.GameModeSelector =>
+                    new EventScreenMatch(
+                        EventScreenState.GameModeSelector,
+                        shared.Confidence),
+                _ => new EventScreenMatch(
+                    EventScreenState.None,
+                    shared.Confidence),
+            };
+        VisionTrace.Emit(
+            "event_match_screen",
+            result.State.ToString(),
+            result.Confidence,
+            new
+            {
+                SharedState = shared.State,
+                shared.Confidence,
+            });
+        return result;
+    }
+
     public static (int X, int Y)
         LobbyEventAction => (50, 410);
 

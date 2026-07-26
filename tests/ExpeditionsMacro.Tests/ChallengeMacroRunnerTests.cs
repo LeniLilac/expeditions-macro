@@ -4,9 +4,11 @@ using ExpeditionsMacro.Automation.Recovery;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
+using ExpeditionsMacro.Core.Persistence;
 using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Challenges;
 using ExpeditionsMacro.Vision.Infrastructure;
+using ExpeditionsMacro.Vision.Packs;
 
 namespace ExpeditionsMacro.Tests;
 
@@ -441,6 +443,54 @@ public sealed class ChallengeMacroRunnerTests
         Assert.Equal([1], attempts);
         Assert.Empty(misses);
         Assert.Empty(observations);
+    }
+
+    [Theory]
+    [InlineData(
+        "Expedition_Map_Select_Map1_001.png",
+        "map_select")]
+    [InlineData(
+        "Expedition_Map_Preview_Map1_001.png",
+        "map_preview")]
+    public void MatchRecovery_PreservesExpeditionNavigationInterruptions(
+        string fixtureName,
+        string expected)
+    {
+        CompiledDetectorPack detector = LoadDetectorPack();
+        string fixture = Directory
+            .EnumerateFiles(
+                TestPaths.Datasets,
+                fixtureName,
+                SearchOption.AllDirectories)
+            .Single();
+        ImageFrame frame = ImageCodec.Load(fixture);
+
+        string? actual =
+            ChallengeMacroRunner.DetectMatchRecoveryState(
+                detector,
+                frame,
+                ChallengeScreenDetector
+                    .DetectMatchState(frame)
+                    .State);
+
+        Assert.Equal(expected, actual);
+    }
+
+    private static CompiledDetectorPack LoadDetectorPack()
+    {
+        DetectorPackManifest manifest =
+            JsonFileStore
+                .ReadAsync<DetectorPackManifest>(
+                    Path.Combine(
+                        TestPaths.DetectorPack,
+                        "manifest.json"))
+                .GetAwaiter()
+                .GetResult() ??
+            throw new InvalidDataException(
+                "Detector pack manifest is missing.");
+        return new CompiledDetectorPack(
+            TestPaths.DetectorPack,
+            manifest);
     }
 
 }

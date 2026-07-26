@@ -6,7 +6,7 @@ namespace ExpeditionsMacro.Tests;
 public sealed class AppSettingsStoreTests
 {
     [Fact]
-    public async Task LegacySettings_DefaultStartupGameCheckToEnabled()
+    public async Task LegacySettings_DefaultStartupChecksToEnabled()
     {
         string root = Path.Combine(
             Path.GetTempPath(),
@@ -28,9 +28,20 @@ public sealed class AppSettingsStoreTests
 
             Assert.True(
                 loaded.AutoCheckGameSettingsOnStart);
+            Assert.True(
+                loaded.RestartRobloxAtMacroStart);
             Assert.Equal(
                 AppSettings.DefaultCancelPlacementKey,
                 loaded.CancelPlacementKey);
+            Assert.Equal(
+                string.Empty,
+                loaded.ChangeUnitTargetingKey);
+            Assert.Equal(
+                string.Empty,
+                loaded.UpgradeUnitKey);
+            Assert.Equal(
+                string.Empty,
+                loaded.ToggleAutoUpgradeUnitKey);
         }
         finally
         {
@@ -106,11 +117,15 @@ public sealed class AppSettingsStoreTests
                 EncryptedPrivateServerLink =
                     "dpapi-protected-private-server",
                 RestartRobloxWithPrivateServer = true,
+                RestartRobloxAtMacroStart = false,
                 DebugModeEnabled = true,
                 DiscordErrorUserId = "123456789012345678",
                 ShiftLockVirtualKey = KeyboardKey.RightShift,
                 AreasMenuKey = "G",
                 CancelPlacementKey = "X",
+                ChangeUnitTargetingKey = "T",
+                UpgradeUnitKey = "Y",
+                ToggleAutoUpgradeUnitKey = "V",
                 ResourceRefuelDebug =
                     new ResourceRefuelDebugSettings
                     {
@@ -128,6 +143,7 @@ public sealed class AppSettingsStoreTests
                 "dpapi-protected-private-server",
                 loaded.EncryptedPrivateServerLink);
             Assert.True(loaded.RestartRobloxWithPrivateServer);
+            Assert.False(loaded.RestartRobloxAtMacroStart);
             Assert.True(loaded.DebugModeEnabled);
             Assert.True(
                 loaded.AutoCheckGameSettingsOnStart);
@@ -136,6 +152,15 @@ public sealed class AppSettingsStoreTests
             Assert.Equal(KeyboardKey.RightShift, loaded.ShiftLockVirtualKey);
             Assert.Equal("G", loaded.AreasMenuKey);
             Assert.Equal("X", loaded.CancelPlacementKey);
+            Assert.Equal(
+                "T",
+                loaded.ChangeUnitTargetingKey);
+            Assert.Equal(
+                "Y",
+                loaded.UpgradeUnitKey);
+            Assert.Equal(
+                "V",
+                loaded.ToggleAutoUpgradeUnitKey);
             Assert.Equal(
                 4321,
                 loaded.ResourceRefuelDebug

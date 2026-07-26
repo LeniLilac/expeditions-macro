@@ -120,6 +120,8 @@ public sealed record MacroTaskProgress
     public int Victories { get; init; }
     public int Defeats { get; init; }
     public long RuntimeSeconds { get; init; }
+    public int TargetVictoryBaseline { get; init; }
+    public long TargetRuntimeBaselineSeconds { get; init; }
     public bool Completed { get; init; }
     public DateTimeOffset? LastAttemptAt { get; init; }
     public DateTimeOffset? LastCompletedAt { get; init; }
@@ -135,6 +137,8 @@ public sealed record MacroPlan
     public required string Name { get; init; }
     public required IReadOnlyList<MacroTaskDefinition> Tasks { get; init; }
     public IReadOnlyList<MacroTaskProgress> Progress { get; init; } = [];
+    public MacroPlanLoopDefinition? Loop { get; init; }
+    public MacroPlanLoopProgress LoopProgress { get; init; } = new();
     public DateTimeOffset UpdatedAt { get; init; } = DateTimeOffset.UtcNow;
 
     public bool UsesPlacementSetupWorkflow =>
@@ -150,6 +154,13 @@ public sealed record MacroPlan
         {
             throw new InvalidDataException("Every macro task must have a unique id.");
         }
+        Loop?.Validate(Tasks);
+        LoopProgress.Validate();
+        if (Loop is null && !LoopProgress.IsEmpty)
+        {
+            throw new InvalidDataException(
+                "A plan without a loop cannot contain loop progress.");
+        }
         string[] taskIds = Tasks.Select(task => task.Id).ToArray();
         if (Progress.Select(value => value.TaskId).Distinct(StringComparer.OrdinalIgnoreCase).Count() != Progress.Count)
         {
@@ -161,7 +172,14 @@ public sealed record MacroPlan
             {
                 throw new InvalidDataException("Macro progress refers to a task that is no longer in the plan.");
             }
-            if (value.Victories < 0 || value.Defeats < 0 || value.RuntimeSeconds < 0)
+            if (value.Victories < 0 ||
+                value.Defeats < 0 ||
+                value.RuntimeSeconds < 0 ||
+                value.TargetVictoryBaseline < 0 ||
+                value.TargetVictoryBaseline > value.Victories ||
+                value.TargetRuntimeBaselineSeconds < 0 ||
+                value.TargetRuntimeBaselineSeconds >
+                    value.RuntimeSeconds)
             {
                 throw new InvalidDataException("Macro task progress cannot be negative.");
             }
@@ -175,6 +193,7 @@ public sealed record MacroPlan
     public MacroPlan ResetProgress() => this with
     {
         Progress = Tasks.Select(task => new MacroTaskProgress { TaskId = task.Id }).ToArray(),
+        LoopProgress = new(),
         UpdatedAt = DateTimeOffset.UtcNow,
     };
 }

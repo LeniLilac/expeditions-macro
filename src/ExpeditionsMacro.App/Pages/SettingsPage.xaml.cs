@@ -240,6 +240,12 @@ public partial class SettingsPage : UserControl, IAppPage
             KeyBindingsPanel.AreasDiagnostic;
         CancelPlacementKeyDiagnosticText.Text =
             KeyBindingsPanel.CancelPlacementDiagnostic;
+        TargetingKeyDiagnosticText.Text =
+            KeyBindingsPanel.TargetingDiagnostic;
+        UpgradeUnitKeyDiagnosticText.Text =
+            KeyBindingsPanel.UpgradeDiagnostic;
+        AutoUpgradeUnitKeyDiagnosticText.Text =
+            KeyBindingsPanel.AutoUpgradeDiagnostic;
         ShiftLockKeyDiagnosticText.Text = KeyBindingsPanel.ShiftLockDiagnostic;
         DebugCaptureDescription.Text = $"Record the Roblox client at the standard 808 by 611 size. {KeyBindingsPanel.HotkeyDisplayName} starts and stops capture and saves a ZIP for bug reports.";
     }

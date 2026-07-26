@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
 
@@ -40,6 +41,15 @@ internal static class ActionButtonDetector
     }
 
     private readonly record struct ButtonMatch(double Score, Component Component);
+
+    private sealed class FrameMatches
+    {
+        public Dictionary<string, ButtonMatch?> Values { get; } =
+            new(StringComparer.OrdinalIgnoreCase);
+    }
+
+    private static readonly ConditionalWeakTable<ImageFrame, FrameMatches>
+        MatchCache = new();
 
     private static readonly IReadOnlyDictionary<string, Profile> Profiles = new Dictionary<string, Profile>(StringComparer.OrdinalIgnoreCase)
     {
@@ -124,6 +134,30 @@ internal static class ActionButtonDetector
     }
 
     private static ButtonMatch? Find(ImageFrame image, string state)
+    {
+        FrameMatches frameMatches =
+            MatchCache.GetOrCreateValue(image);
+        lock (frameMatches)
+        {
+            if (frameMatches.Values.TryGetValue(
+                    state,
+                    out ButtonMatch? cached))
+            {
+                return cached;
+            }
+        }
+
+        ButtonMatch? result = FindUncached(image, state);
+        lock (frameMatches)
+        {
+            frameMatches.Values[state] = result;
+        }
+        return result;
+    }
+
+    private static ButtonMatch? FindUncached(
+        ImageFrame image,
+        string state)
     {
         if (!Profiles.TryGetValue(state, out Profile profile) ||
             image.Format != PixelFormat.Rgb24 ||

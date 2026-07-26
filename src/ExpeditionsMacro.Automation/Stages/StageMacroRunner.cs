@@ -92,7 +92,7 @@ public sealed partial class StageMacroRunner
         int teamSlot = story?.TeamSlot ?? raid!.TeamSlot;
         if (teamSlot > 0 && unitMenuKey is null)
         {
-            throw new InvalidDataException("Set the Unit menu key under Settings > Controls before using a preset that changes teams.");
+            throw new InvalidDataException("Set the Toggle Unit Inventory key under Settings > Controls before using a preset that changes teams.");
         }
 
         int retries = story?.DefeatRetries ?? raid!.DefeatRetries;

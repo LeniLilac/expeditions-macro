@@ -98,6 +98,27 @@ public sealed class DebugSteppingRobloxAutomation : IRobloxAutomation, IDisposab
                 x,
                 y,
                 jitterCycles,
+            cancellationToken),
+            cancellationToken);
+
+    public Task MoveCursorBetweenClientPointsAsync(
+        RobloxWindow window,
+        int startX,
+        int startY,
+        int endX,
+        int endY,
+        int durationMilliseconds,
+        CancellationToken cancellationToken) =>
+        TraceAsync(
+            "Move cursor across Roblox",
+            $"Move from ({startX}, {startY}) to ({endX}, {endY}) over {durationMilliseconds} ms.",
+            () => _inner.MoveCursorBetweenClientPointsAsync(
+                window,
+                startX,
+                startY,
+                endX,
+                endY,
+                durationMilliseconds,
                 cancellationToken),
             cancellationToken);
 

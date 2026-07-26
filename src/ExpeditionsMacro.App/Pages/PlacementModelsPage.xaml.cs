@@ -489,7 +489,7 @@ public partial class PlacementModelsPage : UserControl, IAppPage
         FastBeforeStartButton.IsEnabled = !busy;
         FastAfterStartButton.IsEnabled = !busy;
         PlacementCanvas.IsEnabled = !busy;
-        FastStepsList.IsEnabled = !busy;
+        FastEditorPanel.SetStepsInteractionEnabled(!busy);
         FastTimingButton.IsEnabled = !busy;
         if (busy)
         {

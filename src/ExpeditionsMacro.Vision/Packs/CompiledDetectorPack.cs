@@ -11,6 +11,12 @@ namespace ExpeditionsMacro.Vision.Packs;
 public sealed partial class CompiledDetectorPack : IDetectorPack
 {
     private static readonly string[] RecoveryStates = ["afk", "disconnect", "lobby", "play", "map_select", "map_preview"];
+    private static readonly string[] RootRecoveryStates =
+    [
+        "afk",
+        "disconnect",
+        "lobby",
+    ];
     private static readonly ScreenRegion HotbarAnchorRegion = new(154, 536, 500, 62);
     private static readonly ScreenRegion NodeBarAnchorRegion = new(220, 53, 370, 32);
     private readonly IReadOnlyDictionary<string, StateRuntime> _states;
@@ -91,7 +97,11 @@ public sealed partial class CompiledDetectorPack : IDetectorPack
             StringComparison.OrdinalIgnoreCase);
         Dictionary<string, double> scores = _states.ToDictionary(
             pair => pair.Key,
-            pair => ScoreConfiguredState(pair.Key, pair.Value, clientImage, useSpecializedDetectors),
+            pair => ScoreConfiguredStateCached(
+                pair.Key,
+                pair.Value,
+                clientImage,
+                useSpecializedDetectors),
             StringComparer.OrdinalIgnoreCase);
         if (useSpecializedDetectors) scores["afk"] = AfkChamberDetector.Score(clientImage);
         if (useSpecializedDetectors)
@@ -105,7 +115,12 @@ public sealed partial class CompiledDetectorPack : IDetectorPack
             foreach ((string name, StateRuntime runtime) in _states
                          .Where(pair => pair.Key is "lobby" or "play"))
             {
-                scores[name] = Math.Max(scores[name], ScoreAdaptiveState(name, runtime, clientImage));
+                scores[name] = Math.Max(
+                    scores[name],
+                    ScoreAdaptiveStateCached(
+                        name,
+                        runtime,
+                        clientImage));
             }
         }
         return scores;
@@ -137,7 +152,11 @@ public sealed partial class CompiledDetectorPack : IDetectorPack
         foreach (string name in RecoveryStates)
         {
             if (!_states.TryGetValue(name, out StateRuntime? state)) continue;
-            double score = ScoreConfiguredState(name, state, clientImage, useSpecializedDetectors);
+            double score = ScoreConfiguredStateCached(
+                name,
+                state,
+                clientImage,
+                useSpecializedDetectors);
             scores[name] = score;
             if (score >= state.Definition.Threshold) return name;
         }
@@ -146,7 +165,12 @@ public sealed partial class CompiledDetectorPack : IDetectorPack
             foreach (string name in RecoveryStates.Where(name => name is "lobby" or "play"))
             {
                 StateRuntime state = _states[name];
-                scores[name] = Math.Max(scores.GetValueOrDefault(name), ScoreAdaptiveState(name, state, clientImage));
+                scores[name] = Math.Max(
+                    scores.GetValueOrDefault(name),
+                    ScoreAdaptiveStateCached(
+                        name,
+                        state,
+                        clientImage));
             }
             foreach (string name in RecoveryStates.Where(_states.ContainsKey))
             {
@@ -310,21 +334,25 @@ public sealed partial class CompiledDetectorPack : IDetectorPack
 
     private double ScoreConfiguredState(string name, StateRuntime runtime, ImageFrame image, bool useSpecializedDetectors)
     {
-        double fixedScore = ScoreState(runtime, image, [(0, 0)]);
         if (useSpecializedDetectors)
         {
             if (name.Equals("start", StringComparison.OrdinalIgnoreCase)) return StartDialogDetector.Score(image);
-            if (name.Equals("play", StringComparison.OrdinalIgnoreCase))
-            {
-                (ScreenRegion Region, ImageFrame Reference) title = PlayTitleReference(runtime);
-                return Math.Max(fixedScore, PlayScreenDetector.Score(title.Reference, title.Region, image));
-            }
             if (name.Equals("checkpoint", StringComparison.OrdinalIgnoreCase)) return PauseButtonDetector.ScoreCheckpoint(image);
             if (name.Equals("continue", StringComparison.OrdinalIgnoreCase)) return PauseButtonDetector.ScoreContinue(image);
             // The legacy three-region template could correlate with ordinary units
             // and effects during gameplay. The specialized detector requires the
             // stable reward header and live Select Upgrade controls instead.
             if (name.Equals("reward", StringComparison.OrdinalIgnoreCase)) return RewardScreenDetector.Score(image);
+        }
+
+        double fixedScore = ScoreState(runtime, image, [(0, 0)]);
+        if (useSpecializedDetectors)
+        {
+            if (name.Equals("play", StringComparison.OrdinalIgnoreCase))
+            {
+                (ScreenRegion Region, ImageFrame Reference) title = PlayTitleReference(runtime);
+                return Math.Max(fixedScore, PlayScreenDetector.Score(title.Reference, title.Region, image));
+            }
             if (name is "victory" or "defeat") return Math.Max(fixedScore, TerminalScreenDetector.Score(image, name));
             if (name is "map_select" or "map_preview" or "confirm" or "extract_confirm" or "disconnect")
             {

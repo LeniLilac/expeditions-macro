@@ -66,12 +66,14 @@ public sealed class RobloxPrivateServerRecoveryService
         progress?.Report(new MacroProgress(
             "Recovery",
             0,
-            "In-client recovery stalled. Restarting Roblox through the configured private server.",
+            "Restarting Roblox through the configured private server.",
             "roblox_restart"));
         log?.Invoke(new MacroEvent(
             DateTimeOffset.Now,
-            MacroEventLevel.Warning,
-            "Closing the verified Roblox player process for private-server recovery.",
+            MacroEventLevel.Information,
+            current is null
+                ? "No Roblox player process was open; launching the configured private server."
+                : "Closing the verified Roblox player process before private-server launch.",
             "roblox_restart"));
 
         await _processes.CloseAsync(current, cancellationToken).ConfigureAwait(false);

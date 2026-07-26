@@ -18,6 +18,8 @@ public sealed class MacroTaskRow
 
     public string Name => string.IsNullOrWhiteSpace(Definition.Name) ? Definition.PresetId : Definition.Name;
     public string Type => Definition.Kind.ToString();
+    public string LoopLabel =>
+        $"#{Definition.Priority}  {Type} · {Name}";
     public string Target => Definition.IsRecurring
         ? "Every reset"
         : Definition.CompleteOnRuntimeDefeat
@@ -30,6 +32,6 @@ public sealed class MacroTaskRow
         : Definition.IsRecurring && Progress.NextEligibleAtUtc is DateTimeOffset next
             ? $"Available {next.LocalDateTime:t}"
             : Definition.CompleteOnRuntimeDefeat
-                ? $"{TimeSpan.FromSeconds(Progress.RuntimeSeconds):h\\:mm} - {Progress.Defeats}L"
-                : $"{Progress.Victories}W / {Progress.Defeats}L";
+                ? $"{TimeSpan.FromSeconds(Math.Max(0, Progress.RuntimeSeconds - Progress.TargetRuntimeBaselineSeconds)):h\\:mm} - {Progress.Defeats}L"
+                : $"{Math.Max(0, Progress.Victories - Progress.TargetVictoryBaseline)}W / {Progress.Defeats}L";
 }

@@ -5,6 +5,7 @@ using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Challenges;
 using ExpeditionsMacro.Vision.Events;
+using ExpeditionsMacro.Vision.Stages;
 
 namespace ExpeditionsMacro.Automation.Events;
 
@@ -17,13 +18,11 @@ public sealed partial class EventMacroRunner
         RobloxWindow window,
         EventPreset preset,
         IDetectorPack detector,
-        char playMenuKey,
         CancellationToken cancellationToken)
     {
         await EnsureLobbyAsync(
             window,
             detector,
-            playMenuKey,
             cancellationToken).ConfigureAwait(false);
         await ClickAsync(
             window,
@@ -132,7 +131,6 @@ public sealed partial class EventMacroRunner
     private async Task EnsureLobbyAsync(
         RobloxWindow window,
         IDetectorPack detector,
-        char playMenuKey,
         CancellationToken cancellationToken)
     {
         ImageFrame current =
@@ -151,15 +149,23 @@ public sealed partial class EventMacroRunner
         }
 
         if (state.State ==
-            EventScreenState.GameModeSelector)
+                EventScreenState.GameModeSelector ||
+            EventPlayInterfaceCloser.DetectLayer(current) !=
+                EventPlayInterfaceLayer.Closed)
         {
-            await _automation.TapLetterKeyAsync(
-                window,
-                playMenuKey,
-                cancellationToken).ConfigureAwait(false);
-            await WaitForPlayClosedAsync(
-                window,
-                detector,
+            await EventPlayInterfaceCloser.CloseAsync(
+                () => EventPlayInterfaceCloser.DetectLayer(
+                    CaptureClient(window, detector)),
+                token =>
+                {
+                    (int X, int Y) back =
+                        StageScreenDetector.SelectorBackAction;
+                    return ClickAsync(
+                        window,
+                        back.X,
+                        back.Y,
+                        token);
+                },
                 cancellationToken).ConfigureAwait(false);
             current = CaptureClient(window, detector);
             recovery = detector.RecoveryState(current);
@@ -274,35 +280,6 @@ public sealed partial class EventMacroRunner
         }
 
         return null;
-    }
-
-    private async Task WaitForPlayClosedAsync(
-        RobloxWindow window,
-        IDetectorPack detector,
-        CancellationToken cancellationToken)
-    {
-        DateTimeOffset deadline =
-            DateTimeOffset.UtcNow +
-            TimeSpan.FromSeconds(5);
-        int stable = 0;
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            EventScreenState state =
-                EventScreenDetector.Detect(
-                    CaptureClient(window, detector))
-                    .State;
-            stable =
-                state !=
-                    EventScreenState.GameModeSelector
-                    ? stable + 1
-                    : 0;
-            if (stable >= 2) return;
-            await Task.Delay(
-                180,
-                cancellationToken).ConfigureAwait(false);
-        }
-        throw new RobloxUiUnavailableException(
-            "The Play interface did not close before Event lobby navigation.");
     }
 
     private async Task<EventScreenMatch>

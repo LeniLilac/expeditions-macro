@@ -146,6 +146,51 @@ public static class StageScreenDetector
             : new StageScreenMatch(StageScreenState.None, Math.Max(Math.Max(storySelector, raidSelector), Math.Max(storyDetail, redDetail))));
     }
 
+    public static StageScreenMatch DetectMatchState(
+        ImageFrame image)
+    {
+        ValidateClient(image);
+        double stageVictory = StageVictoryScore(image);
+        ChallengeScreenMatch shared =
+            ChallengeScreenDetector.DetectMatchState(image);
+        StageScreenMatch result =
+            stageVictory >= 0.78
+                ? new StageScreenMatch(
+                    StageScreenState.Victory,
+                    stageVictory)
+                : shared.State switch
+                {
+                    ChallengeScreenState.Victory =>
+                        new StageScreenMatch(
+                            StageScreenState.Victory,
+                            shared.Confidence),
+                    ChallengeScreenState.Defeat =>
+                        new StageScreenMatch(
+                            StageScreenState.Defeat,
+                            shared.Confidence),
+                    ChallengeScreenState.GameModeSelector =>
+                        new StageScreenMatch(
+                            StageScreenState.GameModeSelector,
+                            shared.Confidence),
+                    _ => new StageScreenMatch(
+                        StageScreenState.None,
+                        Math.Max(
+                            stageVictory,
+                            shared.Confidence)),
+                };
+        VisionTrace.Emit(
+            "stage_match_screen",
+            result.State.ToString(),
+            result.Confidence,
+            new
+            {
+                StageVictory = stageVictory,
+                SharedState = shared.State,
+                shared.Confidence,
+            });
+        return result;
+    }
+
     public static (int X, int Y) ModeTileAction(StageMode mode) => mode switch
     {
         // The reward icons on the right side of the Story card consume clicks to

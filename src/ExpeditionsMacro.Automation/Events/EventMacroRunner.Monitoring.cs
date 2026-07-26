@@ -39,7 +39,8 @@ public sealed partial class EventMacroRunner
             ImageFrame frame =
                 CaptureClient(window, detector);
             EventScreenMatch current =
-                EventScreenDetector.Detect(frame);
+                EventScreenDetector.DetectMatchState(
+                    frame);
             string? candidate =
                 current.State is
                     EventScreenState.Victory or
@@ -57,9 +58,12 @@ public sealed partial class EventMacroRunner
             }
 
             string? recoveryState =
-                detector.RecoveryState(frame);
-            if (current.State ==
-                EventScreenState.GameModeSelector)
+                candidate is null
+                    ? detector.RootRecoveryState(frame)
+                    : null;
+            if (candidate is null &&
+                current.State ==
+                    EventScreenState.GameModeSelector)
             {
                 recoveryState = "play";
             }

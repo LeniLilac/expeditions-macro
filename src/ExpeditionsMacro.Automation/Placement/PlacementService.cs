@@ -1,30 +1,38 @@
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
+using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
 using ExpeditionsMacro.Core.Runtime;
+using ExpeditionsMacro.Vision.Placement;
 
 namespace ExpeditionsMacro.Automation.Placement;
 
 public sealed class PlacementService
 {
-    private const int PlacementHoverJitterCycles = 2;
-    private const int PlacementHoverSettleMilliseconds = 200;
-    private const int PlacementClickAttempts = 3;
-    private const int PlacementClickRetryMilliseconds = 100;
+    private const int PlacementApproachDistancePixels = 50;
+    private const int PlacementApproachDurationMilliseconds = 200;
+    private const int PlacementClickAttempts = 8;
+    private const int SelectionPollMilliseconds = 100;
+    private const int SelectionTimeoutMilliseconds = 800;
+    private const int RequiredStableSelectionFrames = 2;
+    private const int TargetingTapIntervalMilliseconds = 100;
 
     private readonly IRobloxAutomation _automation;
     private readonly IPlacementCaptureService _capture;
     private readonly PlacementModelRepository _models;
+    private readonly Func<char> _targetingKey;
 
     public PlacementService(
         IRobloxAutomation automation,
         IPlacementCaptureService capture,
-        PlacementModelRepository models)
+        PlacementModelRepository models,
+        Func<char>? targetingKey = null)
     {
         _automation = automation;
         _capture = capture;
         _models = models;
+        _targetingKey = targetingKey ?? (() => 'T');
     }
 
     public async Task<PlacementModel> RecordAsync(
@@ -121,6 +129,13 @@ public sealed class PlacementService
         }
         cancelPlacementKey =
             char.ToUpperInvariant(cancelPlacementKey);
+        char targetingKey = _targetingKey();
+        if (!char.IsAsciiLetter(targetingKey))
+        {
+            throw new InvalidDataException(
+                "The Change Unit Targeting key must be one letter from A through Z.");
+        }
+        targetingKey = char.ToUpperInvariant(targetingKey);
         EnsureFocus(window);
         await EnsureSizeAsync(window, model.ClientWidth, model.ClientHeight, cancellationToken).ConfigureAwait(false);
         for (int index = 0; index < steps.Count; index++)
@@ -130,90 +145,168 @@ public sealed class PlacementService
             await EnsureSizeAsync(window, model.ClientWidth, model.ClientHeight, cancellationToken).ConfigureAwait(false);
             EnsureFocus(window);
             status?.Invoke(
-                $"Step {index + 1}/{steps.Count}: normalizing placement selection at ({step.X}, {step.Y}).");
-            await _automation.MoveCursorToClientAsync(
-                    window,
-                    step.X,
-                    step.Y,
-                    PlacementHoverJitterCycles,
-                    cancellationToken)
-                .ConfigureAwait(false);
-            await _automation.TapUnitKeyAsync(
+                $"Step {index + 1}/{steps.Count}: normalizing unit {step.UnitKey} placement state at ({step.X}, {step.Y}).");
+            await NormalizePlacementSelectionAsync(
                 window,
-                step.UnitKey,
+                step,
                 keyHoldMilliseconds,
-                cancellationToken).ConfigureAwait(false);
-            await _automation.TapLetterKeyAsync(
-                window,
                 cancelPlacementKey,
                 cancellationToken).ConfigureAwait(false);
-            await _automation.ClickClientRetainingCursorAsync(
-                window,
-                step.X,
-                step.Y,
-                cancellationToken).ConfigureAwait(false);
-
-            status?.Invoke(
-                $"Step {index + 1}/{steps.Count}: selecting top-row {step.UnitKey} for placement.");
-            await _automation.TapUnitKeyAsync(
-                window,
-                step.UnitKey,
-                keyHoldMilliseconds,
-                cancellationToken).ConfigureAwait(false);
-            await Task.Delay(
-                afterKeyMilliseconds,
-                cancellationToken).ConfigureAwait(false);
-            await EnsureSizeAsync(window, model.ClientWidth, model.ClientHeight, cancellationToken).ConfigureAwait(false);
-            EnsureFocus(window);
-            status?.Invoke(
-                $"Step {index + 1}/{steps.Count}: priming relative ({step.X}, {step.Y}) with two cursor jitters.");
-            await _automation.MoveCursorToClientAsync(
-                    window,
-                    step.X,
-                    step.Y,
-                    PlacementHoverJitterCycles,
-                    cancellationToken)
-                .ConfigureAwait(false);
-            await Task.Delay(
-                    PlacementHoverSettleMilliseconds,
-                    cancellationToken)
-                .ConfigureAwait(false);
+            bool selected = false;
             for (int attempt = 1;
                  attempt <= PlacementClickAttempts;
                  attempt++)
             {
+                await EnsureSizeAsync(
+                    window,
+                    model.ClientWidth,
+                    model.ClientHeight,
+                    cancellationToken).ConfigureAwait(false);
                 EnsureFocus(window);
                 status?.Invoke(
                     $"Step {index + 1}/{steps.Count}: placement click {attempt}/{PlacementClickAttempts} at ({step.X}, {step.Y}).");
-                if (attempt == PlacementClickAttempts)
+                await ClickPlacementAsync(
+                    window,
+                    step,
+                    cancellationToken).ConfigureAwait(false);
+                selected = await WaitForSelectedUnitAsync(
+                    window,
+                    cancellationToken).ConfigureAwait(false);
+                if (selected) break;
+                status?.Invoke(
+                    $"Step {index + 1}/{steps.Count}: the selected-unit panel did not appear after click {attempt}; retrying only the timed approach and click.");
+            }
+            if (!selected)
+            {
+                throw new RobloxUiUnavailableException(
+                    $"Unit {step.UnitKey} could not be placed and selected at ({step.X}, {step.Y}) after {PlacementClickAttempts} click attempts.");
+            }
+
+            int targetingTaps =
+                (int)step.TargetingPriority;
+            status?.Invoke(
+                $"Step {index + 1}/{steps.Count}: selected unit confirmed; applying {step.TargetingPriority} targeting ({targetingTaps} key taps).");
+            for (int tap = 0;
+                 tap < targetingTaps;
+                 tap++)
+            {
+                EnsureFocus(window);
+                await _automation.TapLetterKeyAsync(
+                    window,
+                    targetingKey,
+                    cancellationToken).ConfigureAwait(false);
+                if (tap + 1 < targetingTaps)
                 {
-                    await _automation.ClickClientAsync(
-                            window,
-                            step.X,
-                            step.Y,
-                            cancellationToken)
-                        .ConfigureAwait(false);
-                }
-                else
-                {
-                    await _automation
-                        .ClickClientRetainingCursorAsync(
-                            window,
-                            step.X,
-                            step.Y,
-                            cancellationToken)
-                        .ConfigureAwait(false);
                     await Task.Delay(
-                            PlacementClickRetryMilliseconds,
-                            cancellationToken)
-                        .ConfigureAwait(false);
+                        TargetingTapIntervalMilliseconds,
+                        cancellationToken).ConfigureAwait(false);
                 }
+            }
+            if (index + 1 < steps.Count)
+            {
+                await _automation.ParkCursorAsync(
+                    window,
+                    cancellationToken).ConfigureAwait(false);
             }
             stepSent?.Invoke(index + 1, steps.Count, step);
             int delay = useDefaultInterval ? defaultIntervalMilliseconds : step.DelayAfterMilliseconds;
             status?.Invoke($"Step {index + 1}/{steps.Count}: waiting {delay} ms after click.");
             await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    private async Task NormalizePlacementSelectionAsync(
+        RobloxWindow window,
+        PlacementStep step,
+        int keyHoldMilliseconds,
+        char cancelPlacementKey,
+        CancellationToken cancellationToken)
+    {
+        await _automation.TapUnitKeyAsync(
+            window,
+            step.UnitKey,
+            keyHoldMilliseconds,
+            cancellationToken).ConfigureAwait(false);
+        await _automation.TapLetterKeyAsync(
+            window,
+            cancelPlacementKey,
+            cancellationToken).ConfigureAwait(false);
+        await _automation.TapUnitKeyAsync(
+            window,
+            step.UnitKey,
+            keyHoldMilliseconds,
+            cancellationToken).ConfigureAwait(false);
+        await _automation.TapUnitKeyAsync(
+            window,
+            step.UnitKey,
+            keyHoldMilliseconds,
+            cancellationToken).ConfigureAwait(false);
+        await _automation.TapUnitKeyAsync(
+            window,
+            step.UnitKey,
+            keyHoldMilliseconds,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task ClickPlacementAsync(
+        RobloxWindow window,
+        PlacementStep step,
+        CancellationToken cancellationToken)
+    {
+        EnsureFocus(window);
+        int approachX =
+            step.X >= PlacementApproachDistancePixels
+                ? step.X -
+                    PlacementApproachDistancePixels
+                : step.X +
+                    PlacementApproachDistancePixels;
+        await _automation.MoveCursorBetweenClientPointsAsync(
+            window,
+            approachX,
+            step.Y,
+            step.X,
+            step.Y,
+            PlacementApproachDurationMilliseconds,
+            cancellationToken).ConfigureAwait(false);
+        await _automation.ClickClientRetainingCursorAsync(
+            window,
+            step.X,
+            step.Y,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<bool> WaitForSelectedUnitAsync(
+        RobloxWindow window,
+        CancellationToken cancellationToken)
+    {
+        int stable = 0;
+        int samples = Math.Max(
+            RequiredStableSelectionFrames,
+            1 +
+            SelectionTimeoutMilliseconds /
+            SelectionPollMilliseconds);
+        for (int sample = 0;
+             sample < samples;
+             sample++)
+        {
+            EnsureFocus(window);
+            ImageFrame frame =
+                _automation.CaptureClient(window);
+            SelectedUnitPanelMatch match =
+                SelectedUnitPanelDetector.Detect(frame);
+            stable = match.Visible ? stable + 1 : 0;
+            if (stable >= RequiredStableSelectionFrames)
+            {
+                return true;
+            }
+            if (sample + 1 < samples)
+            {
+                await Task.Delay(
+                    SelectionPollMilliseconds,
+                    cancellationToken).ConfigureAwait(false);
+            }
+        }
+        return false;
     }
 
     private async Task EnsureSizeAsync(RobloxWindow window, int width, int height, CancellationToken cancellationToken)

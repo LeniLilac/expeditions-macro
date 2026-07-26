@@ -94,6 +94,10 @@ public static class ChallengeScreenDetector
         return new ChallengeScreenMatch(ChallengeScreenState.None, 0);
     }
 
+    public static ChallengeScreenMatch DetectMatchState(
+        ImageFrame image) =>
+        ChallengeMatchStateDetector.Detect(image);
+
     public static IReadOnlyDictionary<ChallengeScreenState, double> ScoreStates(ImageFrame image)
     {
         ValidateClient(image);
@@ -204,7 +208,7 @@ public static class ChallengeScreenDetector
         _ => 1,
     };
 
-    private static double GameModeSelectorScore(ImageFrame image)
+    internal static double GameModeSelectorScore(ImageFrame image)
     {
         double title = ColorFraction(image, ChallengeTileTitleRegion, IsChallengeYellow);
         double storyTitle = ColorFraction(image, StoryTileTitleRegion, IsCyan);

@@ -14,6 +14,12 @@ namespace ExpeditionsMacro.Automation.Challenges;
 
 public sealed partial class ChallengeMacroRunner
 {
+    private static readonly string[] MatchNavigationRecoveryStates =
+    [
+        "map_select",
+        "map_preview",
+    ];
+
     private async Task<MatchTerminal> MonitorMatchAsync(
         RobloxWindow window,
         ChallengePreset preset,
@@ -52,7 +58,8 @@ public sealed partial class ChallengeMacroRunner
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = CaptureClient(window, detector);
             ChallengeScreenMatch match =
-                ChallengeScreenDetector.Detect(frame);
+                ChallengeScreenDetector.DetectMatchState(
+                    frame);
             ChallengeScreenState candidate =
                 match.State is ChallengeScreenState.Victory or
                     ChallengeScreenState.Defeat
@@ -69,7 +76,14 @@ public sealed partial class ChallengeMacroRunner
                     frame.Clone());
             }
 
-            string? recovery = detector.RecoveryState(frame);
+            string? recovery =
+                candidate is ChallengeScreenState.Victory or
+                    ChallengeScreenState.Defeat
+                    ? null
+                    : DetectMatchRecoveryState(
+                        detector,
+                        frame,
+                        match.State);
             if (recoveryTracker.Update(recovery ?? string.Empty) is
                     string stableRecovery &&
                 !string.IsNullOrEmpty(stableRecovery))
@@ -149,5 +163,48 @@ public sealed partial class ChallengeMacroRunner
                 preset.PollMilliseconds,
                 cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    internal static string? DetectMatchRecoveryState(
+        IDetectorPack detector,
+        ImageFrame frame,
+        ChallengeScreenState matchState)
+    {
+        ArgumentNullException.ThrowIfNull(detector);
+        ArgumentNullException.ThrowIfNull(frame);
+        string? root = detector.RootRecoveryState(frame);
+        if (root?.Equals(
+                "afk",
+                StringComparison.OrdinalIgnoreCase) == true)
+        {
+            return root;
+        }
+
+        IReadOnlyDictionary<string, double> navigationScores =
+            detector.ScoreStates(
+                frame,
+                MatchNavigationRecoveryStates);
+        if (ExpeditionRunPolicy.IsStateDetected(
+                detector.Manifest,
+                navigationScores,
+                "map_select"))
+        {
+            return "map_select";
+        }
+        if (root is not null)
+        {
+            return root;
+        }
+        if (matchState ==
+            ChallengeScreenState.GameModeSelector)
+        {
+            return "play";
+        }
+        return ExpeditionRunPolicy.IsStateDetected(
+                detector.Manifest,
+                navigationScores,
+                "map_preview")
+            ? "map_preview"
+            : null;
     }
 }

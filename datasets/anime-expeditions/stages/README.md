@@ -1,6 +1,6 @@
 # Story, Raid, and team fixtures
 
-This directory contains 47 reviewed 808 by 611 Roblox client-area frames used by the Story, Raid, and saved-team detectors. The retained PNGs contain no account names, chat, notifications, desktop chrome, or secrets. Captured UI pixels remain unscaled and unmodified except for the documented account-name redactions; the three Story wide-button fixtures use documented black padding outside their supplied panel crops.
+This directory contains 49 reviewed 808 by 611 Roblox client-area frames used by the Story, Raid, saved-team, and placement-confirmation detectors. The retained PNGs contain no account names, chat, notifications, desktop chrome, or secrets. Captured UI pixels remain unscaled and unmodified except for the documented account-name redactions; the three Story wide-button fixtures use documented black padding outside their supplied panel crops.
 
 Sources:
 
@@ -24,5 +24,6 @@ Sources:
 - `deep-debug-macro-plan-20260725-065451-49a53ca1816843138df86d3fe6c96d17.zip`: a beta.20 Team 3 failure whose second accepted scrollbar drag settled seven pixels above the nominal target while Team 3's full Load button was already stable and actionable. The retained frame is an unmodified 808 by 611 Roblox client capture with no account name, chat, desktop chrome, notification, or secret.
 - Two beta.13 Raid failures contributed the current Spirit City detail panel with Roblox's custom and default fonts. In both variants, the red Close circle connects to the panel border while the independently detected Select Stage action remains live. The retained frames are unmodified 808 by 611 Roblox client captures with no account name, chat, desktop chrome, notification, or secret.
 - `diagnostic-capture.zip`: a beta.17 passive capture of the rare Spirit City Act 3 unit-drop presentation that hides both the unit hotbar and the ordinary right-side gameplay actions until the player clicks. The retained frame is an unmodified 808 by 611 Roblox client capture with no account name, chat, desktop chrome, notification, or secret.
+- `deep-debug-diagnostic-capture-20260726-131254-0f4860f018f0476aad5a7f5db1d5cbde.zip`: a passive capture contrasting a genuinely selected unit with an ordinary unit hover card. Placement confirmation requires the selected panel's independent red Close control and initial blue **Priority / First** control together; the hover-only negative contains neither complete anchor pair. Both retained frames are unmodified 808 by 611 Roblox client captures with no account name, chat, desktop chrome, notification, or secret.
 
 The full bursts remain local diagnostic artifacts. Only structurally distinct frames needed for detector and cross-state regression are retained here.

@@ -317,6 +317,7 @@
                                     Content="Fast no align"
                                     ToolTip="Start with Shift Lock off. Zooms out and looks straight down without changing yaw."
                                     Click="FastNoAlign_Click" />
+                            <icons:DetectionBenchmarkPanel x:Name="DetectionBenchmarkPanel" />
                         </StackPanel>
                     </Border>
                 </StackPanel>

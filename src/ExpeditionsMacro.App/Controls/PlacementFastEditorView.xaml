@@ -1,7 +1,8 @@
 <UserControl x:Class="ExpeditionsMacro.App.Controls.PlacementFastEditorView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:icons="clr-namespace:ExpeditionsMacro.App.Controls">
+             xmlns:icons="clr-namespace:ExpeditionsMacro.App.Controls"
+             xmlns:models="clr-namespace:ExpeditionsMacro.App.Models">
     <UserControl.Resources>
         <DataTemplate x:Key="PlacementMarkerTemplate">
             <Canvas Width="66"
@@ -92,6 +93,8 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="6" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="6" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <Grid>
                         <TextBlock FontWeight="SemiBold"
@@ -109,8 +112,15 @@
                             <Run Text="{Binding Y, Mode=OneWay}" />
                         </TextBlock.Inlines>
                     </TextBlock>
+                    <StackPanel Grid.Row="4">
+                        <TextBlock Style="{StaticResource FieldLabel}"
+                                   Text="Targeting priority" />
+                        <ComboBox Margin="0,5,0,0"
+                                  ItemsSource="{x:Static models:PlacementStepRow.TargetingPriorities}"
+                                  SelectedItem="{Binding TargetingPriority, Mode=TwoWay}" />
+                    </StackPanel>
                     <StackPanel x:Name="StepAfterStartDelay"
-                                Grid.Row="4">
+                                Grid.Row="6">
                         <TextBlock Style="{StaticResource FieldLabel}"
                                    Text="After Start delay, s" />
                         <TextBox Margin="0,5,0,0"
@@ -188,7 +198,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="14" />
-                <ColumnDefinition Width="236" />
+                <ColumnDefinition Width="300" />
             </Grid.ColumnDefinitions>
 
             <Grid>
@@ -202,44 +212,69 @@
                         BorderThickness="1"
                         CornerRadius="5"
                         ClipToBounds="True">
-                    <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                  VerticalScrollBarVisibility="Auto">
-                        <Grid Width="808"
-                              Height="611"
-                              HorizontalAlignment="Center"
-                              VerticalAlignment="Center"
-                              Background="{DynamicResource RaisedBrush}">
-                            <Image x:Name="PlacementScreenshot"
-                                   Width="808"
-                                   Height="611"
-                                   Stretch="Fill" />
-                            <Canvas x:Name="PlacementCanvas"
-                                    Width="808"
-                                    Height="611"
-                                    Background="Transparent"
-                                    Cursor="Cross"
-                                    MouseLeftButtonDown="PlacementCanvas_MouseLeftButtonDown">
-                                <ItemsControl x:Name="PlacementMarkers"
-                                              Width="808"
-                                              Height="611"
-                                              ItemTemplate="{StaticResource PlacementMarkerTemplate}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <Canvas />
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemContainerStyle>
-                                        <Style TargetType="ContentPresenter">
-                                            <Setter Property="Canvas.Left"
-                                                    Value="{Binding X}" />
-                                            <Setter Property="Canvas.Top"
-                                                    Value="{Binding Y}" />
-                                        </Style>
-                                    </ItemsControl.ItemContainerStyle>
-                                </ItemsControl>
-                            </Canvas>
-                        </Grid>
-                    </ScrollViewer>
+                    <Grid>
+                        <ScrollViewer x:Name="PlacementScrollViewer"
+                                      HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Auto"
+                                      PreviewMouseWheel="PlacementScrollViewer_PreviewMouseWheel"
+                                      PreviewMouseDown="PlacementScrollViewer_PreviewMouseDown"
+                                      PreviewMouseMove="PlacementScrollViewer_PreviewMouseMove"
+                                      PreviewMouseUp="PlacementScrollViewer_PreviewMouseUp"
+                                      LostMouseCapture="PlacementScrollViewer_LostMouseCapture">
+                            <Grid x:Name="PlacementSurface"
+                                  Width="808"
+                                  Height="611"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center"
+                                  Background="{DynamicResource RaisedBrush}">
+                                <Grid.LayoutTransform>
+                                    <ScaleTransform x:Name="PlacementZoomTransform" />
+                                </Grid.LayoutTransform>
+                                <Image x:Name="PlacementScreenshot"
+                                       Width="808"
+                                       Height="611"
+                                       Stretch="Fill" />
+                                <Canvas x:Name="PlacementCanvas"
+                                        Width="808"
+                                        Height="611"
+                                        Background="Transparent"
+                                        Cursor="Cross"
+                                        MouseLeftButtonDown="PlacementCanvas_MouseLeftButtonDown">
+                                    <ItemsControl x:Name="PlacementMarkers"
+                                                  Width="808"
+                                                  Height="611"
+                                                  ItemTemplate="{StaticResource PlacementMarkerTemplate}">
+                                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><Canvas /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemContainerStyle>
+                                            <Style TargetType="ContentPresenter">
+                                                <Setter Property="Canvas.Left" Value="{Binding X}" />
+                                                <Setter Property="Canvas.Top" Value="{Binding Y}" />
+                                            </Style>
+                                        </ItemsControl.ItemContainerStyle>
+                                    </ItemsControl>
+                                </Canvas>
+                            </Grid>
+                        </ScrollViewer>
+                        <Border Margin="10"
+                                Padding="4"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Top"
+                                Background="{DynamicResource RaisedBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="5">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Style="{StaticResource IconButton}" Width="32" MinWidth="32" Height="32"
+                                        icons:Lucide.Icon="Minus" ToolTip="Zoom out" Click="ZoomOut_Click" />
+                                <Button x:Name="PlacementZoomButton" Margin="4,0" MinWidth="58" Height="32"
+                                        Content="100%"
+                                        ToolTip="Scroll to zoom. Hold the middle mouse button and drag to pan. Click to reset."
+                                        Click="ResetZoom_Click" />
+                                <Button Style="{StaticResource IconButton}" Width="32" MinWidth="32" Height="32"
+                                        icons:Lucide.Icon="Plus" ToolTip="Zoom in" Click="ZoomIn_Click" />
+                            </StackPanel>
+                        </Border>
+                    </Grid>
                 </Border>
 
                 <Border Grid.Row="2"
@@ -281,61 +316,24 @@
                                        Text="Unit slot" />
                             <StackPanel Margin="0,7,0,0"
                                         Orientation="Horizontal">
-                                <RadioButton x:Name="FastUnit1Button"
-                                             GroupName="PlacementUnit"
-                                             Style="{StaticResource PlacementChoiceButton}"
-                                             Width="42"
-                                             MinWidth="42"
-                                             Padding="0"
-                                             Content="1"
-                                             Tag="1"
-                                             IsChecked="True"
-                                             Checked="FastUnitButton_Checked" />
-                                <RadioButton x:Name="FastUnit2Button"
-                                             GroupName="PlacementUnit"
-                                             Style="{StaticResource PlacementChoiceButton}"
-                                             Width="42"
-                                             MinWidth="42"
-                                             Padding="0"
-                                             Content="2"
-                                             Tag="2"
-                                             Checked="FastUnitButton_Checked" />
-                                <RadioButton x:Name="FastUnit3Button"
-                                             GroupName="PlacementUnit"
-                                             Style="{StaticResource PlacementChoiceButton}"
-                                             Width="42"
-                                             MinWidth="42"
-                                             Padding="0"
-                                             Content="3"
-                                             Tag="3"
-                                             Checked="FastUnitButton_Checked" />
-                                <RadioButton x:Name="FastUnit4Button"
-                                             GroupName="PlacementUnit"
-                                             Style="{StaticResource PlacementChoiceButton}"
-                                             Width="42"
-                                             MinWidth="42"
-                                             Padding="0"
-                                             Content="4"
-                                             Tag="4"
-                                             Checked="FastUnitButton_Checked" />
-                                <RadioButton x:Name="FastUnit5Button"
-                                             GroupName="PlacementUnit"
-                                             Style="{StaticResource PlacementChoiceButton}"
-                                             Width="42"
-                                             MinWidth="42"
-                                             Padding="0"
-                                             Content="5"
-                                             Tag="5"
-                                             Checked="FastUnitButton_Checked" />
-                                <RadioButton x:Name="FastUnit6Button"
-                                             GroupName="PlacementUnit"
-                                             Style="{StaticResource PlacementChoiceButton}"
-                                             Width="42"
-                                             MinWidth="42"
-                                             Padding="0"
-                                             Content="6"
-                                             Tag="6"
-                                             Checked="FastUnitButton_Checked" />
+                                <RadioButton x:Name="FastUnit1Button" GroupName="PlacementUnit"
+                                             Style="{StaticResource PlacementChoiceButton}" Width="42" MinWidth="42"
+                                             Padding="0" Content="1" Tag="1" IsChecked="True" Checked="FastUnitButton_Checked" />
+                                <RadioButton x:Name="FastUnit2Button" GroupName="PlacementUnit"
+                                             Style="{StaticResource PlacementChoiceButton}" Width="42" MinWidth="42"
+                                             Padding="0" Content="2" Tag="2" Checked="FastUnitButton_Checked" />
+                                <RadioButton x:Name="FastUnit3Button" GroupName="PlacementUnit"
+                                             Style="{StaticResource PlacementChoiceButton}" Width="42" MinWidth="42"
+                                             Padding="0" Content="3" Tag="3" Checked="FastUnitButton_Checked" />
+                                <RadioButton x:Name="FastUnit4Button" GroupName="PlacementUnit"
+                                             Style="{StaticResource PlacementChoiceButton}" Width="42" MinWidth="42"
+                                             Padding="0" Content="4" Tag="4" Checked="FastUnitButton_Checked" />
+                                <RadioButton x:Name="FastUnit5Button" GroupName="PlacementUnit"
+                                             Style="{StaticResource PlacementChoiceButton}" Width="42" MinWidth="42"
+                                             Padding="0" Content="5" Tag="5" Checked="FastUnitButton_Checked" />
+                                <RadioButton x:Name="FastUnit6Button" GroupName="PlacementUnit"
+                                             Style="{StaticResource PlacementChoiceButton}" Width="42" MinWidth="42"
+                                             Padding="0" Content="6" Tag="6" Checked="FastUnitButton_Checked" />
                             </StackPanel>
                         </StackPanel>
                         <StackPanel>

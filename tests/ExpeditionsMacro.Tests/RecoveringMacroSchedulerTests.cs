@@ -242,6 +242,80 @@ public sealed class RecoveringMacroSchedulerTests
     }
 
     [Fact]
+    public async Task StartupRestart_RunsOnceBeforePreflightAndTask()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            AppPaths paths = new(root);
+            MacroPlanRepository plans = new(paths);
+            MacroTaskDefinition task = new()
+            {
+                Id = "event-1",
+                Kind = MacroTaskKind.Event,
+                PresetId = "event-act-1",
+                Name = "Event Act 1",
+                Priority = 1,
+                TargetVictories = 1,
+            };
+            MacroPlan plan = new()
+            {
+                Id = "startup-restart",
+                Name = "Startup restart",
+                Tasks = [task],
+            };
+            List<string> order = [];
+            FakeRecovery recovery = new(
+                () => order.Add("restart"));
+            RecoveringMacroScheduler scheduler = new(
+                new MacroScheduler(plans),
+                plans,
+                recovery);
+            RobloxPrivateServerLaunchTarget target =
+                RobloxPrivateServerLaunchTarget.Parse(
+                    "https://www.roblox.com/share?code=Test_Server_123&type=Server");
+            using CancellationTokenSource cancellation = new();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                scheduler.RunAsync(
+                    plan,
+                    restartTarget: null,
+                    (_, _, _) =>
+                    {
+                        order.Add("task");
+                        return Task.FromResult(
+                            new ScheduledTaskResult(
+                                1,
+                                0,
+                                TimeSpan.FromMinutes(2)));
+                    },
+                    planChanged: saved =>
+                    {
+                        if (saved.ProgressFor(task.Id).Completed)
+                        {
+                            cancellation.Cancel();
+                        }
+                    },
+                    cancellationToken: cancellation.Token,
+                    prepareSession: _ =>
+                    {
+                        order.Add("preflight");
+                        return Task.CompletedTask;
+                    },
+                    startupRestartTarget: target));
+
+            Assert.Equal(
+                ["restart", "preflight", "task"],
+                order);
+            Assert.Equal(1, recovery.Restarts);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Fact]
     public async Task UiFailureWithoutConfiguredRejoinTarget_StopsSafely()
     {
         string root = TestPaths.NewTemporaryDirectory();
@@ -289,6 +363,13 @@ public sealed class RecoveringMacroSchedulerTests
 
     private sealed class FakeRecovery : IRobloxRuntimeRecoveryService
     {
+        private readonly Action? _onRestart;
+
+        public FakeRecovery(Action? onRestart = null)
+        {
+            _onRestart = onRestart;
+        }
+
         public int Restarts { get; private set; }
 
         public Task LaunchAsync(
@@ -303,6 +384,7 @@ public sealed class RecoveringMacroSchedulerTests
             CancellationToken cancellationToken = default)
         {
             Restarts++;
+            _onRestart?.Invoke();
             return Task.FromResult(
                 new RobloxWindow(
                     1,

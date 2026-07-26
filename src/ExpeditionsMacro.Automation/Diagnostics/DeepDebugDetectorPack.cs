@@ -26,6 +26,23 @@ public sealed class DeepDebugDetectorPack : IDetectorPack
         return scores;
     }
 
+    public IReadOnlyDictionary<string, double> ScoreStates(
+        ImageFrame clientImage,
+        IReadOnlyCollection<string> states)
+    {
+        IReadOnlyDictionary<string, double> scores =
+            _inner.ScoreStates(clientImage, states);
+        _debug.RecordEvent(
+            "detector",
+            "state_scores",
+            new
+            {
+                Requested = states,
+                Scores = scores,
+            });
+        return scores;
+    }
+
     public string? Classify(IReadOnlyDictionary<string, double> scores)
     {
         string? state = _inner.Classify(scores);
@@ -37,6 +54,16 @@ public sealed class DeepDebugDetectorPack : IDetectorPack
     {
         string? state = _inner.RecoveryState(clientImage);
         _debug.RecordEvent("detector", "recovery_state", new { State = state });
+        return state;
+    }
+
+    public string? RootRecoveryState(ImageFrame clientImage)
+    {
+        string? state = _inner.RootRecoveryState(clientImage);
+        _debug.RecordEvent(
+            "detector",
+            "root_recovery_state",
+            new { State = state });
         return state;
     }
 

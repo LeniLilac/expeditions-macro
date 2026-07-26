@@ -136,7 +136,6 @@ public sealed partial class EventMacroRunner
                     window,
                     preset,
                     detector,
-                    playMenuKey,
                     cancellationToken).ConfigureAwait(false);
             }
             else

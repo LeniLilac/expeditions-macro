@@ -49,6 +49,23 @@ public sealed class FastNoAlignShareTests
                         RuntimeSeconds = 720,
                     },
                 ],
+                Loop = new MacroPlanLoopDefinition
+                {
+                    StartTaskId =
+                        "expedition-task",
+                    StopTaskId =
+                        "expedition-task",
+                    TotalRuns = 4,
+                },
+                LoopProgress =
+                    new MacroPlanLoopProgress
+                    {
+                        ConfigurationSignature =
+                            "saved-run",
+                        Phase =
+                            MacroPlanLoopPhase.Loop,
+                        CompletedRuns = 2,
+                    },
             };
 
             FastNoAlignShareService exporter =
@@ -71,6 +88,11 @@ public sealed class FastNoAlignShareTests
             FastNoAlignShareBundle bundle =
                 exporter.Read(code);
             Assert.Empty(bundle.Plan.Progress);
+            Assert.True(
+                bundle.Plan.LoopProgress.IsEmpty);
+            Assert.Equal(
+                4,
+                bundle.Plan.Loop?.TotalRuns);
             Assert.Equal(10,
                 bundle.Plan.Tasks[0].TargetVictories);
             Assert.Equal(3,
@@ -92,6 +114,13 @@ public sealed class FastNoAlignShareTests
                 Assert.Single(
                     bundle.PlacementSetups)
                     .DefaultAfterStartDelayMilliseconds);
+            Assert.Equal(
+                UnitTargetingPriority.Strongest,
+                Assert.Single(
+                    Assert.Single(
+                        bundle.PlacementSetups)
+                        .Steps)
+                    .TargetingPriority);
 
             FastNoAlignShareService importer =
                 Service(destinationRoot);
@@ -109,6 +138,11 @@ public sealed class FastNoAlignShareTests
                     .LoadAsync(setup.Id)
                 ?? throw new InvalidOperationException();
             Assert.Empty(importedPlan.Progress);
+            Assert.True(
+                importedPlan.LoopProgress.IsEmpty);
+            Assert.Equal(
+                4,
+                importedPlan.Loop?.TotalRuns);
             Assert.Equal(7, importedSetup.TeamSlot);
             Assert.Equal(
                 1250,
@@ -118,6 +152,10 @@ public sealed class FastNoAlignShareTests
                 42_000,
                 importedSetup
                     .DefaultAfterStartDelayMilliseconds);
+            Assert.Equal(
+                UnitTargetingPriority.Strongest,
+                Assert.Single(importedSetup.Steps)
+                    .TargetingPriority);
             Assert.Equal(
                 PlacementSetupCatalog.IdFor(target),
                 importedSetup.Id);
@@ -427,6 +465,8 @@ public sealed class FastNoAlignShareTests
                     Y = 300,
                     DelayAfterMilliseconds = 900,
                     Phase = PlacementPhase.BeforeStart,
+                    TargetingPriority =
+                        UnitTargetingPriority.Strongest,
                 },
             ],
             CreatedAt = DateTimeOffset.UtcNow,

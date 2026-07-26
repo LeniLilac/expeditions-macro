@@ -20,6 +20,7 @@ internal sealed record DeepDebugSanitizedSettings(
     DateTimeOffset? LastDetectorUpdateCheck,
     bool MinimizeDuringAutomation,
     bool RestartRobloxWithPrivateServer,
+    bool RestartRobloxAtMacroStart,
     bool PrivateServerLinkConfigured,
     int MacroHotkeyVirtualKey,
     int ShiftLockVirtualKey,
@@ -27,6 +28,9 @@ internal sealed record DeepDebugSanitizedSettings(
     string UnitMenuKey,
     string AreasMenuKey,
     string CancelPlacementKey,
+    string ChangeUnitTargetingKey,
+    string UpgradeUnitKey,
+    string ToggleAutoUpgradeUnitKey,
     ResourceRefuelDebugSettings ResourceRefuelDebug)
 {
     public static DeepDebugSanitizedSettings From(
@@ -48,6 +52,7 @@ internal sealed record DeepDebugSanitizedSettings(
         settings.LastDetectorUpdateCheck,
         settings.MinimizeDuringAutomation,
         settings.RestartRobloxWithPrivateServer,
+        settings.RestartRobloxAtMacroStart,
         !string.IsNullOrWhiteSpace(
             settings.EncryptedPrivateServerLink),
         settings.MacroHotkeyVirtualKey,
@@ -56,5 +61,8 @@ internal sealed record DeepDebugSanitizedSettings(
         settings.UnitMenuKey,
         settings.AreasMenuKey,
         settings.CancelPlacementKey,
+        settings.ChangeUnitTargetingKey,
+        settings.UpgradeUnitKey,
+        settings.ToggleAutoUpgradeUnitKey,
         settings.ResourceRefuelDebug);
 }

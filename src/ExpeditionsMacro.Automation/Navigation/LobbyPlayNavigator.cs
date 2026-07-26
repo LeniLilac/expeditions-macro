@@ -8,7 +8,7 @@ public sealed class PlayMenuBindingException : InvalidOperationException
         : base(
             $"The Play interface did not open with {key}.\n\n" +
             $"Open Anime Expeditions Settings > Keybinds, set Toggle Play Menu to {key}, and try again. " +
-            "The Play menu key under Expeditions Macro Settings > Controls must use the same letter.")
+            "The Toggle Play Menu key under Expeditions Macro Settings > Controls must use the same letter.")
     {
         Key = key;
     }

@@ -137,15 +137,21 @@
                             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
                             <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Global hotkey" /><TextBlock x:Name="HotkeyText" HorizontalAlignment="Right" /></Grid>
                             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
-                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Play menu key" /><TextBlock x:Name="PlayMenuKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Play Menu key" /><TextBlock x:Name="PlayMenuKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
                             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
-                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Unit menu key" /><TextBlock x:Name="UnitMenuKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Unit Inventory key" /><TextBlock x:Name="UnitMenuKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
                             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
-                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Areas menu key" /><TextBlock x:Name="AreasMenuKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Areas Menu key" /><TextBlock x:Name="AreasMenuKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
                             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
-                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Placement cancel key" /><TextBlock x:Name="CancelPlacementKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Cancel Unit Placement key" /><TextBlock x:Name="CancelPlacementKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
                             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
-                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Shift Lock key" /><TextBlock x:Name="ShiftLockKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Change Unit Targeting key" /><TextBlock x:Name="TargetingKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Upgrade Unit key" /><TextBlock x:Name="UpgradeUnitKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Auto Upgrade Unit key" /><TextBlock x:Name="AutoUpgradeUnitKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Shift Lock key" /><TextBlock x:Name="ShiftLockKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
                             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
                             <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Runtime" /><TextBlock HorizontalAlignment="Right" Text=".NET 10, Windows x64" /></Grid>
                         </StackPanel>

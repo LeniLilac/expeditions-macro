@@ -36,11 +36,26 @@ public sealed class RecoveringMacroScheduler
         Func<Exception, CancellationToken, Task>?
             recoverableFailure = null,
         Func<CancellationToken, Task>?
-            prepareSession = null)
+            prepareSession = null,
+        RobloxPrivateServerLaunchTarget?
+            startupRestartTarget = null)
     {
         MacroPlan plan = initialPlan;
         RobloxRestartCircuitBreaker circuitBreaker = new();
         bool operationPrepared = false;
+        if (startupRestartTarget is not null)
+        {
+            log?.Invoke(new MacroEvent(
+                DateTimeOffset.Now,
+                MacroEventLevel.Information,
+                "Macro start is establishing a fresh private-server Lobby before navigation.",
+                "roblox_startup_restart"));
+            await _recovery.RestartAsync(
+                startupRestartTarget,
+                progress,
+                log,
+                cancellationToken).ConfigureAwait(false);
+        }
         while (true)
         {
             try

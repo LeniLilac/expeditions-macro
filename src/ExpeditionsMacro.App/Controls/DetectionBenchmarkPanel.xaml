@@ -1,0 +1,101 @@
+<UserControl x:Class="ExpeditionsMacro.App.Controls.DetectionBenchmarkPanel"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:icons="clr-namespace:ExpeditionsMacro.App.Controls">
+    <StackPanel>
+        <Border Height="1"
+                Margin="0,18,0,18"
+                Background="{DynamicResource BorderBrush}" />
+        <TextBlock Style="{StaticResource SectionTitle}"
+                   Text="Performance benchmark" />
+        <TextBlock Margin="0,14,0,0"
+                   Style="{StaticResource FieldLabel}"
+                   Text="Detection path" />
+        <ComboBox x:Name="ModeCombo"
+                  Margin="0,7,0,0"
+                  DisplayMemberPath="Label" />
+        <Grid Margin="0,12,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="92" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Style="{StaticResource FieldLabel}"
+                           Text="Samples" />
+                <TextBox x:Name="SamplesText"
+                         Margin="0,7,0,0"
+                         Text="12" />
+            </StackPanel>
+            <Button x:Name="RunButton"
+                    Grid.Column="1"
+                    Margin="10,22,0,0"
+                    HorizontalAlignment="Right"
+                    Style="{StaticResource PrimaryButton}"
+                    icons:Lucide.Icon="ScanLine"
+                    Content="Run benchmark"
+                    Click="Run_Click" />
+        </Grid>
+        <TextBlock x:Name="StatusText"
+                   Margin="0,10,0,0"
+                   Style="{StaticResource Caption}"
+                   TextWrapping="Wrap"
+                   Visibility="Collapsed" />
+        <Grid x:Name="ResultsGrid"
+              Margin="0,14,0,0"
+              Visibility="Collapsed">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Style="{StaticResource Caption}"
+                       Text="Capture &amp; logging" />
+            <TextBlock x:Name="CaptureResult"
+                       Grid.Column="1"
+                       Foreground="{DynamicResource TextBrush}" />
+            <TextBlock Grid.Row="1"
+                       Margin="0,6,0,0"
+                       Style="{StaticResource Caption}"
+                       Text="Mode detection" />
+            <TextBlock x:Name="ModeResult"
+                       Grid.Row="1"
+                       Grid.Column="1"
+                       Margin="0,6,0,0"
+                       Foreground="{DynamicResource TextBrush}" />
+            <TextBlock Grid.Row="2"
+                       Margin="0,6,0,0"
+                       Style="{StaticResource Caption}"
+                       Text="Root recovery" />
+            <TextBlock x:Name="RecoveryResult"
+                       Grid.Row="2"
+                       Grid.Column="1"
+                       Margin="0,6,0,0"
+                       Foreground="{DynamicResource TextBrush}" />
+            <TextBlock Grid.Row="3"
+                       Margin="0,6,0,0"
+                       Style="{StaticResource Caption}"
+                       Text="Total work" />
+            <TextBlock x:Name="TotalResult"
+                       Grid.Row="3"
+                       Grid.Column="1"
+                       Margin="0,6,0,0"
+                       Foreground="{DynamicResource TextBrush}" />
+            <TextBlock Grid.Row="4"
+                       Margin="0,8,0,0"
+                       Style="{StaticResource Caption}"
+                       Text="Production rate" />
+            <TextBlock x:Name="RateResult"
+                       Grid.Row="4"
+                       Grid.Column="1"
+                       Margin="0,8,0,0"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource SuccessBrush}" />
+        </Grid>
+    </StackPanel>
+</UserControl>

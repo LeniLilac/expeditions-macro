@@ -23,6 +23,7 @@ public partial class DebugPage : UserControl, IAppPage
     {
         _services = services;
         InitializeComponent();
+        DetectionBenchmarkPanel.Initialize(_services);
         TimelineList.ItemsSource = _timeline;
         NavigationStartCombo.ItemsSource = new[]
         {
@@ -142,7 +143,7 @@ public partial class DebugPage : UserControl, IAppPage
     {
         UpdateLayout();
         FrameworkElement? target = showUtilities
-            ? UtilitiesCard
+            ? DetectionBenchmarkPanel
             : showRefuel
                 ? RefuelCard
                 : null;

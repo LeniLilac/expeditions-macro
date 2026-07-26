@@ -59,6 +59,8 @@ public partial class ChallengesPage
                     _services.Settings.AreasMenuKey,
                     _services.Settings
                         .ShiftLockVirtualKey);
+            _ = AppSettings.ParseRequiredUnitActionKeys(
+                _services.Settings);
             if (!DiscordWebhookClient
                     .ValidateWebhookUrl(webhook))
             {
@@ -98,7 +100,7 @@ public partial class ChallengesPage
                     AppSettings
                         .PlayMenuKeySetupInstructions ||
                  error.Message.StartsWith(
-                     "The Play menu key",
+                     "The Toggle Play Menu key",
                      StringComparison.Ordinal)))
             {
                 MessageBox.Show(

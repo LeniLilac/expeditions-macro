@@ -30,9 +30,33 @@ public interface IDetectorPack
 
     IReadOnlyDictionary<string, double> ScoreStates(ExpeditionsMacro.Core.Imaging.ImageFrame clientImage);
 
+    IReadOnlyDictionary<string, double> ScoreStates(
+        ExpeditionsMacro.Core.Imaging.ImageFrame clientImage,
+        IReadOnlyCollection<string> states)
+    {
+        ArgumentNullException.ThrowIfNull(states);
+        IReadOnlyDictionary<string, double> scores =
+            ScoreStates(clientImage);
+        return states
+            .Where(scores.ContainsKey)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                state => state,
+                state => scores[state],
+                StringComparer.OrdinalIgnoreCase);
+    }
+
     string? Classify(IReadOnlyDictionary<string, double> scores);
 
     string? RecoveryState(ExpeditionsMacro.Core.Imaging.ImageFrame clientImage);
+
+    string? RootRecoveryState(ExpeditionsMacro.Core.Imaging.ImageFrame clientImage)
+    {
+        string? state = RecoveryState(clientImage);
+        return state is "afk" or "disconnect" or "lobby"
+            ? state
+            : null;
+    }
 
     string? CurrentNodeType(ExpeditionsMacro.Core.Imaging.ImageFrame clientImage);
 

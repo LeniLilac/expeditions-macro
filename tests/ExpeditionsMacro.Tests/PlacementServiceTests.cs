@@ -4,6 +4,8 @@ using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
+using ExpeditionsMacro.Core.Runtime;
+using ExpeditionsMacro.Vision.Infrastructure;
 
 namespace ExpeditionsMacro.Tests;
 
@@ -46,7 +48,8 @@ public sealed class PlacementServiceTests
                 automation,
                 new FakeCaptureService(automation),
                 new PlacementModelRepository(
-                    new AppPaths(root)));
+                    new AppPaths(root)),
+                () => 'T');
             PlacementModel model = new()
             {
                 Id = "playback",
@@ -61,6 +64,8 @@ public sealed class PlacementServiceTests
                         X = 320,
                         Y = 280,
                         DelayAfterMilliseconds = 0,
+                        TargetingPriority =
+                            UnitTargetingPriority.Strongest,
                     },
                 ],
                 CreatedAt = DateTimeOffset.UtcNow,
@@ -75,34 +80,24 @@ public sealed class PlacementServiceTests
 
             Assert.Equal(
                 [
-                    "hover:320,280:2",
                     "key:4",
                     "letter:Z",
-                    "click-retain:320,280",
                     "key:4",
-                    "hover:320,280:2",
+                    "key:4",
+                    "key:4",
+                    "move:270,280->320,280:200",
                     "click-retain:320,280",
-                    "click-retain:320,280",
-                    "click:320,280",
+                    "letter:T",
+                    "letter:T",
+                    "letter:T",
                 ],
                 automation.InputActions);
             Assert.NotNull(automation.TargetPrimedAt);
-            Assert.NotNull(automation.ClickedAt);
-            Assert.True(
-                automation.ClickedAt -
-                automation.TargetPrimedAt >=
-                TimeSpan.FromMilliseconds(380));
-            Assert.Equal(
-                4,
-                automation.ClickTimes.Count);
-            Assert.True(
-                automation.ClickTimes[2] -
-                automation.ClickTimes[1] >=
-                TimeSpan.FromMilliseconds(90));
-            Assert.True(
-                automation.ClickTimes[3] -
-                automation.ClickTimes[2] >=
-                TimeSpan.FromMilliseconds(90));
+            Assert.Single(
+                automation.ClickTimes);
+            Assert.DoesNotContain(
+                "park",
+                automation.InputActions);
         }
         finally
         {
@@ -112,6 +107,297 @@ public sealed class PlacementServiceTests
             }
         }
     }
+
+    [Fact]
+    public async Task Playback_RetriesOnlyClickWhenSelectedPanelIsAbsent()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            ImageFrame negative = ImageCodec.Load(
+                Path.Combine(
+                    TestPaths.StageDatasets,
+                    "SelectedUnitPanelHoverNegative_01.png"));
+            ImageFrame positive = ImageCodec.Load(
+                Path.Combine(
+                    TestPaths.StageDatasets,
+                    "SelectedUnitPanel_01.png"));
+            FakeAutomation automation = new(
+                Enumerable.Repeat(negative, 8)
+                    .Concat([positive, positive])
+                    .ToArray());
+            PlacementService service = new(
+                automation,
+                new FakeCaptureService(automation),
+                new PlacementModelRepository(
+                    new AppPaths(root)),
+                () => 'T');
+            PlacementModel model = ModelWithSteps(
+                new PlacementStep
+                {
+                    UnitKey = 2,
+                    X = 320,
+                    Y = 280,
+                    DelayAfterMilliseconds = 0,
+                });
+
+            await service.PlayAsync(
+                model,
+                useDefaultInterval: true,
+                defaultIntervalMilliseconds: 0,
+                keyHoldMilliseconds: 0,
+                afterKeyMilliseconds: 0);
+
+            Assert.Equal(
+                4,
+                automation.InputActions.Count(
+                    action => action == "key:2"));
+            Assert.Equal(
+                2,
+                automation.InputActions.Count(
+                    action =>
+                        action == "click-retain:320,280"));
+            Assert.Equal(
+                2,
+                automation.InputActions.Count(
+                    action =>
+                        action ==
+                        "move:270,280->320,280:200"));
+            Assert.Single(
+                automation.InputActions,
+                action => action == "letter:Z");
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task Playback_AcceptsPanelAtTimeoutBoundaryWithoutAnotherClick()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            ImageFrame negative = ImageCodec.Load(
+                Path.Combine(
+                    TestPaths.StageDatasets,
+                    "SelectedUnitPanelHoverNegative_01.png"));
+            ImageFrame positive = ImageCodec.Load(
+                Path.Combine(
+                    TestPaths.StageDatasets,
+                    "SelectedUnitPanel_01.png"));
+            FakeAutomation automation = new(
+                Enumerable.Repeat(negative, 7)
+                    .Concat([positive, positive])
+                    .ToArray());
+            PlacementService service = new(
+                automation,
+                new FakeCaptureService(automation),
+                new PlacementModelRepository(
+                    new AppPaths(root)),
+                () => 'T');
+
+            await service.PlayAsync(
+                ModelWithSteps(
+                    new PlacementStep
+                    {
+                        UnitKey = 2,
+                        X = 320,
+                        Y = 280,
+                        DelayAfterMilliseconds = 0,
+                    }),
+                useDefaultInterval: true,
+                defaultIntervalMilliseconds: 0,
+                keyHoldMilliseconds: 0,
+                afterKeyMilliseconds: 0);
+
+            Assert.Equal(
+                1,
+                automation.InputActions.Count(
+                    action =>
+                        action == "click-retain:320,280"));
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Theory]
+    [InlineData(UnitTargetingPriority.First, 0)]
+    [InlineData(UnitTargetingPriority.None, 8)]
+    public async Task Playback_AppliesConfiguredTargetingTapCount(
+        UnitTargetingPriority priority,
+        int expectedTaps)
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            FakeAutomation automation = new();
+            PlacementService service = new(
+                automation,
+                new FakeCaptureService(automation),
+                new PlacementModelRepository(
+                    new AppPaths(root)),
+                () => 'T');
+
+            await service.PlayAsync(
+                ModelWithSteps(
+                    new PlacementStep
+                    {
+                        UnitKey = 1,
+                        X = 320,
+                        Y = 280,
+                        DelayAfterMilliseconds = 0,
+                        TargetingPriority = priority,
+                    }),
+                useDefaultInterval: true,
+                defaultIntervalMilliseconds: 0,
+                keyHoldMilliseconds: 0,
+                afterKeyMilliseconds: 0);
+
+            Assert.Equal(
+                expectedTaps,
+                automation.InputActions.Count(
+                    action => action == "letter:T"));
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task Playback_ParksOnlyBetweenCompletePlacementSequences()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            FakeAutomation automation = new();
+            PlacementService service = new(
+                automation,
+                new FakeCaptureService(automation),
+                new PlacementModelRepository(
+                    new AppPaths(root)),
+                () => 'T');
+            PlacementModel model = ModelWithSteps(
+                new PlacementStep
+                {
+                    UnitKey = 1,
+                    X = 300,
+                    Y = 280,
+                    DelayAfterMilliseconds = 0,
+                },
+                new PlacementStep
+                {
+                    UnitKey = 2,
+                    X = 340,
+                    Y = 280,
+                    DelayAfterMilliseconds = 0,
+                });
+
+            await service.PlayAsync(
+                model,
+                useDefaultInterval: true,
+                defaultIntervalMilliseconds: 0,
+                keyHoldMilliseconds: 0,
+                afterKeyMilliseconds: 0);
+
+            Assert.Equal(
+                1,
+                automation.InputActions.Count(
+                    action => action == "park"));
+            int park = automation.InputActions.IndexOf(
+                "park");
+            Assert.True(
+                park >
+                automation.InputActions.IndexOf(
+                    "click-retain:300,280"));
+            Assert.True(
+                park <
+                automation.InputActions.IndexOf(
+                    "move:290,280->340,280:200"));
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task Playback_StopsAfterEightUnconfirmedClicks()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            ImageFrame negative = ImageCodec.Load(
+                Path.Combine(
+                    TestPaths.StageDatasets,
+                    "SelectedUnitPanelHoverNegative_01.png"));
+            FakeAutomation automation = new(negative);
+            PlacementService service = new(
+                automation,
+                new FakeCaptureService(automation),
+                new PlacementModelRepository(
+                    new AppPaths(root)),
+                () => 'T');
+            PlacementModel model = ModelWithSteps(
+                new PlacementStep
+                {
+                    UnitKey = 6,
+                    X = 320,
+                    Y = 280,
+                    DelayAfterMilliseconds = 0,
+                });
+
+            RobloxUiUnavailableException error =
+                await Assert.ThrowsAsync<
+                    RobloxUiUnavailableException>(
+                    () => service.PlayAsync(
+                        model,
+                        useDefaultInterval: true,
+                        defaultIntervalMilliseconds: 0,
+                        keyHoldMilliseconds: 0,
+                        afterKeyMilliseconds: 0));
+
+            Assert.Contains(
+                "after 8 click attempts",
+                error.Message,
+                StringComparison.Ordinal);
+            Assert.Equal(
+                4,
+                automation.InputActions.Count(
+                    action => action == "key:6"));
+            Assert.Equal(
+                8,
+                automation.InputActions.Count(
+                    action =>
+                        action == "click-retain:320,280"));
+            Assert.DoesNotContain(
+                "letter:T",
+                automation.InputActions);
+            Assert.DoesNotContain(
+                "park",
+                automation.InputActions);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    private static PlacementModel ModelWithSteps(
+        params PlacementStep[] steps) =>
+        new()
+        {
+            Id = "playback",
+            Name = "Playback",
+            ClientWidth = 808,
+            ClientHeight = 611,
+            Steps = steps,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
 
     private sealed class FakeCaptureService(FakeAutomation automation) : IPlacementCaptureService
     {
@@ -135,6 +421,19 @@ public sealed class PlacementServiceTests
     {
         private readonly RobloxWindow _window = new((nint)42, "Roblox");
         private ClientBounds _client = new(100, 120, 800, 599);
+        private readonly IReadOnlyList<ImageFrame> _captures;
+        private int _captureIndex;
+
+        public FakeAutomation(
+            params ImageFrame[] captures)
+        {
+            _captures = captures.Length == 0
+                ? [ImageCodec.Load(
+                    Path.Combine(
+                        TestPaths.StageDatasets,
+                        "SelectedUnitPanel_01.png"))]
+                : captures;
+        }
 
         public (int Width, int Height)? ResizeRequest { get; private set; }
 
@@ -169,7 +468,15 @@ public sealed class PlacementServiceTests
 
         public ImageFrame CaptureScreen(ScreenRegion region) => throw new NotSupportedException();
 
-        public ImageFrame CaptureClient(RobloxWindow window) => throw new NotSupportedException();
+        public ImageFrame CaptureClient(RobloxWindow window)
+        {
+            ImageFrame frame = _captures[
+                Math.Min(
+                    _captureIndex,
+                    _captures.Count - 1)];
+            _captureIndex++;
+            return frame;
+        }
 
         public Task MoveCursorToClientCenterAsync(RobloxWindow window, CancellationToken cancellationToken) => Task.CompletedTask;
 
@@ -186,7 +493,28 @@ public sealed class PlacementServiceTests
             return Task.CompletedTask;
         }
 
-        public Task ParkCursorAsync(RobloxWindow window, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task MoveCursorBetweenClientPointsAsync(
+            RobloxWindow window,
+            int startX,
+            int startY,
+            int endX,
+            int endY,
+            int durationMilliseconds,
+            CancellationToken cancellationToken)
+        {
+            InputActions.Add(
+                $"move:{startX},{startY}->{endX},{endY}:{durationMilliseconds}");
+            TargetPrimedAt = DateTimeOffset.UtcNow;
+            return Task.CompletedTask;
+        }
+
+        public Task ParkCursorAsync(
+            RobloxWindow window,
+            CancellationToken cancellationToken)
+        {
+            InputActions.Add("park");
+            return Task.CompletedTask;
+        }
 
         public Task ClickClientAsync(
             RobloxWindow window,
