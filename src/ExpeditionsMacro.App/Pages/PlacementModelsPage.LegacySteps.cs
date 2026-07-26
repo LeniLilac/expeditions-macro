@@ -25,13 +25,19 @@ public partial class PlacementModelsPage
 
     private void RemoveRow_Click(
         object sender,
-        RoutedEventArgs e)
+        RoutedEventArgs e) =>
+        RemoveSelectedPlacementStep();
+
+    private bool RemoveSelectedPlacementStep()
     {
         if (ActiveStepsSelector.SelectedItem is
             PlacementStepRow row)
         {
             _steps.Remove(row);
+            return true;
         }
+
+        return false;
     }
 
     private void MoveUp_Click(

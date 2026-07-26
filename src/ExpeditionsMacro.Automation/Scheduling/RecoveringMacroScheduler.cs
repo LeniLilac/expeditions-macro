@@ -40,14 +40,16 @@ public sealed class RecoveringMacroScheduler
     {
         MacroPlan plan = initialPlan;
         RobloxRestartCircuitBreaker circuitBreaker = new();
+        bool operationPrepared = false;
         while (true)
         {
             try
             {
-                if (prepareSession is not null)
+                if (!operationPrepared && prepareSession is not null)
                 {
                     await prepareSession(
                         cancellationToken).ConfigureAwait(false);
+                    operationPrepared = true;
                 }
                 await _scheduler.RunAsync(
                     plan,

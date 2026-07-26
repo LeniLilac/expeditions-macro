@@ -37,11 +37,13 @@ public sealed class StageScreenDetectorTests
     [InlineData("StoryVictory_Act_01.png", StageScreenState.Victory)]
     [InlineData("StoryVictory_Mastery_01.png", StageScreenState.Victory)]
     [InlineData("StoryVictory_Mastery_Current_02.png", StageScreenState.Victory)]
+    [InlineData("StoryVictory_NextStage_Current_03.png", StageScreenState.Victory)]
     [InlineData("StoryDefeat_Act_01.png", StageScreenState.Defeat)]
     [InlineData("StoryDefeat_Infinite_01.png", StageScreenState.Defeat)]
     [InlineData("StoryDefeat_Mastery_01.png", StageScreenState.Defeat)]
     [InlineData("RaidVictory_01.png", StageScreenState.Victory)]
     [InlineData("RaidVictory_CompactActions_01.png", StageScreenState.Victory)]
+    [InlineData("RaidVictory_NextStage_Current_02.png", StageScreenState.Victory)]
     [InlineData("RaidDefeat_01.png", StageScreenState.Defeat)]
     [InlineData("GameModeNegative_01.png", StageScreenState.GameModeSelector)]
     public void ReviewedStageFixtures_MatchTheirExpectedState(string fileName, StageScreenState expected)
@@ -208,6 +210,8 @@ public sealed class StageScreenDetectorTests
     [Theory]
     [InlineData("StoryVictory_Mastery_Current_02.png", StageScreenState.Victory, 210, 240, 420, 452)]
     [InlineData("RaidVictory_CompactActions_01.png", StageScreenState.Victory, 290, 320, 420, 452)]
+    [InlineData("StoryVictory_NextStage_Current_03.png", StageScreenState.Victory, 290, 320, 420, 452)]
+    [InlineData("RaidVictory_NextStage_Current_02.png", StageScreenState.Victory, 290, 320, 420, 452)]
     [InlineData("StoryDefeat_Mastery_01.png", StageScreenState.Defeat, 190, 225, 420, 455)]
     [InlineData("RaidDefeat_01.png", StageScreenState.Defeat, 190, 225, 420, 455)]
     public void TerminalScreens_MapTheLiveRepeatStageControl(

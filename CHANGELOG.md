@@ -4,6 +4,21 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.27] - 2026-07-26
+
+### Added
+
+- Placement Setup and the legacy placement editor now accept the keyboard `Delete` key to remove the selected placement step while preserving ordinary Delete behavior inside editable fields.
+
+### Changed
+
+- UI Scale and required game-settings normalization now runs once per top-level macro start. After that startup check succeeds, ordinary Lobby returns and private-server process recovery resume the incomplete task without changing settings again; recovery may retry only an initial preflight that never completed.
+
+### Tests
+
+- Added current Story and Raid Victory fixtures with separate **Next Stage**, **Repeat Stage**, and **View Party** actions, proving both modes still detect Victory and select the live Repeat Stage control.
+- Added recovery coverage proving a successful startup preflight is not repeated after Roblox is restarted and the saved plan is reloaded.
+
 ## [1.3.0-beta.26] - 2026-07-25
 
 ### Added
@@ -834,7 +849,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.26...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.27...HEAD
+[1.3.0-beta.27]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.26...v1.3.0-beta.27
 [1.3.0-beta.26]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.25...v1.3.0-beta.26
 [1.3.0-beta.25]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.24...v1.3.0-beta.25
 [1.3.0-beta.24]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.23...v1.3.0-beta.24

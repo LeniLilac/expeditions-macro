@@ -11,10 +11,20 @@ public partial class PlacementModelsPage
         object sender,
         KeyEventArgs e)
     {
-        if (FastEditorPanel.Visibility != Visibility.Visible ||
-            Keyboard.Modifiers != ModifierKeys.None ||
+        if (Keyboard.Modifiers != ModifierKeys.None ||
             Keyboard.FocusedElement is TextBoxBase or
                 PasswordBox or ComboBox)
+        {
+            return;
+        }
+
+        if (e.Key == Key.Delete)
+        {
+            e.Handled = RemoveSelectedPlacementStep();
+            return;
+        }
+
+        if (FastEditorPanel.Visibility != Visibility.Visible)
         {
             return;
         }

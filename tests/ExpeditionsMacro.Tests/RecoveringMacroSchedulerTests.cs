@@ -166,6 +166,82 @@ public sealed class RecoveringMacroSchedulerTests
     }
 
     [Fact]
+    public async Task RuntimeFailure_AfterSuccessfulPreflight_DoesNotRepeatPreflightAfterRestart()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            AppPaths paths = new(root);
+            MacroPlanRepository plans = new(paths);
+            MacroTaskDefinition task = new()
+            {
+                Id = "story-1",
+                Kind = MacroTaskKind.Story,
+                PresetId = "story",
+                Name = "Story",
+                Priority = 1,
+                TargetVictories = 1,
+            };
+            MacroPlan plan = new()
+            {
+                Id = "prepared-recovery",
+                Name = "Prepared recovery",
+                Tasks = [task],
+            };
+            FakeRecovery recovery = new();
+            RecoveringMacroScheduler scheduler = new(
+                new MacroScheduler(plans),
+                plans,
+                recovery);
+            RobloxPrivateServerLaunchTarget target =
+                RobloxPrivateServerLaunchTarget.Parse(
+                    "https://www.roblox.com/share?code=Test_Server_123&type=Server");
+            using CancellationTokenSource cancellation = new();
+            int preflights = 0;
+            int executions = 0;
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                scheduler.RunAsync(
+                    plan,
+                    target,
+                    (_, _, _) =>
+                    {
+                        executions++;
+                        return executions == 1
+                            ? Task.FromException<ScheduledTaskResult>(
+                                new RobloxUiUnavailableException(
+                                    "Story panel stopped responding."))
+                            : Task.FromResult(
+                                new ScheduledTaskResult(
+                                    1,
+                                    0,
+                                    TimeSpan.FromMinutes(2)));
+                    },
+                    planChanged: saved =>
+                    {
+                        if (saved.ProgressFor(task.Id).Completed)
+                        {
+                            cancellation.Cancel();
+                        }
+                    },
+                    cancellationToken: cancellation.Token,
+                    prepareSession: _ =>
+                    {
+                        preflights++;
+                        return Task.CompletedTask;
+                    }));
+
+            Assert.Equal(1, preflights);
+            Assert.Equal(2, executions);
+            Assert.Equal(1, recovery.Restarts);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Fact]
     public async Task UiFailureWithoutConfiguredRejoinTarget_StopsSafely()
     {
         string root = TestPaths.NewTemporaryDirectory();
