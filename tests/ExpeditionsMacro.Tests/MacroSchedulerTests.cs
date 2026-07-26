@@ -138,6 +138,7 @@ public sealed class MacroSchedulerTests
     [InlineData(MacroTaskKind.Expedition, true)]
     [InlineData(MacroTaskKind.Story, true)]
     [InlineData(MacroTaskKind.Raid, true)]
+    [InlineData(MacroTaskKind.Event, true)]
     [InlineData(MacroTaskKind.Challenge, false)]
     public void RepeatStage_RequiresTheSameFiniteRoute(MacroTaskKind kind, bool expected)
     {

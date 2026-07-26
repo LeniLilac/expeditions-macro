@@ -1,6 +1,7 @@
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
+using ExpeditionsMacro.Core.Models;
 
 namespace ExpeditionsMacro.Automation.Diagnostics;
 
@@ -280,6 +281,21 @@ public sealed class DebugSteppingRobloxAutomation : IRobloxAutomation, IDisposab
             () => _inner.HoldLetterKeyAsync(
                 window,
                 key,
+                holdMilliseconds,
+                cancellationToken),
+            cancellationToken);
+
+    public Task HoldKeyAsync(
+        RobloxWindow window,
+        int virtualKey,
+        int holdMilliseconds,
+        CancellationToken cancellationToken) =>
+        TraceAsync(
+            $"Hold {KeyboardKey.GetDisplayName(virtualKey)}",
+            $"Hold {KeyboardKey.GetDisplayName(virtualKey)} for {holdMilliseconds} ms.",
+            () => _inner.HoldKeyAsync(
+                window,
+                virtualKey,
                 holdMilliseconds,
                 cancellationToken),
             cancellationToken);

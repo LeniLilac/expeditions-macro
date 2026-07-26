@@ -67,6 +67,16 @@ public partial class MacroPage
                 macroTotals,
                 progress,
                 cancellationToken),
+            MacroTaskKind.Event => ExecuteEventAsync(
+                task,
+                recordResult,
+                webhook,
+                discordUserId,
+                playMenuKey,
+                unitMenuKey,
+                macroTotals,
+                progress,
+                cancellationToken),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(task),
                 task.Kind,
@@ -442,4 +452,5 @@ public partial class MacroPage
                 Skipped: true);
         }
     }
+
 }

@@ -144,6 +144,17 @@ public partial class PlacementModelsPage
                 StoryRunKind.Act,
                 3),
             "Raid Map 1 Act 3");
+
+        for (int act = 1; act <= 3; act++)
+        {
+            AddRootRoute(
+                FindSetup(
+                    PlacementTargetMode.Event,
+                    (int)EventModeId.VillainInvasion,
+                    StoryRunKind.Act,
+                    act),
+                $"Event · Villain Invasion · Act {act}");
+        }
         RebuildVisibleSetupNodes();
     }
 

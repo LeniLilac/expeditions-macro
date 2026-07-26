@@ -145,6 +145,9 @@ public partial class DebugPage
         RunUiScaleButton.IsEnabled = !busy;
         RunGameSettingsButton.IsEnabled = !busy;
         FastNoAlignButton.IsEnabled = !busy;
+        KeyPressKeyButton.IsEnabled = !busy;
+        KeyPressDurationText.IsEnabled = !busy;
+        ArmKeyPressButton.IsEnabled = !busy;
         NavigationStartCombo.IsEnabled = !busy;
         NavigationModeCombo.IsEnabled = !busy;
         NavigationPresetCombo.IsEnabled = !busy;
@@ -165,6 +168,12 @@ public partial class DebugPage
         StepButton.IsEnabled = debugActive && waiting;
         ResumeButton.IsEnabled = debugActive;
         StopButton.IsEnabled = busy;
+        StopButton.Content = _services.Coordinator.State ==
+            OperationState.Armed
+                ? "Cancel arm"
+                : "Stop";
+        bool armed = _services.Coordinator.State ==
+            OperationState.Armed;
         DebugStateText.Text = waiting
             ? "Paused before the next live step"
             : busy
@@ -173,7 +182,9 @@ public partial class DebugPage
         DebugStateDot.Fill = (Brush)FindResource(
             waiting
                 ? "WarningBrush"
-                : busy
+                : armed
+                    ? "WarningBrush"
+                    : busy
                     ? "SuccessBrush"
                     : "FaintBrush");
     }

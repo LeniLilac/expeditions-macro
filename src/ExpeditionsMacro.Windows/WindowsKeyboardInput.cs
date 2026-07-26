@@ -1,4 +1,5 @@
 using ExpeditionsMacro.Core.Abstractions;
+using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Windows.Interop;
 
 namespace ExpeditionsMacro.Windows;
@@ -55,6 +56,27 @@ internal sealed class WindowsKeyboardInput
                 virtualKey,
                 scanCode,
                 false),
+            holdMilliseconds,
+            cancellationToken);
+    }
+
+    public Task HoldKeyAsync(
+        RobloxWindow window,
+        int virtualKey,
+        int holdMilliseconds,
+        CancellationToken cancellationToken)
+    {
+        if (holdMilliseconds is <
+                AutomationKeyPress.MinimumHoldMilliseconds or >
+                AutomationKeyPress.MaximumHoldMilliseconds)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(holdMilliseconds));
+        }
+        return PulseKeyAsync(
+            window,
+            KeyboardInputDescriptor.FromAutomationVirtualKey(
+                virtualKey),
             holdMilliseconds,
             cancellationToken);
     }

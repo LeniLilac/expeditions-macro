@@ -18,6 +18,7 @@ public enum PlacementTargetMode
     Challenge,
     Story,
     Raid,
+    Event,
 }
 
 public static class PlacementAuthoringRules
@@ -27,6 +28,11 @@ public static class PlacementAuthoringRules
     public const int DefaultStepDelayMilliseconds = 900;
 
     public const int DefaultAfterStartDelayMilliseconds = 30_000;
+
+    private const int StartDialogLeft = 310;
+    private const int StartDialogTop = 92;
+    private const int StartDialogRight = 498;
+    private const int StartDialogBottom = 208;
 
     public static bool AreSeparated(
         int firstX,
@@ -62,6 +68,28 @@ public static class PlacementAuthoringRules
                 throw new InvalidDataException(
                     $"Fast no align placements must be at least {MinimumPlacementSpacingPixels} client pixels apart.");
             }
+        }
+    }
+
+    public static bool IsCoveredByStartDialog(
+        int x,
+        int y) =>
+        x >= StartDialogLeft &&
+        x <= StartDialogRight &&
+        y >= StartDialogTop &&
+        y <= StartDialogBottom;
+
+    public static void ValidateBeforeStartSafety(
+        IReadOnlyList<PlacementStep> steps)
+    {
+        PlacementStep? covered = steps.FirstOrDefault(
+            step =>
+                step.Phase == PlacementPhase.BeforeStart &&
+                IsCoveredByStartDialog(step.X, step.Y));
+        if (covered is not null)
+        {
+            throw new InvalidDataException(
+                $"Before-start placement ({covered.X}, {covered.Y}) is covered by the Start Game dialog. Move it outside the centered dialog or mark it After Start.");
         }
     }
 }
@@ -117,6 +145,13 @@ public sealed record PlacementTarget
                 RequireExact(MapNumber, 1, "Raid map");
                 RequireRange(ActNumber, 1, 3, "Raid act");
                 break;
+            case PlacementTargetMode.Event:
+                RequireExact(
+                    MapNumber,
+                    (int)EventModeId.VillainInvasion,
+                    "Event mode");
+                RequireRange(ActNumber, 1, 4, "Event act");
+                break;
             default:
                 throw new InvalidDataException(
                     "The placement route is invalid.");
@@ -165,6 +200,15 @@ public sealed record PlacementTarget
         {
             Mode = PlacementTargetMode.Raid,
             MapNumber = 1,
+            ActNumber = (int)preset.Act,
+        };
+
+    public static PlacementTarget ForEvent(
+        EventPreset preset) =>
+        new()
+        {
+            Mode = PlacementTargetMode.Event,
+            MapNumber = (int)preset.Mode,
             ActNumber = (int)preset.Act,
         };
 

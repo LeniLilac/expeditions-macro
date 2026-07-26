@@ -47,6 +47,9 @@ public partial class MacroPage : UserControl, IAppPage
         DataContext = this;
         PlanCombo.ItemsSource = _plans;
         TaskKindCombo.ItemsSource = Enum.GetValues<MacroTaskKind>()
+            .Where(kind =>
+                kind != MacroTaskKind.Event ||
+                _services.Settings.FastNoAlignEnabled)
             .Select(kind => new NamedChoice<MacroTaskKind>(kind, Label(kind)))
             .ToArray();
         TaskPresetCombo.ItemsSource = _visiblePresets;
@@ -475,6 +478,7 @@ public partial class MacroPage : UserControl, IAppPage
         MacroTaskKind.Expedition => "Expedition",
         MacroTaskKind.Story => "Story",
         MacroTaskKind.Raid => "Raid",
+        MacroTaskKind.Event => "Event",
         _ => kind.ToString(),
     };
 

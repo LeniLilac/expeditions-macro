@@ -74,6 +74,7 @@ public sealed record PlacementModel
         if (CameraPreparationMode == CameraPreparationMode.FastNoAlign)
         {
             PlacementAuthoringRules.ValidateMinimumSpacing(Steps);
+            PlacementAuthoringRules.ValidateBeforeStartSafety(Steps);
         }
     }
 

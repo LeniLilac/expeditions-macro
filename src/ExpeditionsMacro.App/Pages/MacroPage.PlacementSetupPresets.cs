@@ -182,6 +182,38 @@ public partial class MacroPage
                 null));
     }
 
+    private async Task<(
+        EventPreset Preset,
+        PlacementModel Placement)>
+        BuildEventSetupAsync(
+            MacroTaskDefinition task,
+            CancellationToken cancellationToken)
+    {
+        PlacementTarget target =
+            RequireTarget(
+                task,
+                PlacementTargetMode.Event);
+        PlacementModel placement =
+            await LoadPlacementSetupAsync(
+                target,
+                cancellationToken)
+                .ConfigureAwait(false);
+        EventPreset preset = new()
+        {
+            Id = $"task-{task.Id}",
+            Name = task.Name,
+            Mode = (EventModeId)
+                target.MapNumber,
+            Act = (EventAct)
+                target.ActNumber,
+            PlacementModelId = placement.Id,
+            TeamSlot = placement.TeamSlot,
+            DefeatRetries = task.DefeatRetries,
+        };
+        preset.Validate();
+        return (preset, placement);
+    }
+
     private async Task<PlacementModel>
         LoadPlacementSetupAsync(
             PlacementTarget target,

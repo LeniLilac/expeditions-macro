@@ -132,6 +132,14 @@ public interface IRobloxAutomation
         throw new NotSupportedException(
             "This automation backend does not support held letter input.");
 
+    Task HoldKeyAsync(
+        RobloxWindow window,
+        int virtualKey,
+        int holdMilliseconds,
+        CancellationToken cancellationToken) =>
+        throw new NotSupportedException(
+            "This automation backend does not support held keyboard input.");
+
     Task TapUnitKeyAsync(RobloxWindow window, int unitKey, int holdMilliseconds, CancellationToken cancellationToken);
 }
 

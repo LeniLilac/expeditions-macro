@@ -4,6 +4,29 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.24] - 2026-07-25
+
+### Added
+
+- Added Villain Invasion Event Acts 1 through 3 to Fast no-align Placement Setup and Macro plans, including lobby-only Event navigation, deterministic first-load movement, saved-team and placement support, Repeat Stage handling, and a 12-minute recoverable match watchdog.
+- Added a Debug held-key utility that arms an arbitrary supported key and duration for an F6-triggered input test with full Deep Debug coverage.
+
+### Changed
+
+- Updated Expedition map, difficulty, and Select Stage navigation for the current Play interface.
+- Startup now opens and closes Settings through paced accessibility navigation, calibrates UI scale before requiring Lobby detection, and disables the new Event Theme setting alongside the existing required settings.
+
+### Fixed
+
+- Event-themed Lobby frames no longer collide with the Settings detector, while a fully loaded themed Lobby remains recoverable.
+- Event Victory is recognized both with and without the optional Next Stage action; repeat runs continue to select Repeat Stage rather than advancing.
+- Returning to Lobby through accessibility navigation now verifies the confirmation transition before handing control back to startup.
+
+### Tests
+
+- Added privacy-reviewed Event navigation, prestart, Victory, Defeat, placement-map, current Expedition selector, current Settings, themed Lobby, and Lobby-exit fixtures to the cross-state detector corpus.
+- Revalidated all 719 fast tests, 102 golden-image tests, 5 Deep Debug Viewer tests, and 28 packaged dark/light UI snapshots.
+
 ## [1.3.0-beta.23] - 2026-07-25
 
 ### Changed
@@ -771,7 +794,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.23...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.24...HEAD
+[1.3.0-beta.24]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.23...v1.3.0-beta.24
 [1.3.0-beta.23]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.22...v1.3.0-beta.23
 [1.3.0-beta.22]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.21...v1.3.0-beta.22
 [1.3.0-beta.21]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.20...v1.3.0-beta.21

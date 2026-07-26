@@ -54,11 +54,6 @@
       "reason": "Existing page-controller debt; extract preset editing and operation coordination."
     },
     {
-      "path": "src/ExpeditionsMacro.Vision/Packs/CompiledDetectorPack.cs",
-      "maxLines": 565,
-      "reason": "Existing detector-pack composition debt; separate state scoring and action resolution."
-    },
-    {
       "path": "src/ExpeditionsMacro.App/Pages/ExpeditionsPage.xaml.cs",
       "maxLines": 528,
       "reason": "Existing page-controller debt; extract preset editing and operation coordination."

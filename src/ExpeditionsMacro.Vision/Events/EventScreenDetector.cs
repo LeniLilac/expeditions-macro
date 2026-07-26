@@ -1,0 +1,342 @@
+using ExpeditionsMacro.Core.Geometry;
+using ExpeditionsMacro.Core.Imaging;
+using ExpeditionsMacro.Core.Models;
+using ExpeditionsMacro.Vision.Diagnostics;
+using ExpeditionsMacro.Vision.Stages;
+
+namespace ExpeditionsMacro.Vision.Events;
+
+public enum EventScreenState
+{
+    None,
+    EventHome,
+    ActSelector,
+    ActDetail,
+    PreviewReady,
+    Prestart,
+    Victory,
+    Defeat,
+    GameModeSelector,
+}
+
+public readonly record struct EventScreenMatch(
+    EventScreenState State,
+    double Confidence,
+    int? ActionX = null,
+    int? ActionY = null);
+
+public static class EventScreenDetector
+{
+    private static readonly ScreenRegion EventHeader =
+        new(0, 55, 180, 55);
+    private static readonly ScreenRegion EventHomeAction =
+        new(430, 548, 135, 42);
+    private static readonly ScreenRegion ActTitle =
+        new(380, 20, 225, 58);
+    private static readonly ScreenRegion ActScrollRail =
+        new(190, 548, 610, 25);
+
+    public static EventScreenMatch Detect(
+        ImageFrame image)
+    {
+        ValidateClient(image);
+        StageScreenMatch shared =
+            StageScreenDetector.Detect(image);
+        EventScreenMatch? sharedState =
+            shared.State switch
+            {
+                StageScreenState.PreviewReady =>
+                    new(
+                        EventScreenState.PreviewReady,
+                        shared.Confidence,
+                        shared.ActionX,
+                        shared.ActionY),
+                StageScreenState.Prestart =>
+                    new(
+                        EventScreenState.Prestart,
+                        shared.Confidence,
+                        shared.ActionX,
+                        shared.ActionY),
+                StageScreenState.Victory =>
+                    new(
+                        EventScreenState.Victory,
+                        shared.Confidence,
+                        shared.ActionX,
+                        shared.ActionY),
+                StageScreenState.Defeat =>
+                    new(
+                        EventScreenState.Defeat,
+                        shared.Confidence,
+                        shared.ActionX,
+                        shared.ActionY),
+                StageScreenState.GameModeSelector =>
+                    new(
+                        EventScreenState.GameModeSelector,
+                        shared.Confidence),
+                _ => null,
+            };
+        if (sharedState is not null)
+        {
+            return Trace(sharedState.Value);
+        }
+
+        double eventChrome = EventChromeScore(image);
+        if (shared.State == StageScreenState.RaidDetail &&
+            eventChrome >= 0.72)
+        {
+            return Trace(
+                new EventScreenMatch(
+                    EventScreenState.ActDetail,
+                    Math.Min(
+                        shared.Confidence,
+                        eventChrome),
+                    shared.ActionX,
+                    shared.ActionY));
+        }
+
+        double eventHome = EventHomeScore(
+            image,
+            eventChrome);
+        if (eventHome >= 0.72)
+        {
+            return Trace(
+                new EventScreenMatch(
+                    EventScreenState.EventHome,
+                    eventHome,
+                    499,
+                    571));
+        }
+
+        double actSelector = ActSelectorScore(
+            image,
+            eventChrome);
+        return Trace(
+            actSelector >= 0.72
+                ? new EventScreenMatch(
+                    EventScreenState.ActSelector,
+                    actSelector)
+                : new EventScreenMatch(
+                    EventScreenState.None,
+                    Math.Max(
+                        eventHome,
+                        actSelector)));
+    }
+
+    public static (int X, int Y)
+        LobbyEventAction => (50, 410);
+
+    public static (int X, int Y)
+        EventGameModeAction => (499, 571);
+
+    public static (int X, int Y)
+        SelectStageAction => (238, 437);
+
+    public static bool RequiresLaterActScroll(
+        EventAct act) =>
+        act == EventAct.Act4;
+
+    public static (
+        int StartX,
+        int StartY,
+        int EndX,
+        int EndY) LaterActScroll =>
+        (402, 560, 628, 560);
+
+    public static (int X, int Y) ActAction(
+        EventAct act) => act switch
+        {
+            EventAct.Act1 => (270, 410),
+            EventAct.Act2 => (465, 280),
+            EventAct.Act3 => (700, 420),
+            EventAct.Act4 => (585, 320),
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(act)),
+        };
+
+    private static double EventChromeScore(
+        ImageFrame image)
+    {
+        double headerRed = ColorFraction(
+            image,
+            EventHeader,
+            IsEventRed);
+        double dark = ColorFraction(
+            image,
+            new ScreenRegion(0, 0, 808, 611),
+            IsDark);
+        if (headerRed < 0.08 ||
+            dark < 0.33)
+        {
+            return 0;
+        }
+        return Math.Clamp(
+            0.68 +
+            0.20 * Ramp(
+                headerRed,
+                0.08,
+                0.45) +
+            0.12 * Ramp(
+                dark,
+                0.33,
+                0.72),
+            0,
+            1);
+    }
+
+    private static double EventHomeScore(
+        ImageFrame image,
+        double eventChrome)
+    {
+        if (eventChrome == 0) return 0;
+        double actionRed = ColorFraction(
+            image,
+            EventHomeAction,
+            IsEventRed);
+        if (actionRed < 0.55) return 0;
+        return Math.Clamp(
+            0.72 +
+            0.16 * Ramp(
+                actionRed,
+                0.55,
+                0.82) +
+            0.12 * eventChrome,
+            0,
+            1);
+    }
+
+    private static double ActSelectorScore(
+        ImageFrame image,
+        double eventChrome)
+    {
+        if (eventChrome == 0) return 0;
+        double titleRed = ColorFraction(
+            image,
+            ActTitle,
+            IsEventRed);
+        double scrollRed =
+            BestHorizontalLineFraction(
+                image,
+                ActScrollRail,
+                IsEventRed);
+        if (titleRed < 0.025 ||
+            scrollRed < 0.55)
+        {
+            return 0;
+        }
+        return Math.Clamp(
+            0.68 +
+            0.12 * Ramp(
+                titleRed,
+                0.025,
+                0.18) +
+            0.12 * Ramp(
+                scrollRed,
+                0.55,
+                0.95) +
+            0.08 * eventChrome,
+            0,
+            1);
+    }
+
+    private static double ColorFraction(
+        ImageFrame image,
+        ScreenRegion region,
+        Func<byte, byte, byte, bool> predicate)
+    {
+        int matches = 0;
+        for (int y = region.Y; y < region.Bottom; y++)
+        {
+            for (int x = region.X; x < region.Right; x++)
+            {
+                int pixel = (y * image.Width + x) * 3;
+                if (predicate(
+                        image.Pixels[pixel],
+                        image.Pixels[pixel + 1],
+                        image.Pixels[pixel + 2]))
+                {
+                    matches++;
+                }
+            }
+        }
+        return (double)matches /
+            (region.Width * region.Height);
+    }
+
+    private static double BestHorizontalLineFraction(
+        ImageFrame image,
+        ScreenRegion region,
+        Func<byte, byte, byte, bool> predicate)
+    {
+        double best = 0;
+        for (int y = region.Y; y < region.Bottom; y++)
+        {
+            int matches = 0;
+            for (int x = region.X; x < region.Right; x++)
+            {
+                int pixel = (y * image.Width + x) * 3;
+                if (predicate(
+                        image.Pixels[pixel],
+                        image.Pixels[pixel + 1],
+                        image.Pixels[pixel + 2]))
+                {
+                    matches++;
+                }
+            }
+            best = Math.Max(
+                best,
+                (double)matches / region.Width);
+        }
+        return best;
+    }
+
+    private static bool IsEventRed(
+        byte red,
+        byte green,
+        byte blue) =>
+        red >= 95 &&
+        red - green >= 38 &&
+        red - blue >= 25;
+
+    private static bool IsDark(
+        byte red,
+        byte green,
+        byte blue) =>
+        red + green + blue <= 175;
+
+    private static double Ramp(
+        double value,
+        double minimum,
+        double maximum) =>
+        Math.Clamp(
+            (value - minimum) /
+            (maximum - minimum),
+            0,
+            1);
+
+    private static void ValidateClient(
+        ImageFrame image)
+    {
+        if (image.Format != PixelFormat.Rgb24 ||
+            image.Width != 808 ||
+            image.Height != 611)
+        {
+            throw new InvalidDataException(
+                "Event detector input must be an RGB 808 by 611 client image.");
+        }
+    }
+
+    private static EventScreenMatch Trace(
+        EventScreenMatch match)
+    {
+        VisionTrace.Emit(
+            "event_screen",
+            match.State.ToString(),
+            match.Confidence,
+            new
+            {
+                match.ActionX,
+                match.ActionY,
+            });
+        return match;
+    }
+}

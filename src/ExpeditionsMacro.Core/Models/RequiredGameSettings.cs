@@ -26,6 +26,7 @@ public enum RequiredGameSetting
     AutoAbilitiesOnPlacement,
     DisplayUpdateLogOnLogin,
     AutoSprint,
+    EventThemeEnabled,
 }
 
 public readonly record struct RequiredGameSettingState(
@@ -48,6 +49,7 @@ public static class RequiredGameSettings
         new(RequiredGameSetting.ShowDepthOfField, false),
         new(RequiredGameSetting.LowDetailMode, true),
         new(RequiredGameSetting.NightTimeEnabled, false),
+        new(RequiredGameSetting.EventThemeEnabled, false),
         new(RequiredGameSetting.ShowOtherUnitVfx, false),
         new(RequiredGameSetting.ShowOwnUnitVfx, false),
         new(RequiredGameSetting.ShowAbilityEffects, false),

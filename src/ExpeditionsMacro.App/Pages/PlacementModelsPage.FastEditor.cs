@@ -95,6 +95,10 @@ public partial class PlacementModelsPage
                     TargetVariantCombo.SelectedIndex =
                         target.ActNumber - 1;
                     break;
+                case PlacementTargetMode.Event:
+                    TargetVariantCombo.SelectedIndex =
+                        target.ActNumber - 1;
+                    break;
             }
         }
         finally
@@ -168,6 +172,19 @@ public partial class PlacementModelsPage
                         .ToArray();
                 TargetVariantCombo.SelectedIndex = 0;
                 break;
+            case PlacementTargetMode.Event:
+                TargetVariantPanel.Visibility =
+                    Visibility.Visible;
+                TargetVariantLabel.Text = "Act";
+                TargetVariantCombo.ItemsSource =
+                    Enumerable.Range(1, 3)
+                        .Select(act =>
+                            new PlacementEditorChoice<int>(
+                                act,
+                                $"Act {act}"))
+                        .ToArray();
+                TargetVariantCombo.SelectedIndex = 0;
+                break;
             default:
                 TargetVariantPanel.Visibility =
                     Visibility.Collapsed;
@@ -220,6 +237,8 @@ public partial class PlacementModelsPage
                     StoryTarget(map.Value),
                 PlacementTargetMode.Raid =>
                     RaidTarget(map.Value),
+                PlacementTargetMode.Event =>
+                    EventTarget(map.Value),
                 _ => new PlacementTarget
                 {
                     Mode = mode.Value,
@@ -264,6 +283,22 @@ public partial class PlacementModelsPage
         };
     }
 
+    private PlacementTarget EventTarget(int mode)
+    {
+        if (TargetVariantCombo.SelectedItem is not
+            PlacementEditorChoice<int> act)
+        {
+            throw new InvalidOperationException(
+                "Choose an Event act.");
+        }
+        return new PlacementTarget
+        {
+            Mode = PlacementTargetMode.Event,
+            MapNumber = mode,
+            ActNumber = act.Value,
+        };
+    }
+
     private void PlacementCanvas_MouseLeftButtonDown(
         object sender,
         MouseButtonEventArgs e)
@@ -282,6 +317,16 @@ public partial class PlacementModelsPage
             (int)Math.Round(point.Y),
             0,
             610);
+        if (_selectedFastPhase ==
+                PlacementPhase.BeforeStart &&
+            PlacementAuthoringRules
+                .IsCoveredByStartDialog(x, y))
+        {
+            FastStatusText.Text =
+                "That point is covered by the Start Game dialog. Move it outside the dialog or choose After Start.";
+            e.Handled = true;
+            return;
+        }
         PlacementStepRow? nearby =
             _steps.FirstOrDefault(
                 step =>
@@ -419,6 +464,8 @@ public partial class PlacementModelsPage
                 $"Story · {MapChoices(target.Mode)[target.MapNumber - 1].Label} · {StoryVariantLabel(target)}",
             PlacementTargetMode.Raid =>
                 $"Raid · Spirit City · Act {target.ActNumber}",
+            PlacementTargetMode.Event =>
+                $"Event · Villain Invasion · Act {target.ActNumber}",
             _ => target.Mode.ToString(),
         };
 

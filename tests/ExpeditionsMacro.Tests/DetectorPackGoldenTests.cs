@@ -68,7 +68,7 @@ public sealed class DetectorPackGoldenTests
             }
         }
 
-        Assert.Equal(207, checkedImages);
+        Assert.Equal(215, checkedImages);
         Assert.True(failures.Length == 0, $"Compiled detector regressions:{Environment.NewLine}{failures}");
     }
 
@@ -100,7 +100,7 @@ public sealed class DetectorPackGoldenTests
             }
         }
 
-        Assert.Equal(207, checkedImages);
+        Assert.Equal(215, checkedImages);
         Assert.True(failures.Length == 0, $"Cross-state detector regressions:{Environment.NewLine}{failures}");
     }
 
@@ -469,7 +469,7 @@ public sealed class DetectorPackGoldenTests
     public void RecoveryDetection_ToleratesTranslatedAndScaledLayout(string expected, string dataset)
     {
         if (!DatasetsAvailable()) return;
-        ImageFrame transformed = Transform(ImageCodec.Load(Pngs(dataset).First()), 0.90, 0, -12);
+        ImageFrame transformed = Transform(ImageCodec.Load(PngForTransform(dataset)), 0.90, 0, -12);
         Assert.Equal(expected, Pack.Value.RecoveryState(transformed));
     }
 
@@ -479,7 +479,12 @@ public sealed class DetectorPackGoldenTests
     {
         if (!DatasetsAvailable()) return;
         CompiledDetectorPack pack = Pack.Value;
-        ImageFrame original = ImageCodec.Load(Pngs("Expedition_Map_Select_Map1").First());
+        ImageFrame original = ImageCodec.Load(
+            Pngs("Expedition_Map_Select_Map1")
+                .First(path =>
+                    !Path.GetFileName(path).StartsWith(
+                        "CurrentUI",
+                        StringComparison.OrdinalIgnoreCase)));
         const double scale = 0.90;
         const int deltaX = 0;
         const int deltaY = -12;
@@ -663,7 +668,16 @@ public sealed class DetectorPackGoldenTests
     public void SelectedMap_ToleratesTranslatedAndScaledLayout(int expected, string dataset)
     {
         if (!DatasetsAvailable()) return;
-        ImageFrame transformed = Transform(ImageCodec.Load(Pngs(dataset).First()), 0.90, 0, -12);
+        string legacyLayout = Pngs(dataset)
+            .First(path =>
+                !Path.GetFileName(path).StartsWith(
+                    "CurrentUI",
+                    StringComparison.OrdinalIgnoreCase));
+        ImageFrame transformed = Transform(
+            ImageCodec.Load(legacyLayout),
+            0.90,
+            0,
+            -12);
         Assert.Equal(expected, Pack.Value.SelectedMap(transformed));
     }
 
@@ -675,7 +689,16 @@ public sealed class DetectorPackGoldenTests
     public void SelectedDifficulty_ToleratesTranslatedAndScaledLayout(int expected, string dataset)
     {
         if (!DatasetsAvailable()) return;
-        ImageFrame transformed = Transform(ImageCodec.Load(Pngs(dataset).First()), 0.90, 0, -12);
+        string legacyLayout = Pngs(dataset)
+            .First(path =>
+                !Path.GetFileName(path).StartsWith(
+                    "CurrentUI",
+                    StringComparison.OrdinalIgnoreCase));
+        ImageFrame transformed = Transform(
+            ImageCodec.Load(legacyLayout),
+            0.90,
+            0,
+            -12);
         Assert.Equal(expected, Pack.Value.SelectedDifficulty(transformed));
     }
 
@@ -706,7 +729,7 @@ public sealed class DetectorPackGoldenTests
     private static void AssertTransformedState(string expectedState, string dataset, double scale, int deltaX, int deltaY)
     {
         CompiledDetectorPack pack = Pack.Value;
-        ImageFrame original = ImageCodec.Load(Pngs(dataset).First());
+        ImageFrame original = ImageCodec.Load(PngForTransform(dataset));
         ImageFrame transformed = Transform(original, scale, deltaX, deltaY);
         IReadOnlyDictionary<string, double> scores = pack.ScoreStates(transformed);
         DetectorStateDefinition definition = pack.Manifest.States.Single(value => value.Name == expectedState);
@@ -751,6 +774,11 @@ public sealed class DetectorPackGoldenTests
 
     private static IEnumerable<string> Pngs(string dataset) =>
         Directory.EnumerateFiles(Path.Combine(TestPaths.Datasets, dataset), "*.png").Order(StringComparer.OrdinalIgnoreCase);
+
+    private static string PngForTransform(string dataset) =>
+        dataset == "Expedition_Map_Select_Map1"
+            ? Pngs(dataset).First(path => !Path.GetFileName(path).StartsWith("CurrentUI", StringComparison.OrdinalIgnoreCase))
+            : Pngs(dataset).First();
 
     private static bool DatasetsAvailable() => Directory.Exists(TestPaths.Datasets);
 }

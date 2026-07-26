@@ -36,6 +36,9 @@ public sealed class GameSettingsScreenDetectorTests
         "GraphicsPage.png",
         GameSettingsPage.Graphics)]
     [InlineData(
+        "GraphicsPageCurrent.png",
+        GameSettingsPage.Graphics)]
+    [InlineData(
         "UnitsTop.png",
         GameSettingsPage.Units)]
     [InlineData(
@@ -43,6 +46,9 @@ public sealed class GameSettingsScreenDetectorTests
         GameSettingsPage.Units)]
     [InlineData(
         "MiscellaneousPage.png",
+        GameSettingsPage.Miscellaneous)]
+    [InlineData(
+        "MiscellaneousPageCurrent.png",
         GameSettingsPage.Miscellaneous)]
     public void CanonicalPages_ReportTheirSelectedTab(
         string fileName,
@@ -70,30 +76,35 @@ public sealed class GameSettingsScreenDetectorTests
                 Load("SettingsOpeningTransition.png")).Page);
     }
 
-    [Fact]
-    public void Lobby_DoesNotMatchTheSettingsPanel()
+    [Theory]
+    [InlineData("LobbyClosed.png")]
+    [InlineData("LobbyEventTheme.png")]
+    public void Lobby_DoesNotMatchTheSettingsPanel(
+        string fileName)
     {
         GameSettingsPanelMatch match =
             GameSettingsScreenDetector.DetectPanel(
-                Load("LobbyClosed.png"));
+                Load(fileName));
 
         Assert.False(match.Visible);
+        Assert.Equal(0, match.CloseX);
+        Assert.Equal(0, match.CloseY);
         Assert.Equal(
             GameSettingsPage.None,
             GameSettingsScreenDetector.DetectPage(
-                Load("LobbyClosed.png")).Page);
+                Load(fileName)).Page);
         Assert.Equal(
             StageScreenState.None,
             StageScreenDetector.Detect(
-                Load("LobbyClosed.png")).State);
+                Load(fileName)).State);
         Assert.Equal(
             TeamScreenState.None,
             TeamScreenDetector.Detect(
-                Load("LobbyClosed.png")).State);
+                Load(fileName)).State);
         Assert.Equal(
             AreasScreenState.None,
             AreasScreenDetector.Detect(
-                Load("LobbyClosed.png")).State);
+                Load(fileName)).State);
     }
 
     [Fact]
@@ -105,9 +116,9 @@ public sealed class GameSettingsScreenDetectorTests
                 [GameSettingsPage.Gameplay] =
                     new("GameplayPage.png"),
                 [GameSettingsPage.Graphics] =
-                    new("GraphicsPage.png"),
+                    new("GraphicsPageCurrent.png"),
                 [GameSettingsPage.Miscellaneous] =
-                    new("MiscellaneousPage.png"),
+                    new("MiscellaneousPageCurrent.png"),
             };
         ImageFramePair unitsTop = new("UnitsTop.png");
         ImageFramePair unitsBottom = new("UnitsBottom.png");
@@ -138,6 +149,45 @@ public sealed class GameSettingsScreenDetectorTests
                 $"{required.Setting} was {match.State} at {match.Confidence:P0}.");
             Assert.InRange(match.Confidence, 0.72, 1);
         }
+    }
+
+    [Fact]
+    public void CurrentGraphics_RequiresEventThemeOff()
+    {
+        GameSettingToggleMatch match =
+            GameSettingsScreenDetector.DetectToggle(
+                Load("GraphicsPageCurrent.png"),
+                RequiredGameSetting.EventThemeEnabled);
+
+        Assert.Equal(
+            GameSettingToggleState.Disabled,
+            match.State);
+        Assert.InRange(match.Confidence, 0.72, 1);
+        Assert.Equal((436, 293),
+            (match.ActionX, match.ActionY));
+    }
+
+    [Fact]
+    public void CurrentMiscellaneous_UsesShiftedRequiredRow()
+    {
+        GameSettingToggleMatch updateLog =
+            GameSettingsScreenDetector.DetectToggle(
+                Load("MiscellaneousPageCurrent.png"),
+                RequiredGameSetting
+                    .DisplayUpdateLogOnLogin);
+        GameSettingToggleMatch autoSprint =
+            GameSettingsScreenDetector.DetectToggle(
+                Load("MiscellaneousPageCurrent.png"),
+                RequiredGameSetting.AutoSprint);
+
+        Assert.Equal(
+            GameSettingToggleState.Disabled,
+            updateLog.State);
+        Assert.Equal(
+            GameSettingToggleState.Enabled,
+            autoSprint.State);
+        Assert.Equal(364, updateLog.ActionY);
+        Assert.Equal(364, autoSprint.ActionY);
     }
 
     [Fact]

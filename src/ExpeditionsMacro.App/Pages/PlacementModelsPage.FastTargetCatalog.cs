@@ -21,6 +21,9 @@ public partial class PlacementModelsPage
             new(
                 PlacementTargetMode.Raid,
                 "Raid"),
+            new(
+                PlacementTargetMode.Event,
+                "Event"),
         ];
 
     private static readonly IReadOnlyList<
@@ -74,6 +77,12 @@ public partial class PlacementModelsPage
             PlacementTargetMode.Raid =>
             [
                 new(1, "Spirit City"),
+            ],
+            PlacementTargetMode.Event =>
+            [
+                new(
+                    (int)EventModeId.VillainInvasion,
+                    "Villain Invasion"),
             ],
             _ => throw new ArgumentOutOfRangeException(
                 nameof(mode)),

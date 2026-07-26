@@ -421,7 +421,7 @@ public sealed class PlacementAuthoringTests
         IReadOnlyList<PlacementSetupRoute> routes =
             PlacementSetupCatalog.All;
 
-        Assert.Equal(52, routes.Count);
+        Assert.Equal(55, routes.Count);
         Assert.Equal(
             routes.Count,
             routes.Select(route => route.ModelId)
@@ -453,6 +453,16 @@ public sealed class PlacementAuthoringTests
                 PlacementSetupCatalog
                     .IsSharedStoryTarget(
                         route.Target)));
+        Assert.Equal(
+            3,
+            routes.Count(route =>
+                route.Target.Mode ==
+                PlacementTargetMode.Raid));
+        Assert.Equal(
+            3,
+            routes.Count(route =>
+                route.Target.Mode ==
+                PlacementTargetMode.Event));
     }
 
     private static PlacementModel Placement(

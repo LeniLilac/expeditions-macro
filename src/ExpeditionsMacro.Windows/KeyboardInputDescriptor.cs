@@ -58,10 +58,36 @@ internal readonly record struct KeyboardInputDescriptor(int VirtualKey, int Scan
             throw new ArgumentOutOfRangeException(nameof(virtualKey), "The configured Shift Lock key is not supported.");
         }
 
+        return FromVirtualKey(virtualKey);
+    }
+
+    public static KeyboardInputDescriptor FromAutomationVirtualKey(
+        int virtualKey)
+    {
+        if (!KeyboardKey.IsSupportedAutomationKey(virtualKey))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(virtualKey),
+                "The automation key is not supported.");
+        }
+
+        return FromVirtualKey(virtualKey);
+    }
+
+    private static KeyboardInputDescriptor FromVirtualKey(
+        int virtualKey)
+    {
         uint mapped = NativeMethods.MapVirtualKey((uint)virtualKey, MapVirtualKeyToScanCodeExtended);
         int scanCode = (int)(mapped & 0xFF);
-        if (scanCode == 0) throw new InvalidOperationException("Windows could not resolve the configured Shift Lock key to a physical scan code.");
-        bool extended = (mapped & 0xFF00) is 0xE000 or 0xE100;
+        if (scanCode == 0)
+        {
+            throw new InvalidOperationException(
+                "Windows could not resolve the key to a physical scan code.");
+        }
+        bool extended =
+            (mapped & 0xFF00) is 0xE000 or 0xE100 ||
+            virtualKey is >= 0x21 and <= 0x28 or
+                0x2D or 0x2E;
         return new KeyboardInputDescriptor(virtualKey, scanCode, extended);
     }
 }

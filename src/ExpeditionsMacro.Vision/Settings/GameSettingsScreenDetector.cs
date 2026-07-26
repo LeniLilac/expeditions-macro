@@ -27,7 +27,8 @@ public static class GameSettingsScreenDetector
                 .Where(component =>
                     component.Width is >= 12 and <= 32 &&
                     component.Height is >= 12 and <= 32 &&
-                    component.Count >= 70)
+                    component.Count >= 70 &&
+                    IsPlausibleCloseX(component.CenterX))
                 .OrderByDescending(component => component.Count)
                 .ToArray();
         if (closeCandidates.Length == 0)
@@ -41,52 +42,40 @@ public static class GameSettingsScreenDetector
                     0,
                     0));
         }
-        SettingsColorComponent close = closeCandidates[0];
-
-        double closeX = close.CenterX;
-        double closeY = close.CenterY;
-        double scale =
-            (closeX - GameSettingsLayout.PanelCenterX) /
-            GameSettingsLayout.BaseCloseOffsetX;
-        if (scale is < 0.72 or > 1.28)
+        foreach (SettingsColorComponent close in
+                 closeCandidates)
         {
-            return TracePanel(
-                new GameSettingsPanelMatch(
-                    false,
-                    false,
-                    0,
-                    scale,
-                    (int)Math.Round(closeX),
-                    (int)Math.Round(closeY)));
-        }
+            double closeX = close.CenterX;
+            double closeY = close.CenterY;
+            double scale =
+                (closeX -
+                 GameSettingsLayout.PanelCenterX) /
+                GameSettingsLayout.BaseCloseOffsetX;
+            ScreenRegion? interior =
+                InteriorForScale(scale);
+            if (interior is null)
+            {
+                continue;
+            }
 
-        ScreenRegion? interior =
-            InteriorForScale(scale);
-        if (interior is null)
-        {
-            return TracePanel(
-                new GameSettingsPanelMatch(
-                    false,
-                    false,
-                    0,
-                    scale,
-                    (int)Math.Round(closeX),
-                    (int)Math.Round(closeY)));
-        }
-
-        double dark =
-            GameSettingsVisionMetrics.ColorFraction(
-                image,
-                interior.Value,
-                GameSettingsVisionMetrics.IsDark);
-        double expectedCloseY =
-            GameSettingsLayout.PanelCenterY +
-            GameSettingsLayout.BaseCloseOffsetY * scale;
-        bool settled =
-            Math.Abs(closeY - expectedCloseY) <= 8;
-        double confidence = dark < 0.54
-            ? 0
-            : Math.Clamp(
+            double dark =
+                GameSettingsVisionMetrics.ColorFraction(
+                    image,
+                    interior.Value,
+                    GameSettingsVisionMetrics.IsDark);
+            if (dark < 0.54)
+            {
+                continue;
+            }
+            double expectedCloseY =
+                GameSettingsLayout.PanelCenterY +
+                GameSettingsLayout.BaseCloseOffsetY *
+                scale;
+            bool settled =
+                Math.Abs(
+                    closeY -
+                    expectedCloseY) <= 8;
+            double confidence = Math.Clamp(
                 0.58 +
                 0.24 *
                 GameSettingsVisionMetrics.Ramp(
@@ -100,14 +89,34 @@ public static class GameSettingsScreenDetector
                     300),
                 0,
                 1);
+            return TracePanel(
+                new GameSettingsPanelMatch(
+                    confidence >= 0.72,
+                    settled,
+                    confidence,
+                    scale,
+                    (int)Math.Round(closeX),
+                    (int)Math.Round(closeY)));
+        }
+
         return TracePanel(
             new GameSettingsPanelMatch(
-                confidence >= 0.72,
-                settled,
-                confidence,
-                scale,
-                (int)Math.Round(closeX),
-                (int)Math.Round(closeY)));
+                false,
+                false,
+                0,
+                0,
+                0,
+                0));
+    }
+
+    private static bool IsPlausibleCloseX(
+        double closeX)
+    {
+        double scale =
+            (closeX -
+             GameSettingsLayout.PanelCenterX) /
+            GameSettingsLayout.BaseCloseOffsetX;
+        return scale is >= 0.72 and <= 1.28;
     }
 
     public static GameSettingsPageMatch DetectPage(

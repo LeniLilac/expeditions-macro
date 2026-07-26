@@ -287,6 +287,27 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
                 holdMilliseconds,
                 cancellationToken));
 
+    public Task HoldKeyAsync(
+        RobloxWindow window,
+        int virtualKey,
+        int holdMilliseconds,
+        CancellationToken cancellationToken) =>
+        TraceAsync(
+            "automation",
+            "hold_key",
+            new
+            {
+                Window = WindowData(window),
+                VirtualKey = virtualKey,
+                Key = KeyboardKey.GetDisplayName(virtualKey),
+                HoldMilliseconds = holdMilliseconds,
+            },
+            () => _inner.HoldKeyAsync(
+                window,
+                virtualKey,
+                holdMilliseconds,
+                cancellationToken));
+
     public Task TapUnitKeyAsync(RobloxWindow window, int unitKey, int holdMilliseconds, CancellationToken cancellationToken) =>
         TraceAsync(
             "automation",

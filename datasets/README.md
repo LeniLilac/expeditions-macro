@@ -1,6 +1,6 @@
 # Detector image dataset
 
-This repository includes 444 image fixtures used to build and regression-test the bundled Anime Expeditions detector pack, specialized UI detectors, and automatic camera-region selection. Of these, 441 are 808 by 611 Roblox client captures: 277 Expeditions fixtures, 80 selective Challenge fixtures, 45 Story/Raid/team fixtures, 8 cross-mode navigation variants, 15 camera fixtures, 6 experimental resource-refuel fixtures, and 10 game-settings fixtures. The remaining three are privacy-safe 304 by 192 grayscale camera composites derived from a reported runtime-alignment failure. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
+This repository includes 463 image fixtures used to build and regression-test the bundled Anime Expeditions detector pack, specialized UI detectors, and automatic camera-region selection. Of these, 460 are 808 by 611 Roblox client captures: 285 Expeditions fixtures, 80 selective Challenge fixtures, 45 Story/Raid/team fixtures, 9 cross-mode navigation variants, 15 camera fixtures, 6 experimental resource-refuel fixtures, 13 game-settings fixtures, and 7 Event fixtures. The remaining three are privacy-safe 304 by 192 grayscale camera composites derived from a reported runtime-alignment failure. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
 
 Captures are 808 by 611 PNG files organized under:
 
@@ -17,6 +17,8 @@ Camera-alignment fixtures are organized under `datasets/anime-expeditions/camera
 Experimental Areas, Gold Mine, and Resource Drill fixtures are organized under `datasets/anime-expeditions/refuel/`. They support only the Debug-page route calibration tool; no released Macro task or automatic refuel schedule consumes them.
 
 Startup settings fixtures are organized under `datasets/anime-expeditions/settings/`. They cover the closed Lobby, the Settings opening animation, supported UI Scale values, each required settings page, and the Units page at both scroll boundaries.
+
+Villain Invasion Event fixtures are organized under `datasets/anime-expeditions/events/`. They cover Event home, act selection/detail, prestart, Defeat, and both reviewed Victory action rails—with and without **Next Stage**. Event navigation uses these specialized fixtures and remains separate from the shared Play-interface detector because Event is available only from Lobby.
 
 The current builder recognizes these dataset names:
 
@@ -42,5 +44,9 @@ The three `Difficultly*_LayoutShift` folders and `AFK_Chamber` are golden-test f
 `Play_UI` includes different avatars, current maps, reward icons, and Roblox UI scale/layout variants. Play-screen detection must use the stable Expedition tile structure rather than those changing details.
 
 `Expedition_Map_Select_Selection_Regression` contains English and French selector screens that reproduced false "map could not be selected" errors. The beta.9 Map 1 fixture also preserves a bright selected-row preview that made the former all-rows-dark structural gate reject an otherwise unambiguous active marker. Map selection must use the cyan active-row marker rather than localized map-name text, and must not score the selected row's changing artwork as an inactive dark panel.
+
+The `CurrentUI*.png` files in the three map and difficulty folders preserve the 2026-07-25 full-screen Expedition selector. Its active map is owned by the cyan perimeter on the left-side card rail, while difficulty is owned by the current lower-left green, red, or purple control. The old compact selector remains in the same folders as a supported legacy layout.
+
+`LobbyEventTheme.png` preserves the red Event-theme Lobby whose bright railing resembles the Settings close circle. Settings detection must require independent dark panel geometry before accepting that red component. `GraphicsPageCurrent.png` includes the new **Event Theme Enabled** control, which the startup profile disables. `MiscellaneousPageCurrent.png` preserves the current shifted Misc controls. `LobbyExitConfirmation.png` covers the accessibility-owned Back-to-Lobby confirmation.
 
 When extending the dataset, use several captures per state across lighting and moving-object variations. Crop to the Roblox client area and do not include desktop chrome, other applications, notifications, account names, webhook tokens, or chat content.

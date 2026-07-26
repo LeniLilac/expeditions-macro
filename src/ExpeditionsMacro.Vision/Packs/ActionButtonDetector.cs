@@ -45,6 +45,7 @@ internal static class ActionButtonDetector
     {
         ["map_select"] = new(new ScreenRegion(590, 455, 218, 135), ButtonColor.Green, 728, 535, 130, 90, 78, 150, 17, 43, 0.42),
         ["select_stage"] = new(new ScreenRegion(590, 455, 218, 135), ButtonColor.Green, 728, 535, 130, 90, 78, 150, 17, 43, 0.42),
+        ["expedition_current_select_stage"] = new(new ScreenRegion(160, 560, 190, 51), ButtonColor.Green, 254, 589, 55, 24, 130, 175, 20, 40, 0.42),
         ["map_preview"] = new(new ScreenRegion(350, 295, 280, 150), ButtonColor.Green, 479, 370, 80, 60, 70, 150, 16, 42, 0.42),
         ["confirm"] = new(new ScreenRegion(220, 255, 360, 145), ButtonColor.Green, 345, 331, 75, 55, 75, 155, 15, 40, 0.42),
         ["extract_confirm"] = new(new ScreenRegion(220, 315, 360, 140), ButtonColor.Red, 345, 378, 75, 55, 75, 155, 15, 42, 0.42),

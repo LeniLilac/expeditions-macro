@@ -75,6 +75,8 @@ internal static class GameSettingsLayout
                 new(GameSettingsPage.Graphics, 436, 257),
             [RequiredGameSetting.NightTimeEnabled] =
                 new(GameSettingsPage.Graphics, 638, 257),
+            [RequiredGameSetting.EventThemeEnabled] =
+                new(GameSettingsPage.Graphics, 436, 293),
             [RequiredGameSetting.ShowOtherUnitVfx] =
                 new(GameSettingsPage.Units, 638, 222),
             [RequiredGameSetting.ShowOwnUnitVfx] =
@@ -96,8 +98,8 @@ internal static class GameSettingsLayout
             [RequiredGameSetting.AutoAbilitiesOnPlacement] =
                 new(GameSettingsPage.Units, 638, 351, true),
             [RequiredGameSetting.DisplayUpdateLogOnLogin] =
-                new(GameSettingsPage.Miscellaneous, 436, 351),
+                new(GameSettingsPage.Miscellaneous, 436, 364),
             [RequiredGameSetting.AutoSprint] =
-                new(GameSettingsPage.Miscellaneous, 638, 351),
+                new(GameSettingsPage.Miscellaneous, 638, 364),
         };
 }

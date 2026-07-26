@@ -4,6 +4,7 @@ using ExpeditionsMacro.Automation.Camera;
 using ExpeditionsMacro.Automation.Challenges;
 using ExpeditionsMacro.Automation.Diagnostics;
 using ExpeditionsMacro.Automation.Discord;
+using ExpeditionsMacro.Automation.Events;
 using ExpeditionsMacro.Automation.Expeditions;
 using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Automation.Recovery;
@@ -153,6 +154,12 @@ public sealed class AppServices : IDisposable
             Teams,
             _discord,
             FastNoAlign);
+        Events = new EventMacroRunner(
+            Automation,
+            Placement,
+            Teams,
+            _discord,
+            FastNoAlign);
         DetectorUpdates = new DetectorPackUpdateService(DetectorPacks);
         Hotkey.Pressed += (_, _) =>
         {
@@ -197,6 +204,7 @@ public sealed class AppServices : IDisposable
     public RecoveringMacroScheduler RecoveringScheduler { get; }
     public ChallengeMacroRunner Challenges { get; }
     public ExpeditionMacroRunner Expeditions { get; }
+    public EventMacroRunner Events { get; }
     public DetectorPackUpdateService DetectorUpdates { get; }
     public AppSettings Settings { get; private set; } = new();
 

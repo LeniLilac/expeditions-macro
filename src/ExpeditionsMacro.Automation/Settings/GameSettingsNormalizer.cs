@@ -405,6 +405,8 @@ internal sealed class GameSettingsNormalizer
                 "Low Detail Mode",
             RequiredGameSetting.NightTimeEnabled =>
                 "Night Time Enabled",
+            RequiredGameSetting.EventThemeEnabled =>
+                "Event Theme Enabled",
             RequiredGameSetting.ShowOtherUnitVfx =>
                 "Show Other Unit VFX",
             RequiredGameSetting.ShowOwnUnitVfx =>

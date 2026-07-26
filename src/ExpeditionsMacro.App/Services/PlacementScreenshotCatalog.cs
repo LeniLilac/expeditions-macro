@@ -78,6 +78,16 @@ public static class PlacementScreenshotCatalog
                     3 => "raid-spirit-city-act-3.png",
                     _ => throw UnknownTarget(),
                 },
+            PlacementTargetMode.Event =>
+                target.ActNumber switch
+                {
+                    1 => "event-villain-invasion-act-1.png",
+                    2 => "event-villain-invasion-act-2.png",
+                    3 => "event-villain-invasion-act-3.png",
+                    4 => throw new InvalidOperationException(
+                        "The Villain Invasion Act 4 placement screenshot is not available yet."),
+                    _ => throw UnknownTarget(),
+                },
             _ => throw UnknownTarget(),
         };
     }

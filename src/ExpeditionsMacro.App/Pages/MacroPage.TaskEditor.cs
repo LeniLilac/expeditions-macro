@@ -266,6 +266,8 @@ public partial class MacroPage
                 PlacementTargetMode.Story,
             MacroTaskKind.Raid =>
                 PlacementTargetMode.Raid,
+            MacroTaskKind.Event =>
+                PlacementTargetMode.Event,
             _ => null,
         };
         _visibleRoutes.Clear();
@@ -378,7 +380,8 @@ public partial class MacroPage
         bool retries =
             kind is MacroTaskKind.Challenge or
                 MacroTaskKind.Story or
-                MacroTaskKind.Raid;
+                MacroTaskKind.Raid or
+                MacroTaskKind.Event;
         bool runtime =
             TaskRouteCombo.SelectedItem is
                 PlacementSetupRoute route &&

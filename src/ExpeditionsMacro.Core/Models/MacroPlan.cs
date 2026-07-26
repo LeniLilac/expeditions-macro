@@ -6,6 +6,7 @@ public enum MacroTaskKind
     Expedition,
     Story,
     Raid,
+    Event,
 }
 
 public sealed record MacroTaskDefinition
@@ -81,6 +82,8 @@ public sealed record MacroTaskDefinition
                 PlacementTargetMode.Story,
             MacroTaskKind.Raid =>
                 PlacementTargetMode.Raid,
+            MacroTaskKind.Event =>
+                PlacementTargetMode.Event,
             _ => throw new InvalidDataException(
                 "The task route is invalid."),
         };

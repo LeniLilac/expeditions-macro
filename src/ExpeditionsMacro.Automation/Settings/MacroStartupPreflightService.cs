@@ -1,3 +1,4 @@
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
@@ -17,6 +18,8 @@ public sealed class MacroStartupPreflightService
     private readonly IRobloxAutomation _automation;
     private readonly GameSettingsNormalizer _normalizer;
     private readonly UiScaleNormalizer _uiScale;
+    private readonly AccessibilityNavigationController
+        _accessibility;
     private readonly Func<DateTimeOffset> _utcNow;
     private readonly Func<
         TimeSpan,
@@ -49,6 +52,11 @@ public sealed class MacroStartupPreflightService
             automation,
             utcNow,
             delay);
+        _accessibility =
+            new AccessibilityNavigationController(
+                automation,
+                ValidateWindow,
+                delay);
     }
 
     public async Task<GameSettingsNormalizationResult>
@@ -64,30 +72,7 @@ public sealed class MacroStartupPreflightService
                 "Preparing Roblox for the UI Scale check.",
                 progress,
                 cancellationToken).ConfigureAwait(false);
-        await ClickSettingsButtonAsync(
-            window,
-            cancellationToken).ConfigureAwait(false);
-        GameSettingsPanelMatch panel =
-            await WaitForPanelAsync(
-                window,
-                canonicalScale: false,
-                cancellationToken).ConfigureAwait(false);
-        bool changed =
-            Math.Abs(panel.UiScale - 1) >
-            GameSettingsScreenDetector
-                .CanonicalScaleTolerance;
-        if (changed)
-        {
-            Report(
-                $"Calibrating Anime Expeditions rendered UI Scale from {panel.UiScale:0.00} to canonical 1.00.",
-                progress,
-                log,
-                MacroEventLevel.Information);
-            await _uiScale.NormalizeAsync(
-                window,
-                cancellationToken).ConfigureAwait(false);
-        }
-        await CloseSettingsPanelAsync(
+        bool changed = await _uiScale.NormalizeAsync(
             window,
             cancellationToken).ConfigureAwait(false);
         Report(
@@ -120,7 +105,7 @@ public sealed class MacroStartupPreflightService
             detector,
             TimeSpan.FromSeconds(12),
             cancellationToken).ConfigureAwait(false);
-        await ClickSettingsButtonAsync(
+        await OpenSettingsPanelAsync(
             window,
             cancellationToken).ConfigureAwait(false);
         GameSettingsPanelMatch panel =
@@ -202,30 +187,8 @@ public sealed class MacroStartupPreflightService
             progress,
             log,
             MacroEventLevel.Information);
-        await ClickSettingsButtonAsync(
-            window,
-            cancellationToken).ConfigureAwait(false);
-        GameSettingsPanelMatch panel =
-            await WaitForPanelAsync(
-                window,
-                canonicalScale: false,
-                cancellationToken).ConfigureAwait(false);
         bool scaleChanged =
-            Math.Abs(panel.UiScale - 1) >
-            GameSettingsScreenDetector
-                .CanonicalScaleTolerance;
-        if (scaleChanged)
-        {
-            Report(
-                $"Adjusting Anime Expeditions UI Scale from {panel.UiScale:0.00} to 1.00.",
-                progress,
-                log,
-                MacroEventLevel.Information);
             await _uiScale.NormalizeAsync(
-                window,
-                cancellationToken).ConfigureAwait(false);
-        }
-        await CloseSettingsPanelAsync(
             window,
             cancellationToken).ConfigureAwait(false);
         await WaitForLobbyAsync(
@@ -239,7 +202,7 @@ public sealed class MacroStartupPreflightService
             progress,
             log,
             MacroEventLevel.Information);
-        await ClickSettingsButtonAsync(
+        await OpenSettingsPanelAsync(
             window,
             cancellationToken).ConfigureAwait(false);
         await WaitForPanelAsync(
@@ -302,23 +265,47 @@ public sealed class MacroStartupPreflightService
         RobloxWindow window,
         CancellationToken cancellationToken)
     {
-        await ClickSettingsButtonAsync(
+        await _accessibility.RunEnabledAsync(
             window,
+            async token =>
+            {
+                await _accessibility.TapAsync(
+                    window,
+                    RobloxKeyboardKey.RightArrow,
+                    token).ConfigureAwait(false);
+                await _accessibility.TapAsync(
+                    window,
+                    RobloxKeyboardKey.Enter,
+                    token).ConfigureAwait(false);
+            },
             cancellationToken).ConfigureAwait(false);
         await WaitForSettingsClosedAsync(
             window,
             cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task ClickSettingsButtonAsync(
+    private async Task<GameSettingsPanelMatch>
+        OpenSettingsPanelAsync(
         RobloxWindow window,
         CancellationToken cancellationToken)
     {
-        ValidateWindow(window);
-        await _automation.ClickClientAsync(
+        await _accessibility.RunEnabledAsync(
             window,
-            GameSettingsScreenDetector.SettingsButtonX,
-            GameSettingsScreenDetector.SettingsButtonY,
+            async token =>
+            {
+                await _accessibility.TapAsync(
+                    window,
+                    RobloxKeyboardKey.RightArrow,
+                    token).ConfigureAwait(false);
+                await _accessibility.TapAsync(
+                    window,
+                    RobloxKeyboardKey.Enter,
+                    token).ConfigureAwait(false);
+            },
+            cancellationToken).ConfigureAwait(false);
+        return await WaitForPanelAsync(
+            window,
+            canonicalScale: false,
             cancellationToken).ConfigureAwait(false);
     }
 

@@ -157,7 +157,10 @@ public sealed class MacroScheduler
         ScheduledTaskResult result) =>
         !result.Skipped &&
         following is not null &&
-        current.Kind is MacroTaskKind.Expedition or MacroTaskKind.Story or MacroTaskKind.Raid &&
+        current.Kind is MacroTaskKind.Expedition or
+            MacroTaskKind.Story or
+            MacroTaskKind.Raid or
+            MacroTaskKind.Event &&
         following.Kind == current.Kind &&
         SameRoute(current, following);
 

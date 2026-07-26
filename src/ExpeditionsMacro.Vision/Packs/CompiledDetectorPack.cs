@@ -8,10 +8,9 @@ using OpenCvSharp;
 
 namespace ExpeditionsMacro.Vision.Packs;
 
-public sealed class CompiledDetectorPack : IDetectorPack
+public sealed partial class CompiledDetectorPack : IDetectorPack
 {
     private static readonly string[] RecoveryStates = ["afk", "disconnect", "lobby", "play", "map_select", "map_preview"];
-    private static readonly (int X, int Y)[] DifficultyLayoutOffsets = Enumerable.Range(-8, 17).Select(y => (0, y)).ToArray();
     private static readonly ScreenRegion HotbarAnchorRegion = new(154, 536, 500, 62);
     private static readonly ScreenRegion NodeBarAnchorRegion = new(220, 53, 370, 32);
     private readonly IReadOnlyDictionary<string, StateRuntime> _states;
@@ -95,6 +94,12 @@ public sealed class CompiledDetectorPack : IDetectorPack
             pair => ScoreConfiguredState(pair.Key, pair.Value, clientImage, useSpecializedDetectors),
             StringComparer.OrdinalIgnoreCase);
         if (useSpecializedDetectors) scores["afk"] = AfkChamberDetector.Score(clientImage);
+        if (useSpecializedDetectors)
+        {
+            scores["map_select"] = Math.Max(
+                scores.GetValueOrDefault("map_select"),
+                ExpeditionSelectorDetector.Score(clientImage));
+        }
         if (useSpecializedDetectors && Classify(scores) is null)
         {
             foreach ((string name, StateRuntime runtime) in _states
@@ -123,6 +128,11 @@ public sealed class CompiledDetectorPack : IDetectorPack
         ValidateClient(clientImage);
         bool useSpecializedDetectors = Manifest.PackId.Equals(AnimeExpeditionsDetectorSpec.PackId, StringComparison.OrdinalIgnoreCase);
         if (useSpecializedDetectors && AfkChamberDetector.Score(clientImage) >= AfkChamberDetector.Threshold) return "afk";
+        if (useSpecializedDetectors &&
+            ExpeditionSelectorDetector.Score(clientImage) >= 0.90)
+        {
+            return "map_select";
+        }
         Dictionary<string, double> scores = [];
         foreach (string name in RecoveryStates)
         {
@@ -166,43 +176,6 @@ public sealed class CompiledDetectorPack : IDetectorPack
         return ranked[0].Name;
     }
 
-    public int? SelectedMap(ImageFrame clientImage)
-    {
-        ValidateClient(clientImage);
-        if (Manifest.PackId.Equals(AnimeExpeditionsDetectorSpec.PackId, StringComparison.OrdinalIgnoreCase) &&
-            MapSelectionDetector.Detect(clientImage) is int markerSelection)
-        {
-            return markerSelection;
-        }
-
-        int? selected = BestSelection(_maps, clientImage, 0.90, 0.10, [(0, 0)]);
-        return selected ?? BestAdaptiveSelection(_maps, clientImage, 0.90, 0.10);
-    }
-
-    public int? SelectedDifficulty(ImageFrame clientImage)
-    {
-        ValidateClient(clientImage);
-        (bool observed, int? selected) = DifficultyFromHue(clientImage, Manifest.DifficultyHueRegion);
-        if (selected is not null) return selected;
-
-        (SelectionRuntime Runtime, AdaptiveRegionMatch Match)? adaptiveLayout = BestAdaptiveLayout(_difficulties, clientImage);
-        if (adaptiveLayout is not null && Manifest.DifficultyHueRegion is ScreenRegion configuredHue)
-        {
-            ScreenRegion mappedHue = adaptiveLayout.Value.Match.MapRegion(configuredHue);
-            (bool adaptiveObserved, int? adaptiveSelected) = DifficultyFromHue(clientImage, mappedHue);
-            observed |= adaptiveObserved;
-            if (adaptiveSelected is not null) return adaptiveSelected;
-        }
-
-        // Roblox can shift the whole difficulty control slightly between UI revisions.
-        // Pick one shared layout offset from the fixed frame/buttons, then compare all
-        // difficulty references at that same offset. This keeps the active center slot
-        // authoritative instead of following labels as they move through the carousel.
-        int? templateSelected = BestSelectionAtSharedOffset(_difficulties, clientImage, 0.97, 0.01, DifficultyLayoutOffsets);
-        if (templateSelected is not null) return templateSelected;
-        return observed ? null : BestAdaptiveSelection(_difficulties, clientImage, 0.91, 0.015);
-    }
-
     public IReadOnlyList<int> RemainingUnitKeys(ImageFrame clientImage, IReadOnlySet<int> unitKeys)
     {
         ValidateClient(clientImage);
@@ -238,6 +211,12 @@ public sealed class CompiledDetectorPack : IDetectorPack
         if (useSpecializedDetectors)
         {
             ValidateClient(clientImage!);
+            if (ExpeditionSelectorDetector.ActionFor(
+                    clientImage!,
+                    state) is { } expeditionAction)
+            {
+                return expeditionAction;
+            }
             if (state.Equals("afk", StringComparison.OrdinalIgnoreCase) && AfkChamberDetector.ActionFor(clientImage!) is { } afkAction) return afkAction;
             (int X, int Y)? startAction = state.Equals("start", StringComparison.OrdinalIgnoreCase) ? StartDialogDetector.ActionFor(clientImage!) : null;
             if (startAction is not null) return startAction.Value;
@@ -361,133 +340,6 @@ public sealed class CompiledDetectorPack : IDetectorPack
             .OrderBy(candidate => runtime.Definition.Regions[candidate].Region.Width * runtime.Definition.Regions[candidate].Region.Height)
             .First();
         return (runtime.Definition.Regions[index].Region, runtime.References[index]);
-    }
-
-    private int? BestSelection(
-        IReadOnlyDictionary<int, SelectionRuntime> selections,
-        ImageFrame image,
-        double minimumScore,
-        double minimumGap,
-        IReadOnlyList<(int X, int Y)> offsets)
-    {
-        ValidateClient(image);
-        (double Score, int Value)[] ranked = selections
-            .Select(pair => (ScoreSelection(pair.Value, image, offsets), pair.Key))
-            .OrderByDescending(value => value.Item1)
-            .ToArray();
-        if (ranked.Length < 2 || ranked[0].Score < minimumScore || ranked[0].Score - ranked[1].Score < minimumGap) return null;
-        return ranked[0].Value;
-    }
-
-    private int? BestSelectionAtSharedOffset(
-        IReadOnlyDictionary<int, SelectionRuntime> selections,
-        ImageFrame image,
-        double minimumScore,
-        double minimumGap,
-        IReadOnlyList<(int X, int Y)> offsets)
-    {
-        ValidateClient(image);
-        (double LayoutScore, (double Score, int Value)[] Scores) bestLayout = offsets
-            .Select(offset =>
-            {
-                (double Score, int Value)[] scores = selections
-                    .Select(pair => (ScoreSelection(pair.Value, image, [offset]), pair.Key))
-                    .OrderByDescending(value => value.Item1)
-                    .ToArray();
-                return (LayoutScore: Median(scores.Select(value => value.Score).ToArray()), Scores: scores);
-            })
-            .OrderByDescending(candidate => candidate.LayoutScore)
-            .ThenByDescending(candidate => candidate.Scores[0].Score)
-            .First();
-        (double Score, int Value)[] ranked = bestLayout.Scores;
-        if (ranked.Length < 2 || ranked[0].Score < minimumScore || ranked[0].Score - ranked[1].Score < minimumGap) return null;
-        return ranked[0].Value;
-    }
-
-    private int? BestAdaptiveSelection(
-        IReadOnlyDictionary<int, SelectionRuntime> selections,
-        ImageFrame image,
-        double minimumScore,
-        double minimumGap)
-    {
-        ValidateClient(image);
-        (double Score, int Value)[] ranked = selections
-            .Select(pair => (AdaptiveUiMatcher.Find(pair.Value.Reference, image, pair.Value.Definition.Region).Score, pair.Key))
-            .OrderByDescending(value => value.Item1)
-            .ToArray();
-        if (ranked.Length < 2 || ranked[0].Score < minimumScore || ranked[0].Score - ranked[1].Score < minimumGap) return null;
-        return ranked[0].Value;
-    }
-
-    private static (SelectionRuntime Runtime, AdaptiveRegionMatch Match)? BestAdaptiveLayout(
-        IReadOnlyDictionary<int, SelectionRuntime> selections,
-        ImageFrame image)
-    {
-        (SelectionRuntime Runtime, AdaptiveRegionMatch Match)[] ranked = selections.Values
-            .Select(runtime => (runtime, AdaptiveUiMatcher.Find(runtime.Reference, image, runtime.Definition.Region)))
-            .OrderByDescending(value => value.Item2.Score)
-            .ToArray();
-        return ranked.Length == 0 || ranked[0].Match.Score < 0.35 ? null : ranked[0];
-    }
-
-    private static double ScoreSelection(SelectionRuntime runtime, ImageFrame image, IReadOnlyList<(int X, int Y)> offsets)
-    {
-        double best = 0;
-        foreach ((int x, int y) in offsets)
-        {
-            ScreenRegion region = runtime.Definition.Region.Translate(x, y);
-            if (!region.FitsWithin(image.Width, image.Height)) continue;
-            ImageFrame current = VisionScorer.PrepareGray(image.Crop(region), runtime.Reference.Width, runtime.Reference.Height);
-            best = Math.Max(best, VisionScorer.RobustSimilarity(runtime.Reference, current));
-        }
-        return best;
-    }
-
-    private (bool Observed, int? Selected) DifficultyFromHue(ImageFrame image, ScreenRegion? candidateRegion)
-    {
-        IReadOnlyDictionary<int, double>? prototypes = Manifest.DifficultyHuePrototypes;
-        ScreenRegion? configuredRegion = candidateRegion;
-        if ((prototypes is null || configuredRegion is null) && Manifest.PackId.Equals(AnimeExpeditionsDetectorSpec.PackId, StringComparison.OrdinalIgnoreCase))
-        {
-            prototypes = AnimeExpeditionsDetectorSpec.DifficultyHuePrototypes;
-            configuredRegion = AnimeExpeditionsDetectorSpec.DifficultyHueRegion;
-        }
-        if (prototypes is null || configuredRegion is not ScreenRegion region || !region.FitsWithin(image.Width, image.Height)) return (false, null);
-
-        using Mat rgb = ImageCodec.ToMat(image.Crop(region));
-        using Mat hsv = new();
-        Cv2.CvtColor(rgb, hsv, ColorConversionCodes.RGB2HSV);
-        Dictionary<int, int> counts = prototypes.Keys.ToDictionary(value => value, _ => 0);
-        int coloredPixels = 0;
-        int rows = hsv.Rows;
-        int columns = hsv.Cols;
-        for (int y = 0; y < rows; y++)
-        {
-            for (int x = 0; x < columns; x++)
-            {
-                Vec3b pixel = hsv.At<Vec3b>(y, x);
-                if (pixel.Item1 < 140 || pixel.Item2 < 90) continue;
-                coloredPixels++;
-                double nearestDistance = double.MaxValue;
-                int nearestValue = 0;
-                foreach ((int value, double prototype) in prototypes)
-                {
-                    double distance = HueDistance(pixel.Item0, prototype);
-                    if (distance >= nearestDistance) continue;
-                    nearestDistance = distance;
-                    nearestValue = value;
-                }
-                if (nearestDistance <= 18) counts[nearestValue]++;
-            }
-        }
-
-        if (coloredPixels < 50) return (false, null);
-        (int Count, int Value)[] ranked = counts
-            .Select(pair => (pair.Value, pair.Key))
-            .OrderByDescending(value => value.Item1)
-            .ToArray();
-        if (ranked.Length < 2 || ranked[0].Count < 50 || ranked[0].Count - ranked[1].Count < 30) return (true, null);
-        return (true, ranked[0].Value);
     }
 
     private static double? NodeHue(ImageFrame image, ScreenRegion region)

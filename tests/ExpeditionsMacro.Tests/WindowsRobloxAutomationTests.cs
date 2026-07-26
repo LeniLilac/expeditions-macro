@@ -32,6 +32,27 @@ public sealed class WindowsRobloxAutomationTests
     }
 
     [Theory]
+    [InlineData(0x57, 0x11, false)]
+    [InlineData(0x20, 0x39, false)]
+    [InlineData(0x25, 0x4B, true)]
+    [InlineData(0x26, 0x48, true)]
+    [InlineData(0x27, 0x4D, true)]
+    [InlineData(0x28, 0x50, true)]
+    public void AutomationKeys_MapToPhysicalScanCodes(
+        int virtualKey,
+        int expectedScanCode,
+        bool expectedExtended)
+    {
+        KeyboardInputDescriptor key =
+            KeyboardInputDescriptor.FromAutomationVirtualKey(
+                virtualKey);
+
+        Assert.Equal(virtualKey, key.VirtualKey);
+        Assert.Equal(expectedScanCode, key.ScanCode);
+        Assert.Equal(expectedExtended, key.Extended);
+    }
+
+    [Theory]
     [InlineData(RobloxKeyboardKey.Backspace, 0x08, 0x0E, false)]
     [InlineData(RobloxKeyboardKey.Enter, 0x0D, 0x1C, false)]
     [InlineData(RobloxKeyboardKey.Backslash, 0xDC, 0x2B, false)]
