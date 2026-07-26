@@ -8,7 +8,7 @@
         <TextBlock Margin="0,5,0,0"
                    Style="{StaticResource Caption}"
                    TextWrapping="Wrap"
-                   Text="Choose the macro hotkey, then match the Play Menu, Units, Areas, and Shift Lock bindings configured in Anime Expeditions." />
+                   Text="Choose the macro hotkey, then match the Play Menu, Units, Areas, Cancel Placement, and Shift Lock bindings configured in Anime Expeditions." />
 
         <Grid Margin="0,16,0,0">
             <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
@@ -76,6 +76,23 @@
                     controls:Lucide.Icon="Keyboard"
                     Content="Set key"
                     Click="AreasButton_Click" />
+        </Grid>
+
+        <Grid Margin="0,14,0,0">
+            <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Placement cancel key" />
+                <TextBlock x:Name="CancelPlacementStatusText"
+                           Margin="0,5,0,0"
+                           Style="{StaticResource Caption}"
+                           TextWrapping="Wrap"
+                           Text="Defaults to Z. Match Anime Expeditions' Cancel Placement binding." />
+            </StackPanel>
+            <Button x:Name="CancelPlacementButton"
+                    Width="160"
+                    HorizontalAlignment="Right"
+                    controls:Lucide.Icon="Keyboard"
+                    Content="Z"
+                    Click="CancelPlacementButton_Click" />
         </Grid>
 
         <Grid Margin="0,14,0,0">

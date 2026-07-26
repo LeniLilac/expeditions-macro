@@ -337,11 +337,22 @@ public partial class PlacementModelsPage : UserControl, IAppPage
         RoutedEventArgs e)
     {
         PlacementModel model;
+        char cancelPlacementKey;
         try
         {
             model = BuildModel();
             await _services.PlacementModels.SaveAsync(model);
             _selectedModel = model;
+            cancelPlacementKey =
+                AppSettings.ParseCancelPlacementKey(
+                    _services.Settings.CancelPlacementKey,
+                    _services.Settings
+                        .MacroHotkeyVirtualKey,
+                    _services.Settings.PlayMenuKey,
+                    _services.Settings.UnitMenuKey,
+                    _services.Settings.AreasMenuKey,
+                    _services.Settings
+                        .ShiftLockVirtualKey);
         }
         catch (Exception error)
         {
@@ -372,6 +383,8 @@ public partial class PlacementModelsPage : UserControl, IAppPage
                     model,
                     overrideTiming,
                     delay,
+                    cancelPlacementKey:
+                        cancelPlacementKey,
                     stepSent: (index, total, step) =>
                     {
                         _services.DeepDebug.RecordEvent(

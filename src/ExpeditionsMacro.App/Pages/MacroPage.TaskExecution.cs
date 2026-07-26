@@ -19,6 +19,7 @@ public partial class MacroPage
         string discordUserId,
         char playMenuKey,
         char? unitMenuKey,
+        char cancelPlacementKey,
         MacroRunTotals macroTotals,
         ChallengeRotationState challengeRotation,
         IProgress<MacroProgress> progress,
@@ -33,6 +34,7 @@ public partial class MacroPage
                 discordUserId,
                 playMenuKey,
                 unitMenuKey,
+                cancelPlacementKey,
                 macroTotals,
                 challengeRotation,
                 progress,
@@ -44,6 +46,7 @@ public partial class MacroPage
                 discordUserId,
                 playMenuKey,
                 unitMenuKey,
+                cancelPlacementKey,
                 macroTotals,
                 progress,
                 cancellationToken),
@@ -54,6 +57,7 @@ public partial class MacroPage
                 discordUserId,
                 playMenuKey,
                 unitMenuKey,
+                cancelPlacementKey,
                 macroTotals,
                 progress,
                 cancellationToken),
@@ -64,6 +68,7 @@ public partial class MacroPage
                 discordUserId,
                 playMenuKey,
                 unitMenuKey,
+                cancelPlacementKey,
                 macroTotals,
                 progress,
                 cancellationToken),
@@ -74,6 +79,7 @@ public partial class MacroPage
                 discordUserId,
                 playMenuKey,
                 unitMenuKey,
+                cancelPlacementKey,
                 macroTotals,
                 progress,
                 cancellationToken),
@@ -90,6 +96,7 @@ public partial class MacroPage
         string discordUserId,
         char playMenuKey,
         char? unitMenuKey,
+        char cancelPlacementKey,
         MacroRunTotals macroTotals,
         ChallengeRotationState challengeRotation,
         IProgress<MacroProgress> progress,
@@ -146,7 +153,8 @@ public partial class MacroPage
             maximumCompletedRuns: 1,
             returnWhenUnavailable: true,
             unitMenuKey,
-            macroTotals).ConfigureAwait(false);
+            macroTotals,
+            cancelPlacementKey).ConfigureAwait(false);
 
         ChallengeRunSummary result = summary
             ?? throw new InvalidOperationException(
@@ -172,6 +180,7 @@ public partial class MacroPage
         string discordUserId,
         char playMenuKey,
         char? unitMenuKey,
+        char cancelPlacementKey,
         MacroRunTotals macroTotals,
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken)
@@ -251,9 +260,10 @@ public partial class MacroPage
                         victories,
                         defeats,
                         runtime),
-                    token).ConfigureAwait(false)
-                == ScheduledTaskContinuation.RepeatStage,
-            macroTotals: macroTotals).ConfigureAwait(false);
+                    token).ConfigureAwait(false),
+            macroTotals: macroTotals,
+            cancelPlacementKey: cancelPlacementKey)
+            .ConfigureAwait(false);
 
         ExpeditionRunSummary result = summary
             ?? throw new InvalidOperationException(
@@ -278,6 +288,7 @@ public partial class MacroPage
         string discordUserId,
         char playMenuKey,
         char? unitMenuKey,
+        char cancelPlacementKey,
         MacroRunTotals macroTotals,
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken)
@@ -334,9 +345,10 @@ public partial class MacroPage
                             victories,
                             defeats,
                             runtime),
-                        token).ConfigureAwait(false)
-                    == ScheduledTaskContinuation.RepeatStage,
-                macroTotals: macroTotals).ConfigureAwait(false);
+                        token).ConfigureAwait(false),
+                macroTotals: macroTotals,
+                cancelPlacementKey:
+                    cancelPlacementKey).ConfigureAwait(false);
             return ToScheduledResult(result);
         }
         catch (CameraAlignmentException error)
@@ -369,6 +381,7 @@ public partial class MacroPage
         string discordUserId,
         char playMenuKey,
         char? unitMenuKey,
+        char cancelPlacementKey,
         MacroRunTotals macroTotals,
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken)
@@ -425,9 +438,10 @@ public partial class MacroPage
                             victories,
                             defeats,
                             runtime),
-                        token).ConfigureAwait(false)
-                    == ScheduledTaskContinuation.RepeatStage,
-                macroTotals: macroTotals).ConfigureAwait(false);
+                        token).ConfigureAwait(false),
+                macroTotals: macroTotals,
+                cancelPlacementKey:
+                    cancelPlacementKey).ConfigureAwait(false);
             return ToScheduledResult(result);
         }
         catch (CameraAlignmentException error)

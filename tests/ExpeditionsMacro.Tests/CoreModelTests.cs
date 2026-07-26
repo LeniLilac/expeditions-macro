@@ -231,6 +231,34 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public void AppSettings_PlacementCancelDefaultsToZAndRejectsConflicts()
+    {
+        AppSettings settings = new();
+
+        Assert.Equal(
+            "Z",
+            settings.CancelPlacementKey);
+        Assert.Equal(
+            'X',
+            AppSettings.ParseCancelPlacementKey(
+                " x ",
+                AppSettings.DefaultMacroHotkeyVirtualKey,
+                "P",
+                "H",
+                "U",
+                KeyboardKey.LeftControl));
+        Assert.Throws<InvalidDataException>(
+            () =>
+                AppSettings.ParseCancelPlacementKey(
+                    "P",
+                    AppSettings.DefaultMacroHotkeyVirtualKey,
+                    "P",
+                    "H",
+                    "U",
+                    KeyboardKey.LeftControl));
+    }
+
+    [Fact]
     public void ResourceRefuelDebugSettings_ValidatesRouteTimingAndRetries()
     {
         ResourceRefuelDebugSettings settings = new();

@@ -114,6 +114,7 @@ public sealed partial class EventMacroRunner
         EventPreset preset,
         PlacementModel placement,
         IReadOnlyList<PlacementStep> steps,
+        char cancelPlacementKey,
         CancellationToken cancellationToken) =>
         _placements.PlayStepsAsync(
             window,
@@ -123,6 +124,7 @@ public sealed partial class EventMacroRunner
             defaultIntervalMilliseconds: 0,
             preset.UnitKeyHoldMilliseconds,
             preset.UnitSelectDelayMilliseconds,
+            cancelPlacementKey,
             stepSent: null,
             status: null,
             cancellationToken);

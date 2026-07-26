@@ -101,7 +101,8 @@ public sealed class AppServices : IDisposable
                 Settings.MacroHotkeyVirtualKey,
                 Settings.PlayMenuKey,
                 Settings.UnitMenuKey,
-                Settings.AreasMenuKey));
+                Settings.AreasMenuKey,
+                Settings.CancelPlacementKey));
         FastNoAlign = new FastNoAlignPreparationSession(
             CameraPose);
         Camera = new CameraAlignmentEngine(

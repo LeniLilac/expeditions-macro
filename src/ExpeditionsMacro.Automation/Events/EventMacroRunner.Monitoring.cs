@@ -19,6 +19,7 @@ public sealed partial class EventMacroRunner
         PlacementModel placement,
         IDetectorPack detector,
         Stopwatch matchRuntime,
+        char cancelPlacementKey,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<PlacementStep> afterStart =
@@ -96,6 +97,7 @@ public sealed partial class EventMacroRunner
                     preset,
                     placement,
                     [afterStart[nextStep]],
+                    cancelPlacementKey,
                     cancellationToken).ConfigureAwait(false);
                 nextStep++;
             }

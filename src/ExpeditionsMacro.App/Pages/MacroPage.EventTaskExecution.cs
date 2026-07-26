@@ -21,6 +21,7 @@ public partial class MacroPage
         string discordUserId,
         char playMenuKey,
         char? unitMenuKey,
+        char cancelPlacementKey,
         MacroRunTotals macroTotals,
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken)
@@ -58,9 +59,10 @@ public partial class MacroPage
                             victories,
                             defeats,
                             runtime),
-                        token).ConfigureAwait(false)
-                    == ScheduledTaskContinuation.RepeatStage,
-                macroTotals: macroTotals)
+                        token).ConfigureAwait(false),
+                macroTotals: macroTotals,
+                cancelPlacementKey:
+                    cancelPlacementKey)
                 .ConfigureAwait(false);
         return ToScheduledResult(result);
     }

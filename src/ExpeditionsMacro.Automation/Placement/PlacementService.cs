@@ -76,13 +76,26 @@ public sealed class PlacementService
         int defaultIntervalMilliseconds,
         int keyHoldMilliseconds = 110,
         int afterKeyMilliseconds = 250,
+        char cancelPlacementKey =
+            AppSettings.DefaultCancelPlacementKeyChar,
         Action<int, int, PlacementStep>? stepSent = null,
         Action<string>? status = null,
         CancellationToken cancellationToken = default)
     {
         model.Validate();
         RobloxWindow window = _automation.FindWindow() ?? throw new RobloxSessionUnavailableException("No visible Roblox window was found.");
-        await PlayStepsAsync(window, model, model.Steps, useDefaultInterval, defaultIntervalMilliseconds, keyHoldMilliseconds, afterKeyMilliseconds, stepSent, status, cancellationToken).ConfigureAwait(false);
+        await PlayStepsAsync(
+            window,
+            model,
+            model.Steps,
+            useDefaultInterval,
+            defaultIntervalMilliseconds,
+            keyHoldMilliseconds,
+            afterKeyMilliseconds,
+            cancelPlacementKey,
+            stepSent,
+            status,
+            cancellationToken).ConfigureAwait(false);
     }
 
     public async Task PlayStepsAsync(
@@ -93,21 +106,61 @@ public sealed class PlacementService
         int defaultIntervalMilliseconds,
         int keyHoldMilliseconds,
         int afterKeyMilliseconds,
+        char cancelPlacementKey,
         Action<int, int, PlacementStep>? stepSent,
         Action<string>? status,
         CancellationToken cancellationToken)
     {
         if (defaultIntervalMilliseconds < 0) throw new ArgumentOutOfRangeException(nameof(defaultIntervalMilliseconds));
+        if (!char.IsAsciiLetter(cancelPlacementKey))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(cancelPlacementKey));
+        }
+        cancelPlacementKey =
+            char.ToUpperInvariant(cancelPlacementKey);
         EnsureFocus(window);
         await EnsureSizeAsync(window, model.ClientWidth, model.ClientHeight, cancellationToken).ConfigureAwait(false);
         for (int index = 0; index < steps.Count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             PlacementStep step = steps[index];
+            await EnsureSizeAsync(window, model.ClientWidth, model.ClientHeight, cancellationToken).ConfigureAwait(false);
             EnsureFocus(window);
-            status?.Invoke($"Step {index + 1}/{steps.Count}: pressing top-row {step.UnitKey} for {keyHoldMilliseconds} ms.");
-            await _automation.TapUnitKeyAsync(window, step.UnitKey, keyHoldMilliseconds, cancellationToken).ConfigureAwait(false);
-            await Task.Delay(afterKeyMilliseconds, cancellationToken).ConfigureAwait(false);
+            status?.Invoke(
+                $"Step {index + 1}/{steps.Count}: normalizing placement selection at ({step.X}, {step.Y}).");
+            await _automation.MoveCursorToClientAsync(
+                    window,
+                    step.X,
+                    step.Y,
+                    PlacementHoverJitterCycles,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await _automation.TapUnitKeyAsync(
+                window,
+                step.UnitKey,
+                keyHoldMilliseconds,
+                cancellationToken).ConfigureAwait(false);
+            await _automation.TapLetterKeyAsync(
+                window,
+                cancelPlacementKey,
+                cancellationToken).ConfigureAwait(false);
+            await _automation.ClickClientAsync(
+                window,
+                step.X,
+                step.Y,
+                cancellationToken).ConfigureAwait(false);
+
+            status?.Invoke(
+                $"Step {index + 1}/{steps.Count}: selecting top-row {step.UnitKey} for placement.");
+            await _automation.TapUnitKeyAsync(
+                window,
+                step.UnitKey,
+                keyHoldMilliseconds,
+                cancellationToken).ConfigureAwait(false);
+            await Task.Delay(
+                afterKeyMilliseconds,
+                cancellationToken).ConfigureAwait(false);
             await EnsureSizeAsync(window, model.ClientWidth, model.ClientHeight, cancellationToken).ConfigureAwait(false);
             EnsureFocus(window);
             status?.Invoke(

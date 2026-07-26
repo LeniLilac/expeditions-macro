@@ -13,6 +13,7 @@ public sealed partial class StageMacroRunner
         IReadOnlyList<PlacementStep> steps,
         StoryPreset? story,
         RaidPreset? raid,
+        char cancelPlacementKey,
         CancellationToken cancellationToken) =>
         _placements.PlayStepsAsync(
             window,
@@ -24,6 +25,7 @@ public sealed partial class StageMacroRunner
                 raid!.UnitKeyHoldMilliseconds,
             story?.UnitSelectDelayMilliseconds ??
                 raid!.UnitSelectDelayMilliseconds,
+            cancelPlacementKey,
             stepSent: null,
             status: null,
             cancellationToken);

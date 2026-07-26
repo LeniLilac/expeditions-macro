@@ -21,6 +21,7 @@ public sealed partial class StageMacroRunner
         IDetectorPack detector,
         Stopwatch matchRuntime,
         int stableDetections,
+        char cancelPlacementKey,
         CancellationToken cancellationToken)
     {
         PlacementModel? afterStartModel =
@@ -48,6 +49,7 @@ public sealed partial class StageMacroRunner
             detector,
             matchRuntime,
             stableDetections,
+            cancelPlacementKey,
             cancellationToken);
     }
 
@@ -62,6 +64,7 @@ public sealed partial class StageMacroRunner
         IDetectorPack detector,
         Stopwatch matchRuntime,
         int stableDetections,
+        char cancelPlacementKey,
         CancellationToken cancellationToken)
     {
         bool fast =
@@ -128,6 +131,7 @@ public sealed partial class StageMacroRunner
                     [step],
                     story,
                     raid,
+                    cancelPlacementKey,
                     cancellationToken).ConfigureAwait(false);
                 nextFastStep++;
                 placed =
@@ -147,6 +151,7 @@ public sealed partial class StageMacroRunner
                     delayedSteps,
                     story,
                     raid,
+                    cancelPlacementKey,
                     cancellationToken).ConfigureAwait(false);
                 placementCompletedThisIteration = true;
             }

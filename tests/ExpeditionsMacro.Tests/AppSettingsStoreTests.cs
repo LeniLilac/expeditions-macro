@@ -28,6 +28,9 @@ public sealed class AppSettingsStoreTests
 
             Assert.True(
                 loaded.AutoCheckGameSettingsOnStart);
+            Assert.Equal(
+                AppSettings.DefaultCancelPlacementKey,
+                loaded.CancelPlacementKey);
         }
         finally
         {
@@ -107,6 +110,7 @@ public sealed class AppSettingsStoreTests
                 DiscordErrorUserId = "123456789012345678",
                 ShiftLockVirtualKey = KeyboardKey.RightShift,
                 AreasMenuKey = "G",
+                CancelPlacementKey = "X",
                 ResourceRefuelDebug =
                     new ResourceRefuelDebugSettings
                     {
@@ -131,6 +135,7 @@ public sealed class AppSettingsStoreTests
             Assert.Equal("123456789012345678", loaded.DiscordErrorUserId);
             Assert.Equal(KeyboardKey.RightShift, loaded.ShiftLockVirtualKey);
             Assert.Equal("G", loaded.AreasMenuKey);
+            Assert.Equal("X", loaded.CancelPlacementKey);
             Assert.Equal(
                 4321,
                 loaded.ResourceRefuelDebug

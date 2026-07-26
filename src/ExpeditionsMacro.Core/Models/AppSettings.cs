@@ -19,6 +19,10 @@ public sealed record AppSettings
 
     public const string DefaultAreasMenuKey = "";
 
+    public const char DefaultCancelPlacementKeyChar = 'Z';
+
+    public const string DefaultCancelPlacementKey = "Z";
+
     public const string PlayMenuKeySetupInstructions =
         "1. Go to the Settings menu in game\n" +
         "2. Go to the Keybinds section in settings\n" +
@@ -76,6 +80,9 @@ public sealed record AppSettings
 
     public string AreasMenuKey { get; init; } = DefaultAreasMenuKey;
 
+    public string CancelPlacementKey { get; init; } =
+        DefaultCancelPlacementKey;
+
     public ResourceRefuelDebugSettings ResourceRefuelDebug { get; init; } = new();
 
     public static int ParseShiftLockKey(
@@ -83,7 +90,8 @@ public sealed record AppSettings
         int macroHotkeyVirtualKey,
         string? playMenuKey,
         string? unitMenuKey,
-        string? areasMenuKey = null)
+        string? areasMenuKey = null,
+        string? cancelPlacementKey = null)
     {
         string displayName = KeyboardKey.GetDisplayName(virtualKey);
         if (!KeyboardKey.IsSupportedShiftLockKey(virtualKey))
@@ -101,6 +109,7 @@ public sealed record AppSettings
             ("Play menu", playMenuKey),
             ("Unit menu", unitMenuKey),
             ("Areas menu", areasMenuKey),
+            ("placement cancel", cancelPlacementKey),
         })
         {
             string candidate = binding.Value?.Trim() ?? string.Empty;
@@ -212,6 +221,54 @@ public sealed record AppSettings
             {
                 throw new InvalidDataException(
                     $"The Areas menu key and {binding.Label} key must be different.");
+            }
+        }
+
+        return key;
+    }
+
+    public static char ParseCancelPlacementKey(
+        string? value,
+        int macroHotkeyVirtualKey,
+        string? playMenuKey,
+        string? unitMenuKey,
+        string? areasMenuKey,
+        int shiftLockVirtualKey)
+    {
+        string candidate = value?.Trim() ?? string.Empty;
+        if (candidate.Length != 1 ||
+            !char.IsAsciiLetter(candidate[0]))
+        {
+            throw new InvalidDataException(
+                "Set the placement Cancel key under Settings > Controls to the same letter assigned to Cancel Placement in Anime Expeditions.");
+        }
+
+        char key = char.ToUpperInvariant(candidate[0]);
+        if (macroHotkeyVirtualKey == key)
+        {
+            throw new InvalidDataException(
+                $"The placement Cancel key and macro start/stop hotkey cannot both be {key}.");
+        }
+        if (shiftLockVirtualKey == key)
+        {
+            throw new InvalidDataException(
+                $"The placement Cancel key and Shift Lock key cannot both be {key}.");
+        }
+
+        foreach ((string Label, string? Value) binding in new[]
+        {
+            ("Play menu", playMenuKey),
+            ("Unit menu", unitMenuKey),
+            ("Areas menu", areasMenuKey),
+        })
+        {
+            string other = binding.Value?.Trim() ??
+                string.Empty;
+            if (other.Length == 1 &&
+                char.ToUpperInvariant(other[0]) == key)
+            {
+                throw new InvalidDataException(
+                    $"The placement Cancel key and {binding.Label} key must be different.");
             }
         }
 

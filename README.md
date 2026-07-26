@@ -55,6 +55,8 @@ Start every Macro plan from the fully loaded lobby with Play, Areas, Units, and 
 
 If a Fast Placement Setup should load a saved Team, also assign the game's **Toggle Units** action to a letter and record it as **Unit menu key** under Settings. Leave the setup's Team at **Don't change** when the active team should remain untouched. Legacy camera-model presets retain their own Team fields.
 
+The **Placement cancel key** defaults to **Z**. Match it to Anime Expeditions' **Cancel Placement** binding under **Settings > Controls**. Before every placement, the macro uses this key to normalize an uncertain selected-unit state, then explicitly selects the intended slot again before the final click. Keep it different from the macro, Play, Unit, Areas, and Shift Lock bindings.
+
 The **Shift Lock key** defaults to **Left Ctrl**. If Anime Expeditions uses a different Shift Lock binding, click that key under **Settings > Controls** and press the matching physical key. Left and right Shift/Ctrl are stored separately; letters, numbers, symbols, numpad keys, function keys, and common control keys are also supported. Keep it different from the macro hotkey, Play menu key, and Unit menu key.
 
 ### 1. Choose a camera workflow

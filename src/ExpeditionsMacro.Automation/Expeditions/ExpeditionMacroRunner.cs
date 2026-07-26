@@ -70,8 +70,16 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
         Func<Exception, CancellationToken, Task>? recoverableFailure = null,
         int? maximumRuns = null,
         char? unitMenuKey = null,
-        Func<int, int, TimeSpan, CancellationToken, Task<bool>>? continueScheduledRoute = null,
-        MacroRunTotals? macroTotals = null)
+        Func<
+            int,
+            int,
+            TimeSpan,
+            CancellationToken,
+            Task<ScheduledTaskContinuation>>?
+            continueScheduledRoute = null,
+        MacroRunTotals? macroTotals = null,
+        char cancelPlacementKey =
+            AppSettings.DefaultCancelPlacementKeyChar)
     {
         if (maximumRuns is < 1) throw new ArgumentOutOfRangeException(nameof(maximumRuns));
         preset.Validate();
@@ -190,6 +198,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                             beforeStart,
                             preset,
                             Write,
+                            cancelPlacementKey,
                             cancellationToken).ConfigureAwait(false);
                         Write(
                             $"Preplace pass sent {beforeStart.Count} placement(s).");
@@ -220,6 +229,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                         value => { bossesSeen = value; PublishSummary(); },
                         Report,
                         Write,
+                        cancelPlacementKey,
                         cancellationToken).ConfigureAwait(false);
 
                     if (terminal.State == "victory") victories++;
@@ -238,24 +248,24 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                         matchRuntime.Elapsed);
                     if (continueScheduledRoute is not null)
                     {
-                        bool repeatSameRoute = await continueScheduledRoute(
-                            terminal.State == "victory" ? 1 : 0,
-                            terminal.State == "defeat" ? 1 : 0,
-                            matchRuntime.Elapsed,
-                            cancellationToken).ConfigureAwait(false);
-                        if (repeatSameRoute)
+                        bool repeated =
+                            await CompleteScheduledHandoffAsync(
+                                window,
+                                detector,
+                                terminal,
+                                preset,
+                                playMenuKey,
+                                preparation,
+                                matchRuntime.Elapsed,
+                                continueScheduledRoute,
+                                Report,
+                                Write,
+                                cancellationToken)
+                            .ConfigureAwait(false);
+                        if (repeated)
                         {
-                            Report("Completed", 100, "The same Expedition preset is next. Repeating the stage.", terminal.State, null);
-                            Write("The scheduler kept the same Expedition route; using Repeat Stage instead of reopening Play.", MacroEventLevel.Success, "repeat_stage", null);
-                            await ClickActionAsync(window, detector, terminal.State, terminal.Frame, cancellationToken).ConfigureAwait(false);
-                            preparation.MarkRepeatStageRequested();
-                            await Task.Delay(4500, cancellationToken).ConfigureAwait(false);
                             continue;
                         }
-
-                        Report("Completed", 100, "Scheduled Expedition match finished. Returning to shared navigation.", terminal.State, null);
-                        Write("The next scheduled route is different. Leaving the completed Expedition through the Play selector.", MacroEventLevel.Information);
-                        await OpenPlayMenuForModeSwitchAsync(window, detector, terminal, preset, playMenuKey, Report, Write, cancellationToken).ConfigureAwait(false);
                         return;
                     }
                     if (maximumRuns is int maximum && repeats >= maximum)
@@ -414,103 +424,6 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
             report,
             log,
             cancellationToken);
-
-    private async Task ExtractAtCheckpointAsync(
-        RobloxWindow window,
-        IDetectorPack detector,
-        ExpeditionPreset preset,
-        ImageFrame checkpointFrame,
-        Action<string, int, string, string?, double?> report,
-        Action<string, MacroEventLevel, string?, double?> log,
-        CancellationToken cancellationToken)
-    {
-        ExtractionTransactionState transaction = new();
-        if (!transaction.TryBegin()) throw new InvalidOperationException("Could not begin checkpoint extraction.");
-        log("Checkpoint has an Extract button; opening extraction confirmation.", MacroEventLevel.Information, "checkpoint", null);
-        await ClickActionAsync(window, detector, "extract", checkpointFrame, cancellationToken).ConfigureAwait(false);
-        bool found = await WaitForStateWithTimeoutAsync(window, detector, "extract_confirm", ExtractionTransitionTimeout, preset, report, cancellationToken).ConfigureAwait(false);
-        if (!found)
-        {
-            throw new RobloxUiUnavailableException(
-                "Extraction confirmation did not appear within 30 seconds. The macro stopped without clicking Extract again to avoid a delayed duplicate action.");
-        }
-        await ConfirmExtractionAsync(window, detector, preset, transaction, clientImage: null, report, log, cancellationToken).ConfigureAwait(false);
-        log("Extraction confirmed. Waiting for Victory or an early Defeat screen.", MacroEventLevel.Success, "extract_confirm", null);
-    }
-
-    private async Task ConfirmExtractionAsync(
-        RobloxWindow window,
-        IDetectorPack detector,
-        ExpeditionPreset preset,
-        ExtractionTransactionState transaction,
-        ImageFrame? clientImage,
-        Action<string, int, string, string?, double?> report,
-        Action<string, MacroEventLevel, string?, double?> log,
-        CancellationToken cancellationToken)
-    {
-        if (!transaction.TryConfirm()) throw new InvalidOperationException("Extraction confirmation was already clicked.");
-        ConfirmationDismissalState dismissal = new();
-        while (dismissal.TryBeginAttempt())
-        {
-            ImageFrame frame = clientImage ?? CaptureClient(window, detector);
-            clientImage = null;
-            IReadOnlyDictionary<string, double> scores = detector.ScoreStates(frame);
-            if (!ExpeditionRunPolicy.IsStateDetected(detector.Manifest, scores, "extract_confirm"))
-            {
-                if (!dismissal.TryComplete() || !transaction.TryComplete())
-                {
-                    throw new InvalidOperationException("Could not complete extraction confirmation handling.");
-                }
-                return;
-            }
-
-            report(
-                "Extraction",
-                0,
-                dismissal.Attempts == 1
-                    ? "Confirming extraction and waiting for the dialog to close."
-                    : $"Extraction confirmation is still visible; retrying the focused click ({dismissal.Attempts}/{ConfirmationDismissalState.MaximumAttempts}).",
-                "extract_confirm",
-                scores["extract_confirm"]);
-            await ClickActionAsync(window, detector, "extract_confirm", frame, cancellationToken).ConfigureAwait(false);
-            bool dismissed = await WaitForStateToClearAsync(
-                window,
-                detector,
-                "extract_confirm",
-                ConfirmationDismissalTimeout,
-                preset,
-                report,
-                cancellationToken).ConfigureAwait(false);
-            if (dismissed)
-            {
-                if (!dismissal.TryComplete() || !transaction.TryComplete())
-                {
-                    throw new InvalidOperationException("Could not complete extraction confirmation handling.");
-                }
-                log(
-                    $"Extraction confirmation closed after {dismissal.Attempts} focused click attempt(s).",
-                    MacroEventLevel.Success,
-                    "extract_confirm",
-                    null);
-                await Task.Delay(700, cancellationToken).ConfigureAwait(false);
-                return;
-            }
-
-            if (!dismissal.TryMarkStillVisible())
-            {
-                throw new InvalidOperationException("Could not continue extraction confirmation handling.");
-            }
-            log(
-                $"Extraction confirmation remained visible after click attempt {dismissal.Attempts}/{ConfirmationDismissalState.MaximumAttempts}.",
-                MacroEventLevel.Warning,
-                "extract_confirm",
-                scores["extract_confirm"]);
-        }
-
-        throw new RobloxUiUnavailableException(
-            $"The Extraction confirmation remained visible after {ConfirmationDismissalState.MaximumAttempts} focused click attempts. " +
-            "Roblox did not acknowledge the button; retry after the client is responsive.");
-    }
 
     private async Task RecoverToPrestartAsync(
         RobloxWindow window,

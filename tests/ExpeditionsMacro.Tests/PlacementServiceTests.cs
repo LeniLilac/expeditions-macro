@@ -34,7 +34,7 @@ public sealed class PlacementServiceTests
     }
 
     [Fact]
-    public async Task Playback_PrimesTargetTwiceThenSettlesBeforeClick()
+    public async Task Playback_NormalizesSelectionThenPrimesBeforePlacement()
     {
         string root = Path.Combine(
             Path.GetTempPath(),
@@ -75,6 +75,10 @@ public sealed class PlacementServiceTests
 
             Assert.Equal(
                 [
+                    "hover:320,280:2",
+                    "key:4",
+                    "letter:Z",
+                    "click:320,280",
                     "key:4",
                     "hover:320,280:2",
                     "click:320,280",
@@ -198,7 +202,15 @@ public sealed class PlacementServiceTests
 
         public Task TapShiftLockKeyAsync(RobloxWindow window, int virtualKey, CancellationToken cancellationToken) => Task.CompletedTask;
 
-        public Task TapLetterKeyAsync(RobloxWindow window, char key, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task TapLetterKeyAsync(
+            RobloxWindow window,
+            char key,
+            CancellationToken cancellationToken)
+        {
+            InputActions.Add(
+                $"letter:{char.ToUpperInvariant(key)}");
+            return Task.CompletedTask;
+        }
 
         public Task TapUnitKeyAsync(
             RobloxWindow window,

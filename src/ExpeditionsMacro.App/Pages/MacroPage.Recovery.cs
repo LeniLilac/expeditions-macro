@@ -25,6 +25,7 @@ public partial class MacroPage
         string discordUserId,
         char playMenuKey,
         char? unitMenuKey,
+        char cancelPlacementKey,
         RobloxPrivateServerLaunchTarget? restartTarget,
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken)
@@ -45,6 +46,7 @@ public partial class MacroPage
                     discordUserId,
                     playMenuKey,
                     unitMenuKey,
+                    cancelPlacementKey,
                     macroTotals,
                     challengeRotation,
                     progress,

@@ -22,6 +22,7 @@ public sealed partial class ExpeditionMacroRunner
         Action<int> bossesChanged,
         Action<string, int, string, string?, double?> report,
         Action<string, MacroEventLevel, string?, double?> log,
+        char cancelPlacementKey,
         CancellationToken cancellationToken)
     {
         StableStateTracker<string> stateTracker = new(preset.StableDetections);
@@ -80,6 +81,7 @@ public sealed partial class ExpeditionMacroRunner
                     [step],
                     preset,
                     log,
+                    cancelPlacementKey,
                     cancellationToken).ConfigureAwait(false);
                 retryableSteps.Add(step);
                 nextAfterStartStep++;
@@ -152,6 +154,7 @@ public sealed partial class ExpeditionMacroRunner
                     detector,
                     frame,
                     log,
+                    cancelPlacementKey,
                     cancellationToken).ConfigureAwait(false);
                 report("Transition", 0, $"Continuing from the {state} pause.", state, score);
                 // Placement retries can take several seconds. Re-capture the pause so

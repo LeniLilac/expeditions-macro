@@ -16,6 +16,7 @@ public sealed partial class ExpeditionMacroRunner
         ImageFrame frame,
         Action<string, MacroEventLevel, string?, double?>
             log,
+        char cancelPlacementKey,
         CancellationToken cancellationToken)
     {
         HashSet<int> keys = eligibleSteps
@@ -46,6 +47,7 @@ public sealed partial class ExpeditionMacroRunner
             steps,
             preset,
             log,
+            cancelPlacementKey,
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -56,6 +58,7 @@ public sealed partial class ExpeditionMacroRunner
         ExpeditionPreset preset,
         Action<string, MacroEventLevel, string?, double?>
             log,
+        char cancelPlacementKey,
         CancellationToken cancellationToken) =>
         _placements.PlayStepsAsync(
             window,
@@ -65,6 +68,7 @@ public sealed partial class ExpeditionMacroRunner
             defaultIntervalMilliseconds: 0,
             preset.UnitKeyHoldMilliseconds,
             preset.UnitSelectDelayMilliseconds,
+            cancelPlacementKey,
             stepSent: null,
             status: message => log(
                 message,

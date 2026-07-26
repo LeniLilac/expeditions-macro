@@ -54,8 +54,11 @@ public sealed partial class EventMacroRunner
             int,
             TimeSpan,
             CancellationToken,
-            Task<bool>>? continueScheduledRoute = null,
-        MacroRunTotals? macroTotals = null)
+            Task<ScheduledTaskContinuation>>?
+            continueScheduledRoute = null,
+        MacroRunTotals? macroTotals = null,
+        char cancelPlacementKey =
+            AppSettings.DefaultCancelPlacementKeyChar)
     {
         ArgumentNullException.ThrowIfNull(preset);
         ArgumentNullException.ThrowIfNull(placement);
@@ -171,6 +174,7 @@ public sealed partial class EventMacroRunner
                     preset,
                     placement,
                     beforeStart,
+                    cancelPlacementKey,
                     cancellationToken).ConfigureAwait(false);
             }
 
@@ -202,6 +206,7 @@ public sealed partial class EventMacroRunner
                     placement,
                     detector,
                     matchRuntime,
+                    cancelPlacementKey,
                     cancellationToken).ConfigureAwait(false);
             StageRunOutcome outcome =
                 terminal.State ==
@@ -245,49 +250,34 @@ public sealed partial class EventMacroRunner
 
             if (continueScheduledRoute is not null)
             {
-                bool repeat = await continueScheduledRoute(
-                    outcome == StageRunOutcome.Victory ? 1 : 0,
-                    outcome == StageRunOutcome.Defeat ? 1 : 0,
-                    matchRuntime.Elapsed,
-                    cancellationToken).ConfigureAwait(false);
-                if (repeat)
-                {
-                    (int X, int Y)? repeatAction =
-                        StageScreenDetector.RepeatStageAction(
-                            terminal.Frame,
-                            terminal.State ==
-                                EventScreenState.Victory
-                                ? StageScreenState.Victory
-                                : StageScreenState.Defeat);
-                    if (repeatAction is null)
-                    {
-                        throw new RobloxUiUnavailableException(
-                            "The Event Repeat Stage button could not be located.");
-                    }
-                    await ClickAsync(
+                bool repeated =
+                    await CompleteScheduledHandoffAsync(
                         window,
-                        repeatAction.Value.X,
-                        repeatAction.Value.Y,
-                        cancellationToken).ConfigureAwait(false);
-                    preparation.MarkRepeatStageRequested();
-                    await WaitForStateAsync(
-                        window,
-                        EventScreenState.Prestart,
-                        TimeSpan.FromSeconds(45),
+                        terminal,
+                        preparation,
                         detector,
-                        cancellationToken).ConfigureAwait(false);
+                        playMenuKey,
+                        outcome,
+                        matchRuntime.Elapsed,
+                        continueScheduledRoute,
+                        Report,
+                        Write,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                if (repeated)
+                {
                     attempts = 0;
                     continue;
                 }
+                return last;
             }
 
-            await OpenPlayMenuAsync(
+            await OpenGameModeSelectorAsync(
                 window,
                 detector,
                 playMenuKey,
                 cancellationToken).ConfigureAwait(false);
-            if (continueScheduledRoute is not null ||
-                outcome == StageRunOutcome.Victory ||
+            if (outcome == StageRunOutcome.Victory ||
                 attempts > preset.DefeatRetries)
             {
                 return last;

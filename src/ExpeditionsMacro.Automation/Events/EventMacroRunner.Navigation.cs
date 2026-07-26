@@ -3,6 +3,7 @@ using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
+using ExpeditionsMacro.Vision.Challenges;
 using ExpeditionsMacro.Vision.Events;
 
 namespace ExpeditionsMacro.Automation.Events;
@@ -174,42 +175,100 @@ public sealed partial class EventMacroRunner
         _fastNoAlign.ObserveLobby(window);
     }
 
-    private async Task OpenPlayMenuAsync(
+    private async Task OpenGameModeSelectorAsync(
         RobloxWindow window,
         IDetectorPack detector,
         char playMenuKey,
         CancellationToken cancellationToken)
     {
-        for (int attempt = 1; attempt <= 3; attempt++)
+        ImageFrame current =
+            CaptureClient(window, detector);
+        if (EventScreenDetector.Detect(current).State ==
+            EventScreenState.GameModeSelector)
         {
-            ImageFrame current =
-                CaptureClient(window, detector);
-            if (EventScreenDetector.Detect(current).State ==
-                EventScreenState.GameModeSelector)
-            {
-                return;
-            }
-            await _automation.TapLetterKeyAsync(
-                window,
-                playMenuKey,
-                cancellationToken).ConfigureAwait(false);
-            try
-            {
-                await WaitForStateAsync(
-                    window,
-                    EventScreenState.GameModeSelector,
-                    TimeSpan.FromSeconds(4),
-                    detector,
-                    cancellationToken).ConfigureAwait(false);
-                return;
-            }
-            catch (TimeoutException)
-                when (attempt < 3)
-            {
-            }
+            return;
         }
-        throw new PlayMenuBindingException(
-            playMenuKey);
+
+        ImageFrame party =
+            await PlayMenuNavigator.OpenWithRetriesAsync(
+                playMenuKey,
+                () => CaptureClient(window, detector),
+                (key, token) =>
+                    _automation.TapLetterKeyAsync(
+                        window,
+                        key,
+                        token),
+                (timeout, token) =>
+                    TryWaitForPostMatchPreviewAsync(
+                        window,
+                        detector,
+                        timeout,
+                        token),
+                attempt => { },
+                attempt => { },
+                cancellationToken).ConfigureAwait(false);
+        (int X, int Y)? changeMode =
+            ChallengeScreenDetector.ActionFor(
+                ChallengeScreenState.PostMatchPreview,
+                party);
+        if (changeMode is null)
+        {
+            throw new RobloxUiUnavailableException(
+                "The Event post-match Change Gamemode button could not be located.");
+        }
+
+        await ClickAsync(
+            window,
+            changeMode.Value.X,
+            changeMode.Value.Y,
+            cancellationToken).ConfigureAwait(false);
+        await WaitForStateAsync(
+            window,
+            EventScreenState.GameModeSelector,
+            NavigationTimeout,
+            detector,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<ImageFrame?>
+        TryWaitForPostMatchPreviewAsync(
+        RobloxWindow window,
+        IDetectorPack detector,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        DateTimeOffset deadline =
+            DateTimeOffset.UtcNow + timeout;
+        StableNavigationActionTracker<
+            ChallengeScreenState> tracker =
+                new(required: 2);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            cancellationToken
+                .ThrowIfCancellationRequested();
+            ImageFrame frame =
+                CaptureClient(window, detector);
+            ChallengeScreenMatch match =
+                ChallengeScreenDetector.Detect(frame);
+            (int X, int Y)? action =
+                ChallengeScreenDetector.ActionFor(
+                    ChallengeScreenState.PostMatchPreview,
+                    frame);
+            if (tracker.Update(
+                    match.State ==
+                        ChallengeScreenState.PostMatchPreview
+                        ? match.State
+                        : ChallengeScreenState.None,
+                    action) is not null)
+            {
+                return frame;
+            }
+            await Task.Delay(
+                180,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        return null;
     }
 
     private async Task WaitForPlayClosedAsync(

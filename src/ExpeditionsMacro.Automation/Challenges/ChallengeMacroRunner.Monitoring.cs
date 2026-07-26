@@ -24,6 +24,7 @@ public sealed partial class ChallengeMacroRunner
         Stopwatch matchRuntime,
         Action<string, MacroEventLevel, string?, double?> log,
         Action<string, int, string, string?, double?> report,
+        char cancelPlacementKey,
         CancellationToken cancellationToken)
     {
         bool fast = preset.CameraPreparationMode ==
@@ -108,6 +109,7 @@ public sealed partial class ChallengeMacroRunner
                     models.PrestartPlacement!,
                     [step],
                     log,
+                    cancelPlacementKey,
                     cancellationToken).ConfigureAwait(false);
                 nextFastStep++;
                 delayedPlaced =
@@ -134,6 +136,7 @@ public sealed partial class ChallengeMacroRunner
                     preset,
                     models.DelayedPlacement!,
                     log,
+                    cancelPlacementKey,
                     cancellationToken).ConfigureAwait(false);
                 delayedPlaced = true;
             }

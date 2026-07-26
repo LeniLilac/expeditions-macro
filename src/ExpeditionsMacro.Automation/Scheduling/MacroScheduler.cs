@@ -15,6 +15,7 @@ public enum ScheduledTaskContinuation
 {
     Handoff,
     RepeatStage,
+    ReturnToLobby,
 }
 
 public sealed class MacroScheduler
@@ -83,7 +84,12 @@ public sealed class MacroScheduler
                 LogResult(activeTask, result, log);
 
                 MacroTaskDefinition? following = SelectNext(plan, DateTimeOffset.UtcNow);
-                if (!CanRepeatStage(activeTask, following, result)) return ScheduledTaskContinuation.Handoff;
+                if (!CanRepeatStage(activeTask, following, result))
+                {
+                    return following?.Kind == MacroTaskKind.Event
+                        ? ScheduledTaskContinuation.ReturnToLobby
+                        : ScheduledTaskContinuation.Handoff;
+                }
                 log?.Invoke(new MacroEvent(
                     DateTimeOffset.Now,
                     MacroEventLevel.Information,

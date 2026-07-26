@@ -44,58 +44,6 @@ public sealed partial class StageMacroRunner
         _discord = discord;
     }
 
-    public Task<StageRunResult> RunStoryAsync(
-        StoryPreset preset,
-        StageRuntimeModels models,
-        IDetectorPack detector,
-        string webhookUrl,
-        char playMenuKey,
-        char? unitMenuKey,
-        IProgress<MacroProgress>? progress = null,
-        Action<MacroEvent>? log = null,
-        CancellationToken cancellationToken = default,
-        Func<int, int, TimeSpan, CancellationToken, Task<bool>>? continueScheduledRoute = null,
-        MacroRunTotals? macroTotals = null) =>
-        RunAsync(
-            StageMode.Story,
-            preset,
-            models,
-            detector,
-            webhookUrl,
-            playMenuKey,
-            unitMenuKey,
-            progress,
-            log,
-            cancellationToken,
-            continueScheduledRoute,
-            macroTotals);
-
-    public Task<StageRunResult> RunRaidAsync(
-        RaidPreset preset,
-        StageRuntimeModels models,
-        IDetectorPack detector,
-        string webhookUrl,
-        char playMenuKey,
-        char? unitMenuKey,
-        IProgress<MacroProgress>? progress = null,
-        Action<MacroEvent>? log = null,
-        CancellationToken cancellationToken = default,
-        Func<int, int, TimeSpan, CancellationToken, Task<bool>>? continueScheduledRoute = null,
-        MacroRunTotals? macroTotals = null) =>
-        RunAsync(
-            StageMode.Raid,
-            preset,
-            models,
-            detector,
-            webhookUrl,
-            playMenuKey,
-            unitMenuKey,
-            progress,
-            log,
-            cancellationToken,
-            continueScheduledRoute,
-            macroTotals);
-
     private async Task<StageRunResult> RunAsync(
         StageMode mode,
         object preset,
@@ -107,8 +55,15 @@ public sealed partial class StageMacroRunner
         IProgress<MacroProgress>? progress,
         Action<MacroEvent>? log,
         CancellationToken cancellationToken,
-        Func<int, int, TimeSpan, CancellationToken, Task<bool>>? continueScheduledRoute,
-        MacroRunTotals? macroTotals)
+        Func<
+            int,
+            int,
+            TimeSpan,
+            CancellationToken,
+            Task<ScheduledTaskContinuation>>?
+            continueScheduledRoute,
+        MacroRunTotals? macroTotals,
+        char cancelPlacementKey)
     {
         StoryPreset? story = preset as StoryPreset;
         RaidPreset? raid = preset as RaidPreset;
@@ -232,6 +187,7 @@ public sealed partial class StageMacroRunner
                         beforeStart,
                         story,
                         raid,
+                        cancelPlacementKey,
                         cancellationToken).ConfigureAwait(false);
                 }
 
@@ -255,6 +211,7 @@ public sealed partial class StageMacroRunner
                         detector,
                         matchRuntime,
                         stableDetections,
+                        cancelPlacementKey,
                         cancellationToken).ConfigureAwait(false);
                 StageRunOutcome outcome = terminal.State == StageScreenState.Victory ? StageRunOutcome.Victory : StageRunOutcome.Defeat;
                 matchCompleted = true;
@@ -276,32 +233,29 @@ public sealed partial class StageMacroRunner
 
                 if (continueScheduledRoute is not null)
                 {
-                    bool repeatSameRoute = await continueScheduledRoute(
-                        outcome == StageRunOutcome.Victory ? 1 : 0,
-                        outcome == StageRunOutcome.Defeat ? 1 : 0,
-                        matchRuntime.Elapsed,
-                        cancellationToken).ConfigureAwait(false);
-                    if (repeatSameRoute)
-                    {
-                        (int X, int Y)? repeat = StageScreenDetector.RepeatStageAction(terminal.Frame, terminal.State);
-                        if (repeat is null)
-                        {
-                            throw new RobloxUiUnavailableException($"The {Label(mode)} Repeat Stage button could not be located.");
-                        }
-                        Report("Handoff", 100, $"The same {Label(mode)} preset is next. Repeating the stage.", "repeat_stage", terminal.Confidence);
-                        Write($"The scheduler kept the same {Label(mode)} route; using Repeat Stage instead of reopening Play.", MacroEventLevel.Success, "repeat_stage", terminal.Confidence);
-                        await ClickAsync(window, repeat.Value.X, repeat.Value.Y, cancellationToken).ConfigureAwait(false);
-                        preparation.MarkRepeatStageRequested();
-                        await WaitForStateAsync(
+                    bool repeated =
+                        await CompleteScheduledHandoffAsync(
                             window,
-                            StageScreenState.Prestart,
-                            TimeSpan.FromSeconds(45),
+                            mode,
+                            terminal,
+                            preparation,
                             detector,
+                            playMenuKey,
+                            autoRecover,
                             stableDetections,
-                            cancellationToken).ConfigureAwait(false);
+                            outcome,
+                            matchRuntime.Elapsed,
+                            continueScheduledRoute,
+                            Report,
+                            Write,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    if (repeated)
+                    {
                         attempts = 0;
                         continue;
                     }
+                    return last;
                 }
 
                 bool recoveredAfterResult = await EnsureGameModeSelectorAsync(
@@ -315,7 +269,6 @@ public sealed partial class StageMacroRunner
                     Write,
                     cancellationToken).ConfigureAwait(false);
                 if (recoveredAfterResult) preparation.Invalidate();
-                if (continueScheduledRoute is not null) return last;
                 if (outcome == StageRunOutcome.Victory || attempts > retries) return last;
                 Write($"Retrying after defeat ({attempts}/{retries + 1}).", MacroEventLevel.Warning);
             }

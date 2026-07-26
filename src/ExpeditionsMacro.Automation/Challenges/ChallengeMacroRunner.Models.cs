@@ -75,6 +75,7 @@ public sealed partial class ChallengeMacroRunner
         PlacementModel model,
         Action<string, MacroEventLevel, string?, double?>
             log,
+        char cancelPlacementKey,
         CancellationToken cancellationToken) =>
         PlaceAsync(
             window,
@@ -82,6 +83,7 @@ public sealed partial class ChallengeMacroRunner
             model,
             model.Steps,
             log,
+            cancelPlacementKey,
             cancellationToken);
 
     private Task PlaceAsync(
@@ -91,6 +93,7 @@ public sealed partial class ChallengeMacroRunner
         IReadOnlyList<PlacementStep> steps,
         Action<string, MacroEventLevel, string?, double?>
             log,
+        char cancelPlacementKey,
         CancellationToken cancellationToken) =>
         _placements.PlayStepsAsync(
             window,
@@ -100,6 +103,7 @@ public sealed partial class ChallengeMacroRunner
             defaultIntervalMilliseconds: 0,
             preset.UnitKeyHoldMilliseconds,
             preset.UnitSelectDelayMilliseconds,
+            cancelPlacementKey,
             stepSent: null,
             status: message => log(
                 message,

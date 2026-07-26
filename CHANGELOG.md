@@ -4,6 +4,25 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.26] - 2026-07-25
+
+### Added
+
+- Added a configurable **Placement cancel key** under Settings > Controls, defaulting to `Z` to match Anime Expeditions' Cancel Placement binding.
+
+### Changed
+
+- Placement playback now normalizes an uncertain selected-unit state before every attempt, explicitly reselects the intended unit, then preserves the existing target jitter and 200 ms settle before placing.
+
+### Fixed
+
+- Event-to-Event and every normal-mode-to-Event scheduler transition now return through a verified Lobby because Event routes are not available in Play.
+- Event-to-Story, Raid, Challenge, or Expedition transitions now open the verified post-match party panel and select **Change Gamemode** before handing off shared navigation.
+
+### Tests
+
+- Added scheduler routing-matrix, placement-input-order, default-key, key-conflict, and settings-persistence regressions.
+
 ## [1.3.0-beta.25] - 2026-07-25
 
 ### Added
@@ -815,7 +834,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.25...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.26...HEAD
+[1.3.0-beta.26]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.25...v1.3.0-beta.26
 [1.3.0-beta.25]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.24...v1.3.0-beta.25
 [1.3.0-beta.24]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.23...v1.3.0-beta.24
 [1.3.0-beta.23]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.22...v1.3.0-beta.23

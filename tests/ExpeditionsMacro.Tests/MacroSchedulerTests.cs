@@ -202,6 +202,104 @@ public sealed class MacroSchedulerTests
         }
     }
 
+    [Theory]
+    [InlineData(MacroTaskKind.Expedition)]
+    [InlineData(MacroTaskKind.Story)]
+    [InlineData(MacroTaskKind.Raid)]
+    [InlineData(MacroTaskKind.Challenge)]
+    public async Task RouteIntoEvent_RequiresLobby(
+        MacroTaskKind currentKind)
+    {
+        MacroTaskDefinition current =
+            Task("current", currentKind, 1) with
+            {
+                TargetVictories = 1,
+            };
+        MacroTaskDefinition next =
+            Task("event", MacroTaskKind.Event, 2) with
+            {
+                TargetVictories = 1,
+            };
+        ScheduledTaskResult result =
+            currentKind == MacroTaskKind.Challenge
+                ? new ScheduledTaskResult(
+                    0,
+                    0,
+                    TimeSpan.Zero,
+                    DateTimeOffset.UtcNow.AddMinutes(30),
+                    Skipped: true)
+                : new ScheduledTaskResult(
+                    1,
+                    0,
+                    TimeSpan.FromMinutes(3));
+
+        ScheduledTaskContinuation continuation =
+            await ObserveContinuationAsync(
+                current,
+                next,
+                result);
+
+        Assert.Equal(
+            ScheduledTaskContinuation.ReturnToLobby,
+            continuation);
+    }
+
+    [Fact]
+    public async Task DifferentEventRoute_ReturnsToLobby()
+    {
+        MacroTaskDefinition current =
+            Task("event-one", MacroTaskKind.Event, 1) with
+            {
+                TargetVictories = 1,
+            };
+        MacroTaskDefinition next =
+            Task("event-two", MacroTaskKind.Event, 2) with
+            {
+                TargetVictories = 1,
+            };
+
+        ScheduledTaskContinuation continuation =
+            await ObserveContinuationAsync(
+                current,
+                next,
+                new ScheduledTaskResult(
+                    1,
+                    0,
+                    TimeSpan.FromMinutes(3)));
+
+        Assert.Equal(
+            ScheduledTaskContinuation.ReturnToLobby,
+            continuation);
+    }
+
+    [Fact]
+    public async Task EventToPlayAccessibleRoute_UsesSharedHandoff()
+    {
+        MacroTaskDefinition current =
+            Task("event", MacroTaskKind.Event, 1) with
+            {
+                TargetVictories = 1,
+            };
+        MacroTaskDefinition next =
+            Task("story", MacroTaskKind.Story, 2) with
+            {
+                TargetVictories = 1,
+            };
+
+        ScheduledTaskContinuation continuation =
+            await ObserveContinuationAsync(
+                current,
+                next,
+                new ScheduledTaskResult(
+                    1,
+                    0,
+                    TimeSpan.FromMinutes(3)));
+
+        Assert.Equal(
+            ScheduledTaskContinuation.Handoff,
+            continuation);
+    }
+
     [Fact]
     public async Task ResetProgress_PersistsAnEmptyRecordForEveryTask()
     {
@@ -254,4 +352,41 @@ public sealed class MacroSchedulerTests
         Name = "Test plan",
         Tasks = tasks,
     };
+
+    private static async Task<ScheduledTaskContinuation>
+        ObserveContinuationAsync(
+        MacroTaskDefinition current,
+        MacroTaskDefinition following,
+        ScheduledTaskResult result)
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            MacroScheduler scheduler = new(
+                new MacroPlanRepository(
+                    new AppPaths(root)));
+            using CancellationTokenSource stopped = new();
+            ScheduledTaskContinuation? observed = null;
+            await Assert.ThrowsAnyAsync<
+                OperationCanceledException>(
+                () => scheduler.RunAsync(
+                    Plan(current, following),
+                    async (_, record, token) =>
+                    {
+                        observed = await record(
+                            result,
+                            token);
+                        stopped.Cancel();
+                        return result;
+                    },
+                    cancellationToken:
+                        stopped.Token));
+            return Assert.IsType<
+                ScheduledTaskContinuation>(observed);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
 }

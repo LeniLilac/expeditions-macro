@@ -20,7 +20,7 @@
   "lineDebt": [
     {
       "path": "src/ExpeditionsMacro.Automation/Challenges/ChallengeMacroRunner.cs",
-      "maxLines": 920,
+      "maxLines": 825,
       "reason": "Existing mode-runner orchestration debt; extract state-specific workflow services when touched."
     },
     {
@@ -30,7 +30,7 @@
     },
     {
       "path": "src/ExpeditionsMacro.Automation/Expeditions/ExpeditionMacroRunner.cs",
-      "maxLines": 1092,
+      "maxLines": 1005,
       "reason": "Existing mode-runner orchestration debt; extract state-specific workflow services when touched."
     },
     {
@@ -40,7 +40,7 @@
     },
     {
       "path": "src/ExpeditionsMacro.Automation/Stages/StageMacroRunner.cs",
-      "maxLines": 562,
+      "maxLines": 515,
       "reason": "Existing shared Story/Raid orchestration debt; extract navigation and terminal handoff services."
     },
     {
@@ -50,12 +50,7 @@
     },
     {
       "path": "src/ExpeditionsMacro.App/Pages/ChallengesPage.xaml.cs",
-      "maxLines": 627,
-      "reason": "Existing page-controller debt; extract preset editing and operation coordination."
-    },
-    {
-      "path": "src/ExpeditionsMacro.App/Pages/ExpeditionsPage.xaml.cs",
-      "maxLines": 528,
+      "maxLines": 536,
       "reason": "Existing page-controller debt; extract preset editing and operation coordination."
     },
     {

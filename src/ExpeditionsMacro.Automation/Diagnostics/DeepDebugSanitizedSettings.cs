@@ -26,6 +26,7 @@ internal sealed record DeepDebugSanitizedSettings(
     string PlayMenuKey,
     string UnitMenuKey,
     string AreasMenuKey,
+    string CancelPlacementKey,
     ResourceRefuelDebugSettings ResourceRefuelDebug)
 {
     public static DeepDebugSanitizedSettings From(
@@ -54,5 +55,6 @@ internal sealed record DeepDebugSanitizedSettings(
         settings.PlayMenuKey,
         settings.UnitMenuKey,
         settings.AreasMenuKey,
+        settings.CancelPlacementKey,
         settings.ResourceRefuelDebug);
 }
