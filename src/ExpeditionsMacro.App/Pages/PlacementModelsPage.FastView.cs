@@ -1,4 +1,5 @@
 using System.Windows.Controls;
+using ExpeditionsMacro.App.Controls;
 
 namespace ExpeditionsMacro.App.Pages;
 
@@ -67,6 +68,9 @@ public partial class PlacementModelsPage
     private ListBox FastStepsList =>
         FastEditorPanel.FastStepsList;
 
+    private Button FastTimingButton =>
+        FastEditorPanel.FastTimingButton;
+
     private TextBlock FastStatusText =>
         FastEditorPanel.FastStatusText;
 
@@ -94,6 +98,12 @@ public partial class PlacementModelsPage
         FastEditorPanel.RemoveStepRequested += RemoveRow_Click;
         FastEditorPanel.MoveStepUpRequested += MoveUp_Click;
         FastEditorPanel.MoveStepDownRequested += MoveDown_Click;
+        FastEditorPanel.StepReorderRequested +=
+            FastStepReorderRequested;
+        FastEditorPanel.TimingSettingsOpening +=
+            FastTimingSettingsOpening;
+        FastEditorPanel.TimingSettingsApplied +=
+            FastTimingSettingsApplied;
         FastEditorPanel.UnitChanged +=
             FastUnitButton_Checked;
         FastEditorPanel.PhaseChanged +=

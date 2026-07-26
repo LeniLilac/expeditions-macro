@@ -98,6 +98,59 @@ public sealed class CameraPosePreparationService
         }
     }
 
+    public async Task PreparePitchOnlyAsync(
+        RobloxWindow existingWindow,
+        int pitchDragPixels = 1800,
+        int settleMilliseconds = 200,
+        IProgress<MacroProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (pitchDragPixels is < 300 or > 5000)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(pitchDragPixels));
+        }
+        if (settleMilliseconds is < 25 or > 5000)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(settleMilliseconds));
+        }
+
+        Focus(existingWindow);
+        int? shiftLockKey = null;
+        try
+        {
+            shiftLockKey = await EnableShiftLockAsync(
+                existingWindow,
+                "Settings preparation",
+                25,
+                progress,
+                cancellationToken).ConfigureAwait(false);
+            await ClampPitchAsync(
+                existingWindow,
+                pitchDragPixels,
+                settleMilliseconds,
+                regions: null,
+                "Settings preparation",
+                75,
+                progress,
+                cancellationToken).ConfigureAwait(false);
+            progress?.Report(new MacroProgress(
+                "Settings preparation",
+                100,
+                "Camera is looking straight down; zoom and yaw were preserved."));
+        }
+        finally
+        {
+            if (shiftLockKey is int key)
+            {
+                await DisableShiftLockAsync(
+                    existingWindow,
+                    key).ConfigureAwait(false);
+            }
+        }
+    }
+
     internal async Task ClampZoomAsync(
         RobloxWindow window,
         int zoomTicks,

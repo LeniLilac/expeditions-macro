@@ -12,6 +12,7 @@ internal static partial class NativeMethods
     internal const int SwpShowWindow = 0x0040;
     internal const int SwRestore = 9;
     internal const uint MonitorDefaultToNearest = 0x00000002;
+    internal const int MonitorDpiTypeEffective = 0;
     internal const uint WmHotkey = 0x0312;
     internal const uint ModNoRepeat = 0x4000;
     internal const uint WmQuit = 0x0012;
@@ -229,6 +230,13 @@ internal static partial class NativeMethods
 
     [LibraryImport("user32.dll")]
     internal static partial nint MonitorFromWindow(nint window, uint flags);
+
+    [LibraryImport("shcore.dll")]
+    internal static partial int GetDpiForMonitor(
+        nint monitor,
+        int dpiType,
+        out uint dpiX,
+        out uint dpiY);
 
     [LibraryImport("user32.dll", EntryPoint = "GetMonitorInfoW")]
     [return: MarshalAs(UnmanagedType.Bool)]

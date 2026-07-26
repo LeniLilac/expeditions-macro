@@ -1,6 +1,6 @@
 # Detector image dataset
 
-This repository includes 466 image fixtures used to build and regression-test the bundled Anime Expeditions detector pack, specialized UI detectors, and automatic camera-region selection. Of these, 463 are 808 by 611 Roblox client captures: 285 Expeditions fixtures, 80 selective Challenge fixtures, 47 Story/Raid/team fixtures, 9 cross-mode navigation variants, 15 camera fixtures, 6 experimental resource-refuel fixtures, 14 game-settings fixtures, and 7 Event fixtures. The remaining three are privacy-safe 304 by 192 grayscale camera composites derived from a reported runtime-alignment failure. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
+This repository includes 470 image fixtures used to build and regression-test the bundled Anime Expeditions detector pack, specialized UI detectors, and automatic camera-region selection. Of these, 467 are 808 by 611 Roblox client captures: 285 Expeditions fixtures, 81 selective Challenge fixtures, 47 Story/Raid/team fixtures, 9 cross-mode navigation variants, 15 camera fixtures, 6 experimental resource-refuel fixtures, 14 game-settings fixtures, and 10 Event fixtures. The remaining three are privacy-safe 304 by 192 grayscale camera composites derived from a reported runtime-alignment failure. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
 
 Captures are 808 by 611 PNG files organized under:
 
@@ -18,7 +18,7 @@ Experimental Areas, Gold Mine, and Resource Drill fixtures are organized under `
 
 Startup settings fixtures are organized under `datasets/anime-expeditions/settings/`. They cover the closed Lobby, the Settings opening animation, supported UI Scale values, each required settings page, and the Units page at both scroll boundaries.
 
-Villain Invasion Event fixtures are organized under `datasets/anime-expeditions/events/`. They cover Event home, act selection/detail, prestart, Defeat, and both reviewed Victory action rails—with and without **Next Stage**. Event navigation uses these specialized fixtures and remains separate from the shared Play-interface detector because Event is available only from Lobby.
+Villain Invasion Event fixtures are organized under `datasets/anime-expeditions/events/`. They cover Event home, act selection/detail, the horizontally scrolled Act 4 selector and detail, prestart, Defeat, and reviewed Victory action rails—with and without **Next Stage**, including the final Act 4 rail. Event navigation uses these specialized fixtures and remains separate from the shared Play-interface detector because Event is available only from Lobby.
 
 The current builder recognizes these dataset names:
 

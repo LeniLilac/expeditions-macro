@@ -177,7 +177,7 @@ public partial class PlacementModelsPage
                     Visibility.Visible;
                 TargetVariantLabel.Text = "Act";
                 TargetVariantCombo.ItemsSource =
-                    Enumerable.Range(1, 3)
+                    Enumerable.Range(1, 4)
                         .Select(act =>
                             new PlacementEditorChoice<int>(
                                 act,
@@ -349,16 +349,14 @@ public partial class PlacementModelsPage
             Y = y,
             Phase = _selectedFastPhase,
             DelayAfterMilliseconds =
-                PlacementAuthoringRules
-                    .DefaultStepDelayMilliseconds,
+                _fastPlacementIntervalMilliseconds,
             DelayAfterStartMilliseconds =
                 _selectedFastPhase ==
                     PlacementPhase.AfterStart
-                    ? PlacementAuthoringRules
-                        .DefaultAfterStartDelayMilliseconds
+                    ? _fastDefaultAfterStartDelayMilliseconds
                     : 0,
         };
-        _steps.Add(row);
+        InsertStepInPhaseOrder(row);
         FastStepsList.SelectedItem = row;
         FastStepsList.ScrollIntoView(row);
         FastStatusText.Text =

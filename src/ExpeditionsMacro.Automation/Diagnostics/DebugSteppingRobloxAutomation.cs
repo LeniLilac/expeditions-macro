@@ -125,6 +125,21 @@ public sealed class DebugSteppingRobloxAutomation : IRobloxAutomation, IDisposab
                 cancellationToken),
             cancellationToken);
 
+    public Task ClickClientRetainingCursorAsync(
+        RobloxWindow window,
+        int x,
+        int y,
+        CancellationToken cancellationToken) =>
+        TraceAsync(
+            "Click Roblox without parking",
+            $"Click client coordinate ({x}, {y}) and keep the cursor there.",
+            () => _inner.ClickClientRetainingCursorAsync(
+                window,
+                x,
+                y,
+                cancellationToken),
+            cancellationToken);
+
     public Task DragClientAsync(
         RobloxWindow window,
         int startX,

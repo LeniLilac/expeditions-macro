@@ -22,6 +22,23 @@ public sealed class MatchRuntimePolicyTests
         Assert.Equal(
             TimeSpan.FromMinutes(12),
             MatchRuntimePolicy.StageLimit(null, Raid()));
+        Assert.Equal(
+            TimeSpan.FromMinutes(12),
+            MatchRuntimePolicy.EventLimit(Event(EventAct.Act1)));
+        Assert.Equal(
+            TimeSpan.FromMinutes(12),
+            MatchRuntimePolicy.EventLimit(Event(EventAct.Act2)));
+        Assert.Equal(
+            TimeSpan.FromMinutes(12),
+            MatchRuntimePolicy.EventLimit(Event(EventAct.Act3)));
+    }
+
+    [Fact]
+    public void EventActFourUsesSeventeenMinuteLimit()
+    {
+        Assert.Equal(
+            TimeSpan.FromMinutes(17),
+            MatchRuntimePolicy.EventLimit(Event(EventAct.Act4)));
     }
 
     [Fact]
@@ -89,6 +106,14 @@ public sealed class MatchRuntimePolicyTests
     {
         Id = "raid",
         Name = "Raid",
+    };
+
+    private static EventPreset Event(EventAct act) => new()
+    {
+        Id = "event",
+        Name = "Event",
+        Act = act,
+        PlacementModelId = "placement",
     };
 
     private static ExpeditionPreset Expedition() => new()

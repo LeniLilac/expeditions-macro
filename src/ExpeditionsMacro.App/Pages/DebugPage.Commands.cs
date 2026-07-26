@@ -179,7 +179,7 @@ public partial class DebugPage
                     token).ConfigureAwait(false);
                 _services.DebugCheckpoints.RecordStatus(
                     "Returning to lobby",
-                    "Opening and confirming Roblox Back to Lobby.");
+                    "Opening Roblox Back to Lobby, then clicking the detected confirmation.");
                 await _services.MatchLobby
                     .ReturnAsync(
                         window,

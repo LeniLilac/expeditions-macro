@@ -59,11 +59,6 @@ public sealed record EventPreset
             throw new InvalidDataException(
                 "The Event mode or act is invalid.");
         }
-        if (Act == EventAct.Act4)
-        {
-            throw new InvalidDataException(
-                "Villain Invasion Act 4 is not supported until its placement dataset is available.");
-        }
         if (TeamSlot is < 0 or > 8 ||
             DefeatRetries is < 0 or > 20)
         {

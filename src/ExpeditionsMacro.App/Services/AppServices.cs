@@ -87,7 +87,27 @@ public sealed class AppServices : IDisposable
         SecretProtector = new DpapiSecretProtector();
         Hotkey = new GlobalHotkeyService();
         Coordinator = new OperationCoordinator(dispatcher);
-        Coordinator.OperationRunner = DeepDebug.RunOperationAsync;
+        Coordinator.OperationRunner =
+            (
+                description,
+                debugContext,
+                action,
+                cancellationToken) =>
+                DeepDebug.RunOperationAsync(
+                    description,
+                    debugContext,
+                    async operationToken =>
+                    {
+                        operationToken.ThrowIfCancellationRequested();
+                        if (automation.FindWindow() is { } window)
+                        {
+                            WindowsRobloxDisplayScale
+                                .EnsureOneHundredPercent(window);
+                        }
+                        await action(operationToken)
+                            .ConfigureAwait(false);
+                    },
+                    cancellationToken);
         DiagnosticCapture = new DiagnosticCaptureService(Automation, Paths);
         PlacementCaptureService placementCapture = new(Automation);
         placementCapture.InputTrace += DeepDebug.RecordPlacementInput;
@@ -127,7 +147,9 @@ public sealed class AppServices : IDisposable
             Automation,
             RobloxRecovery);
         StartupPreflight =
-            new MacroStartupPreflightService(Automation);
+            new MacroStartupPreflightService(
+                Automation,
+                CameraPose);
         MatchLobby = new MatchLobbyNavigator(Automation);
         _discord = new DiscordWebhookClient();
         Teams = new TeamSelectionService(Automation);

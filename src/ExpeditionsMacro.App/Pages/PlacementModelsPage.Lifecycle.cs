@@ -14,8 +14,9 @@ public partial class PlacementModelsPage
             PlacementSetupCatalog.All[0].Target;
         ApplyFastTarget(_selectedSetupTarget);
         FastTeamCombo.SelectedIndex = 2;
+        ResetFastTimingDefaults();
         _steps.Clear();
-        _steps.Add(new PlacementStepRow
+        InsertStepInPhaseOrder(new PlacementStepRow
         {
             UnitKey = 1,
             X = 390,
@@ -25,7 +26,7 @@ public partial class PlacementModelsPage
                 PlacementAuthoringRules
                     .DefaultStepDelayMilliseconds,
         });
-        _steps.Add(new PlacementStepRow
+        InsertStepInPhaseOrder(new PlacementStepRow
         {
             UnitKey = 2,
             X = 445,
@@ -38,7 +39,7 @@ public partial class PlacementModelsPage
                 PlacementAuthoringRules
                     .DefaultStepDelayMilliseconds,
         });
-        _steps.Add(new PlacementStepRow
+        InsertStepInPhaseOrder(new PlacementStepRow
         {
             UnitKey = 3,
             X = 505,

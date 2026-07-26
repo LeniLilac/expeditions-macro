@@ -54,22 +54,10 @@ public sealed class MatchLobbyNavigator
             await OpenConfirmationAsync(
                 window,
                 cancellationToken).ConfigureAwait(false);
-        await ConfirmWithAccessibilityAsync(
+        await ConfirmByClickAsync(
             window,
+            confirmation,
             cancellationToken).ConfigureAwait(false);
-
-        if (await ConfirmationRemainsAsync(
-                window,
-                TimeSpan.FromSeconds(3),
-                cancellationToken).ConfigureAwait(false))
-        {
-            ValidateWindow(window);
-            await _automation.ClickClientAsync(
-                window,
-                confirmation.ActionX,
-                confirmation.ActionY,
-                cancellationToken).ConfigureAwait(false);
-        }
 
         await RobloxLobbyReadinessGate.WaitAsync(
             token => CaptureAsync(window, token),
@@ -118,23 +106,33 @@ public sealed class MatchLobbyNavigator
             "Anime Expeditions did not open the verified Return to Lobby confirmation.");
     }
 
-    private Task ConfirmWithAccessibilityAsync(
+    private async Task ConfirmByClickAsync(
         RobloxWindow window,
-        CancellationToken cancellationToken) =>
-        _accessibility.RunEnabledAsync(
-            window,
-            async token =>
+        LobbyExitConfirmationMatch confirmation,
+        CancellationToken cancellationToken)
+    {
+        for (int attempt = 1;
+             attempt <= 2;
+             attempt++)
+        {
+            ValidateWindow(window);
+            await _automation.ClickClientAsync(
+                window,
+                confirmation.ActionX,
+                confirmation.ActionY,
+                cancellationToken).ConfigureAwait(false);
+            if (await WaitForConfirmationClosedAsync(
+                    window,
+                    TimeSpan.FromSeconds(3),
+                    cancellationToken).ConfigureAwait(false))
             {
-                await _accessibility.TapAsync(
-                    window,
-                    RobloxKeyboardKey.DownArrow,
-                    token).ConfigureAwait(false);
-                await _accessibility.TapAsync(
-                    window,
-                    RobloxKeyboardKey.Enter,
-                    token).ConfigureAwait(false);
-            },
-            cancellationToken);
+                return;
+            }
+        }
+
+        throw new RobloxUiUnavailableException(
+            "The verified Return to Lobby confirmation did not accept its red action.");
+    }
 
     private async Task<LobbyExitConfirmationMatch>
         WaitForConfirmationAsync(
@@ -160,12 +158,13 @@ public sealed class MatchLobbyNavigator
         return last;
     }
 
-    private async Task<bool> ConfirmationRemainsAsync(
+    private async Task<bool> WaitForConfirmationClosedAsync(
         RobloxWindow window,
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
         DateTimeOffset deadline = _utcNow() + timeout;
+        int absent = 0;
         while (_utcNow() < deadline)
         {
             LobbyExitConfirmationMatch match =
@@ -173,12 +172,13 @@ public sealed class MatchLobbyNavigator
                     await CaptureAsync(
                         window,
                         cancellationToken).ConfigureAwait(false));
-            if (!match.Visible) return false;
+            absent = match.Visible ? 0 : absent + 1;
+            if (absent >= 2) return true;
             await _delay(
                 PollInterval,
                 cancellationToken).ConfigureAwait(false);
         }
-        return true;
+        return false;
     }
 
     private Task<ImageFrame> CaptureAsync(

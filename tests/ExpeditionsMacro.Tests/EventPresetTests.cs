@@ -8,24 +8,12 @@ public sealed class EventPresetTests
     [InlineData(EventAct.Act1)]
     [InlineData(EventAct.Act2)]
     [InlineData(EventAct.Act3)]
+    [InlineData(EventAct.Act4)]
     public void ReviewedActs_AreValid(EventAct act)
     {
         EventPreset preset = Preset(act);
 
         preset.Validate();
-    }
-
-    [Fact]
-    public void ActFour_RemainsUnavailableWithoutPlacementData()
-    {
-        InvalidDataException error =
-            Assert.Throws<InvalidDataException>(
-                () => Preset(EventAct.Act4).Validate());
-
-        Assert.Contains(
-            "Act 4",
-            error.Message,
-            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

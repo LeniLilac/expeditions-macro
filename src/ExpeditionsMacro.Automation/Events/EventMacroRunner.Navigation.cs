@@ -75,8 +75,13 @@ public sealed partial class EventMacroRunner
         }
 
         (int actX, int actY) =
-            EventScreenDetector.ActAction(
-                preset.Act);
+            await WaitForActActionAsync(
+                window,
+                preset.Act,
+                NavigationTimeout,
+                detector,
+                cancellationToken)
+                .ConfigureAwait(false);
         await ClickAsync(
             window,
             actX,
@@ -360,5 +365,51 @@ public sealed partial class EventMacroRunner
         }
         throw new TimeoutException(
             $"Event navigation did not reach {expected}. Last state: {last.State} ({last.Confidence:P0}).");
+    }
+
+    private async Task<(int X, int Y)>
+        WaitForActActionAsync(
+        RobloxWindow window,
+        EventAct act,
+        TimeSpan timeout,
+        IDetectorPack detector,
+        CancellationToken cancellationToken)
+    {
+        DateTimeOffset deadline =
+            DateTimeOffset.UtcNow + timeout;
+        StableNavigationActionTracker<string>
+            tracker = new(required: 2);
+        EventScreenMatch last = default;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            cancellationToken
+                .ThrowIfCancellationRequested();
+            ImageFrame frame =
+                CaptureClient(window, detector);
+            last =
+                EventScreenDetector.Detect(frame);
+            (int X, int Y)? action =
+                last.State ==
+                    EventScreenState.ActSelector
+                    ? EventScreenDetector.ActAction(
+                        frame,
+                        act)
+                    : null;
+            (int X, int Y)? stable =
+                tracker.Update(
+                    action is null
+                        ? null
+                        : act.ToString(),
+                    action);
+            if (stable is not null)
+            {
+                return stable.Value;
+            }
+            await Task.Delay(
+                180,
+                cancellationToken).ConfigureAwait(false);
+        }
+        throw new RobloxUiUnavailableException(
+            $"The Event Act {(int)act} emblem did not settle into a clickable card. Last state: {last.State} ({last.Confidence:P0}).");
     }
 }

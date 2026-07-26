@@ -40,6 +40,9 @@ public sealed class RobloxRuntimeRecoveryPolicyTests
                 new PlayMenuBindingException('P')));
         Assert.False(
             RobloxRuntimeRecoveryPolicy.IsRestartCandidate(
+                new RobloxDisplayScaleException(125)));
+        Assert.False(
+            RobloxRuntimeRecoveryPolicy.IsRestartCandidate(
                 new InvalidDataException("invalid preset")));
     }
 

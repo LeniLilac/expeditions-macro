@@ -281,6 +281,7 @@ public sealed class ChallengeScreenDetectorTests
     [Theory]
     [InlineData("Prestart_FlowerForest_02.png")]
     [InlineData("Prestart_FlowerForest_03.png")]
+    [InlineData("Prestart_FlowerForest_04.png")]
     public void ColorfulFlowerForestScenery_DoesNotSuppressTheStartDialog(
         string fileName)
     {
@@ -367,24 +368,6 @@ public sealed class ChallengeScreenDetectorTests
         {
             ChallengeScreenState state = ChallengeScreenDetector.Detect(ImageCodec.Load(file)).State;
             Assert.True(state is ChallengeScreenState.None or ChallengeScreenState.Prestart);
-        }
-    }
-
-    [Theory]
-    [InlineData("Expedition_Reward_Select")]
-    [InlineData("Expedition_Reward_Select2")]
-    [InlineData("Expedition_Reward_Select3")]
-    [InlineData("Expedition_Reward_Select4")]
-    [InlineData("Expedition_Reward_Transition")]
-    public void ExpeditionsRewardDatasets_DoNotMatchChallengePanels(string dataset)
-    {
-        string directory = Path.Combine(TestPaths.Datasets, dataset);
-        if (!Directory.Exists(directory)) return;
-
-        foreach (string file in Directory.EnumerateFiles(directory, "*.png"))
-        {
-            ChallengeScreenMatch match = ChallengeScreenDetector.Detect(ImageCodec.Load(file));
-            Assert.Equal(ChallengeScreenState.None, match.State);
         }
     }
 

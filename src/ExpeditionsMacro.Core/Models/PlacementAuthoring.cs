@@ -47,6 +47,29 @@ public static class PlacementAuthoringRules
             minimum * minimum;
     }
 
+    public static IReadOnlyList<PlacementStep>
+        OrderForAuthoring(
+            IReadOnlyList<PlacementStep> steps)
+    {
+        ArgumentNullException.ThrowIfNull(steps);
+        return steps
+            .Select(
+                (step, index) =>
+                    new
+                    {
+                        Step = step,
+                        Index = index,
+                    })
+            .OrderBy(item =>
+                item.Step.Phase ==
+                    PlacementPhase.BeforeStart
+                    ? 0
+                    : 1)
+            .ThenBy(item => item.Index)
+            .Select(item => item.Step)
+            .ToArray();
+    }
+
     public static void ValidateMinimumSpacing(
         IReadOnlyList<PlacementStep> steps)
     {

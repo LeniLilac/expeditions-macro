@@ -34,6 +34,7 @@ public sealed class MacroStartupPreflightServiceTests
         Assert.Empty(automation.Clicks);
         Assert.Empty(automation.Keys);
         Assert.Empty(automation.Drags);
+        Assert.Equal(0, automation.PitchPreparationCount);
         Assert.Equal((808, 611), automation.ResizeRequest);
     }
 
@@ -105,6 +106,10 @@ public sealed class MacroStartupPreflightServiceTests
                     GameSettingsScreenDetector
                         .SettingsButtonY));
         Assert.Empty(automation.Drags);
+        Assert.Equal(1, automation.PitchPreparationCount);
+        Assert.Equal(
+            "pitch",
+            automation.ActionSequence[0]);
     }
 
     [Fact]
@@ -131,9 +136,38 @@ public sealed class MacroStartupPreflightServiceTests
         Assert.Contains(
             RobloxKeyboardKey.Digit1,
             automation.Keys);
+        Assert.Equal(1, automation.PitchPreparationCount);
+        Assert.Equal(
+            "pitch",
+            automation.ActionSequence[0]);
         Assert.Same(
             frames.NonLobby,
             automation.CurrentFrame);
+    }
+
+    [Fact]
+    public async Task GameSettingsDebug_PreparesPitchBeforeAccessibility()
+    {
+        TestFrames frames = new();
+        PreflightAutomation automation =
+            new(frames, frames.Lobby);
+        TestClock clock = new();
+        MacroStartupPreflightService service =
+            CreateService(automation, clock);
+
+        GameSettingsNormalizationResult result =
+            await service.RunGameSettingsAsync(
+                new LobbyDetector(frames.Lobby),
+                progress: null,
+                log: null,
+                CancellationToken.None);
+
+        Assert.Equal(0, result.ChangedSettings);
+        Assert.Equal(1, automation.PitchPreparationCount);
+        Assert.Equal(
+            "pitch",
+            automation.ActionSequence[0]);
+        Assert.Same(frames.Lobby, automation.CurrentFrame);
     }
 
     [Fact]
@@ -195,6 +229,7 @@ public sealed class MacroStartupPreflightServiceTests
             automation.Clicks,
             point => point == (638, 222));
         Assert.Single(automation.Drags);
+        Assert.Equal(1, automation.PitchPreparationCount);
         Assert.Same(frames.Lobby, automation.CurrentFrame);
     }
 
@@ -309,7 +344,8 @@ public sealed class MacroStartupPreflightServiceTests
         new(
             automation,
             () => clock.UtcNow,
-            clock.DelayAsync);
+            clock.DelayAsync,
+            automation.PrepareSettingsCameraAsync);
 
     private static ImageFrame ReplaceToggle(
         ImageFrame source,
@@ -361,36 +397,6 @@ public sealed class MacroStartupPreflightServiceTests
         }
     }
 
-    private sealed class TestFrames
-    {
-        public ImageFrame Lobby { get; } =
-            Load("LobbyClosed.png");
-        public ImageFrame NonLobby { get; } =
-            Load("LobbyClosed.png");
-        public ImageFrame EventThemeLobby { get; } =
-            Load("LobbyEventTheme.png");
-        public ImageFrame Scale080 { get; } =
-            Load("SettingsScale080.png");
-        public ImageFrame Scale120 { get; } =
-            Load("SettingsScale120.png");
-        public ImageFrame Gameplay { get; } =
-            Load("GameplayPage.png");
-        public ImageFrame Graphics { get; } =
-            Load("GraphicsPageCurrent.png");
-        public ImageFrame UnitsTop { get; } =
-            Load("UnitsTop.png");
-        public ImageFrame UnitsBottom { get; } =
-            Load("UnitsBottom.png");
-        public ImageFrame Miscellaneous { get; } =
-            Load("MiscellaneousPageCurrent.png");
-
-        private static ImageFrame Load(string name) =>
-            ImageCodec.Load(
-                Path.Combine(
-                    TestPaths.SettingsDatasets,
-                    name));
-    }
-
     private sealed class PreflightAutomation : IRobloxAutomation
     {
         private static readonly RobloxWindow Window =
@@ -440,6 +446,10 @@ public sealed class MacroStartupPreflightServiceTests
 
         public List<string> AppliedScaleValues { get; } = [];
 
+        public List<string> ActionSequence { get; } = [];
+
+        public int PitchPreparationCount { get; private set; }
+
         public List<(
             int StartX,
             int StartY,
@@ -448,6 +458,16 @@ public sealed class MacroStartupPreflightServiceTests
         { get; } = [];
 
         public (int Width, int Height)? ResizeRequest { get; private set; }
+
+        public Task PrepareSettingsCameraAsync(
+            RobloxWindow window,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            PitchPreparationCount++;
+            ActionSequence.Add("pitch");
+            return Task.CompletedTask;
+        }
 
         public RobloxWindow? FindWindow(
             string titleFragment = "Roblox") =>
@@ -619,6 +639,7 @@ public sealed class MacroStartupPreflightServiceTests
             RobloxKeyboardKey key,
             CancellationToken cancellationToken)
         {
+            ActionSequence.Add($"key:{key}");
             Keys.Add(key);
             if (key == RobloxKeyboardKey.Backslash)
             {
@@ -753,47 +774,4 @@ public sealed class MacroStartupPreflightServiceTests
             Task.CompletedTask;
     }
 
-    private sealed class LobbyDetector(
-        ImageFrame lobby,
-        bool alwaysLobby = false) : IDetectorPack
-    {
-        public DetectorPackManifest Manifest => null!;
-
-        public IReadOnlyDictionary<string, double> ScoreStates(
-            ImageFrame clientImage) =>
-            new Dictionary<string, double>();
-
-        public string? Classify(
-            IReadOnlyDictionary<string, double> scores) =>
-            null;
-
-        public string? RecoveryState(
-            ImageFrame clientImage) =>
-            alwaysLobby ||
-            ReferenceEquals(clientImage, lobby)
-                ? "lobby"
-                : null;
-
-        public string? CurrentNodeType(
-            ImageFrame clientImage) =>
-            null;
-
-        public int? SelectedMap(
-            ImageFrame clientImage) =>
-            null;
-
-        public int? SelectedDifficulty(
-            ImageFrame clientImage) =>
-            null;
-
-        public IReadOnlyList<int> RemainingUnitKeys(
-            ImageFrame clientImage,
-            IReadOnlySet<int> unitKeys) =>
-            [];
-
-        public (int X, int Y) ActionFor(
-            string state,
-            ImageFrame? clientImage = null) =>
-            throw new NotSupportedException();
-    }
 }

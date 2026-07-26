@@ -50,26 +50,11 @@ public partial class PlacementModelsPage
         RoutedEventArgs e) =>
         MoveSelected(1);
 
-    private void MoveSelected(int offset)
-    {
-        if (ActiveStepsSelector.SelectedItem is not
-            PlacementStepRow row)
-        {
-            return;
-        }
-        int current = _steps.IndexOf(row);
-        int target = current + offset;
-        if (target < 0 || target >= _steps.Count) return;
-        _steps.Move(current, target);
-        ActiveStepsSelector.SelectedItem = row;
-    }
-
     private int ReadPlaybackDelay()
     {
         if (FastWorkflow)
         {
-            return PlacementAuthoringRules
-                .DefaultStepDelayMilliseconds;
+            return _fastPlacementIntervalMilliseconds;
         }
         return TryReadDelay(DefaultDelayText, out int delay)
             ? delay

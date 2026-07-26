@@ -84,8 +84,7 @@ public static class PlacementScreenshotCatalog
                     1 => "event-villain-invasion-act-1.png",
                     2 => "event-villain-invasion-act-2.png",
                     3 => "event-villain-invasion-act-3.png",
-                    4 => throw new InvalidOperationException(
-                        "The Villain Invasion Act 4 placement screenshot is not available yet."),
+                    4 => "event-villain-invasion-act-4.png",
                     _ => throw UnknownTarget(),
                 },
             _ => throw UnknownTarget(),

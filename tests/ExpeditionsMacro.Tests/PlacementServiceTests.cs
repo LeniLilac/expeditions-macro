@@ -34,7 +34,7 @@ public sealed class PlacementServiceTests
     }
 
     [Fact]
-    public async Task Playback_NormalizesSelectionThenPrimesBeforePlacement()
+    public async Task Playback_NormalizesSelectionWithoutParkingThenPrimesBeforePlacement()
     {
         string root = Path.Combine(
             Path.GetTempPath(),
@@ -78,9 +78,11 @@ public sealed class PlacementServiceTests
                     "hover:320,280:2",
                     "key:4",
                     "letter:Z",
-                    "click:320,280",
+                    "click-retain:320,280",
                     "key:4",
                     "hover:320,280:2",
+                    "click-retain:320,280",
+                    "click-retain:320,280",
                     "click:320,280",
                 ],
                 automation.InputActions);
@@ -89,7 +91,18 @@ public sealed class PlacementServiceTests
             Assert.True(
                 automation.ClickedAt -
                 automation.TargetPrimedAt >=
-                TimeSpan.FromMilliseconds(180));
+                TimeSpan.FromMilliseconds(380));
+            Assert.Equal(
+                4,
+                automation.ClickTimes.Count);
+            Assert.True(
+                automation.ClickTimes[2] -
+                automation.ClickTimes[1] >=
+                TimeSpan.FromMilliseconds(90));
+            Assert.True(
+                automation.ClickTimes[3] -
+                automation.ClickTimes[2] >=
+                TimeSpan.FromMilliseconds(90));
         }
         finally
         {
@@ -132,6 +145,8 @@ public sealed class PlacementServiceTests
         public DateTimeOffset? TargetPrimedAt { get; private set; }
 
         public DateTimeOffset? ClickedAt { get; private set; }
+
+        public List<DateTimeOffset> ClickTimes { get; } = [];
 
         public RobloxWindow? FindWindow(string titleFragment = "Roblox") => _window;
 
@@ -181,6 +196,18 @@ public sealed class PlacementServiceTests
         {
             InputActions.Add($"click:{x},{y}");
             ClickedAt = DateTimeOffset.UtcNow;
+            ClickTimes.Add(ClickedAt.Value);
+            return Task.CompletedTask;
+        }
+
+        public Task ClickClientRetainingCursorAsync(
+            RobloxWindow window,
+            int x,
+            int y,
+            CancellationToken cancellationToken)
+        {
+            InputActions.Add($"click-retain:{x},{y}");
+            ClickTimes.Add(DateTimeOffset.UtcNow);
             return Task.CompletedTask;
         }
 

@@ -1,0 +1,54 @@
+<UserControl x:Class="ExpeditionsMacro.App.Controls.PlacementTimingPopover"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="292"
+             FontFamily="{StaticResource UiFont}"
+             Foreground="{DynamicResource TextBrush}">
+    <Border Padding="16"
+            Background="{DynamicResource RaisedBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="6">
+        <StackPanel>
+            <TextBlock Style="{StaticResource SectionTitle}"
+                       Text="Placement timing" />
+            <TextBlock Margin="0,4,0,0"
+                       Style="{StaticResource Caption}"
+                       Text="Saved with this placement setup." />
+
+            <TextBlock Margin="0,16,0,0"
+                       Style="{StaticResource FieldLabel}"
+                       Text="Between placements, ms" />
+            <TextBox x:Name="PlacementIntervalText"
+                     Margin="0,6,0,0"
+                     AutomationProperties.Name="Delay between placements in milliseconds" />
+            <TextBlock Margin="0,5,0,0"
+                       Style="{StaticResource Caption}"
+                       Text="Updates every step in this setup."
+                       TextWrapping="Wrap" />
+
+            <TextBlock Margin="0,14,0,0"
+                       Style="{StaticResource FieldLabel}"
+                       Text="Default After Start delay, s" />
+            <TextBox x:Name="DefaultAfterStartDelayText"
+                     Margin="0,6,0,0"
+                     AutomationProperties.Name="Default After Start delay in seconds" />
+            <TextBlock Margin="0,5,0,0"
+                       Style="{StaticResource Caption}"
+                       Text="Used for new steps. Existing custom delays stay unchanged."
+                       TextWrapping="Wrap" />
+
+            <TextBlock x:Name="TimingErrorText"
+                       Margin="0,10,0,0"
+                       Foreground="{DynamicResource ErrorBrush}"
+                       TextWrapping="Wrap"
+                       Visibility="Collapsed" />
+
+            <Button Margin="0,16,0,0"
+                    HorizontalAlignment="Right"
+                    Style="{StaticResource PrimaryButton}"
+                    Content="Apply"
+                    Click="Apply_Click" />
+        </StackPanel>
+    </Border>
+</UserControl>

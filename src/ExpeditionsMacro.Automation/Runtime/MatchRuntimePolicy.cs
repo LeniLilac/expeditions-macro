@@ -7,10 +7,21 @@ internal static class MatchRuntimePolicy
     public static readonly TimeSpan FifteenWaveLimit =
         TimeSpan.FromMinutes(12);
 
+    public static readonly TimeSpan EventActFourLimit =
+        TimeSpan.FromMinutes(17);
+
     public static readonly TimeSpan ExpeditionFirstCheckpointLimit =
         TimeSpan.FromMinutes(10);
 
     public static TimeSpan ChallengeLimit() => FifteenWaveLimit;
+
+    public static TimeSpan EventLimit(EventPreset preset)
+    {
+        ArgumentNullException.ThrowIfNull(preset);
+        return preset.Act == EventAct.Act4
+            ? EventActFourLimit
+            : FifteenWaveLimit;
+    }
 
     public static TimeSpan? StageLimit(
         StoryPreset? story,

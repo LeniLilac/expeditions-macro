@@ -18,6 +18,9 @@ public sealed class PlacementAuthoringTests
         JsonObject json = SerializeObject(current);
         json.Remove("camera_preparation_mode");
         json.Remove("target");
+        json.Remove("placement_interval_milliseconds");
+        json.Remove(
+            "default_after_start_delay_milliseconds");
         json["steps"]!.AsArray()[0]!
             .AsObject()
             .Remove("phase");
@@ -38,6 +41,14 @@ public sealed class PlacementAuthoringTests
             0,
             Assert.Single(legacy.Steps)
                 .DelayAfterStartMilliseconds);
+        Assert.Equal(
+            PlacementAuthoringRules
+                .DefaultStepDelayMilliseconds,
+            legacy.PlacementIntervalMilliseconds);
+        Assert.Equal(
+            PlacementAuthoringRules
+                .DefaultAfterStartDelayMilliseconds,
+            legacy.DefaultAfterStartDelayMilliseconds);
         legacy.Validate();
     }
 
@@ -297,6 +308,16 @@ public sealed class PlacementAuthoringTests
     [Fact]
     public void FastPlacement_DefaultTimingUsesThirtySecondAfterStartDelay()
     {
+        PlacementModel model = Placement(
+            CameraPreparationMode.FastNoAlign,
+            new PlacementTarget
+            {
+                Mode = PlacementTargetMode.Raid,
+                MapNumber = 1,
+                ActNumber = 1,
+            },
+            Step(PlacementPhase.BeforeStart, 1));
+
         Assert.Equal(
             900,
             PlacementAuthoringRules
@@ -305,6 +326,80 @@ public sealed class PlacementAuthoringTests
             30_000,
             PlacementAuthoringRules
                 .DefaultAfterStartDelayMilliseconds);
+        Assert.Equal(
+            900,
+            model.PlacementIntervalMilliseconds);
+        Assert.Equal(
+            30_000,
+            model.DefaultAfterStartDelayMilliseconds);
+    }
+
+    [Fact]
+    public void PlacementSetup_RejectsNegativeTimingDefaults()
+    {
+        PlacementModel model = Placement(
+            CameraPreparationMode.FastNoAlign,
+            new PlacementTarget
+            {
+                Mode = PlacementTargetMode.Raid,
+                MapNumber = 1,
+                ActNumber = 1,
+            },
+            Step(PlacementPhase.BeforeStart, 1));
+
+        InvalidDataException intervalError =
+            Assert.Throws<InvalidDataException>(
+                () => (model with
+                {
+                    PlacementIntervalMilliseconds = -1,
+                }).Validate());
+        InvalidDataException afterStartError =
+            Assert.Throws<InvalidDataException>(
+                () => (model with
+                {
+                    DefaultAfterStartDelayMilliseconds = -1,
+                }).Validate());
+
+        Assert.Contains(
+            "Placement interval",
+            intervalError.Message,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Default After Start delay",
+            afterStartError.Message,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AuthoringOrder_GroupsPhasesAndPreservesTheirStepOrder()
+    {
+        PlacementStep afterFirst =
+            Step(PlacementPhase.AfterStart, 1);
+        PlacementStep beforeFirst =
+            Step(PlacementPhase.BeforeStart, 2);
+        PlacementStep afterSecond =
+            Step(PlacementPhase.AfterStart, 3);
+        PlacementStep beforeSecond =
+            Step(PlacementPhase.BeforeStart, 4);
+
+        IReadOnlyList<PlacementStep> ordered =
+            PlacementAuthoringRules
+                .OrderForAuthoring(
+                [
+                    afterFirst,
+                    beforeFirst,
+                    afterSecond,
+                    beforeSecond,
+                ]);
+
+        Assert.Equal(
+            [
+                beforeFirst,
+                beforeSecond,
+                afterFirst,
+                afterSecond,
+            ],
+            ordered);
     }
 
     [Fact]
@@ -421,7 +516,7 @@ public sealed class PlacementAuthoringTests
         IReadOnlyList<PlacementSetupRoute> routes =
             PlacementSetupCatalog.All;
 
-        Assert.Equal(55, routes.Count);
+        Assert.Equal(56, routes.Count);
         Assert.Equal(
             routes.Count,
             routes.Select(route => route.ModelId)
@@ -459,7 +554,7 @@ public sealed class PlacementAuthoringTests
                 route.Target.Mode ==
                 PlacementTargetMode.Raid));
         Assert.Equal(
-            3,
+            4,
             routes.Count(route =>
                 route.Target.Mode ==
                 PlacementTargetMode.Event));

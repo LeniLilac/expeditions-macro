@@ -11,10 +11,13 @@ public sealed class EventScreenDetectorTests
     [Theory]
     [InlineData("EventHome.png", EventScreenState.EventHome)]
     [InlineData("ActSelector.png", EventScreenState.ActSelector)]
+    [InlineData("Act4Selector.png", EventScreenState.ActSelector)]
     [InlineData("Act1Detail.png", EventScreenState.ActDetail)]
+    [InlineData("Act4Detail.png", EventScreenState.ActDetail)]
     [InlineData("Prestart.png", EventScreenState.Prestart)]
     [InlineData("Victory.png", EventScreenState.Victory)]
     [InlineData("VictoryNextStage.png", EventScreenState.Victory)]
+    [InlineData("Act4Victory.png", EventScreenState.Victory)]
     [InlineData("Defeat.png", EventScreenState.Defeat)]
     public void ReviewedEventScreens_ReportTheirOwnedState(
         string fileName,
@@ -51,12 +54,105 @@ public sealed class EventScreenDetectorTests
             EventScreenDetector.EventGameModeAction);
         Assert.Equal((238, 437),
             EventScreenDetector.SelectStageAction);
-        Assert.Equal((270, 410),
-            EventScreenDetector.ActAction(EventAct.Act1));
-        Assert.Equal((465, 280),
-            EventScreenDetector.ActAction(EventAct.Act2));
-        Assert.Equal((700, 420),
-            EventScreenDetector.ActAction(EventAct.Act3));
+        Assert.False(
+            EventScreenDetector.RequiresLaterActScroll(
+                EventAct.Act1));
+        Assert.False(
+            EventScreenDetector.RequiresLaterActScroll(
+                EventAct.Act2));
+        Assert.True(
+            EventScreenDetector.RequiresLaterActScroll(
+                EventAct.Act3));
+        Assert.True(
+            EventScreenDetector.RequiresLaterActScroll(
+                EventAct.Act4));
+        Assert.Equal(
+            (402, 560, 628, 560),
+            EventScreenDetector.LaterActScroll);
+    }
+
+    [Theory]
+    [InlineData(
+        "ActSelector.png",
+        EventAct.Act1,
+        300,
+        335,
+        350,
+        390)]
+    [InlineData(
+        "ActSelector.png",
+        EventAct.Act2,
+        540,
+        580,
+        250,
+        300)]
+    [InlineData(
+        "Act4Selector.png",
+        EventAct.Act3,
+        315,
+        355,
+        400,
+        450)]
+    [InlineData(
+        "Act4Selector.png",
+        EventAct.Act4,
+        565,
+        610,
+        295,
+        345)]
+    public void ActEmblems_MapTheirLiveCards(
+        string fileName,
+        EventAct act,
+        int minimumX,
+        int maximumX,
+        int minimumY,
+        int maximumY)
+    {
+        ImageFrame frame = Load(fileName);
+
+        (int X, int Y)? action =
+            EventScreenDetector.ActAction(
+                frame,
+                act);
+
+        Assert.NotNull(action);
+        Assert.InRange(
+            action.Value.X,
+            minimumX,
+            maximumX);
+        Assert.InRange(
+            action.Value.Y,
+            minimumY,
+            maximumY);
+    }
+
+    [Theory]
+    [InlineData("ActSelector.png", EventAct.Act3)]
+    [InlineData("ActSelector.png", EventAct.Act4)]
+    [InlineData("Act4Selector.png", EventAct.Act1)]
+    [InlineData("Act4Selector.png", EventAct.Act2)]
+    public void ActEmblems_RejectCardsOutsideTheVisibleCarousel(
+        string fileName,
+        EventAct act)
+    {
+        Assert.Null(
+            EventScreenDetector.ActAction(
+                Load(fileName),
+                act));
+    }
+
+    [Fact]
+    public void ActFourDetail_LocatesSelectStageAction()
+    {
+        EventScreenMatch match =
+            EventScreenDetector.Detect(
+                Load("Act4Detail.png"));
+
+        Assert.Equal(
+            EventScreenState.ActDetail,
+            match.State);
+        Assert.InRange(match.ActionX ?? -1, 180, 305);
+        Assert.InRange(match.ActionY ?? -1, 420, 455);
     }
 
     [Fact]
@@ -75,6 +171,25 @@ public sealed class EventScreenDetectorTests
         Assert.True(
             repeat!.Value.X is >= 285 and <= 325 &&
             repeat.Value.Y is >= 420 and <= 455,
+            $"Repeat Stage mapped to ({repeat.Value.X}, {repeat.Value.Y}).");
+    }
+
+    [Fact]
+    public void ActFourVictory_MapsFinalRepeatStageAction()
+    {
+        ImageFrame frame = Load("Act4Victory.png");
+
+        Assert.Equal(
+            EventScreenState.Victory,
+            EventScreenDetector.Detect(frame).State);
+        (int X, int Y)? repeat =
+            StageScreenDetector.RepeatStageAction(
+                frame,
+                StageScreenState.Victory);
+        Assert.NotNull(repeat);
+        Assert.True(
+            repeat!.Value.X is >= 148 and <= 302 &&
+            repeat.Value.Y is >= 421 and <= 453,
             $"Repeat Stage mapped to ({repeat.Value.X}, {repeat.Value.Y}).");
     }
 

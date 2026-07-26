@@ -134,22 +134,6 @@ public sealed partial class WindowsRobloxAutomation : IRobloxAutomation, IDispos
         return new WindowBounds(rectangle.Left, rectangle.Top, rectangle.Right - rectangle.Left, rectangle.Bottom - rectangle.Top);
     }
 
-    public bool Focus(RobloxWindow window)
-    {
-        nint handle = ResolveHandle(window);
-        if (TryFocus(handle)) return true;
-
-        RobloxWindow? refreshed = FindWindow();
-        if (refreshed is null) return false;
-        RegisterAlias(window.Handle, refreshed.Value.Handle);
-        if (handle != refreshed.Value.Handle)
-        {
-            DiagnosticMessage?.Invoke($"Roblox window refreshed after a focus failure: {refreshed.Value.ProcessDescription}.");
-        }
-        RevalidateTrackedClientSize(refreshed.Value.Handle);
-        return TryFocus(refreshed.Value.Handle);
-    }
-
     public async Task ResizeClientAsync(RobloxWindow window, int width, int height, CancellationToken cancellationToken)
     {
         nint handle = ResolveHandle(window, revalidateTrackedSize: false);
@@ -228,50 +212,6 @@ public sealed partial class WindowsRobloxAutomation : IRobloxAutomation, IDispos
         {
             RestoreForcedStyle(handle, state.OriginalBounds, throwOnFailure: false);
         }
-    }
-
-    public Task MoveCursorToClientCenterAsync(RobloxWindow window, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        ClientBounds bounds = GetClientBounds(window);
-        MoveCursorWithRegisteredMotion(bounds.X + bounds.Width / 2, bounds.Y + bounds.Height / 2, 1, "Windows could not move the cursor to Roblox.");
-        return Task.CompletedTask;
-    }
-
-    public async Task ParkCursorAsync(RobloxWindow window, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!Focus(window)) throw new InvalidOperationException("Windows could not focus Roblox.");
-        await ParkCursorWithAcknowledgedMotionAsync(GetClientBounds(window), cancellationToken).ConfigureAwait(false);
-    }
-
-    public async Task ClickClientAsync(RobloxWindow window, int x, int y, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        ClientBounds bounds = GetClientBounds(window);
-        if (x < 0 || y < 0 || x >= bounds.Width || y >= bounds.Height) throw new ArgumentOutOfRangeException(nameof(x), "Click falls outside the Roblox client.");
-        int clickNudge = x < bounds.Width - 1 ? 1 : -1;
-        MoveCursorWithRegisteredMotion(bounds.X + x, bounds.Y + y, clickNudge, "Windows could not move the cursor to the Roblox coordinate.");
-        // Low-frame-rate clients can render the new button before their input loop
-        // acknowledges the registered cursor move. Give Roblox two typical frames
-        // before pressing so the click is hit-tested at the visible target.
-        await Task.Delay(ClickPositionSettleMilliseconds, cancellationToken).ConfigureAwait(false);
-        NativeMethods.mouse_event(NativeMethods.MouseeventfLeftDown, 0, 0, 0, 0);
-        EmitTrace(new WindowsAutomationTrace(DateTimeOffset.UtcNow, "mouse", "left_down", X: x, Y: y, Flags: NativeMethods.MouseeventfLeftDown));
-        try
-        {
-            await Task.Delay(ClickHoldMilliseconds, cancellationToken).ConfigureAwait(false);
-        }
-        finally
-        {
-            NativeMethods.mouse_event(NativeMethods.MouseeventfLeftUp, 0, 0, 0, 0);
-            EmitTrace(new WindowsAutomationTrace(DateTimeOffset.UtcNow, "mouse", "left_up", X: x, Y: y, Flags: NativeMethods.MouseeventfLeftUp));
-        }
-        // SetCursorPos alone can move the Windows pointer without making Roblox
-        // process a mouse-motion event. Keep the pointer safely inside the client and
-        // send spaced motion pulses so Roblox cannot coalesce the entire hover clear.
-        await ParkCursorWithAcknowledgedMotionAsync(bounds, cancellationToken).ConfigureAwait(false);
-        await Task.Delay(HoverRenderSettleMilliseconds, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task ScrollClientAsync(RobloxWindow window, int notches, CancellationToken cancellationToken)

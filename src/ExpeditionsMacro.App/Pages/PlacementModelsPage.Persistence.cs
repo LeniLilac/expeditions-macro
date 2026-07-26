@@ -77,9 +77,23 @@ public partial class PlacementModelsPage
                     TeamChoice team
                 ? team.Value
                 : 0,
-            Steps = _steps
-                .Select(row => row.ToModel())
-                .ToArray(),
+            PlacementIntervalMilliseconds =
+                FastWorkflow
+                    ? _fastPlacementIntervalMilliseconds
+                    : PlacementAuthoringRules
+                        .DefaultStepDelayMilliseconds,
+            DefaultAfterStartDelayMilliseconds =
+                FastWorkflow
+                    ? _fastDefaultAfterStartDelayMilliseconds
+                    : PlacementAuthoringRules
+                        .DefaultAfterStartDelayMilliseconds,
+            Steps =
+                PlacementAuthoringRules
+                    .OrderForAuthoring(
+                        _steps
+                            .Select(row =>
+                                row.ToModel())
+                            .ToArray()),
             CreatedAt =
                 _selectedModel?.CreatedAt ??
                 DateTimeOffset.UtcNow,

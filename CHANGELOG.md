@@ -4,6 +4,31 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.28] - 2026-07-26
+
+### Added
+
+- Added Villain Invasion Event Act 4 navigation, Fast no-align Placement Setup, stable yellow-emblem selection, final Victory support, and a recoverable 17-minute watchdog for its 25-wave match.
+- Added a startup guard that checks the effective Windows display scale on Roblox's current monitor and asks the user to change it to 100% before automation input begins.
+- Placement Setup steps can now be reordered by dragging their grip within the Before Start or After Start phase. A compact timing panel beside the step actions configures the setup's interval between placements and default After Start delay.
+
+### Changed
+
+- Deep Debug now saves a frame before and after every high-level Roblox automation action, including mouse movement, clicks, drags, scrolling, key presses, camera actions, and window changes.
+- Startup UI-scale and required-settings checks first pitch the camera straight down without changing zoom or yaw, preventing world interaction prompts from taking accessibility focus.
+- Placement playback keeps the cursor at the active coordinate throughout one placement sequence, makes three bounded placement clicks, and parks the cursor only before moving to the next configured unit.
+
+### Fixed
+
+- Event act selection now follows the act's stable colored emblem after scrolling rather than relying on a fixed carousel coordinate.
+- Reward-card suppression is limited to Expedition mode, so valid Challenge, Story, Raid, and Event prestart dialogs cannot be hidden by a colorful gameplay-frame false positive.
+- Returning to Lobby now uses accessibility navigation only to open the confirmation, then clicks the verified red confirmation action directly and waits for a stable Lobby before recovery continues.
+
+### Tests
+
+- Added Event Act 4 selector, detail, Victory, runtime-policy, placement-map, and cross-state detector regressions.
+- Added display-scale, pitch-only startup preparation, action-boundary Deep Debug, manual Lobby confirmation, cursor-retaining placement, triple-click, drag ordering, timing persistence, and Fast no-align share compatibility coverage.
+
 ## [1.3.0-beta.27] - 2026-07-26
 
 ### Added
@@ -849,7 +874,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.27...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.28...HEAD
+[1.3.0-beta.28]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.27...v1.3.0-beta.28
 [1.3.0-beta.27]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.26...v1.3.0-beta.27
 [1.3.0-beta.26]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.25...v1.3.0-beta.26
 [1.3.0-beta.25]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.24...v1.3.0-beta.25

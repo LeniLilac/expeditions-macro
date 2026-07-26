@@ -28,6 +28,12 @@ public partial class PlacementModelsPage : UserControl, IAppPage
     private int _selectedFastUnit = 1;
     private PlacementPhase _selectedFastPhase =
         PlacementPhase.BeforeStart;
+    private int _fastPlacementIntervalMilliseconds =
+        PlacementAuthoringRules
+            .DefaultStepDelayMilliseconds;
+    private int _fastDefaultAfterStartDelayMilliseconds =
+        PlacementAuthoringRules
+            .DefaultAfterStartDelayMilliseconds;
 
     public PlacementModelsPage(AppServices services)
     {
@@ -130,8 +136,15 @@ public partial class PlacementModelsPage : UserControl, IAppPage
     private void ApplyModel(PlacementModel model)
     {
         _selectedModel = model;
+        _fastPlacementIntervalMilliseconds =
+            model.PlacementIntervalMilliseconds;
+        _fastDefaultAfterStartDelayMilliseconds =
+            model.DefaultAfterStartDelayMilliseconds;
         _steps.Clear();
-        foreach (PlacementStep step in model.Steps)
+        foreach (PlacementStep step in
+                 PlacementAuthoringRules
+                     .OrderForAuthoring(
+                         model.Steps))
         {
             _steps.Add(PlacementStepRow.FromModel(step));
         }
@@ -189,6 +202,7 @@ public partial class PlacementModelsPage : UserControl, IAppPage
     {
         if (FastWorkflow)
         {
+            ResetFastTimingDefaults();
             FastBeforeStartButton.IsChecked = true;
             FastUnit1Button.IsChecked = true;
             if (_selectedSetupTarget is not null)
@@ -475,5 +489,11 @@ public partial class PlacementModelsPage : UserControl, IAppPage
         FastBeforeStartButton.IsEnabled = !busy;
         FastAfterStartButton.IsEnabled = !busy;
         PlacementCanvas.IsEnabled = !busy;
+        FastStepsList.IsEnabled = !busy;
+        FastTimingButton.IsEnabled = !busy;
+        if (busy)
+        {
+            FastEditorPanel.CloseTimingSettings();
+        }
     }
 }

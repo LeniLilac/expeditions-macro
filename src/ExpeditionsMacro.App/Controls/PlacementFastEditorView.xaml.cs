@@ -9,6 +9,8 @@ public partial class PlacementFastEditorView : UserControl
     public PlacementFastEditorView()
     {
         InitializeComponent();
+        FastTimingEditor.ApplyRequested +=
+            FastTimingEditor_ApplyRequested;
     }
 
     public event RoutedEventHandler? SaveRequested;
@@ -25,6 +27,22 @@ public partial class PlacementFastEditorView : UserControl
     public event MouseButtonEventHandler? CanvasClicked;
     public event MouseButtonEventHandler? MarkerSelected;
     public event MouseButtonEventHandler? MarkerRemoved;
+    public event EventHandler? TimingSettingsOpening;
+    public event EventHandler<PlacementTimingApplyEventArgs>?
+        TimingSettingsApplied;
+
+    public void SetTimingSettings(
+        int placementIntervalMilliseconds,
+        int defaultAfterStartDelayMilliseconds) =>
+        FastTimingEditor.SetValues(
+            placementIntervalMilliseconds,
+            defaultAfterStartDelayMilliseconds);
+
+    public void ShowTimingError(string message) =>
+        FastTimingEditor.ShowError(message);
+
+    public void CloseTimingSettings() =>
+        FastTimingPopup.IsOpen = false;
 
     private void Save_Click(
         object sender,
@@ -60,6 +78,21 @@ public partial class PlacementFastEditorView : UserControl
         object sender,
         RoutedEventArgs e) =>
         MoveStepDownRequested?.Invoke(sender, e);
+
+    private void FastTimingButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        FastTimingPopup.IsOpen = true;
+        TimingSettingsOpening?.Invoke(
+            this,
+            EventArgs.Empty);
+    }
+
+    private void FastTimingEditor_ApplyRequested(
+        object? sender,
+        PlacementTimingApplyEventArgs e) =>
+        TimingSettingsApplied?.Invoke(this, e);
 
     private void FastUnitButton_Checked(
         object sender,

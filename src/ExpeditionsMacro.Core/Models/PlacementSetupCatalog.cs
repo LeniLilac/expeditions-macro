@@ -184,7 +184,7 @@ public static class PlacementSetupCatalog
                 $"setup-raid-map-1-act-{act}");
         }
 
-        for (int act = 1; act <= 3; act++)
+        for (int act = 1; act <= 4; act++)
         {
             Add(
                 routes,

@@ -76,7 +76,7 @@ public sealed partial class EventMacroRunner
 
             MatchRuntimePolicy.ThrowIfExceeded(
                 matchRuntime.Elapsed,
-                MatchRuntimePolicy.FifteenWaveLimit,
+                MatchRuntimePolicy.EventLimit(preset),
                 "Event match");
             await keepAlive.TryPulseAsync(
                 (key, token) =>

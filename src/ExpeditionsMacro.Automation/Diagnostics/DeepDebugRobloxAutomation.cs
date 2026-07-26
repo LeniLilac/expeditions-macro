@@ -10,11 +10,17 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
 {
     private readonly IRobloxAutomation _inner;
     private readonly DeepDebugSessionService _debug;
+    private readonly DeepDebugActionFrameRecorder
+        _actionFrames;
 
     public DeepDebugRobloxAutomation(IRobloxAutomation inner, DeepDebugSessionService debug)
     {
         _inner = inner;
         _debug = debug;
+        _actionFrames =
+            new DeepDebugActionFrameRecorder(
+                inner,
+                debug);
     }
 
     public RobloxWindow? FindWindow(string titleFragment = "Roblox")
@@ -63,6 +69,7 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
 
     public Task ResizeClientAsync(RobloxWindow window, int width, int height, CancellationToken cancellationToken) =>
         TraceAsync(
+            window,
             "window",
             "resize_client",
             new { Window = WindowData(window), Width = width, Height = height },
@@ -71,14 +78,26 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
     public void RestoreWindowBounds(RobloxWindow window, WindowBounds bounds)
     {
         _debug.RecordEvent("window", "restore_bounds_requested", new { Window = WindowData(window), Bounds = bounds });
+        _actionFrames.Record(
+            window,
+            "restore_bounds",
+            "before");
         try
         {
             _inner.RestoreWindowBounds(window, bounds);
             _debug.RecordEvent("window", "restore_bounds_completed", new { Window = WindowData(window), Bounds = bounds });
+            _actionFrames.Record(
+                window,
+                "restore_bounds",
+                "after");
         }
         catch (Exception error)
         {
             _debug.RecordEvent("window", "restore_bounds_failed", new { Error = error.ToString() });
+            _actionFrames.Record(
+                window,
+                "restore_bounds",
+                "failed");
             throw;
         }
     }
@@ -107,6 +126,7 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
 
     public Task MoveCursorToClientCenterAsync(RobloxWindow window, CancellationToken cancellationToken) =>
         TraceAsync(
+            window,
             "automation",
             "move_cursor_to_client_center",
             new { Window = WindowData(window) },
@@ -119,6 +139,7 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
         int jitterCycles,
         CancellationToken cancellationToken) =>
         TraceAsync(
+            window,
             "automation",
             "move_cursor_to_client",
             new
@@ -137,6 +158,7 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
 
     public Task ParkCursorAsync(RobloxWindow window, CancellationToken cancellationToken) =>
         TraceAsync(
+            window,
             "automation",
             "park_cursor",
             new { Window = WindowData(window) },
@@ -144,10 +166,27 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
 
     public Task ClickClientAsync(RobloxWindow window, int x, int y, CancellationToken cancellationToken) =>
         TraceAsync(
+            window,
             "automation",
             "click_client",
             new { Window = WindowData(window), X = x, Y = y },
             () => _inner.ClickClientAsync(window, x, y, cancellationToken));
+
+    public Task ClickClientRetainingCursorAsync(
+        RobloxWindow window,
+        int x,
+        int y,
+        CancellationToken cancellationToken) =>
+        TraceAsync(
+            window,
+            "automation",
+            "click_client_retaining_cursor",
+            new { Window = WindowData(window), X = x, Y = y },
+            () => _inner.ClickClientRetainingCursorAsync(
+                window,
+                x,
+                y,
+                cancellationToken));
 
     public Task DragClientAsync(
         RobloxWindow window,
@@ -157,6 +196,7 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
         int endY,
         CancellationToken cancellationToken) =>
         TraceAsync(
+            window,
             "automation",
             "drag_client",
             new { Window = WindowData(window), StartX = startX, StartY = startY, EndX = endX, EndY = endY },
@@ -164,6 +204,7 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
 
     public Task ScrollClientAsync(RobloxWindow window, int notches, CancellationToken cancellationToken) =>
         TraceAsync(
+            window,
             "automation",
             "scroll_client",
             new { Window = WindowData(window), Notches = notches },
@@ -171,6 +212,7 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
 
     public Task DragCameraAsync(RobloxWindow window, int deltaX, int deltaY, int chunkPixels, CancellationToken cancellationToken) =>
         TraceAsync(
+            window,
             "automation",
             "drag_camera",
             new { Window = WindowData(window), DeltaX = deltaX, DeltaY = deltaY, ChunkPixels = chunkPixels },
@@ -182,6 +224,7 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
         int holdMilliseconds,
         CancellationToken cancellationToken) =>
         TraceAsync(
+            window,
             "automation",
             "pulse_camera_yaw",
             new { Window = WindowData(window), Direction = direction, HoldMilliseconds = holdMilliseconds },
@@ -196,6 +239,7 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
         Func<CameraYawSweepSample, bool> observe,
         CancellationToken cancellationToken) =>
         TraceAsync(
+            window,
             "automation",
             "capture_camera_yaw_sweep",
             new
@@ -234,6 +278,7 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
         Action<CameraFineYawSweepSample> observe,
         CancellationToken cancellationToken) =>
         TraceAsync(
+            window,
             "automation",
             "capture_camera_fine_yaw_sweep",
             new
@@ -258,6 +303,7 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
 
     public Task ZoomOutFullyAsync(RobloxWindow window, int ticks, CancellationToken cancellationToken) =>
         TraceAsync(
+            window,
             "automation",
             "zoom_out_fully",
             new { Window = WindowData(window), Ticks = ticks },
@@ -265,6 +311,7 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
 
     public Task TapShiftLockKeyAsync(RobloxWindow window, int virtualKey, CancellationToken cancellationToken) =>
         TraceAsync(
+            window,
             "automation",
             "tap_shift_lock_key",
             new { Window = WindowData(window), VirtualKey = virtualKey, Key = KeyboardKey.GetDisplayName(virtualKey) },
@@ -272,6 +319,7 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
 
     public Task TapLetterKeyAsync(RobloxWindow window, char key, CancellationToken cancellationToken) =>
         TraceAsync(
+            window,
             "automation",
             "tap_letter_key",
             new { Window = WindowData(window), Key = key },
@@ -282,6 +330,7 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
         RobloxKeyboardKey key,
         CancellationToken cancellationToken) =>
         TraceAsync(
+            window,
             "automation",
             "tap_keyboard_key",
             new { Window = WindowData(window), Key = key.ToString() },
@@ -296,6 +345,7 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
         int holdMilliseconds,
         CancellationToken cancellationToken) =>
         TraceAsync(
+            window,
             "automation",
             "hold_letter_key",
             new
@@ -316,6 +366,7 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
         int holdMilliseconds,
         CancellationToken cancellationToken) =>
         TraceAsync(
+            window,
             "automation",
             "hold_key",
             new
@@ -333,6 +384,7 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
 
     public Task TapUnitKeyAsync(RobloxWindow window, int unitKey, int holdMilliseconds, CancellationToken cancellationToken) =>
         TraceAsync(
+            window,
             "automation",
             "tap_unit_key",
             new { Window = WindowData(window), UnitKey = unitKey, HoldMilliseconds = holdMilliseconds },
@@ -343,22 +395,43 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
         if (_inner is IDisposable disposable) disposable.Dispose();
     }
 
-    private async Task TraceAsync(string category, string action, object data, Func<Task> callback)
+    private async Task TraceAsync(
+        RobloxWindow window,
+        string category,
+        string action,
+        object data,
+        Func<Task> callback)
     {
         _debug.RecordEvent(category, $"{action}_requested", data);
+        _actionFrames.Record(
+            window,
+            action,
+            "before");
         try
         {
             await callback().ConfigureAwait(false);
             _debug.RecordEvent(category, $"{action}_completed", data);
+            _actionFrames.Record(
+                window,
+                action,
+                "after");
         }
         catch (OperationCanceledException)
         {
             _debug.RecordEvent(category, $"{action}_canceled", data);
+            _actionFrames.Record(
+                window,
+                action,
+                "canceled");
             throw;
         }
         catch (Exception error)
         {
             _debug.RecordEvent(category, $"{action}_failed", new { Request = data, Error = error.ToString() });
+            _actionFrames.Record(
+                window,
+                action,
+                "failed");
             throw;
         }
     }

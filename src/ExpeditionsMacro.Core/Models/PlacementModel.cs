@@ -53,6 +53,14 @@ public sealed record PlacementModel
 
     public int TeamSlot { get; init; }
 
+    public int PlacementIntervalMilliseconds { get; init; } =
+        PlacementAuthoringRules
+            .DefaultStepDelayMilliseconds;
+
+    public int DefaultAfterStartDelayMilliseconds { get; init; } =
+        PlacementAuthoringRules
+            .DefaultAfterStartDelayMilliseconds;
+
     public required DateTimeOffset CreatedAt { get; init; }
 
     public DateTimeOffset UpdatedAt { get; init; } = DateTimeOffset.UtcNow;
@@ -65,6 +73,16 @@ public sealed record PlacementModel
         if (Steps.Count == 0) throw new InvalidDataException("Placement model has no steps.");
         if (!Enum.IsDefined(CameraPreparationMode)) throw new InvalidDataException("Placement model camera preparation is invalid.");
         if (TeamSlot is < 0 or > 8) throw new InvalidDataException("Team must be Don't change or Team 1 through 8.");
+        if (PlacementIntervalMilliseconds < 0)
+        {
+            throw new InvalidDataException(
+                "Placement interval cannot be negative.");
+        }
+        if (DefaultAfterStartDelayMilliseconds < 0)
+        {
+            throw new InvalidDataException(
+                "Default After Start delay cannot be negative.");
+        }
         if (CameraPreparationMode == CameraPreparationMode.FastNoAlign)
         {
             if (Target is null) throw new InvalidDataException("Choose the map and act for this Fast no align placement model.");

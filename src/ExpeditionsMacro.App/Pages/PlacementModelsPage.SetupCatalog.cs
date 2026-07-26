@@ -145,7 +145,7 @@ public partial class PlacementModelsPage
                 3),
             "Raid Map 1 Act 3");
 
-        for (int act = 1; act <= 3; act++)
+        for (int act = 1; act <= 4; act++)
         {
             AddRootRoute(
                 FindSetup(

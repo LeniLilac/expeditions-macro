@@ -26,6 +26,7 @@ public enum LucideIconKind
     Eye,
     EyeOff,
     FolderOpen,
+    GripVertical,
     FastForward,
     Keyboard,
     LogOut,
@@ -180,6 +181,13 @@ public sealed class LucideIcon : Control
             Path("M17.479 17.499A10.75 10.75 0 0 1 12 19c-4.76 0-8.637-3.337-9.648-6.652a1 1 0 0 1 0-.696 10.72 10.72 0 0 1 3.9-5.5"),
             Path("m2 2 20 20")),
         [LucideIconKind.FolderOpen] = Path("m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"),
+        [LucideIconKind.GripVertical] = Group(
+            Circle(9, 5, 1),
+            Circle(9, 12, 1),
+            Circle(9, 19, 1),
+            Circle(15, 5, 1),
+            Circle(15, 12, 1),
+            Circle(15, 19, 1)),
         [LucideIconKind.FastForward] = Group(
             Path("m13 19 9-7-9-7z"),
             Path("m2 19 9-7-9-7z")),

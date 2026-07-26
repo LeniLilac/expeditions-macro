@@ -20,7 +20,12 @@ public sealed class FastNoAlignShareTests
                 MapNumber = 2,
             };
             PlacementModel setup =
-                Setup(target, team: 7);
+                Setup(target, team: 7) with
+                {
+                    PlacementIntervalMilliseconds = 1250,
+                    DefaultAfterStartDelayMilliseconds =
+                        42_000,
+                };
             MacroPlan plan = Plan(
                 new MacroTaskDefinition
                 {
@@ -77,6 +82,16 @@ public sealed class FastNoAlignShareTests
                 Assert.Single(
                     bundle.PlacementSetups)
                     .TeamSlot);
+            Assert.Equal(
+                1250,
+                Assert.Single(
+                    bundle.PlacementSetups)
+                    .PlacementIntervalMilliseconds);
+            Assert.Equal(
+                42_000,
+                Assert.Single(
+                    bundle.PlacementSetups)
+                    .DefaultAfterStartDelayMilliseconds);
 
             FastNoAlignShareService importer =
                 Service(destinationRoot);
@@ -95,6 +110,14 @@ public sealed class FastNoAlignShareTests
                 ?? throw new InvalidOperationException();
             Assert.Empty(importedPlan.Progress);
             Assert.Equal(7, importedSetup.TeamSlot);
+            Assert.Equal(
+                1250,
+                importedSetup
+                    .PlacementIntervalMilliseconds);
+            Assert.Equal(
+                42_000,
+                importedSetup
+                    .DefaultAfterStartDelayMilliseconds);
             Assert.Equal(
                 PlacementSetupCatalog.IdFor(target),
                 importedSetup.Id);

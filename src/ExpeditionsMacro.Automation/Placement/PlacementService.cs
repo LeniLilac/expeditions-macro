@@ -10,6 +10,8 @@ public sealed class PlacementService
 {
     private const int PlacementHoverJitterCycles = 2;
     private const int PlacementHoverSettleMilliseconds = 200;
+    private const int PlacementClickAttempts = 3;
+    private const int PlacementClickRetryMilliseconds = 100;
 
     private readonly IRobloxAutomation _automation;
     private readonly IPlacementCaptureService _capture;
@@ -145,7 +147,7 @@ public sealed class PlacementService
                 window,
                 cancelPlacementKey,
                 cancellationToken).ConfigureAwait(false);
-            await _automation.ClickClientAsync(
+            await _automation.ClickClientRetainingCursorAsync(
                 window,
                 step.X,
                 step.Y,
@@ -176,9 +178,37 @@ public sealed class PlacementService
                     PlacementHoverSettleMilliseconds,
                     cancellationToken)
                 .ConfigureAwait(false);
-            EnsureFocus(window);
-            status?.Invoke($"Step {index + 1}/{steps.Count}: clicking relative ({step.X}, {step.Y}).");
-            await _automation.ClickClientAsync(window, step.X, step.Y, cancellationToken).ConfigureAwait(false);
+            for (int attempt = 1;
+                 attempt <= PlacementClickAttempts;
+                 attempt++)
+            {
+                EnsureFocus(window);
+                status?.Invoke(
+                    $"Step {index + 1}/{steps.Count}: placement click {attempt}/{PlacementClickAttempts} at ({step.X}, {step.Y}).");
+                if (attempt == PlacementClickAttempts)
+                {
+                    await _automation.ClickClientAsync(
+                            window,
+                            step.X,
+                            step.Y,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                else
+                {
+                    await _automation
+                        .ClickClientRetainingCursorAsync(
+                            window,
+                            step.X,
+                            step.Y,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    await Task.Delay(
+                            PlacementClickRetryMilliseconds,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+            }
             stepSent?.Invoke(index + 1, steps.Count, step);
             int delay = useDefaultInterval ? defaultIntervalMilliseconds : step.DelayAfterMilliseconds;
             status?.Invoke($"Step {index + 1}/{steps.Count}: waiting {delay} ms after click.");

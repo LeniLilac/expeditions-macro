@@ -1,3 +1,4 @@
+using ExpeditionsMacro.Automation.Camera;
 using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
@@ -25,25 +26,37 @@ public sealed class MacroStartupPreflightService
         TimeSpan,
         CancellationToken,
         Task> _delay;
+    private readonly Func<
+        RobloxWindow,
+        CancellationToken,
+        Task> _prepareCamera;
 
     public MacroStartupPreflightService(
-        IRobloxAutomation automation)
+        IRobloxAutomation automation,
+        CameraPosePreparationService cameraPose)
         : this(
             automation,
             static () => DateTimeOffset.UtcNow,
             static (duration, token) =>
-                Task.Delay(duration, token))
+                Task.Delay(duration, token),
+            (window, token) =>
+                cameraPose.PreparePitchOnlyAsync(
+                    window,
+                    cancellationToken: token))
     {
     }
 
     internal MacroStartupPreflightService(
         IRobloxAutomation automation,
         Func<DateTimeOffset> utcNow,
-        Func<TimeSpan, CancellationToken, Task> delay)
+        Func<TimeSpan, CancellationToken, Task> delay,
+        Func<RobloxWindow, CancellationToken, Task>
+            prepareCamera)
     {
         _automation = automation;
         _utcNow = utcNow;
         _delay = delay;
+        _prepareCamera = prepareCamera;
         _normalizer = new GameSettingsNormalizer(
             automation,
             utcNow,
@@ -72,6 +85,9 @@ public sealed class MacroStartupPreflightService
                 "Preparing Roblox for the UI Scale check.",
                 progress,
                 cancellationToken).ConfigureAwait(false);
+        await _prepareCamera(
+            window,
+            cancellationToken).ConfigureAwait(false);
         bool changed = await _uiScale.NormalizeAsync(
             window,
             cancellationToken).ConfigureAwait(false);
@@ -100,6 +116,9 @@ public sealed class MacroStartupPreflightService
                 "Waiting for a stable lobby before checking game settings.",
                 progress,
                 cancellationToken).ConfigureAwait(false);
+        await _prepareCamera(
+            window,
+            cancellationToken).ConfigureAwait(false);
         await WaitForLobbyAsync(
             window,
             detector,
@@ -182,6 +201,9 @@ public sealed class MacroStartupPreflightService
             return new GameSettingsNormalizationResult(0, false);
         }
 
+        await _prepareCamera(
+            window,
+            cancellationToken).ConfigureAwait(false);
         Report(
             "Checking Anime Expeditions UI Scale before lobby verification.",
             progress,

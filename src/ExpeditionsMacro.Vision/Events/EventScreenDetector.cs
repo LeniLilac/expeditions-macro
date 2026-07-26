@@ -133,7 +133,8 @@ public static class EventScreenDetector
 
     public static bool RequiresLaterActScroll(
         EventAct act) =>
-        act == EventAct.Act4;
+        act is EventAct.Act3 or
+            EventAct.Act4;
 
     public static (
         int StartX,
@@ -142,16 +143,18 @@ public static class EventScreenDetector
         int EndY) LaterActScroll =>
         (402, 560, 628, 560);
 
-    public static (int X, int Y) ActAction(
-        EventAct act) => act switch
-        {
-            EventAct.Act1 => (270, 410),
-            EventAct.Act2 => (465, 280),
-            EventAct.Act3 => (700, 420),
-            EventAct.Act4 => (585, 320),
-            _ => throw new ArgumentOutOfRangeException(
-                nameof(act)),
-        };
+    public static (int X, int Y)? ActAction(
+        ImageFrame image,
+        EventAct act)
+    {
+        EventActAnchorMatch? anchor =
+            EventActAnchorDetector.Find(
+                image,
+                act);
+        return anchor is EventActAnchorMatch match
+            ? (match.ActionX, match.ActionY)
+            : null;
+    }
 
     private static double EventChromeScore(
         ImageFrame image)
