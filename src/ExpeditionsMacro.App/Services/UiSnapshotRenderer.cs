@@ -175,6 +175,13 @@ internal static class UiSnapshotRenderer
                 "dashboard-run-log",
                 StringComparison.OrdinalIgnoreCase))
         {
+            if (string.Equals(
+                    Environment.GetEnvironmentVariable("CI"),
+                    "true",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return standard;
+            }
             return new Size(1660, 1040);
         }
         if (file.Contains(
