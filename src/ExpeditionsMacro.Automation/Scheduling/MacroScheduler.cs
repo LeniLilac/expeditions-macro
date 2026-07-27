@@ -150,7 +150,7 @@ public sealed class MacroScheduler
         MacroPlan plan,
         DateTimeOffset now) =>
         MacroPlanLoopPolicy
-            .ActiveTasks(plan)
+            .ActiveTasks(plan, now)
             .Select((task, index) => new { Task = task, Index = index, Progress = plan.ProgressFor(task.Id) })
             .Where(value => value.Task.Enabled)
             .Where(value => value.Task.IsRecurring || !value.Progress.Completed)
@@ -241,7 +241,7 @@ public sealed class MacroScheduler
 
     private static DateTimeOffset? NextWake(MacroPlan plan, DateTimeOffset now) =>
         MacroPlanLoopPolicy
-            .ActiveTasks(plan)
+            .ActiveTasks(plan, now)
             .Where(task => task.Enabled && (task.IsRecurring || !plan.ProgressFor(task.Id).Completed))
             .Select(task => plan.ProgressFor(task.Id).NextEligibleAtUtc)
             .Where(value => value > now)

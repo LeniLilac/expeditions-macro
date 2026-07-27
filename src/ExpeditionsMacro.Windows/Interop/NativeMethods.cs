@@ -6,11 +6,17 @@ internal static partial class NativeMethods
 {
     internal const int GwlStyle = -16;
     internal const int GwlExStyle = -20;
+    internal const int GwlHwndParent = -8;
+    internal const int WsChild = 0x40000000;
+    internal const int WsVisible = 0x10000000;
+    internal const int WsClipSiblings = 0x04000000;
+    internal const int WsClipChildren = 0x02000000;
     internal const int SwpNoZOrder = 0x0004;
     internal const int SwpNoActivate = 0x0010;
     internal const int SwpFrameChanged = 0x0020;
     internal const int SwpShowWindow = 0x0040;
     internal const int SwRestore = 9;
+    internal const int SwShow = 5;
     internal const uint MonitorDefaultToNearest = 0x00000002;
     internal const int MonitorDpiTypeEffective = 0;
     internal const uint WmHotkey = 0x0312;
@@ -175,6 +181,13 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool EnumWindows(EnumWindowsProc callback, nint parameter);
 
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool EnumChildWindows(
+        nint parent,
+        EnumWindowsProc callback,
+        nint parameter);
+
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool IsWindowVisible(nint window);
@@ -182,6 +195,9 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool IsWindow(nint window);
+
+    [LibraryImport("user32.dll")]
+    internal static partial nint GetDesktopWindow();
 
     [LibraryImport("user32.dll")]
     internal static partial uint GetWindowThreadProcessId(nint window, out uint processId);
@@ -222,6 +238,47 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool SetWindowPos(nint window, nint insertAfter, int x, int y, int width, int height, uint flags);
 
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool MoveWindow(
+        nint window,
+        int x,
+        int y,
+        int width,
+        int height,
+        [MarshalAs(UnmanagedType.Bool)] bool repaint);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    internal static partial nint SetParent(
+        nint child,
+        nint newParent);
+
+    [LibraryImport("user32.dll")]
+    internal static partial nint GetParent(nint window);
+
+    [LibraryImport(
+        "user32.dll",
+        EntryPoint = "CreateWindowExW",
+        SetLastError = true,
+        StringMarshalling = StringMarshalling.Utf16)]
+    internal static partial nint CreateWindowEx(
+        uint extendedStyle,
+        string className,
+        string? windowName,
+        uint style,
+        int x,
+        int y,
+        int width,
+        int height,
+        nint parent,
+        nint menu,
+        nint instance,
+        nint parameter);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool DestroyWindow(nint window);
+
     [LibraryImport("user32.dll", EntryPoint = "GetWindowLongPtrW", SetLastError = true)]
     internal static partial nint GetWindowLongPtr(nint window, int index);
 
@@ -249,6 +306,19 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool SetForegroundWindow(nint window);
+
+    [LibraryImport("user32.dll")]
+    internal static partial nint SetFocus(nint window);
+
+    [LibraryImport("user32.dll")]
+    internal static partial nint GetFocus();
+
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool AttachThreadInput(
+        uint attachThread,
+        uint attachToThread,
+        [MarshalAs(UnmanagedType.Bool)] bool attach);
 
     [LibraryImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

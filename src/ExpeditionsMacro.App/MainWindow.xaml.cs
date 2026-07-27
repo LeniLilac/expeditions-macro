@@ -17,19 +17,26 @@ public partial class MainWindow : Window
     private const string SetupGuideUrl = "https://docs.google.com/document/d/10NeDNa3BNEwPEpZj0oVQiR98_7GN67dmKS-OZwaxALM/edit?usp=sharing";
     private readonly AppServices _services;
     private readonly Dictionary<string, IAppPage> _pages;
+    private readonly MacroPage _macroPage;
     private bool _autoMinimized;
     private bool _closingAfterStop;
     private bool _selectingSnapshotPage;
+    private bool _handlingWindowState;
     private readonly bool _snapshotMode;
+    private string _currentPageKey = "Dashboard";
 
     public MainWindow(AppServices services, bool snapshotMode = false)
     {
         _services = services;
         _snapshotMode = snapshotMode;
         InitializeComponent();
+        _macroPage = new MacroPage(services);
+        _macroPage.SetNativeDockingEnabled(
+            !snapshotMode);
         _pages = new Dictionary<string, IAppPage>(StringComparer.OrdinalIgnoreCase)
         {
-            ["Macro"] = new MacroPage(services),
+            ["Dashboard"] = _macroPage,
+            ["Macro Plan"] = _macroPage,
             ["Expeditions"] = new ExpeditionsPage(services),
             ["Challenges"] = new ChallengesPage(services),
             ["Story"] = new StoryPage(services),
@@ -49,11 +56,11 @@ public partial class MainWindow : Window
         {
             Loaded += async (_, _) =>
             {
-                await ShowPageAsync("Macro");
+                await ShowPageAsync("Dashboard");
                 if (_pages["Settings"] is SettingsPage settings) await settings.CheckForUpdatesAsync(automatic: true);
             };
         }
-        StateChanged += (_, _) => Lucide.SetIcon(MaximizeButton, WindowState == WindowState.Maximized ? LucideIconKind.Copy : LucideIconKind.Square);
+        StateChanged += Window_StateChanged;
     }
 
     private async void Navigation_Checked(object sender, RoutedEventArgs e)
@@ -64,23 +71,43 @@ public partial class MainWindow : Window
 
     private async Task ShowPageAsync(string key)
     {
+        bool dashboard =
+            string.Equals(
+                key,
+                "Dashboard",
+                StringComparison.OrdinalIgnoreCase);
+        if (!_macroPage.TrySetDashboardActive(
+            dashboard,
+            out string pinningError))
+        {
+            RestoreNavigationSelection();
+            MessageBox.Show(
+                this,
+                pinningError,
+                "Roblox pinning",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
         IAppPage page = _pages[key];
+        if (page is MacroPage macro)
+        {
+            macro.SelectWorkspace(key);
+        }
         PageHost.Content = page;
         TitleContext.Text = key;
         _services.Coordinator.DefaultIdleHotkeyAction = page.IdleHotkeyAction;
         await page.OnShownAsync();
-        EnsurePlacementWorkspaceSize(key);
+        _currentPageKey = key;
+        EnsureWorkspaceSize(key);
     }
 
-    private void EnsurePlacementWorkspaceSize(string key)
+    private void EnsureWorkspaceSize(string key)
     {
         if (_snapshotMode ||
             WindowState != WindowState.Normal ||
-            !string.Equals(
-                key,
-                "Placement Setup",
-                StringComparison.OrdinalIgnoreCase) ||
-            !_services.Settings.FastNoAlignEnabled)
+            !NeedsExpandedWorkspace(key))
         {
             return;
         }
@@ -112,14 +139,57 @@ public partial class MainWindow : Window
             workArea.Bottom - Height);
     }
 
+    private bool NeedsExpandedWorkspace(
+        string key) =>
+        string.Equals(
+            key,
+            "Dashboard",
+            StringComparison.OrdinalIgnoreCase) ||
+        (string.Equals(
+            key,
+            "Placement Setup",
+            StringComparison.OrdinalIgnoreCase) &&
+         _services.Settings.FastNoAlignEnabled);
+
+    private void RestoreNavigationSelection()
+    {
+        RadioButton navigation =
+            _currentPageKey switch
+            {
+                "Dashboard" => DashboardNav,
+                "Macro Plan" => MacroPlanNav,
+                "Expeditions" => ExpeditionsNav,
+                "Challenges" => ChallengesNav,
+                "Story" => StoryNav,
+                "Raid" => RaidNav,
+                "Camera Models" => CameraNav,
+                "Placement Setup" => PlacementNav,
+                "Debug" => DebugNav,
+                "Settings" => SettingsNav,
+                _ => DashboardNav,
+            };
+        _selectingSnapshotPage = true;
+        try
+        {
+            navigation.IsChecked = true;
+        }
+        finally
+        {
+            _selectingSnapshotPage = false;
+        }
+    }
+
     internal async Task SelectPageForSnapshotAsync(
         string key,
         bool showPageEnd = false,
-        bool showDebugUtilities = false)
+        bool showDebugUtilities = false,
+        MacroPlanSnapshotState macroPlanState =
+            MacroPlanSnapshotState.NestedLoops)
     {
         RadioButton navigation = key switch
         {
-            "Macro" => MacroNav,
+            "Dashboard" => DashboardNav,
+            "Macro Plan" => MacroPlanNav,
             "Expeditions" => ExpeditionsNav,
             "Challenges" => ChallengesNav,
             "Story" => StoryNav,
@@ -147,7 +217,12 @@ public partial class MainWindow : Window
         if (_pages[key] is StoryPage story) story.SetSnapshotFastMode();
         if (_pages[key] is RaidPage raid) raid.SetSnapshotFastMode();
         if (_pages[key] is PlacementModelsPage placement) placement.SetSnapshotState();
-        if (_pages[key] is MacroPage macro) macro.SetSnapshotScroll(showPageEnd);
+        if (_pages[key] is MacroPage macro)
+        {
+            macro.SetSnapshotScroll(
+                showPageEnd,
+                macroPlanState);
+        }
         if (_pages[key] is SettingsPage settings) settings.SetSnapshotScroll(showPageEnd);
         if (_pages[key] is ChallengesPage challenges) challenges.SetSnapshotScroll(showPageEnd);
         if (_pages[key] is DebugPage debug)
@@ -180,7 +255,14 @@ public partial class MainWindow : Window
                 OperationState.Stopping => "WarningBrush",
                 _ => "FaintBrush",
             });
-            if (_services.Coordinator.State == OperationState.Running && _services.Settings.MinimizeDuringAutomation && WindowState != WindowState.Minimized)
+            if (_services.Coordinator.State ==
+                    OperationState.Running &&
+                _services.Settings
+                    .MinimizeDuringAutomation &&
+                !_macroPage
+                    .KeepsDashboardWindowVisible &&
+                WindowState !=
+                    WindowState.Minimized)
             {
                 _autoMinimized = true;
                 WindowState = WindowState.Minimized;
@@ -193,6 +275,52 @@ public partial class MainWindow : Window
             }
             if (_closingAfterStop && _services.Coordinator.State == OperationState.Idle) Close();
         });
+    }
+
+    private void Window_StateChanged(
+        object? sender,
+        EventArgs e)
+    {
+        Lucide.SetIcon(
+            MaximizeButton,
+            WindowState ==
+                WindowState.Maximized
+                ? LucideIconKind.Copy
+                : LucideIconKind.Square);
+        if (_snapshotMode ||
+            _handlingWindowState)
+        {
+            return;
+        }
+
+        bool ownerVisible =
+            WindowState !=
+                WindowState.Minimized;
+        if (_macroPage
+            .TrySetDashboardOwnerVisible(
+                ownerVisible,
+                out string error))
+        {
+            return;
+        }
+
+        _handlingWindowState = true;
+        try
+        {
+            WindowState =
+                WindowState.Normal;
+            Activate();
+            MessageBox.Show(
+                this,
+                error,
+                "Roblox pinning",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+        finally
+        {
+            _handlingWindowState = false;
+        }
     }
 
     private void Coordinator_OperationFailed(object? sender, Exception error)
@@ -221,7 +349,7 @@ public partial class MainWindow : Window
                 PageHost.Content,
                 _pages["Debug"]))
         {
-            MacroNav.IsChecked = true;
+            DashboardNav.IsChecked = true;
         }
 
         bool cameraVisible =
@@ -267,7 +395,7 @@ public partial class MainWindow : Window
                 StoryPage or
                 RaidPage)
         {
-            MacroNav.IsChecked = true;
+            DashboardNav.IsChecked = true;
         }
     }
 
@@ -280,6 +408,18 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
+        if (!_macroPage.TryDetachRoblox(
+            out string pinningError))
+        {
+            e.Cancel = true;
+            MessageBox.Show(
+                this,
+                pinningError,
+                "Roblox pinning",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            return;
+        }
         if (_services.Coordinator.State == OperationState.Idle) return;
         e.Cancel = true;
         _closingAfterStop = true;
@@ -288,7 +428,27 @@ public partial class MainWindow : Window
 
     private void TitleBar_RightClick(object sender, MouseButtonEventArgs e) => SystemCommands.ShowSystemMenu(this, PointToScreen(e.GetPosition(this)));
 
-    private void Minimize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+    private void Minimize_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (!_macroPage
+            .TrySetDashboardOwnerVisible(
+                visible: false,
+                out string error))
+        {
+            MessageBox.Show(
+                this,
+                error,
+                "Roblox pinning",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+
+        WindowState =
+            WindowState.Minimized;
+    }
 
     private void Maximize_Click(object sender, RoutedEventArgs e) => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
 

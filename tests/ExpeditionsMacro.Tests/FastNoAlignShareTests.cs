@@ -26,6 +26,18 @@ public sealed class FastNoAlignShareTests
                     DefaultAfterStartDelayMilliseconds =
                         42_000,
                 };
+            MacroPlanLoopDefinition foreverLoop = new()
+            {
+                StartTaskId = "expedition-task",
+                StopTaskId = "expedition-task",
+                Forever = true,
+            };
+            MacroPlanLoopDefinition finiteLoop = new()
+            {
+                StartTaskId = "expedition-task",
+                StopTaskId = "expedition-task",
+                TotalRuns = 4,
+            };
             MacroPlan plan = Plan(
                 new MacroTaskDefinition
                 {
@@ -49,23 +61,23 @@ public sealed class FastNoAlignShareTests
                         RuntimeSeconds = 720,
                     },
                 ],
-                Loop = new MacroPlanLoopDefinition
-                {
-                    StartTaskId =
-                        "expedition-task",
-                    StopTaskId =
-                        "expedition-task",
-                    TotalRuns = 4,
-                },
-                LoopProgress =
+                Loops =
+                [
+                    foreverLoop,
+                    finiteLoop,
+                ],
+                LoopStates =
+                [
                     new MacroPlanLoopProgress
                     {
                         ConfigurationSignature =
-                            "saved-run",
+                            finiteLoop
+                                .ConfigurationSignature,
                         Phase =
                             MacroPlanLoopPhase.Loop,
                         CompletedRuns = 2,
                     },
+                ],
             };
 
             FastNoAlignShareService exporter =
@@ -90,9 +102,16 @@ public sealed class FastNoAlignShareTests
             Assert.Empty(bundle.Plan.Progress);
             Assert.True(
                 bundle.Plan.LoopProgress.IsEmpty);
+            Assert.Empty(bundle.Plan.LoopStates);
             Assert.Equal(
                 4,
-                bundle.Plan.Loop?.TotalRuns);
+                Assert.Single(
+                    bundle.Plan.Loops,
+                    loop => !loop.Forever)
+                    .TotalRuns);
+            Assert.Single(
+                bundle.Plan.Loops,
+                loop => loop.Forever);
             Assert.Equal(10,
                 bundle.Plan.Tasks[0].TargetVictories);
             Assert.Equal(3,
@@ -140,9 +159,13 @@ public sealed class FastNoAlignShareTests
             Assert.Empty(importedPlan.Progress);
             Assert.True(
                 importedPlan.LoopProgress.IsEmpty);
+            Assert.Empty(importedPlan.LoopStates);
             Assert.Equal(
                 4,
-                importedPlan.Loop?.TotalRuns);
+                Assert.Single(
+                    importedPlan.Loops,
+                    loop => !loop.Forever)
+                    .TotalRuns);
             Assert.Equal(7, importedSetup.TeamSlot);
             Assert.Equal(
                 1250,

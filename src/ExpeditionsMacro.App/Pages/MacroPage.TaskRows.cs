@@ -10,15 +10,8 @@ public partial class MacroPage
         RoutedEventArgs e) =>
         ResetTaskEditor();
 
-    private void RemoveTask_Click(
-        object sender,
-        RoutedEventArgs e)
+    private void RemoveTask(MacroTaskRow row)
     {
-        if ((sender as FrameworkElement)?.Tag is not
-            MacroTaskRow row)
-        {
-            return;
-        }
         TaskRows.Remove(row);
         ReindexRows();
         if (_editingTaskId == row.Definition.Id)
@@ -29,45 +22,10 @@ public partial class MacroPage
             "Task removed. Save the plan to persist the change.";
     }
 
-    private void MoveTaskUp_Click(
-        object sender,
-        RoutedEventArgs e) =>
-        MoveTask(
-            (sender as FrameworkElement)?.Tag as
-                MacroTaskRow,
-            -1);
-
-    private void MoveTaskDown_Click(
-        object sender,
-        RoutedEventArgs e) =>
-        MoveTask(
-            (sender as FrameworkElement)?.Tag as
-                MacroTaskRow,
-            1);
-
-    private void MoveTask(
-        MacroTaskRow? row,
-        int direction)
-    {
-        if (row is null) return;
-        int index = TaskRows.IndexOf(row);
-        int target = index + direction;
-        if (index < 0 ||
-            target < 0 ||
-            target >= TaskRows.Count)
-        {
-            return;
-        }
-        TaskRows.Move(index, target);
-        ReindexRows();
-        TaskEditorStatusText.Text =
-            "Priority changed. Save the plan to persist the order.";
-    }
-
     private void ResetTaskEditor()
     {
         _editingTaskId = null;
-        AddTaskButton.Content = "Add task";
+        AddTaskButton.Content = "Add block";
         CancelTaskEditButton.Visibility =
             Visibility.Collapsed;
         TaskEnabledCheck.IsChecked = true;
@@ -85,11 +43,9 @@ public partial class MacroPage
 
     private void ReindexRows()
     {
-        string? loopStartTaskId =
-            LoopEditor.StartTaskId;
-        string? loopStopTaskId =
-            LoopEditor.StopTaskId;
-        MacroTaskRow[] rows = TaskRows
+        LoopEditor.SetTasks(TaskRows);
+        MacroTaskRow[] rows = LoopEditor
+            .OrderedTaskRows
             .Select((row, index) =>
                 new MacroTaskRow
                 {
@@ -106,9 +62,7 @@ public partial class MacroPage
         {
             TaskRows.Add(row);
         }
-        LoopEditor.RestoreSelections(
-            loopStartTaskId,
-            loopStopTaskId);
+        LoopEditor.SetTasks(TaskRows);
         EmptyTasksText.Visibility =
             TaskRows.Count == 0
                 ? Visibility.Visible

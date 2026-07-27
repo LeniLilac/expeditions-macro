@@ -36,7 +36,7 @@ public sealed class PlacementServiceTests
     }
 
     [Fact]
-    public async Task Playback_NormalizesSelectionWithoutParkingThenPrimesBeforePlacement()
+    public async Task Playback_NormalizesSelectionThenDismissesFinalPanelAtIdlePoint()
     {
         string root = Path.Combine(
             Path.GetTempPath(),
@@ -90,14 +90,19 @@ public sealed class PlacementServiceTests
                     "letter:T",
                     "letter:T",
                     "letter:T",
+                    "park",
+                    "click:783,586",
+                    "park",
                 ],
                 automation.InputActions);
             Assert.NotNull(automation.TargetPrimedAt);
-            Assert.Single(
-                automation.ClickTimes);
-            Assert.DoesNotContain(
-                "park",
-                automation.InputActions);
+            Assert.Equal(
+                2,
+                automation.ClickTimes.Count);
+            Assert.Equal(
+                2,
+                automation.InputActions.Count(
+                    action => action == "park"));
         }
         finally
         {
@@ -269,7 +274,7 @@ public sealed class PlacementServiceTests
     }
 
     [Fact]
-    public async Task Playback_ParksOnlyBetweenCompletePlacementSequences()
+    public async Task Playback_ParksBetweenSequencesAndDismissesFinalSelection()
     {
         string root = TestPaths.NewTemporaryDirectory();
         try
@@ -305,10 +310,11 @@ public sealed class PlacementServiceTests
                 afterKeyMilliseconds: 0);
 
             Assert.Equal(
-                1,
+                3,
                 automation.InputActions.Count(
                     action => action == "park"));
-            int park = automation.InputActions.IndexOf(
+            int park =
+                automation.InputActions.IndexOf(
                 "park");
             Assert.True(
                 park >
@@ -318,6 +324,56 @@ public sealed class PlacementServiceTests
                 park <
                 automation.InputActions.IndexOf(
                     "move:290,280->340,280:200"));
+            Assert.Single(
+                automation.InputActions,
+                action =>
+                    action == "click:783,586");
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task Playback_ClicksIdlePointUntilFinalSelectionCloses()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            FakeAutomation automation = new()
+            {
+                IdleClicksBeforeDismissal = 3,
+            };
+            PlacementService service = new(
+                automation,
+                new FakeCaptureService(automation),
+                new PlacementModelRepository(
+                    new AppPaths(root)),
+                () => 'T');
+
+            await service.PlayAsync(
+                ModelWithSteps(
+                    new PlacementStep
+                    {
+                        UnitKey = 3,
+                        X = 320,
+                        Y = 280,
+                        DelayAfterMilliseconds = 0,
+                    }),
+                useDefaultInterval: true,
+                defaultIntervalMilliseconds: 0,
+                keyHoldMilliseconds: 0,
+                afterKeyMilliseconds: 0);
+
+            Assert.Equal(
+                3,
+                automation.InputActions.Count(
+                    action =>
+                        action == "click:783,586"));
+            Assert.Equal(
+                "park",
+                automation.InputActions[^1]);
         }
         finally
         {
@@ -422,7 +478,10 @@ public sealed class PlacementServiceTests
         private readonly RobloxWindow _window = new((nint)42, "Roblox");
         private ClientBounds _client = new(100, 120, 800, 599);
         private readonly IReadOnlyList<ImageFrame> _captures;
+        private readonly ImageFrame _dismissedCapture;
         private int _captureIndex;
+        private int _idleClickCount;
+        private bool _panelDismissed;
 
         public FakeAutomation(
             params ImageFrame[] captures)
@@ -433,6 +492,10 @@ public sealed class PlacementServiceTests
                         TestPaths.StageDatasets,
                         "SelectedUnitPanel_01.png"))]
                 : captures;
+            _dismissedCapture = ImageCodec.Load(
+                Path.Combine(
+                    TestPaths.StageDatasets,
+                    "SelectedUnitPanelHoverNegative_01.png"));
         }
 
         public (int Width, int Height)? ResizeRequest { get; private set; }
@@ -446,6 +509,8 @@ public sealed class PlacementServiceTests
         public DateTimeOffset? ClickedAt { get; private set; }
 
         public List<DateTimeOffset> ClickTimes { get; } = [];
+
+        public int IdleClicksBeforeDismissal { get; init; } = 1;
 
         public RobloxWindow? FindWindow(string titleFragment = "Roblox") => _window;
 
@@ -470,6 +535,10 @@ public sealed class PlacementServiceTests
 
         public ImageFrame CaptureClient(RobloxWindow window)
         {
+            if (_panelDismissed)
+            {
+                return _dismissedCapture;
+            }
             ImageFrame frame = _captures[
                 Math.Min(
                     _captureIndex,
@@ -525,6 +594,14 @@ public sealed class PlacementServiceTests
             InputActions.Add($"click:{x},{y}");
             ClickedAt = DateTimeOffset.UtcNow;
             ClickTimes.Add(ClickedAt.Value);
+            if (x == 783 &&
+                y == 586)
+            {
+                _idleClickCount++;
+                _panelDismissed =
+                    _idleClickCount >=
+                    IdleClicksBeforeDismissal;
+            }
             return Task.CompletedTask;
         }
 

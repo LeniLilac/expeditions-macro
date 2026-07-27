@@ -89,6 +89,15 @@ public sealed partial class WindowsRobloxAutomation : IRobloxAutomation, IDispos
             return true;
         };
         if (!NativeMethods.EnumWindows(callback, nint.Zero)) throw new Win32Exception(Marshal.GetLastWin32Error());
+        if (matches.Count == 0 &&
+            !NativeMethods.EnumChildWindows(
+                NativeMethods.GetDesktopWindow(),
+                callback,
+                nint.Zero))
+        {
+            throw new Win32Exception(
+                Marshal.GetLastWin32Error());
+        }
         return SelectBestWindow(matches, fragment);
     }
 
@@ -154,6 +163,10 @@ public sealed partial class WindowsRobloxAutomation : IRobloxAutomation, IDispos
 
     private async Task ResizeClientCoreAsync(nint handle, int width, int height, CancellationToken cancellationToken)
     {
+        if (HasClientSize(handle, width, height))
+        {
+            return;
+        }
         await RestoreForSizingAsync(handle, cancellationToken).ConfigureAwait(false);
         if (IsForcedWindow(handle))
         {
@@ -541,19 +554,6 @@ public sealed partial class WindowsRobloxAutomation : IRobloxAutomation, IDispos
         {
             _windowAliases[original] = replacement;
         }
-    }
-
-    private static bool TryFocus(nint handle)
-    {
-        if (handle == nint.Zero || !NativeMethods.IsWindow(handle)) return false;
-        if (NativeMethods.IsIconic(handle)) NativeMethods.ShowWindowAsync(handle, NativeMethods.SwRestore);
-        for (int attempt = 0; attempt < 3; attempt++)
-        {
-            NativeMethods.BringWindowToTop(handle);
-            if (NativeMethods.SetForegroundWindow(handle) || NativeMethods.GetForegroundWindow() == handle) return true;
-            if (attempt < 2) Thread.Sleep(25);
-        }
-        return false;
     }
 
     private bool IsForcedWindow(nint handle)

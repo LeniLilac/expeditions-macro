@@ -59,24 +59,23 @@ public partial class MacroPage
     {
         ReindexRows();
         string name = PlanNameText.Text.Trim();
-        MacroPlanLoopDefinition? loop =
-            LoopEditor.ReadDefinition(
-                TaskRows
-                    .Select(row => row.Definition)
-                    .ToArray());
+        MacroTaskDefinition[] tasks =
+            TaskRows
+                .Select(row => row.Definition)
+                .ToArray();
+        IReadOnlyList<MacroPlanLoopDefinition> loops =
+            LoopEditor.ReadDefinitions(tasks);
         MacroPlan plan = new()
         {
             Id = ModelId.FromName(name),
             Name = name,
-            Tasks = TaskRows
-                .Select(row => row.Definition)
-                .ToArray(),
+            Tasks = tasks,
             Progress = TaskRows
                 .Select(row => row.Progress)
                 .ToArray(),
-            Loop = loop,
-            LoopProgress =
-                LoopEditor.ProgressFor(loop),
+            Loops = loops,
+            LoopStates =
+                LoopEditor.ProgressFor(loops),
             UpdatedAt = DateTimeOffset.UtcNow,
         };
         plan.Validate();
@@ -113,9 +112,10 @@ public partial class MacroPage
     {
         PlanNameText.Text = "Daily rotation";
         TaskRows.Clear();
+        LoopEditor.SetTasks(TaskRows);
         EmptyTasksText.Visibility =
             Visibility.Visible;
-        LoopEditor.Apply(null, new());
+        LoopEditor.Apply([], []);
         ResetTaskEditor();
         ApplyTotals();
     }
@@ -137,8 +137,8 @@ public partial class MacroPage
         }
         ReindexRows();
         LoopEditor.Apply(
-            plan.Loop,
-            plan.LoopProgress);
+            plan.EffectiveLoops(),
+            plan.EffectiveLoopStates());
         ResetTaskEditor();
         ApplyTotals();
     }
@@ -147,7 +147,7 @@ public partial class MacroPage
         MacroPlan plan)
     {
         LoopEditor.UpdateProgress(
-            plan.LoopProgress);
+            plan.EffectiveLoopStates());
         Dictionary<string, MacroTaskProgress>
             progress = plan.Progress.ToDictionary(
                 value => value.TaskId,

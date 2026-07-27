@@ -16,6 +16,10 @@ public sealed class PlacementService
     private const int SelectionPollMilliseconds = 100;
     private const int SelectionTimeoutMilliseconds = 800;
     private const int RequiredStableSelectionFrames = 2;
+    private const int SelectionDismissAttempts = 8;
+    private const int SelectionDismissPollMilliseconds = 100;
+    private const int SelectionDismissSamples = 4;
+    private const int IdleCursorInsetPixels = 24;
     private const int TargetingTapIntervalMilliseconds = 100;
 
     private readonly IRobloxAutomation _automation;
@@ -208,6 +212,16 @@ public sealed class PlacementService
                     window,
                     cancellationToken).ConfigureAwait(false);
             }
+            else
+            {
+                status?.Invoke(
+                    "Placement batch complete: closing the final selected-unit panel and parking the cursor.");
+                await DismissFinalSelectedUnitPanelAsync(
+                    window,
+                    model.ClientWidth,
+                    model.ClientHeight,
+                    cancellationToken).ConfigureAwait(false);
+            }
             stepSent?.Invoke(index + 1, steps.Count, step);
             int delay = useDefaultInterval ? defaultIntervalMilliseconds : step.DelayAfterMilliseconds;
             status?.Invoke($"Step {index + 1}/{steps.Count}: waiting {delay} ms after click.");
@@ -307,6 +321,98 @@ public sealed class PlacementService
             }
         }
         return false;
+    }
+
+    private async Task DismissFinalSelectedUnitPanelAsync(
+        RobloxWindow window,
+        int clientWidth,
+        int clientHeight,
+        CancellationToken cancellationToken)
+    {
+        int idleX = Math.Max(
+            0,
+            clientWidth -
+            1 -
+            IdleCursorInsetPixels);
+        int idleY = Math.Max(
+            0,
+            clientHeight -
+            1 -
+            IdleCursorInsetPixels);
+        await _automation.ParkCursorAsync(
+            window,
+            cancellationToken).ConfigureAwait(false);
+        if (await WaitForSelectedUnitHiddenAsync(
+            window,
+            cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        for (int attempt = 0;
+             attempt < SelectionDismissAttempts;
+             attempt++)
+        {
+            EnsureFocus(window);
+            await _automation.ClickClientAsync(
+                window,
+                idleX,
+                idleY,
+                cancellationToken).ConfigureAwait(false);
+            if (await WaitForSelectedUnitHiddenAsync(
+                window,
+                cancellationToken).ConfigureAwait(false))
+            {
+                await _automation.ParkCursorAsync(
+                    window,
+                    cancellationToken).ConfigureAwait(false);
+                return;
+            }
+        }
+
+        throw new RobloxUiUnavailableException(
+            "The final selected-unit panel remained open after " +
+            $"{SelectionDismissAttempts} clicks at the safe idle point.");
+    }
+
+    private async Task<bool> WaitForSelectedUnitHiddenAsync(
+        RobloxWindow window,
+        CancellationToken cancellationToken)
+    {
+        int stable = 0;
+        for (int sample = 0;
+             sample < SelectionDismissSamples;
+             sample++)
+        {
+            EnsureFocus(window);
+            stable =
+                SelectedUnitPanelIsVisible(window)
+                    ? 0
+                    : stable + 1;
+            if (stable >=
+                RequiredStableSelectionFrames)
+            {
+                return true;
+            }
+            if (sample + 1 <
+                SelectionDismissSamples)
+            {
+                await Task.Delay(
+                    SelectionDismissPollMilliseconds,
+                    cancellationToken).ConfigureAwait(false);
+            }
+        }
+        return false;
+    }
+
+    private bool SelectedUnitPanelIsVisible(
+        RobloxWindow window)
+    {
+        ImageFrame frame =
+            _automation.CaptureClient(window);
+        return SelectedUnitPanelDetector
+            .Detect(frame)
+            .PanelVisible;
     }
 
     private async Task EnsureSizeAsync(RobloxWindow window, int width, int height, CancellationToken cancellationToken)

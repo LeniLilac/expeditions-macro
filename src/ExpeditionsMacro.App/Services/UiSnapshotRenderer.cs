@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using ExpeditionsMacro.App.Pages;
 using ExpeditionsMacro.Core.Models;
 
 namespace ExpeditionsMacro.App.Services;
@@ -13,22 +14,27 @@ internal static class UiSnapshotRenderer
         string Key,
         string File,
         bool ShowPageEnd,
-        bool ShowDebugUtilities)[] Pages =
+        bool ShowDebugUtilities,
+        MacroPlanSnapshotState MacroPlanState)[] Pages =
     [
-        ("Macro", "macro", false, false),
-        ("Macro", "macro-status", true, false),
-        ("Expeditions", "expeditions", false, false),
-        ("Challenges", "challenges", false, false),
-        ("Challenges", "challenges-status", true, false),
-        ("Story", "story", false, false),
-        ("Raid", "raid", false, false),
-        ("Camera Models", "camera-models", false, false),
-        ("Placement Setup", "placement-setup", false, false),
-        ("Debug", "debug", false, false),
-        ("Debug", "debug-refuel", true, false),
-        ("Debug", "debug-utilities", false, true),
-        ("Settings", "settings", false, false),
-        ("Settings", "settings-debug", true, false),
+        ("Dashboard", "dashboard", false, false, MacroPlanSnapshotState.Empty),
+        ("Dashboard", "dashboard-controls", true, false, MacroPlanSnapshotState.Empty),
+        ("Macro Plan", "macro-plan-empty", false, false, MacroPlanSnapshotState.Empty),
+        ("Macro Plan", "macro-plan-tasks-only", false, false, MacroPlanSnapshotState.TasksOnly),
+        ("Macro Plan", "macro-plan", false, false, MacroPlanSnapshotState.NestedLoops),
+        ("Macro Plan", "macro-plan-share", true, false, MacroPlanSnapshotState.NestedLoops),
+        ("Expeditions", "expeditions", false, false, MacroPlanSnapshotState.Empty),
+        ("Challenges", "challenges", false, false, MacroPlanSnapshotState.Empty),
+        ("Challenges", "challenges-status", true, false, MacroPlanSnapshotState.Empty),
+        ("Story", "story", false, false, MacroPlanSnapshotState.Empty),
+        ("Raid", "raid", false, false, MacroPlanSnapshotState.Empty),
+        ("Camera Models", "camera-models", false, false, MacroPlanSnapshotState.Empty),
+        ("Placement Setup", "placement-setup", false, false, MacroPlanSnapshotState.Empty),
+        ("Debug", "debug", false, false, MacroPlanSnapshotState.Empty),
+        ("Debug", "debug-refuel", true, false, MacroPlanSnapshotState.Empty),
+        ("Debug", "debug-utilities", false, true, MacroPlanSnapshotState.Empty),
+        ("Settings", "settings", false, false, MacroPlanSnapshotState.Empty),
+        ("Settings", "settings-debug", true, false, MacroPlanSnapshotState.Empty),
     ];
 
     public static async Task RenderAsync(AppServices services, string outputDirectory)
@@ -68,12 +74,14 @@ internal static class UiSnapshotRenderer
                     string key,
                     string file,
                     bool showPageEnd,
-                    bool showDebugUtilities) in Pages)
+                    bool showDebugUtilities,
+                    MacroPlanSnapshotState macroPlanState) in Pages)
                 {
                     await window.SelectPageForSnapshotAsync(
                         key,
                         showPageEnd,
-                        showDebugUtilities);
+                        showDebugUtilities,
+                        macroPlanState);
                     Size size = SnapshotSize(key);
                     await File.WriteAllTextAsync(
                         progressPath,
@@ -113,6 +121,13 @@ internal static class UiSnapshotRenderer
     private static Size SnapshotSize(string key)
     {
         Size standard = new(1200, 780);
+        if (string.Equals(
+                key,
+                "Macro Plan",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return new Size(1440, 1080);
+        }
         if (!string.Equals(
                 key,
                 "Placement Setup",

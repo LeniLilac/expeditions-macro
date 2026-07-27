@@ -29,7 +29,7 @@ public sealed class DetectionOptimizationTests
     public void ChallengeMatchPath_PreservesOwnedStates()
     {
         AssertMatchEquivalence(
-            TestPaths.ChallengeDatasets,
+            TestPaths.Datasets,
             frame =>
             {
                 ChallengeScreenMatch full =
@@ -60,7 +60,7 @@ public sealed class DetectionOptimizationTests
     public void StageMatchPath_PreservesOwnedStates()
     {
         AssertMatchEquivalence(
-            TestPaths.StageDatasets,
+            TestPaths.Datasets,
             frame =>
             {
                 StageScreenMatch full =
@@ -91,7 +91,7 @@ public sealed class DetectionOptimizationTests
     public void EventMatchPath_PreservesOwnedStates()
     {
         AssertMatchEquivalence(
-            TestPaths.EventDatasets,
+            TestPaths.Datasets,
             frame =>
             {
                 EventScreenMatch full =

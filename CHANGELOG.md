@@ -4,6 +4,32 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.30] - 2026-07-26
+
+### Added
+
+- Split the workspace into a live Dashboard and a focused Macro Plan editor. The Dashboard owns run controls, status, logs, Discord reporting, private-server recovery, startup preparation, and keybindings.
+- Added an interactive pinned Roblox window over the Dashboard. Roblox remains a real top-level window that accepts direct input, and its original style, bounds, and topmost state are restored when unpinned, navigating away, minimizing, or exiting.
+- Replaced the single range-loop form with Scratch-style Loop blocks that users add, remove, and drag tasks or finite loops into. Plans support multiple finite loops, nesting up to three levels, and at most one root-terminal Forever loop.
+- Added current production-path latency measurements to the Debug detection benchmark.
+
+### Changed
+
+- Macro-plan loop persistence, scheduling, progress, and Fast no-align share codes now preserve the visible nested block structure while remaining compatible with task-only and legacy range-loop plans.
+- State-specific detection paths reuse per-frame evidence and cached action-button matches while retaining equivalence with the full detector path.
+- After the last configured placement, playback dismisses the selected-unit panel through bounded verified clicks and parks the cursor at the idle corner.
+
+### Fixed
+
+- Pinned Roblox no longer becomes a non-interactive mirror or remains attached after leaving the Dashboard.
+- Loop editing no longer creates a default loop, restricts a plan to one finite range, or loses valid nested structure while moving blocks.
+- Selected-unit cleanup no longer leaves the final unit panel open after placement playback completes.
+
+### Tests
+
+- Added nested-loop validation, scheduling, migration, share-code, drag/drop, interactive pinning, detector-equivalence, benchmark, and final-placement cleanup coverage.
+- Revalidated all 912 application and detector tests, all 5 Deep Debug Viewer tests, repository policy, and 36 dark/light UI snapshots.
+
 ## [1.3.0-beta.29] - 2026-07-26
 
 ### Added
@@ -902,6 +928,7 @@ All notable changes to Expeditions Macro are documented here.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
 [Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.28...HEAD
+[1.3.0-beta.30]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.28...v1.3.0-beta.30
 [1.3.0-beta.28]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.27...v1.3.0-beta.28
 [1.3.0-beta.27]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.26...v1.3.0-beta.27
 [1.3.0-beta.26]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.25...v1.3.0-beta.26

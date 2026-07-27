@@ -10,92 +10,119 @@ internal sealed record MacroPlanLoopEvaluation(
 internal static class MacroPlanLoopPolicy
 {
     public static MacroPlan Normalize(
-        MacroPlan plan)
+        MacroPlan source)
     {
+        IReadOnlyList<MacroPlanLoopDefinition> loops =
+            source.EffectiveLoops();
+        IReadOnlyList<MacroPlanLoopProgress> savedStates =
+            source.EffectiveLoopStates();
         IReadOnlyList<MacroTaskProgress> normalized =
-            plan.Tasks
-                .Select(task => plan.ProgressFor(task.Id))
+            source.Tasks
+                .Select(task => source.ProgressFor(task.Id))
                 .ToArray();
-        if (plan.Loop is null)
+        if (loops.Count == 0)
         {
             MacroTaskProgress[] withoutBaselines =
-                normalized
-                    .Select(ClearBaseline)
-                    .ToArray();
-            if (plan.Progress.SequenceEqual(
+                normalized.Select(ClearBaseline).ToArray();
+            if (source.Progress.SequenceEqual(
                     withoutBaselines) &&
-                plan.LoopProgress.IsEmpty)
+                source.Loops.Count == 0 &&
+                source.Loop is null &&
+                source.LoopStates.Count == 0 &&
+                source.LoopProgress.IsEmpty)
             {
-                return plan;
+                return source;
             }
-            return plan with
+            return source with
             {
                 Progress = withoutBaselines,
+                Loops = [],
+                LoopStates = [],
+                Loop = null,
                 LoopProgress = new(),
             };
         }
 
-        MacroPlanLoopDefinition loop = plan.Loop;
-        (int start, int stop) =
-            loop.ResolveRange(plan.Tasks);
-        if (string.Equals(
-                plan.LoopProgress.ConfigurationSignature,
-                loop.ConfigurationSignature,
-                StringComparison.Ordinal))
-        {
-            MacroPlanLoopProgress progress =
-                plan.LoopProgress;
-            if (!loop.Forever &&
-                progress.CompletedRuns >= loop.TotalRuns &&
-                progress.Phase !=
-                    MacroPlanLoopPhase.AfterLoop)
+        HashSet<string> savedSignatures =
+            savedStates
+                .Select(state =>
+                    state.ConfigurationSignature)
+                .ToHashSet(StringComparer.Ordinal);
+        MacroPlanLoopProgress[] states =
+            loops.Select(loop =>
             {
-                progress = progress with
+                MacroPlanLoopProgress? saved =
+                    savedStates.FirstOrDefault(state =>
+                        string.Equals(
+                            state.ConfigurationSignature,
+                            loop.ConfigurationSignature,
+                            StringComparison.Ordinal));
+                MacroPlanLoopProgress state =
+                    saved ?? InitialState(loop);
+                MacroPlanLoopPhase phase =
+                    state.Phase ==
+                        MacroPlanLoopPhase.AfterLoop ||
+                    !loop.Forever &&
+                    state.CompletedRuns >= loop.TotalRuns
+                        ? MacroPlanLoopPhase.AfterLoop
+                        : MacroPlanLoopPhase.Loop;
+                return state with
                 {
-                    Phase =
-                        MacroPlanLoopPhase.AfterLoop,
+                    ConfigurationSignature =
+                        loop.ConfigurationSignature,
+                    Phase = phase,
                 };
-            }
-            if (plan.Progress.SequenceEqual(
-                    normalized) &&
-                progress == plan.LoopProgress)
-            {
-                return plan;
-            }
-            return plan with
-            {
-                Progress = normalized,
-                LoopProgress = progress,
-            };
-        }
+            }).ToArray();
 
-        MacroTaskProgress[] reset =
-            plan.Tasks
-                .Select((task, index) =>
-                {
-                    MacroTaskProgress progress =
-                        normalized[index];
-                    if (index >= start &&
-                        index <= stop &&
-                        !task.IsRecurring)
-                    {
-                        return BeginNextRun(progress);
-                    }
-                    return ClearBaseline(progress);
-                })
-                .ToArray();
-        return plan with
+        HashSet<int> covered = [];
+        HashSet<int> newlyConfigured = [];
+        foreach (MacroPlanLoopDefinition loop in loops)
         {
-            Progress = reset,
-            LoopProgress = new MacroPlanLoopProgress
+            (int start, int stop) =
+                loop.ResolveRange(source.Tasks);
+            for (int index = start;
+                 index <= stop;
+                 index++)
             {
-                ConfigurationSignature =
-                    loop.ConfigurationSignature,
-                Phase = start == 0
-                    ? MacroPlanLoopPhase.Loop
-                    : MacroPlanLoopPhase.BeforeLoop,
-            },
-        };
+                covered.Add(index);
+                if (!savedSignatures.Contains(
+                        loop.ConfigurationSignature))
+                {
+                    newlyConfigured.Add(index);
+                }
+            }
+        }
+        MacroTaskProgress[] progress =
+            source.Tasks.Select((task, index) =>
+            {
+                MacroTaskProgress value =
+                    normalized[index];
+                if (!covered.Contains(index))
+                {
+                    return ClearBaseline(value);
+                }
+                return newlyConfigured.Contains(index) &&
+                    !task.IsRecurring
+                        ? BeginNextRun(value)
+                        : value;
+            }).ToArray();
+
+        bool alreadyCurrent =
+            source.Loop is null &&
+            source.LoopProgress.IsEmpty &&
+            source.Loops.SequenceEqual(loops) &&
+            source.LoopStates.SequenceEqual(states) &&
+            source.Progress.SequenceEqual(progress);
+        return alreadyCurrent
+            ? source
+            : source with
+            {
+                Progress = progress,
+                Loops = loops.ToArray(),
+                LoopStates = states,
+                Loop = null,
+                LoopProgress = new(),
+            };
     }
 
     public static MacroPlanLoopEvaluation Prepare(
@@ -105,136 +132,200 @@ internal static class MacroPlanLoopPolicy
         MacroPlan plan = Normalize(source);
         bool changed = !ReferenceEquals(plan, source);
         List<string> messages = [];
-        if (plan.Loop is null)
+        while (plan.EffectiveLoops().Count != 0)
         {
-            return new MacroPlanLoopEvaluation(
+            LoopSearchResult result =
+                FindNext(plan, now);
+            if (result.Tasks.Count != 0 ||
+                result.LoopToAdvance is null)
+            {
+                break;
+            }
+            plan = AdvanceLoop(
                 plan,
-                changed,
+                result.LoopToAdvance,
+                now,
                 messages);
-        }
-
-        while (true)
-        {
-            MacroPlanLoopPhase phase =
-                plan.LoopProgress.Phase;
-            IReadOnlyList<MacroTaskDefinition> scope =
-                ActiveTasks(plan);
-            if (!ScopeComplete(plan, scope, now))
-            {
-                return new MacroPlanLoopEvaluation(
-                    plan,
-                    changed,
-                    messages);
-            }
-
-            if (phase == MacroPlanLoopPhase.BeforeLoop)
-            {
-                plan = plan with
-                {
-                    LoopProgress =
-                        plan.LoopProgress with
-                        {
-                            Phase =
-                                MacroPlanLoopPhase.Loop,
-                        },
-                    UpdatedAt = now,
-                };
-                changed = true;
-                messages.Add(
-                    "Tasks before the loop are complete; starting loop run 1.");
-                continue;
-            }
-            if (phase == MacroPlanLoopPhase.AfterLoop)
-            {
-                return new MacroPlanLoopEvaluation(
-                    plan,
-                    changed,
-                    messages);
-            }
-
-            long completedRuns =
-                plan.LoopProgress.CompletedRuns + 1;
-            if (!plan.Loop.Forever &&
-                completedRuns >=
-                    plan.Loop.TotalRuns)
-            {
-                plan = plan with
-                {
-                    LoopProgress =
-                        plan.LoopProgress with
-                        {
-                            CompletedRuns =
-                                completedRuns,
-                            Phase =
-                                MacroPlanLoopPhase
-                                    .AfterLoop,
-                        },
-                    UpdatedAt = now,
-                };
-                changed = true;
-                messages.Add(
-                    $"Loop finished after {completedRuns} run{Plural(completedRuns)}.");
-                continue;
-            }
-
-            (int start, int stop) =
-                plan.Loop.ResolveRange(plan.Tasks);
-            MacroTaskProgress[] nextProgress =
-                plan.Tasks
-                    .Select((task, index) =>
-                        index >= start &&
-                        index <= stop &&
-                        !task.IsRecurring
-                            ? BeginNextRun(
-                                plan.ProgressFor(
-                                    task.Id))
-                            : plan.ProgressFor(
-                                task.Id))
-                    .ToArray();
-            plan = plan with
-            {
-                Progress = nextProgress,
-                LoopProgress =
-                    plan.LoopProgress with
-                    {
-                        CompletedRuns =
-                            completedRuns,
-                    },
-                UpdatedAt = now,
-            };
             changed = true;
-            messages.Add(
-                plan.Loop.Forever
-                    ? $"Loop run {completedRuns} complete; starting run {completedRuns + 1}."
-                    : $"Loop run {completedRuns} of {plan.Loop.TotalRuns} complete; starting run {completedRuns + 1}.");
         }
+        return new MacroPlanLoopEvaluation(
+            plan,
+            changed,
+            messages);
     }
 
     public static IReadOnlyList<MacroTaskDefinition>
         ActiveTasks(
-        MacroPlan plan)
+        MacroPlan plan,
+        DateTimeOffset now)
     {
-        if (plan.Loop is null)
+        if (plan.EffectiveLoops().Count == 0)
         {
             return plan.Tasks;
         }
-        (int start, int stop) =
-            plan.Loop.ResolveRange(plan.Tasks);
-        return plan.LoopProgress.Phase switch
+        return FindNext(plan, now).Tasks;
+    }
+
+    private static LoopSearchResult FindNext(
+        MacroPlan plan,
+        DateTimeOffset now) =>
+        SearchContainer(
+            plan,
+            0,
+            plan.Tasks.Count - 1,
+            MacroPlanLoopTree.Build(plan),
+            now);
+
+    private static LoopSearchResult SearchContainer(
+        MacroPlan plan,
+        int start,
+        int stop,
+        IReadOnlyList<MacroPlanLoopNode> children,
+        DateTimeOffset now)
+    {
+        int cursor = start;
+        foreach (MacroPlanLoopNode child in children)
         {
-            MacroPlanLoopPhase.BeforeLoop =>
-                plan.Tasks.Take(start).ToArray(),
-            MacroPlanLoopPhase.Loop =>
-                plan.Tasks
-                    .Skip(start)
-                    .Take(stop - start + 1)
-                    .ToArray(),
-            MacroPlanLoopPhase.AfterLoop =>
-                plan.Tasks.Skip(stop + 1).ToArray(),
-            _ => throw new InvalidDataException(
-                "Macro loop phase is invalid."),
+            IReadOnlyList<MacroTaskDefinition> before =
+                Slice(plan.Tasks, cursor, child.Start - 1);
+            if (!ScopeComplete(plan, before, now))
+            {
+                return new LoopSearchResult(
+                    before,
+                    null);
+            }
+
+            MacroPlanLoopProgress state =
+                plan.LoopStateFor(child.Definition);
+            if (state.Phase !=
+                MacroPlanLoopPhase.AfterLoop)
+            {
+                LoopSearchResult nested =
+                    SearchContainer(
+                        plan,
+                        child.Start,
+                        child.Stop,
+                        child.Children,
+                        now);
+                if (nested.Tasks.Count != 0 ||
+                    nested.LoopToAdvance is not null)
+                {
+                    return nested;
+                }
+                return new LoopSearchResult(
+                    [],
+                    child);
+            }
+            cursor = child.Stop + 1;
+        }
+
+        IReadOnlyList<MacroTaskDefinition> after =
+            Slice(plan.Tasks, cursor, stop);
+        return ScopeComplete(plan, after, now)
+            ? new LoopSearchResult([], null)
+            : new LoopSearchResult(after, null);
+    }
+
+    private static MacroPlan AdvanceLoop(
+        MacroPlan plan,
+        MacroPlanLoopNode node,
+        DateTimeOffset now,
+        ICollection<string> messages)
+    {
+        MacroPlanLoopDefinition loop =
+            node.Definition;
+        MacroPlanLoopProgress state =
+            plan.LoopStateFor(loop);
+        long completedRuns = state.CompletedRuns + 1;
+        bool finished =
+            !loop.Forever &&
+            completedRuns >= loop.TotalRuns;
+        MacroPlanLoopProgress nextState =
+            state with
+            {
+                CompletedRuns = completedRuns,
+                Phase = finished
+                    ? MacroPlanLoopPhase.AfterLoop
+                    : MacroPlanLoopPhase.Loop,
+            };
+        IReadOnlyList<MacroPlanLoopProgress> states =
+            ReplaceState(
+                plan.LoopStates,
+                nextState);
+        IReadOnlyList<MacroTaskProgress> progress =
+            plan.Progress;
+        if (!finished)
+        {
+            HashSet<string> descendantSignatures =
+                node.Descendants()
+                    .Select(child =>
+                        child.Definition
+                            .ConfigurationSignature)
+                    .ToHashSet(StringComparer.Ordinal);
+            states = states
+                .Select(value =>
+                    descendantSignatures.Contains(
+                        value.ConfigurationSignature)
+                        ? InitialState(
+                            plan.EffectiveLoops()
+                                .Single(loopValue =>
+                                    string.Equals(
+                                        loopValue
+                                            .ConfigurationSignature,
+                                        value.ConfigurationSignature,
+                                        StringComparison.Ordinal)))
+                        : value)
+                .ToArray();
+            progress = plan.Tasks
+                .Select((task, index) =>
+                    index >= node.Start &&
+                    index <= node.Stop &&
+                    !task.IsRecurring
+                        ? BeginNextRun(
+                            plan.ProgressFor(task.Id))
+                        : plan.ProgressFor(task.Id))
+                .ToArray();
+        }
+
+        string range =
+            $"tasks {node.Start + 1}-{node.Stop + 1}";
+        messages.Add(finished
+            ? $"Loop {range} finished after {completedRuns} run{Plural(completedRuns)}."
+            : loop.Forever
+                ? $"Forever loop {range} completed run {completedRuns}; starting run {completedRuns + 1}."
+                : $"Loop {range} completed run {completedRuns} of {loop.TotalRuns}; starting run {completedRuns + 1}.");
+        return plan with
+        {
+            Progress = progress,
+            LoopStates = states,
+            UpdatedAt = now,
         };
     }
+
+    private static IReadOnlyList<MacroPlanLoopProgress>
+        ReplaceState(
+        IReadOnlyList<MacroPlanLoopProgress> states,
+        MacroPlanLoopProgress replacement) =>
+        states
+            .Select(state =>
+                string.Equals(
+                    state.ConfigurationSignature,
+                    replacement.ConfigurationSignature,
+                    StringComparison.Ordinal)
+                    ? replacement
+                    : state)
+            .ToArray();
+
+    private static IReadOnlyList<MacroTaskDefinition> Slice(
+        IReadOnlyList<MacroTaskDefinition> tasks,
+        int start,
+        int stop) =>
+        stop < start
+            ? []
+            : tasks
+                .Skip(start)
+                .Take(stop - start + 1)
+                .ToArray();
 
     private static bool ScopeComplete(
         MacroPlan plan,
@@ -250,6 +341,15 @@ internal static class MacroPlanLoopPolicy
                     ? progress.NextEligibleAtUtc > now
                     : progress.Completed;
             });
+
+    private static MacroPlanLoopProgress InitialState(
+        MacroPlanLoopDefinition loop) =>
+        new()
+        {
+            ConfigurationSignature =
+                loop.ConfigurationSignature,
+            Phase = MacroPlanLoopPhase.Loop,
+        };
 
     private static MacroTaskProgress BeginNextRun(
         MacroTaskProgress progress) =>
@@ -278,4 +378,8 @@ internal static class MacroPlanLoopPolicy
         value == 1
             ? string.Empty
             : "s";
+
+    private sealed record LoopSearchResult(
+        IReadOnlyList<MacroTaskDefinition> Tasks,
+        MacroPlanLoopNode? LoopToAdvance);
 }

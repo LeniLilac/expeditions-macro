@@ -157,15 +157,8 @@ public partial class MacroPage
         return definition;
     }
 
-    private void EditTask_Click(
-        object sender,
-        RoutedEventArgs e)
+    private void BeginTaskEdit(MacroTaskRow row)
     {
-        if ((sender as FrameworkElement)?.Tag is not
-            MacroTaskRow row)
-        {
-            return;
-        }
         if (FastTaskWorkflow &&
             !row.Definition.UsesPlacementSetup)
         {
@@ -208,11 +201,11 @@ public partial class MacroPage
                     .TargetVictories
                     .ToString(
                         CultureInfo.InvariantCulture);
-        AddTaskButton.Content = "Update task";
+        AddTaskButton.Content = "Update block";
         CancelTaskEditButton.Visibility =
             Visibility.Visible;
         TaskEditorStatusText.Text =
-            "Editing this task. Changing its route or target resets its saved progress.";
+            "Editing this block. Changing its route or target resets its saved progress.";
         UpdateTaskTargetEditor();
     }
 

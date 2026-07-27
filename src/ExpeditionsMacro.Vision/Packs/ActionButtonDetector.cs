@@ -145,14 +145,12 @@ internal static class ActionButtonDetector
             {
                 return cached;
             }
-        }
 
-        ButtonMatch? result = FindUncached(image, state);
-        lock (frameMatches)
-        {
+            ButtonMatch? result =
+                FindUncached(image, state);
             frameMatches.Values[state] = result;
+            return result;
         }
-        return result;
     }
 
     private static ButtonMatch? FindUncached(

@@ -207,7 +207,11 @@ public sealed class DetectionBenchmarkService
             detector.ScoreStates(
                 frame,
                 ExpeditionActiveStates);
-        return detector.Classify(scores) ?? "None";
+        return ExpeditionRunPolicy.PreferActiveState(
+                detector.Manifest,
+                scores,
+                detector.Classify(scores)) ??
+            "None";
     }
 
     private static DetectionBenchmarkMetric Metric(

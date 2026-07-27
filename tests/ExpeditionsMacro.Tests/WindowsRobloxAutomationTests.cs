@@ -182,6 +182,52 @@ public sealed class WindowsRobloxAutomationTests
     }
 
     [Fact]
+    public void PinnedWindowStyle_RemainsTopLevelAndRemovesFrame()
+    {
+        const long visible = 0x10000000L;
+        const long child = 0x40000000L;
+        const long caption = 0x00C00000L;
+        const long thickFrame = 0x00040000L;
+        const long popup = 0x80000000L;
+
+        long pinned =
+            WindowsRobloxWindowPin.BuildPinnedStyle(
+                visible |
+                child |
+                caption |
+                thickFrame |
+                popup);
+
+        Assert.NotEqual(0, pinned & visible);
+        Assert.NotEqual(0, pinned & popup);
+        Assert.Equal(0, pinned & child);
+        Assert.Equal(0, pinned & caption);
+        Assert.Equal(0, pinned & thickFrame);
+    }
+
+    [Fact]
+    public void PinnedExtendedWindowStyle_UsesInteractiveTopmostCutout()
+    {
+        const long unrelatedFlag = 0x00000080L;
+        const long topmost = 0x00000008L;
+        const long noActivate = 0x08000000L;
+        const long appWindow = 0x00040000L;
+
+        long pinned =
+            WindowsRobloxWindowPin
+                .BuildPinnedExtendedStyle(
+                    unrelatedFlag |
+                    topmost |
+                    noActivate |
+                    appWindow);
+
+        Assert.NotEqual(0, pinned & unrelatedFlag);
+        Assert.NotEqual(0, pinned & topmost);
+        Assert.Equal(0, pinned & noActivate);
+        Assert.Equal(0, pinned & appWindow);
+    }
+
+    [Fact]
     public void WindowCapture_MapsClientPixelsInsideTheExtendedFrame()
     {
         ScreenRegion crop = WindowsGraphicsCapture.ResolveClientCrop(

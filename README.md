@@ -112,7 +112,7 @@ Saving the same name replaces the previous model.
 1. Open **Macro**, create a plan, and choose a route directly.
 2. Configure its victory/runtime target and route policy. Challenge tasks own enabled Challenge types and defeat retries; Expeditions own difficulty, extraction, and boss nodes before extraction; Story owns Hard mode and defeat retries; Raid and Event own defeat retries.
 3. Add and order tasks. The first enabled, eligible row always runs next.
-4. Optionally enable **Loop**, choose its start and stop rows, then select a finite number of runs or **Forever**. Tasks before the range run once, the range repeats without resetting lifetime totals, and tasks after it run after a finite loop completes.
+4. Optionally choose **Add loop block** one or more times. Finite blocks may be separate or nested, and an inner block completes all of its runs for each containing-loop run. One optional **Forever** block may begin at any row but must end at the final task; it can contain finite blocks or follow earlier finite blocks. Crossing ranges are rejected. Loop runs reset only their target baselines, never lifetime victories, defeats, or runtime.
 5. Use **Export code** to copy the plan plus the exact overrides and category fallbacks it resolves to, including Placement Setup coordinates, Teams, targeting priorities, and loop configuration, as a compact `EMFAST1:` Base64 string. **Import code** validates and restores that same secret-free bundle on another device. Camera models, app settings, webhooks, private-server links, diagnostics, and task progress are never included.
 6. Save the plan and press the macro hotkey.
 

@@ -43,8 +43,15 @@ public partial class MacroPage : UserControl, IAppPage
     {
         _services = services;
         InitializeComponent();
+        InitializeDashboard();
         DataContext = this;
         LoopEditor.SetTasks(TaskRows);
+        LoopEditor.ValueChanged +=
+            (_, _) => ReindexRows();
+        LoopEditor.EditTaskRequested +=
+            (_, args) => BeginTaskEdit(args.Task);
+        LoopEditor.RemoveTaskRequested +=
+            (_, args) => RemoveTask(args.Task);
         PlanCombo.ItemsSource = _plans;
         TaskKindCombo.ItemsSource = Enum.GetValues<MacroTaskKind>()
             .Where(kind =>
@@ -100,10 +107,14 @@ public partial class MacroPage : UserControl, IAppPage
             _loading = false;
         }
         UpdateHotkeyText();
+        RefreshDashboardSettings();
         CoordinatorStateChanged();
     }
 
-    internal void SetSnapshotScroll(bool showEnd)
+    internal void SetSnapshotScroll(
+        bool showEnd,
+        MacroPlanSnapshotState planState =
+            MacroPlanSnapshotState.NestedLoops)
     {
         // Snapshot artifacts are uploaded by CI. Never render locally protected
         // reporting values into those images, even when the normal controls mask
@@ -114,49 +125,9 @@ public partial class MacroPage : UserControl, IAppPage
         ShareCodeText.Text = string.Empty;
         SharePlanStatusText.Text = string.Empty;
         ClearPrivateServerRecoverySnapshot();
-        PopulateSnapshotTasks();
+        PopulateSnapshotTasks(planState);
         UpdateLayout();
-        if (showEnd) PageScroll.ScrollToEnd();
-        else PageScroll.ScrollToTop();
-    }
-
-    private void PopulateSnapshotTasks()
-    {
-        TaskRows.Clear();
-        TaskRows.Add(new MacroTaskRow
-        {
-            Definition = new MacroTaskDefinition
-            {
-                Id = "snapshot-challenge",
-                Kind = MacroTaskKind.Challenge,
-                PresetId = "snapshot-challenge-preset",
-                Name = "Challenge rotation",
-                Priority = 1,
-            },
-            Progress = new MacroTaskProgress { TaskId = "snapshot-challenge" },
-        });
-        TaskRows.Add(new MacroTaskRow
-        {
-            Definition = new MacroTaskDefinition
-            {
-                Id = "snapshot-story",
-                Kind = MacroTaskKind.Story,
-                PresetId = "snapshot-story-preset",
-                Name = "School Grounds infinite",
-                Priority = 2,
-                CompleteOnRuntimeDefeat = true,
-                TargetRuntimeMinutes = 180,
-            },
-            Progress = new MacroTaskProgress
-            {
-                TaskId = "snapshot-story",
-                Victories = 12,
-                Defeats = 1,
-                RuntimeSeconds = 8450,
-            },
-        });
-        EmptyTasksText.Visibility = Visibility.Collapsed;
-        ApplyTotals();
+        SetActiveWorkspaceSnapshotScroll(showEnd);
     }
 
     private async Task<IDetectorPack> LoadDetectorAsync(string id, CancellationToken cancellationToken) =>
@@ -221,6 +192,7 @@ public partial class MacroPage : UserControl, IAppPage
                 ShareCodeText.Text);
         ImportPlanCodeButton.IsEnabled = !busy;
         SetPrivateServerRecoveryControlsEnabled(!busy);
+        UpdateDashboardBusyState();
         UpdateTaskTargetEditor();
 
         if (!busy && _macroOwned)

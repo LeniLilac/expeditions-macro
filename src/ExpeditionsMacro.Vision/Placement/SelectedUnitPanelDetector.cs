@@ -6,6 +6,7 @@ namespace ExpeditionsMacro.Vision.Placement;
 
 public sealed record SelectedUnitPanelMatch(
     bool Visible,
+    bool PanelVisible,
     double Confidence,
     double CloseScore,
     double FirstPriorityScore,
@@ -17,6 +18,7 @@ public static class SelectedUnitPanelDetector
     public const int ClientHeight = 611;
     private const double MinimumCloseScore = 0.18;
     private const double MinimumFirstPriorityScore = 0.32;
+    private const double MinimumPanelScore = 0.52;
 
     private static readonly ScreenRegion CloseControl =
         new(244, 209, 29, 30);
@@ -41,6 +43,9 @@ public static class SelectedUnitPanelDetector
             image,
             PanelBody,
             IsDark);
+        bool panelVisible =
+            close >= MinimumCloseScore &&
+            panel >= MinimumPanelScore;
         bool visible =
             close >= MinimumCloseScore &&
             first >= MinimumFirstPriorityScore;
@@ -55,6 +60,7 @@ public static class SelectedUnitPanelDetector
             1);
         SelectedUnitPanelMatch match = new(
             visible,
+            panelVisible,
             confidence,
             close,
             first,
@@ -68,6 +74,7 @@ public static class SelectedUnitPanelDetector
                 close,
                 first_priority = first,
                 panel,
+                panel_visible = panelVisible,
             });
         return match;
     }

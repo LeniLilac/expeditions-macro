@@ -30,9 +30,41 @@ public sealed class SelectedUnitPanelDetectorTests
                 LoadStage("SelectedUnitPanelHoverNegative_01.png"));
 
         Assert.False(match.Visible);
+        Assert.False(match.PanelVisible);
         Assert.True(
             match.CloseScore < 0.18 ||
             match.FirstPriorityScore < 0.32);
+    }
+
+    [Fact]
+    public void ChangedTargeting_RemainsAnOpenPanelWithoutPlacementProof()
+    {
+        ImageFrame selected =
+            LoadStage("SelectedUnitPanel_01.png");
+        byte[] pixels = selected.Pixels.ToArray();
+
+        Fill(
+            pixels,
+            selected.Width,
+            x: 29,
+            y: 342,
+            width: 52,
+            height: 32,
+            red: 128,
+            green: 128,
+            blue: 128);
+
+        SelectedUnitPanelMatch match =
+            SelectedUnitPanelDetector.Detect(
+                new ImageFrame(
+                    selected.Width,
+                    selected.Height,
+                    selected.Format,
+                    pixels,
+                    takeOwnership: true));
+
+        Assert.False(match.Visible);
+        Assert.True(match.PanelVisible);
     }
 
     [Fact]
@@ -100,14 +132,37 @@ public sealed class SelectedUnitPanelDetectorTests
         Assert.Empty(falseMatches);
     }
 
+    [Fact]
+    public void EveryOtherReviewedStageScreen_IsNotAnOpenSelectedUnitPanel()
+    {
+        string[] falseMatches = Directory
+            .EnumerateFiles(TestPaths.StageDatasets, "*.png")
+            .Where(path =>
+                !string.Equals(
+                    Path.GetFileName(path),
+                    "SelectedUnitPanel_01.png",
+                    StringComparison.OrdinalIgnoreCase))
+            .Where(path =>
+                SelectedUnitPanelDetector.Detect(
+                    ImageCodec.Load(path)).PanelVisible)
+            .Select(Path.GetFileName)
+            .Order(StringComparer.Ordinal)
+            .ToArray()!;
+
+        Assert.Empty(falseMatches);
+    }
+
     [Theory]
     [MemberData(nameof(CrossStateScreens))]
     public void OtherModeAndShellStates_AreNotPlacementProof(
         string path)
     {
-        Assert.False(
+        SelectedUnitPanelMatch match =
             SelectedUnitPanelDetector.Detect(
-                ImageCodec.Load(path)).Visible);
+                ImageCodec.Load(path));
+
+        Assert.False(match.Visible);
+        Assert.False(match.PanelVisible);
     }
 
     [Fact]

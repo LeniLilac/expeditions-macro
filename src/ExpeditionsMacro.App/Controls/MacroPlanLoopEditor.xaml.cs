@@ -1,5 +1,5 @@
 using System.Collections;
-using System.Globalization;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -8,98 +8,128 @@ using ExpeditionsMacro.Core.Models;
 
 namespace ExpeditionsMacro.App.Controls;
 
+public sealed class MacroPlanTaskRequestedEventArgs(
+    MacroTaskRow task) : EventArgs
+{
+    public MacroTaskRow Task { get; } = task;
+}
+
 public partial class MacroPlanLoopEditor :
     UserControl
 {
-    private MacroPlanLoopProgress _progress = new();
     private bool _interactionEnabled = true;
     private bool _updating;
 
     public MacroPlanLoopEditor()
     {
         InitializeComponent();
+        StructureTree.ItemsSource = RootBlocks;
+        RootDropZone.Visibility =
+            Visibility.Collapsed;
+        UpdateState();
     }
 
     public event EventHandler? ValueChanged;
 
-    public string? StartTaskId =>
-        SelectedTaskId(LoopStartCombo.SelectedItem);
+    public event EventHandler<
+        MacroPlanTaskRequestedEventArgs>?
+        EditTaskRequested;
 
-    public string? StopTaskId =>
-        SelectedTaskId(LoopStopCombo.SelectedItem);
+    public event EventHandler<
+        MacroPlanTaskRequestedEventArgs>?
+        RemoveTaskRequested;
+
+    public ObservableCollection<MacroPlanBlockNode>
+        RootBlocks { get; } = [];
+
+    public IReadOnlyList<MacroTaskRow>
+        OrderedTaskRows =>
+        MacroPlanStructure.FlattenTasks(RootBlocks)
+            .Select(node => node.TaskRow)
+            .ToArray();
 
     public void SetTasks(IEnumerable tasks)
     {
-        LoopStartCombo.ItemsSource = tasks;
-        LoopStopCombo.ItemsSource = tasks;
+        MacroPlanStructure.SynchronizeTasks(
+            RootBlocks,
+            tasks.OfType<MacroTaskRow>()
+                .ToArray());
+        UpdateState();
     }
 
-    public MacroPlanLoopDefinition? ReadDefinition(
-        IReadOnlyList<MacroTaskDefinition> tasks)
-    {
-        if (LoopEnabledCheck.IsChecked != true)
-        {
-            return null;
-        }
-        MacroTaskRow start =
-            LoopStartCombo.SelectedItem as
-                MacroTaskRow ??
-            throw new InvalidDataException(
-                "Choose the first task in the loop.");
-        MacroTaskRow stop =
-            LoopStopCombo.SelectedItem as
-                MacroTaskRow ??
-            throw new InvalidDataException(
-                "Choose the last task in the loop.");
-        bool forever =
-            LoopForeverCheck.IsChecked == true;
-        MacroPlanLoopDefinition loop = new()
-        {
-            StartTaskId = start.Definition.Id,
-            StopTaskId = stop.Definition.Id,
-            TotalRuns = forever
-                ? 1
-                : ParseAmount(),
-            Forever = forever,
-        };
-        loop.Validate(tasks);
-        return loop;
-    }
+    public IReadOnlyList<MacroPlanLoopDefinition>
+        ReadDefinitions(
+        IReadOnlyList<MacroTaskDefinition> tasks) =>
+        MacroPlanStructure.ReadDefinitions(
+            RootBlocks,
+            tasks);
 
-    public MacroPlanLoopProgress ProgressFor(
-        MacroPlanLoopDefinition? loop)
+    public IReadOnlyList<MacroPlanLoopProgress>
+        ProgressFor(
+        IReadOnlyList<MacroPlanLoopDefinition> loops)
     {
-        if (loop is null)
+        IReadOnlyList<MacroPlanLoopBlockNode> nodes =
+            MacroPlanStructure.FlattenLoops(
+                RootBlocks);
+        IReadOnlyList<MacroPlanLoopDefinition> current =
+            MacroPlanStructure.ReadDefinitions(
+                RootBlocks,
+                OrderedTaskRows.Select(row =>
+                        row.Definition)
+                    .ToArray());
+        return loops.Select(loop =>
         {
-            return new();
-        }
-        return string.Equals(
-                _progress.ConfigurationSignature,
-                loop.ConfigurationSignature,
-                StringComparison.Ordinal)
-            ? _progress
-            : new();
+            int index = current
+                .Select((value, valueIndex) =>
+                    new
+                    {
+                        Value = value,
+                        Index = valueIndex,
+                    })
+                .First(value =>
+                    string.Equals(
+                        value.Value
+                            .ConfigurationSignature,
+                        loop.ConfigurationSignature,
+                        StringComparison.Ordinal))
+                .Index;
+            MacroPlanLoopProgress progress =
+                nodes[index].Progress;
+            return string.Equals(
+                    progress.ConfigurationSignature,
+                    loop.ConfigurationSignature,
+                    StringComparison.Ordinal)
+                ? progress
+                : new MacroPlanLoopProgress
+                {
+                    ConfigurationSignature =
+                        loop.ConfigurationSignature,
+                    Phase = MacroPlanLoopPhase.Loop,
+                };
+        }).ToArray();
     }
 
     public void Apply(
-        MacroPlanLoopDefinition? loop,
-        MacroPlanLoopProgress progress)
+        IReadOnlyList<MacroPlanLoopDefinition> loops,
+        IReadOnlyList<MacroPlanLoopProgress> progress)
     {
+        MacroTaskRow[] taskRows =
+            OrderedTaskRows.ToArray();
         _updating = true;
         try
         {
-            _progress = progress;
-            LoopEnabledCheck.IsChecked =
-                loop is not null;
-            LoopForeverCheck.IsChecked =
-                loop?.Forever == true;
-            LoopAmountText.Text =
-                (loop?.TotalRuns ?? 2).ToString(
-                    CultureInfo.InvariantCulture);
-            LoopStartCombo.SelectedItem =
-                FindRow(loop?.StartTaskId);
-            LoopStopCombo.SelectedItem =
-                FindRow(loop?.StopTaskId);
+            UnsubscribeAll();
+            RootBlocks.Clear();
+            ObservableCollection<MacroPlanBlockNode>
+                built = MacroPlanStructure.Build(
+                    taskRows,
+                    loops,
+                    progress);
+            foreach (MacroPlanBlockNode node in built)
+            {
+                RootBlocks.Add(node);
+            }
+            SubscribeAll();
         }
         finally
         {
@@ -109,198 +139,196 @@ public partial class MacroPlanLoopEditor :
     }
 
     public void UpdateProgress(
-        MacroPlanLoopProgress progress)
+        IReadOnlyList<MacroPlanLoopProgress> progress)
     {
-        _progress = progress;
-        UpdateStatus();
-    }
-
-    public void RestoreSelections(
-        string? startTaskId,
-        string? stopTaskId)
-    {
-        _updating = true;
         try
         {
-            LoopStartCombo.SelectedItem =
-                FindRow(startTaskId) ??
-                FirstRow();
-            LoopStopCombo.SelectedItem =
-                FindRow(stopTaskId) ??
-                LastRow();
+            IReadOnlyList<MacroPlanLoopDefinition>
+                definitions =
+                    MacroPlanStructure.ReadDefinitions(
+                        RootBlocks,
+                        OrderedTaskRows.Select(row =>
+                                row.Definition)
+                            .ToArray());
+            IReadOnlyList<MacroPlanLoopBlockNode> nodes =
+                MacroPlanStructure.FlattenLoops(
+                    RootBlocks);
+            for (int index = 0;
+                 index < nodes.Count;
+                 index++)
+            {
+                nodes[index].Progress =
+                    progress.FirstOrDefault(value =>
+                        string.Equals(
+                            value.ConfigurationSignature,
+                            definitions[index]
+                                .ConfigurationSignature,
+                            StringComparison.Ordinal)) ??
+                    new();
+            }
         }
-        finally
+        catch (InvalidDataException)
         {
-            _updating = false;
+            // An empty user-authored loop has no persisted signature yet.
         }
-        UpdateStatus();
+        Refresh();
     }
 
-    public void SetInteractionEnabled(
-        bool enabled)
+    public void SetInteractionEnabled(bool enabled)
     {
         _interactionEnabled = enabled;
         UpdateState();
     }
 
-    private void Control_Changed(
+    private void AddLoop_Click(
         object sender,
         RoutedEventArgs e)
     {
-        if (_updating ||
-            LoopAmountText is null)
+        MacroPlanLoopBlockNode loop =
+            MacroPlanStructure.AddLoopBlock(
+                RootBlocks);
+        Subscribe(loop);
+        CompleteChange();
+    }
+
+    private void RemoveLoop_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is not
+            MacroPlanLoopBlockNode loop)
         {
             return;
         }
-        if (LoopEnabledCheck.IsChecked == true)
+        loop.ValueChanged -= Loop_ValueChanged;
+        MacroPlanStructureMove
+            .RemoveLoopAndPromoteChildren(
+                RootBlocks,
+                loop);
+        CompleteChange();
+    }
+
+    private void EditTask_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is
+            MacroTaskRow task)
         {
-            LoopStartCombo.SelectedItem ??=
-                FirstRow();
-            LoopStopCombo.SelectedItem ??=
-                LastRow();
+            EditTaskRequested?.Invoke(
+                this,
+                new MacroPlanTaskRequestedEventArgs(
+                    task));
         }
+    }
+
+    private void RemoveTask_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is
+            MacroTaskRow task)
+        {
+            RemoveTaskRequested?.Invoke(
+                this,
+                new MacroPlanTaskRequestedEventArgs(
+                    task));
+        }
+    }
+
+    private void Loop_ValueChanged(
+        object? sender,
+        EventArgs e)
+    {
+        if (_updating ||
+            sender is not MacroPlanLoopBlockNode loop)
+        {
+            return;
+        }
+        if (loop.Forever)
+        {
+            _updating = true;
+            try
+            {
+                MacroPlanStructureMove.MakeForever(
+                    RootBlocks,
+                    loop);
+            }
+            finally
+            {
+                _updating = false;
+            }
+        }
+        CompleteChange();
+    }
+
+    private void CompleteChange()
+    {
+        Refresh();
+        ValueChanged?.Invoke(
+            this,
+            EventArgs.Empty);
+    }
+
+    private void Refresh()
+    {
+        MacroPlanStructure.RefreshPresentation(
+            RootBlocks);
+        ShowValidation(string.Empty);
         UpdateState();
-        ValueChanged?.Invoke(this, EventArgs.Empty);
-    }
-
-    private void Selection_Changed(
-        object sender,
-        SelectionChangedEventArgs e)
-    {
-        if (_updating ||
-            LoopStatusText is null)
-        {
-            return;
-        }
-        UpdateStatus();
-        ValueChanged?.Invoke(this, EventArgs.Empty);
-    }
-
-    private void Amount_Changed(
-        object sender,
-        TextChangedEventArgs e)
-    {
-        if (_updating ||
-            LoopStatusText is null)
-        {
-            return;
-        }
-        UpdateStatus();
-        ValueChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void UpdateState()
     {
-        bool enabled =
-            _interactionEnabled &&
-            LoopEnabledCheck.IsChecked == true;
-        LoopEnabledCheck.IsEnabled =
+        bool hasLoops =
+            MacroPlanStructure.FlattenLoops(
+                RootBlocks).Count != 0;
+        LoopHeading.Visibility = hasLoops
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        StructureTree.Visibility =
+            RootBlocks.Count == 0
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        AddLoopButton.IsEnabled =
             _interactionEnabled;
-        LoopStartCombo.IsEnabled = enabled;
-        LoopStopCombo.IsEnabled = enabled;
-        LoopForeverCheck.IsEnabled = enabled;
-        LoopAmountText.IsEnabled =
-            enabled &&
-            LoopForeverCheck.IsChecked != true;
-        UpdateStatus();
+        StructureTree.IsEnabled =
+            _interactionEnabled;
     }
 
-    private void UpdateStatus()
+    private void ShowValidation(string message)
     {
-        if (LoopEnabledCheck.IsChecked != true)
-        {
-            LoopStatusText.Text = string.Empty;
-            return;
-        }
-        if (LoopStartCombo.SelectedItem is not
-                MacroTaskRow start ||
-            LoopStopCombo.SelectedItem is not
-                MacroTaskRow stop)
-        {
-            LoopStatusText.Text =
-                "Choose loop start and stop tasks.";
-            return;
-        }
-
-        bool forever =
-            LoopForeverCheck.IsChecked == true;
-        int amount = forever
-            ? 1
-            : ParseAmountOrDefault();
-        string signature =
-            new MacroPlanLoopDefinition
-            {
-                StartTaskId =
-                    start.Definition.Id,
-                StopTaskId =
-                    stop.Definition.Id,
-                TotalRuns = amount,
-                Forever = forever,
-            }.ConfigurationSignature;
-        long completed = string.Equals(
-                _progress.ConfigurationSignature,
-                signature,
-                StringComparison.Ordinal)
-            ? _progress.CompletedRuns
-            : 0;
-        LoopStatusText.Text = forever
-            ? $"{completed} loop run{Plural(completed)} completed; runs continue until stopped."
-            : $"{completed} of {amount} loop runs completed.";
+        LoopValidationText.Text = message;
+        LoopValidationText.Visibility =
+            string.IsNullOrWhiteSpace(message)
+                ? Visibility.Collapsed
+                : Visibility.Visible;
     }
 
-    private int ParseAmount()
+    private void SubscribeAll()
     {
-        if (!int.TryParse(
-                LoopAmountText.Text.Trim(),
-                NumberStyles.Integer,
-                CultureInfo.InvariantCulture,
-                out int amount) ||
-            amount is < 1 or > 100000)
+        foreach (MacroPlanLoopBlockNode loop in
+                 MacroPlanStructure.FlattenLoops(
+                     RootBlocks))
         {
-            throw new InvalidDataException(
-                "Loop amount must be 1 through 100000.");
+            Subscribe(loop);
         }
-        return amount;
     }
 
-    private int ParseAmountOrDefault() =>
-        int.TryParse(
-            LoopAmountText.Text.Trim(),
-            NumberStyles.Integer,
-            CultureInfo.InvariantCulture,
-            out int amount) &&
-        amount is >= 1 and <= 100000
-            ? amount
-            : 2;
+    private void UnsubscribeAll()
+    {
+        foreach (MacroPlanLoopBlockNode loop in
+                 MacroPlanStructure.FlattenLoops(
+                     RootBlocks))
+        {
+            loop.ValueChanged -= Loop_ValueChanged;
+        }
+    }
 
-    private MacroTaskRow? FindRow(string? id) =>
-        id is null
-            ? null
-            : LoopStartCombo.Items
-                .OfType<MacroTaskRow>()
-                .FirstOrDefault(row =>
-                    string.Equals(
-                        row.Definition.Id,
-                        id,
-                        StringComparison.OrdinalIgnoreCase));
-
-    private MacroTaskRow? FirstRow() =>
-        LoopStartCombo.Items
-            .OfType<MacroTaskRow>()
-            .FirstOrDefault();
-
-    private MacroTaskRow? LastRow() =>
-        LoopStopCombo.Items
-            .OfType<MacroTaskRow>()
-            .LastOrDefault();
-
-    private static string? SelectedTaskId(
-        object? selected) =>
-        (selected as MacroTaskRow)?
-            .Definition.Id;
-
-    private static string Plural(long count) =>
-        count == 1
-            ? string.Empty
-            : "s";
+    private void Subscribe(
+        MacroPlanLoopBlockNode loop)
+    {
+        loop.ValueChanged -= Loop_ValueChanged;
+        loop.ValueChanged += Loop_ValueChanged;
+    }
 }

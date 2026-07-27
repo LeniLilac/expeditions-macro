@@ -193,6 +193,8 @@ The system is flat by default and uses no application-level shadow vocabulary. D
 - **Style:** A quiet sidebar with 38px items, 5px corners, and 11px horizontal padding.
 - **Default / Hover / Active:** Muted text at rest, hover tone with primary text, and selected tone with primary text.
 - **State:** The persistent status block stays separate from navigation and uses text in addition to its status dot.
+- **Workspace split:** Dashboard is the supervision surface for Roblox, run state, logs, connections, startup preparation, and controls. Macro Plan is the authoring surface for plan blocks, loops, and sharing. They share one runtime owner; navigation changes the surface, never the active operation.
+- **Plan blocks:** Express ordered work as one calm connected stack. Use a clear start cap, numbered task blocks, and a visually nested loop range. Preserve explicit route, target, progress, and edit/reorder/delete actions without imitating Scratch's saturated palette or decorative puzzle shapes.
 
 ### Data and Progress
 

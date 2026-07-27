@@ -43,19 +43,14 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel>
                         <TextBlock Style="{StaticResource SectionTitle}"
-                                   Text="Macro preparation" />
+                                   Text="Placement workflow" />
                         <TextBlock Margin="0,5,24,0"
                                    Style="{StaticResource Caption}"
                                    TextWrapping="Wrap"
-                                   Text="Startup checks and camera preparation for each Macro plan." />
+                                   Text="Choose how placement setup prepares the camera." />
                     </StackPanel>
                     <StackPanel Grid.Column="1">
-                        <CheckBox x:Name="AutoGameSettingsCheck"
-                                  Content="Check and fix game settings at macro start"
-                                  Checked="AutoGameSettingsCheck_Changed"
-                                  Unchecked="AutoGameSettingsCheck_Changed" />
                         <CheckBox x:Name="FastNoAlignCheck"
-                                  Margin="0,14,0,0"
                                   Content="Use Fast no align placement workflow"
                                   Checked="FastNoAlignCheck_Changed"
                                   Unchecked="FastNoAlignCheck_Changed" />
@@ -67,9 +62,9 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Row="3" Style="{StaticResource SectionDivider}">
-                <icons:SettingsKeyBindingsPanel x:Name="KeyBindingsPanel" />
-            </Border>
+            <icons:SettingsKeyBindingsPanel x:Name="KeyBindingsPanel"
+                                             Grid.Row="3"
+                                             Visibility="Collapsed" />
 
             <Border Grid.Row="4" Style="{StaticResource SectionDivider}">
                 <StackPanel Width="640" HorizontalAlignment="Left">

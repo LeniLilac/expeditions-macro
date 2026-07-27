@@ -29,6 +29,7 @@ public enum LucideIconKind
     GripVertical,
     FastForward,
     Keyboard,
+    LayoutDashboard,
     LogOut,
     MapPin,
     MessagesSquare,
@@ -53,6 +54,7 @@ public enum LucideIconKind
     Swords,
     Trash2,
     Users,
+    Blocks,
     Workflow,
     X,
 }
@@ -192,6 +194,11 @@ public sealed class LucideIcon : Control
             Path("m13 19 9-7-9-7z"),
             Path("m2 19 9-7-9-7z")),
         [LucideIconKind.Keyboard] = Group(Path("M10 8h.01"), Path("M12 12h.01"), Path("M14 8h.01"), Path("M16 12h.01"), Path("M18 8h.01"), Path("M6 8h.01"), Path("M7 16h10"), Path("M8 12h.01"), Rectangle(2, 4, 20, 16, 2)),
+        [LucideIconKind.LayoutDashboard] = Group(
+            Rectangle(3, 3, 7, 9, 1),
+            Rectangle(14, 3, 7, 5, 1),
+            Rectangle(14, 12, 7, 9, 1),
+            Rectangle(3, 16, 7, 5, 1)),
         [LucideIconKind.LogOut] = Group(
             Path("M10 17l5-5-5-5"),
             Path("M15 12H3"),
@@ -234,6 +241,11 @@ public sealed class LucideIcon : Control
             Circle(9, 7, 4),
             Path("M22 21v-2a4 4 0 0 0-3-3.87"),
             Path("M16 3.13a4 4 0 0 1 0 7.75")),
+        [LucideIconKind.Blocks] = Group(
+            Rectangle(14, 3, 7, 7, 1),
+            Rectangle(3, 14, 7, 7, 1),
+            Path("M10 7h2a5 5 0 0 1 5 5v2"),
+            Path("M7 10v2a5 5 0 0 0 5 5h2")),
         [LucideIconKind.Workflow] = Group(Rectangle(3, 3, 8, 8, 2), Path("M7 11v4a2 2 0 0 0 2 2h4"), Rectangle(13, 13, 8, 8, 2)),
         [LucideIconKind.X] = Group(Path("M18 6 6 18"), Path("m6 6 12 12")),
     };

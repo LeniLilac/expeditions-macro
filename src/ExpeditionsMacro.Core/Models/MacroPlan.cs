@@ -137,6 +137,11 @@ public sealed record MacroPlan
     public required string Name { get; init; }
     public required IReadOnlyList<MacroTaskDefinition> Tasks { get; init; }
     public IReadOnlyList<MacroTaskProgress> Progress { get; init; } = [];
+    public IReadOnlyList<MacroPlanLoopDefinition> Loops { get; init; } = [];
+    public IReadOnlyList<MacroPlanLoopProgress> LoopStates { get; init; } = [];
+
+    // Beta 29 wrote one loop and one progress object. Keep those fields
+    // readable so existing local plans and share codes migrate in place.
     public MacroPlanLoopDefinition? Loop { get; init; }
     public MacroPlanLoopProgress LoopProgress { get; init; } = new();
     public DateTimeOffset UpdatedAt { get; init; } = DateTimeOffset.UtcNow;
@@ -154,12 +159,52 @@ public sealed record MacroPlan
         {
             throw new InvalidDataException("Every macro task must have a unique id.");
         }
-        Loop?.Validate(Tasks);
-        LoopProgress.Validate();
-        if (Loop is null && !LoopProgress.IsEmpty)
+        if (Loop is not null && Loops.Count != 0)
         {
             throw new InvalidDataException(
-                "A plan without a loop cannot contain loop progress.");
+                "A plan cannot mix legacy and current loop definitions.");
+        }
+        if (!LoopProgress.IsEmpty && Loop is null)
+        {
+            throw new InvalidDataException(
+                "Legacy loop progress requires its saved loop.");
+        }
+        if (LoopStates.Count != 0 && Loops.Count == 0)
+        {
+            throw new InvalidDataException(
+                "Loop progress requires current loop definitions.");
+        }
+
+        IReadOnlyList<MacroPlanLoopDefinition> loops =
+            EffectiveLoops();
+        MacroPlanLoopDefinition.ValidateAll(loops, Tasks);
+        HashSet<string> signatures = loops
+            .Select(loop => loop.ConfigurationSignature)
+            .ToHashSet(StringComparer.Ordinal);
+        if (signatures.Count != loops.Count)
+        {
+            throw new InvalidDataException(
+                "Every loop must have a unique configuration.");
+        }
+        IReadOnlyList<MacroPlanLoopProgress> states =
+            EffectiveLoopStates();
+        if (states
+                .Select(state => state.ConfigurationSignature)
+                .Distinct(StringComparer.Ordinal)
+                .Count() != states.Count)
+        {
+            throw new InvalidDataException(
+                "Every loop may have only one progress record.");
+        }
+        foreach (MacroPlanLoopProgress state in states)
+        {
+            state.Validate();
+            if (!signatures.Contains(
+                    state.ConfigurationSignature))
+            {
+                throw new InvalidDataException(
+                    "Loop progress refers to a loop that is no longer in the plan.");
+            }
         }
         string[] taskIds = Tasks.Select(task => task.Id).ToArray();
         if (Progress.Select(value => value.TaskId).Distinct(StringComparer.OrdinalIgnoreCase).Count() != Progress.Count)
@@ -190,9 +235,44 @@ public sealed record MacroPlan
         Progress.FirstOrDefault(value => string.Equals(value.TaskId, taskId, StringComparison.OrdinalIgnoreCase))
         ?? new MacroTaskProgress { TaskId = taskId };
 
+    public IReadOnlyList<MacroPlanLoopDefinition>
+        EffectiveLoops() =>
+        Loops.Count != 0
+            ? Loops
+            : Loop is null
+                ? []
+                : [Loop];
+
+    public IReadOnlyList<MacroPlanLoopProgress>
+        EffectiveLoopStates() =>
+        LoopStates.Count != 0
+            ? LoopStates
+            : Loop is null ||
+                LoopProgress.IsEmpty
+                ? []
+                : [LoopProgress];
+
+    public MacroPlanLoopProgress LoopStateFor(
+        MacroPlanLoopDefinition loop) =>
+        EffectiveLoopStates()
+            .FirstOrDefault(state =>
+                string.Equals(
+                    state.ConfigurationSignature,
+                    loop.ConfigurationSignature,
+                    StringComparison.Ordinal)) ??
+        new MacroPlanLoopProgress
+        {
+            ConfigurationSignature =
+                loop.ConfigurationSignature,
+            Phase = MacroPlanLoopPhase.Loop,
+        };
+
     public MacroPlan ResetProgress() => this with
     {
         Progress = Tasks.Select(task => new MacroTaskProgress { TaskId = task.Id }).ToArray(),
+        Loops = EffectiveLoops().ToArray(),
+        LoopStates = [],
+        Loop = null,
         LoopProgress = new(),
         UpdatedAt = DateTimeOffset.UtcNow,
     };
