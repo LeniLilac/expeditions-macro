@@ -17,8 +17,10 @@ internal static class StageNavigationPolicy
     public static GameModeHandoffCommand SelectGameModeHandoffCommand(
         StageScreenState state,
         bool hasStageChangeModeAction,
-        bool recoveryTransitionPending = false) =>
-        recoveryTransitionPending && state != StageScreenState.GameModeSelector
+        bool recoveryTransitionPending = false,
+        bool selectorEvidencePending = false) =>
+        (recoveryTransitionPending || selectorEvidencePending) &&
+        state != StageScreenState.GameModeSelector
             ? GameModeHandoffCommand.Wait
             : state switch
             {
@@ -29,6 +31,17 @@ internal static class StageNavigationPolicy
                 StageScreenState.StorySelector or StageScreenState.RaidSelector or StageScreenState.PreviewReady => GameModeHandoffCommand.Back,
                 _ => GameModeHandoffCommand.PressPlayKey,
             };
+
+    public static StageScreenState ResolveGameModeSelectorState(
+        StageScreenState stageState,
+        string? recoveryState) =>
+        stageState == StageScreenState.None &&
+        string.Equals(
+            recoveryState,
+            "play",
+            StringComparison.OrdinalIgnoreCase)
+                ? StageScreenState.GameModeSelector
+                : stageState;
 
     public static bool MatchesExpectedState(
         StageScreenState expected,

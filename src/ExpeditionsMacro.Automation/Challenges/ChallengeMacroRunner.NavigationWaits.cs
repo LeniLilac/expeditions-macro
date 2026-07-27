@@ -106,23 +106,33 @@ public sealed partial class ChallengeMacroRunner
         CancellationToken cancellationToken,
         bool initialDesiredObservation = false)
     {
+        if (RequiresStableChallengeAction(desired))
+        {
+            (ImageFrame Frame, ChallengeScreenMatch Match)? action =
+                await TryWaitForActionAsync(
+                        window,
+                        preset,
+                        detector,
+                        desired,
+                        timeout,
+                        report,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            return action?.Frame;
+        }
+
         StableStateTracker<ChallengeScreenState> stateTracker =
             new(preset.StableDetections);
-        StableNavigationActionTracker<ChallengeScreenState>
-            actionTracker =
-                new(Math.Max(2, preset.StableDetections));
         ObservationWaitBudget budget = new(
             timeout,
             preset.StableDetections);
-        if (initialDesiredObservation &&
-            !RequiresStableChallengeAction(desired))
+        if (initialDesiredObservation)
         {
             _ = stateTracker.Update(desired);
             budget.MarkObserved();
         }
         while (budget.ShouldObserve(
-                   stateTracker.HasPendingCandidate ||
-                   actionTracker.HasPendingCandidate))
+                   stateTracker.HasPendingCandidate))
         {
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = CaptureClient(window, detector);
@@ -134,15 +144,7 @@ public sealed partial class ChallengeMacroRunner
                     : ChallengeScreenState.None;
             ChallengeScreenState? stable =
                 stateTracker.Update(candidate);
-            (int X, int Y)? stableAction =
-                actionTracker.Update(
-                    RequiresStableChallengeAction(desired)
-                        ? candidate
-                        : ChallengeScreenState.None,
-                    MatchAction(match));
-            if (RequiresStableChallengeAction(desired)
-                ? stableAction is not null
-                : stable == desired)
+            if (stable == desired)
             {
                 return frame;
             }
@@ -159,6 +161,144 @@ public sealed partial class ChallengeMacroRunner
             await Task.Delay(
                 preset.PollMilliseconds,
                 cancellationToken).ConfigureAwait(false);
+        }
+        return null;
+    }
+
+    private Task<(ImageFrame Frame, ChallengeScreenMatch Match)?>
+        TryWaitForActionAsync(
+        RobloxWindow window,
+        ChallengePreset preset,
+        IDetectorPack detector,
+        ChallengeScreenState desired,
+        TimeSpan timeout,
+        Action<string, int, string, string?, double?> report,
+        CancellationToken cancellationToken) =>
+        WaitForStableActionAsync(
+            desired,
+            preset.StableDetections,
+            () =>
+            {
+                ImageFrame frame =
+                    CaptureClient(window, detector);
+                return (
+                    frame,
+                    ChallengeScreenDetector.Detect(frame));
+            },
+            timeout,
+            preset.PollMilliseconds,
+            match =>
+            {
+                if (match.State !=
+                    ChallengeScreenState.None)
+                {
+                    report(
+                        "Waiting",
+                        0,
+                        $"Detected {Label(match.State)}.",
+                        match.State.ToString(),
+                        match.Confidence);
+                }
+            },
+            cancellationToken);
+
+    private async Task<(ImageFrame Frame, ChallengeScreenMatch Match)>
+        WaitForPreviewStartAsync(
+        RobloxWindow window,
+        ChallengePreset preset,
+        IDetectorPack detector,
+        Action<string, int, string, string?, double?> report,
+        CancellationToken cancellationToken)
+    {
+        (ImageFrame Frame, ChallengeScreenMatch Match)? observation =
+            await TryWaitForActionAsync(
+                    window,
+                    preset,
+                    detector,
+                    ChallengeScreenState.PreviewReady,
+                    TimeSpan.FromSeconds(15),
+                    report,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        return observation ??
+            throw new RobloxUiUnavailableException(
+                "The Challenge preview did not expose a stable live Start button within 15 seconds.");
+    }
+
+    internal static async Task<(
+        ImageFrame Frame,
+        ChallengeScreenMatch Match)?>
+        WaitForStableActionAsync(
+        ChallengeScreenState desired,
+        int stableDetections,
+        Func<(ImageFrame Frame, ChallengeScreenMatch Match)>
+            observe,
+        TimeSpan timeout,
+        int pollMilliseconds,
+        Action<ChallengeScreenMatch>? observed,
+        CancellationToken cancellationToken,
+        Func<DateTimeOffset>? utcNow = null,
+        Func<int, CancellationToken, Task>? delay = null)
+    {
+        ArgumentNullException.ThrowIfNull(observe);
+        if (stableDetections < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(stableDetections));
+        }
+        if (timeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(timeout));
+        }
+        if (pollMilliseconds < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(pollMilliseconds));
+        }
+
+        int required = Math.Max(2, stableDetections);
+        StableNavigationActionTracker<ChallengeScreenState>
+            tracker = new(required);
+        ObservationWaitBudget budget =
+            new(timeout, required, utcNow);
+        while (budget.ShouldObserve(
+                   tracker.HasPendingCandidate))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            (ImageFrame Frame, ChallengeScreenMatch Match)
+                observation = observe();
+            ChallengeScreenMatch match =
+                observation.Match;
+            // GB-011: the enum's None value is still a valid generic tracker
+            // state. Strip every action that does not belong to the requested UI.
+            (int X, int Y)? action =
+                match.State == desired
+                    ? MatchAction(match)
+                    : null;
+            (int X, int Y)? stableAction =
+                tracker.Update(desired, action);
+            observed?.Invoke(match);
+            budget.MarkObserved();
+            if (stableAction is not null)
+            {
+                return (
+                    observation.Frame,
+                    match with
+                    {
+                        ActionX = stableAction.Value.X,
+                        ActionY = stableAction.Value.Y,
+                    });
+            }
+
+            await (delay is null
+                    ? Task.Delay(
+                        pollMilliseconds,
+                        cancellationToken)
+                    : delay(
+                        pollMilliseconds,
+                        cancellationToken))
+                .ConfigureAwait(false);
         }
         return null;
     }

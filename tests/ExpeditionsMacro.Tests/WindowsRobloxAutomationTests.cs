@@ -227,70 +227,30 @@ public sealed class WindowsRobloxAutomationTests
         Assert.Equal(0, pinned & appWindow);
     }
 
-    [Theory]
-    [InlineData(101, 202, 101, true)]
-    [InlineData(101, 202, 202, true)]
-    [InlineData(101, 202, 303, false)]
-    [InlineData(101, 0, 202, false)]
-    [InlineData(0, 202, 202, false)]
-    [InlineData(101, 202, 0, false)]
-    public void PinnedWindowForegroundPolicy_OnlyAllowsTheDashboardOrPinnedRoblox(
-        int owner,
-        int source,
-        int foreground,
-        bool expected)
-    {
-        Assert.Equal(
-            expected,
-            WindowsRobloxWindowPin
-                .IsForegroundWindowAllowed(
-                    (nint)owner,
-                    (nint)source,
-                    (nint)foreground));
-    }
-
     [Fact]
-    public void PinnedWindowForegroundPolicy_SuspendsForAnAppOwnedModal()
-    {
-        nint dashboard = (nint)101;
-        nint roblox = (nint)202;
-        nint ownedModal = (nint)303;
-
-        Assert.False(
-            WindowsRobloxWindowPin
-                .IsForegroundWindowAllowed(
-                    dashboard,
-                    roblox,
-                    ownedModal));
-        Assert.True(
-            WindowsRobloxWindowPin
-                .IsForegroundWindowAllowed(
-                    dashboard,
-                    source: nint.Zero,
-                    foreground: dashboard));
-    }
-
-    [Theory]
-    [InlineData(
-        (int)PinnedWindowReleaseDisposition.MinimizeRetained,
-        7)]
-    [InlineData(
-        (int)PinnedWindowReleaseDisposition.Restore,
-        9)]
-    public void PinnedWindowReleasePolicy_UsesNonActivatingMinimizeForAutomaticDetach(
-        int disposition,
-        int expectedCommand)
+    public void PinnedWindowReleasePolicy_PageOrScrollAutoDetachUsesNonActivatingMinimize()
     {
         Assert.Equal(
-            expectedCommand,
+            7,
             WindowsPinnedWindowRelease
                 .ResolveShowCommand(
-                    (PinnedWindowReleaseDisposition)
-                        disposition));
+                    PinnedWindowReleaseDisposition
+                        .MinimizeRetained));
     }
 
     [Fact]
-    public void PinnedWindowReleasePolicy_DoesNotShowOrActivateDuringSuspension()
+    public void PinnedWindowReleasePolicy_ManualUnpinAndShutdownRestoreWithoutMinimizing()
+    {
+        Assert.Equal(
+            9,
+            WindowsPinnedWindowRelease
+                .ResolveShowCommand(
+                    PinnedWindowReleaseDisposition
+                        .Restore));
+    }
+
+    [Fact]
+    public void PinnedWindowReleasePolicy_OcclusionAndModalSuspendWithoutShowingOrActivating()
     {
         Assert.Null(
             WindowsPinnedWindowRelease

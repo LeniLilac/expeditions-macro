@@ -73,27 +73,46 @@ public partial class MacroPage
                 MessageBoxImage.Warning);
             if (answer != MessageBoxResult.Yes) return;
 
-            await _services.FastNoAlignShare
-                .ImportAsync(bundle);
-            await _services.UpdateSettingsAsync(
-                settings => settings with
+            _changingPlan = true;
+            try
+            {
+                await _planAutoSave.FlushAsync();
+                await _services.FastNoAlignShare
+                    .ImportAsync(bundle);
+                await _services.UpdateSettingsAsync(
+                    settings => settings with
+                    {
+                        SelectedMacroPlanId =
+                            bundle.Plan.Id,
+                    });
+                MacroPlan imported;
+                _loading = true;
+                try
                 {
-                    SelectedMacroPlanId =
-                        bundle.Plan.Id,
-                });
-            await RefreshPlansAsync();
-            MacroPlan imported =
-                _plans.First(plan =>
-                    string.Equals(
-                        plan.Id,
-                        bundle.Plan.Id,
-                        StringComparison.OrdinalIgnoreCase));
-            PlanCombo.SelectedItem = imported;
-            ApplyPlan(imported);
-            SharePlanStatusText.Text =
-                $"Imported '{imported.Name}'.";
-            PhaseText.Text =
-                $"Plan '{imported.Name}' imported locally.";
+                    await RefreshPlansAsync();
+                    imported = _plans.First(plan =>
+                        string.Equals(
+                            plan.Id,
+                            bundle.Plan.Id,
+                            StringComparison
+                                .OrdinalIgnoreCase));
+                    PlanCombo.SelectedItem =
+                        imported;
+                }
+                finally
+                {
+                    _loading = false;
+                }
+                ApplyPlan(imported);
+                SharePlanStatusText.Text =
+                    $"Imported '{imported.Name}'.";
+                PhaseText.Text =
+                    $"Plan '{imported.Name}' imported locally.";
+            }
+            finally
+            {
+                _changingPlan = false;
+            }
         }
         catch (Exception error)
         {

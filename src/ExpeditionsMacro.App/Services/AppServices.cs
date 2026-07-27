@@ -34,6 +34,8 @@ public sealed record MacroFailureHandlingResult(
 public sealed class AppServices : IDisposable
 {
     private readonly DiscordWebhookClient _discord;
+    private readonly SemaphoreSlim _settingsUpdateGate =
+        new(1, 1);
 
     private AppServices(Dispatcher dispatcher)
     {
@@ -125,11 +127,9 @@ public sealed class AppServices : IDisposable
             PlacementCapture,
             PlacementModels,
             () => AppSettings
-                .ParseRequiredUnitActionKeys(Settings)
-                .ChangeTargeting,
+                .ParseChangeUnitTargetingKey(Settings),
             () => AppSettings
-                .ParseRequiredUnitActionKeys(Settings)
-                .AutoUpgrade);
+                .ParseAutoUpgradeUnitKey(Settings));
         ManualRecorder =
             new WindowsManualInputRecorder(Automation);
         WindowsManualInputPlayback manualPlayback =
@@ -297,7 +297,9 @@ public sealed class AppServices : IDisposable
             services.Settings = services.Settings with { MacroHotkeyVirtualKey = configuredHotkey };
             await services.SettingsStore.SaveAsync(services.Settings);
         }
-        if (!KeyboardKey.IsSupportedShiftLockKey(services.Settings.ShiftLockVirtualKey))
+        if (services.Settings.ShiftLockVirtualKey != 0 &&
+            !KeyboardKey.IsSupportedShiftLockKey(
+                services.Settings.ShiftLockVirtualKey))
         {
             services.Settings = services.Settings with { ShiftLockVirtualKey = AppSettings.DefaultShiftLockVirtualKey };
             await services.SettingsStore.SaveAsync(services.Settings);
@@ -321,9 +323,18 @@ public sealed class AppServices : IDisposable
 
     public async Task UpdateSettingsAsync(Func<AppSettings, AppSettings> update)
     {
-        AppSettings updated = update(Settings);
-        await SettingsStore.SaveAsync(updated);
-        Settings = updated;
+        ArgumentNullException.ThrowIfNull(update);
+        await _settingsUpdateGate.WaitAsync();
+        try
+        {
+            AppSettings updated = update(Settings);
+            await SettingsStore.SaveAsync(updated);
+            Settings = updated;
+        }
+        finally
+        {
+            _settingsUpdateGate.Release();
+        }
         SettingsChanged?.Invoke(this, EventArgs.Empty);
     }
 

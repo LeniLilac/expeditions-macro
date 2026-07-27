@@ -11,6 +11,29 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
     { get; } =
         Enum.GetValues<UnitTargetingPriority>();
 
+    public static IReadOnlyList<
+        PlacementEditorChoice<PlacementPhase>>
+        Phases
+    { get; } =
+    [
+        new(PlacementPhase.BeforeStart, "Before Start"),
+        new(PlacementPhase.AfterStart, "After Start"),
+    ];
+
+    public static IReadOnlyList<
+        PlacementEditorChoice<UnitAutoUpgradePriority>>
+        AutoUpgradePriorities
+    { get; } =
+    [
+        new(UnitAutoUpgradePriority.Off, "Off"),
+        new(UnitAutoUpgradePriority.Priority1, "Priority 1"),
+        new(UnitAutoUpgradePriority.Priority2, "Priority 2"),
+        new(UnitAutoUpgradePriority.Priority3, "Priority 3"),
+        new(UnitAutoUpgradePriority.Priority4, "Priority 4"),
+        new(UnitAutoUpgradePriority.Priority5, "Priority 5"),
+        new(UnitAutoUpgradePriority.Priority6, "Priority 6"),
+    ];
+
     private int _unitKey;
     private int _x;
     private int _y;
@@ -18,7 +41,8 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
     private int _delayAfterStartMilliseconds;
     private PlacementPhase _phase;
     private UnitTargetingPriority _targetingPriority;
-    private bool _autoUpgrade = true;
+    private UnitAutoUpgradePriority
+        _autoUpgradePriority;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -59,6 +83,11 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         get => _phase;
         set
         {
+            if (!Enum.IsDefined(value))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(value));
+            }
             if (!Set(ref _phase, value)) return;
             Raise(nameof(MarkerLabel));
             Raise(nameof(PhaseLabel));
@@ -77,10 +106,13 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         }
     }
 
-    public bool AutoUpgrade
+    public UnitAutoUpgradePriority
+        AutoUpgradePriority
     {
-        get => _autoUpgrade;
-        set => Set(ref _autoUpgrade, value);
+        get => _autoUpgradePriority;
+        set => Set(
+            ref _autoUpgradePriority,
+            value);
     }
 
     public string PhaseLabel =>
@@ -112,7 +144,8 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         DelayAfterStartMilliseconds =
             DelayAfterStartMilliseconds,
         TargetingPriority = TargetingPriority,
-        AutoUpgrade = AutoUpgrade,
+        AutoUpgradePriority =
+            AutoUpgradePriority,
     };
 
     public static PlacementStepRow FromModel(PlacementStep step) => new()
@@ -125,7 +158,8 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         DelayAfterStartMilliseconds =
             step.DelayAfterStartMilliseconds,
         TargetingPriority = step.TargetingPriority,
-        AutoUpgrade = step.AutoUpgrade,
+        AutoUpgradePriority =
+            step.AutoUpgradePriority,
     };
 
     private bool Set<T>(

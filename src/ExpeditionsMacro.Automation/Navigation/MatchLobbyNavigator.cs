@@ -16,8 +16,6 @@ public sealed class MatchLobbyNavigator
         TimeSpan,
         CancellationToken,
         Task> _delay;
-    private readonly AccessibilityNavigationController
-        _accessibility;
 
     public MatchLobbyNavigator(
         IRobloxAutomation automation)
@@ -37,11 +35,6 @@ public sealed class MatchLobbyNavigator
         _automation = automation;
         _utcNow = utcNow;
         _delay = delay;
-        _accessibility =
-            new AccessibilityNavigationController(
-                automation,
-                ValidateWindow,
-                delay);
     }
 
     public async Task ReturnAsync(
@@ -77,23 +70,16 @@ public sealed class MatchLobbyNavigator
         LobbyExitConfirmationMatch last = default;
         for (int attempt = 1; attempt <= 2; attempt++)
         {
-            await _accessibility.RunEnabledAsync(
+            MatchLobbyDoorButtonMatch door =
+                await WaitForStableDoorAsync(
+                    window,
+                    TimeSpan.FromSeconds(4),
+                    cancellationToken).ConfigureAwait(false);
+            ValidateWindow(window);
+            await _automation.ClickClientAsync(
                 window,
-                async token =>
-                {
-                    await _accessibility.TapAsync(
-                        window,
-                        RobloxKeyboardKey.RightArrow,
-                        token).ConfigureAwait(false);
-                    await _accessibility.TapAsync(
-                        window,
-                        RobloxKeyboardKey.RightArrow,
-                        token).ConfigureAwait(false);
-                    await _accessibility.TapAsync(
-                        window,
-                        RobloxKeyboardKey.Enter,
-                        token).ConfigureAwait(false);
-                },
+                door.ActionX,
+                door.ActionY,
                 cancellationToken).ConfigureAwait(false);
             last = await WaitForConfirmationAsync(
                 window,
@@ -104,6 +90,39 @@ public sealed class MatchLobbyNavigator
 
         throw new RobloxUiUnavailableException(
             "Anime Expeditions did not open the verified Return to Lobby confirmation.");
+    }
+
+    private async Task<MatchLobbyDoorButtonMatch>
+        WaitForStableDoorAsync(
+        RobloxWindow window,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        DateTimeOffset deadline = _utcNow() + timeout;
+        StableNavigationActionTracker<MatchLobbyDoorLayout>
+            tracker = new(
+                required: 2,
+                coordinateTolerance: 0);
+        while (_utcNow() < deadline)
+        {
+            MatchLobbyDoorButtonMatch match =
+                MatchLobbyDoorButtonDetector.Detect(
+                    await CaptureAsync(
+                        window,
+                        cancellationToken).ConfigureAwait(false));
+            (int X, int Y)? stable = tracker.Update(
+                match.Layout,
+                match.Visible
+                    ? (match.ActionX, match.ActionY)
+                    : null);
+            if (stable is not null) return match;
+            await _delay(
+                PollInterval,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        throw new RobloxUiUnavailableException(
+            "Anime Expeditions did not expose a stable in-match Return to Lobby door.");
     }
 
     private async Task ConfirmByClickAsync(

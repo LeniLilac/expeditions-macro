@@ -12,6 +12,17 @@ public interface IRobloxRuntimeRecoveryService
         RobloxPrivateServerLaunchTarget target,
         CancellationToken cancellationToken = default);
 
+    Task<RobloxWindow> RestartForStartupAsync(
+        RobloxPrivateServerLaunchTarget target,
+        IProgress<MacroProgress>? progress = null,
+        Action<MacroEvent>? log = null,
+        CancellationToken cancellationToken = default) =>
+        RestartAsync(
+            target,
+            progress,
+            log,
+            cancellationToken);
+
     Task<RobloxWindow> RestartAsync(
         RobloxPrivateServerLaunchTarget target,
         IProgress<MacroProgress>? progress = null,
@@ -23,7 +34,7 @@ public sealed class RobloxPrivateServerRecoveryService
     : IRobloxRuntimeRecoveryService
 {
     private static readonly TimeSpan WindowDiscoveryTimeout = TimeSpan.FromMinutes(2);
-    private static readonly TimeSpan LobbyReadinessTimeout =
+    private static readonly TimeSpan RestartReadinessTimeout =
         TimeSpan.FromMinutes(3);
     private static readonly TimeSpan DiscoveryPollInterval = TimeSpan.FromMilliseconds(500);
     private static readonly TimeSpan ResizeSettleDelay =
@@ -57,6 +68,31 @@ public sealed class RobloxPrivateServerRecoveryService
         RobloxPrivateServerLaunchTarget target,
         IProgress<MacroProgress>? progress = null,
         Action<MacroEvent>? log = null,
+        CancellationToken cancellationToken = default) =>
+        await RestartCoreAsync(
+            target,
+            startupPreflightReadiness: false,
+            progress,
+            log,
+            cancellationToken).ConfigureAwait(false);
+
+    public async Task<RobloxWindow> RestartForStartupAsync(
+        RobloxPrivateServerLaunchTarget target,
+        IProgress<MacroProgress>? progress = null,
+        Action<MacroEvent>? log = null,
+        CancellationToken cancellationToken = default) =>
+        await RestartCoreAsync(
+            target,
+            startupPreflightReadiness: true,
+            progress,
+            log,
+            cancellationToken).ConfigureAwait(false);
+
+    private async Task<RobloxWindow> RestartCoreAsync(
+        RobloxPrivateServerLaunchTarget target,
+        bool startupPreflightReadiness,
+        IProgress<MacroProgress>? progress,
+        Action<MacroEvent>? log,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(target);
@@ -97,41 +133,75 @@ public sealed class RobloxPrivateServerRecoveryService
                 progress?.Report(new MacroProgress(
                     "Recovery",
                     0,
-                    "Roblox reopened. Waiting for the lobby to finish loading.",
+                    startupPreflightReadiness
+                        ? "Roblox reopened. Waiting for the game view to finish loading before startup checks."
+                        : "Roblox reopened. Waiting for the lobby to finish loading.",
                     "roblox_restarted"));
                 log?.Invoke(new MacroEvent(
                     DateTimeOffset.Now,
                     MacroEventLevel.Information,
-                    $"Roblox reopened as {window.ProcessDescription}; waiting for stable lobby frames.",
+                    startupPreflightReadiness
+                        ? $"Roblox reopened as {window.ProcessDescription}; waiting for a stable startup-check view."
+                        : $"Roblox reopened as {window.ProcessDescription}; waiting for stable lobby frames.",
                     "roblox_restarted"));
                 IDetectorPack detector =
                     await _detectorProvider(cancellationToken)
                         .ConfigureAwait(false);
-                await RobloxLobbyReadinessGate.WaitAsync(
-                    token => CaptureCanonicalClientAsync(
-                        window,
-                        detector,
-                        token),
-                    detector.RecoveryState,
-                    LobbyReadinessTimeout,
-                    DiscoveryPollInterval,
-                    cancellationToken).ConfigureAwait(false);
+                if (startupPreflightReadiness)
+                {
+                    DetectorStateDefinition lobby =
+                        detector.Manifest.States.Single(
+                            state => state.Name.Equals(
+                                "lobby",
+                                StringComparison.OrdinalIgnoreCase));
+                    await RobloxStartupReadinessGate.WaitAsync(
+                        token => ObserveStartupReadinessAsync(
+                            window,
+                            detector,
+                            lobby.Threshold,
+                            token),
+                        RestartReadinessTimeout,
+                        DiscoveryPollInterval,
+                        cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    await RobloxLobbyReadinessGate.WaitAsync(
+                        token => CaptureCanonicalClientAsync(
+                            window,
+                            detector,
+                            token),
+                        detector.RecoveryState,
+                        RestartReadinessTimeout,
+                        DiscoveryPollInterval,
+                        cancellationToken).ConfigureAwait(false);
+                }
                 progress?.Report(new MacroProgress(
                     "Recovery",
                     0,
-                    "Roblox reached the lobby. Resuming the current task from its saved progress.",
-                    "lobby"));
+                    startupPreflightReadiness
+                        ? "Roblox finished loading. Starting the configured startup checks."
+                        : "Roblox reached the lobby. Resuming the current task from its saved progress.",
+                    startupPreflightReadiness
+                        ? "startup_ready"
+                        : "lobby"));
                 log?.Invoke(new MacroEvent(
                     DateTimeOffset.Now,
                     MacroEventLevel.Success,
-                    "Roblox reached a stable lobby after private-server restart.",
-                    "lobby"));
+                    startupPreflightReadiness
+                        ? "Roblox reached a stable Lobby-shaped view for startup checks; strict Lobby verification remains pending."
+                        : "Roblox reached a stable lobby after private-server restart.",
+                    startupPreflightReadiness
+                        ? "startup_ready"
+                        : "lobby"));
                 RobloxWindow? readyWindow = _automation.FindWindow();
                 if (readyWindow is not RobloxWindow active ||
                     active.ProcessId != window.ProcessId)
                 {
                     throw new RobloxSessionUnavailableException(
-                        "Roblox reached the lobby but its active window changed before recovery could resume.");
+                        startupPreflightReadiness
+                            ? "Roblox finished loading but its active window changed before startup checks could begin."
+                            : "Roblox reached the lobby but its active window changed before recovery could resume.");
                 }
 
                 return active;
@@ -141,6 +211,35 @@ public sealed class RobloxPrivateServerRecoveryService
 
         throw new RobloxSessionUnavailableException(
             "Roblox did not reopen within two minutes after the private-server launch was sent.");
+    }
+
+    private async Task<RobloxStartupReadinessObservation>
+        ObserveStartupReadinessAsync(
+        RobloxWindow window,
+        IDetectorPack detector,
+        double lobbyThreshold,
+        CancellationToken cancellationToken)
+    {
+        ImageFrame frame = await CaptureCanonicalClientAsync(
+            window,
+            detector,
+            cancellationToken).ConfigureAwait(false);
+        IReadOnlyDictionary<string, double> scores =
+            detector.ScoreStates(frame);
+        double lobbyScore =
+            scores.GetValueOrDefault("lobby");
+        double strongestOther = scores
+            .Where(pair => !pair.Key.Equals(
+                "lobby",
+                StringComparison.OrdinalIgnoreCase))
+            .Select(pair => pair.Value)
+            .DefaultIfEmpty(0)
+            .Max();
+        return new RobloxStartupReadinessObservation(
+            detector.Classify(scores),
+            lobbyScore,
+            strongestOther,
+            lobbyThreshold);
     }
 
     private async Task<ImageFrame> CaptureCanonicalClientAsync(

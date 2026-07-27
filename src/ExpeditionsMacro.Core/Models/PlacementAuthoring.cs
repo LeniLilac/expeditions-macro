@@ -21,6 +21,11 @@ public enum PlacementTargetMode
     Event,
 }
 
+public sealed record PlacementPhaseChange(
+    IReadOnlyList<PlacementStep> Steps,
+    int ChangedIndex,
+    bool Changed);
+
 public static class PlacementAuthoringRules
 {
     public const int MinimumPlacementSpacingPixels = 7;
@@ -68,6 +73,64 @@ public static class PlacementAuthoringRules
             .ThenBy(item => item.Index)
             .Select(item => item.Step)
             .ToArray();
+    }
+
+    public static PlacementPhaseChange
+        ChangePhaseForAuthoring(
+            IReadOnlyList<PlacementStep> steps,
+            int sourceIndex,
+            PlacementPhase destination)
+    {
+        ArgumentNullException.ThrowIfNull(steps);
+        if (sourceIndex < 0 ||
+            sourceIndex >= steps.Count)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(sourceIndex));
+        }
+        if (!Enum.IsDefined(destination))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(destination));
+        }
+
+        foreach (PlacementStep step in steps)
+        {
+            if (!Enum.IsDefined(step.Phase))
+            {
+                throw new InvalidDataException(
+                    "Placement phase is invalid.");
+            }
+        }
+        PlacementStep source = steps[sourceIndex];
+        if (source.Phase == destination)
+        {
+            return new PlacementPhaseChange(
+                steps.ToArray(),
+                sourceIndex,
+                Changed: false);
+        }
+
+        PlacementStep changed =
+            source with { Phase = destination };
+        IReadOnlyList<PlacementStep> ordered =
+            OrderForAuthoring(
+                steps.Select(
+                        (step, index) =>
+                            index == sourceIndex
+                                ? changed
+                                : step)
+                    .ToArray());
+        int beforeCount = ordered.Count(
+            step =>
+                step.Phase ==
+                PlacementPhase.BeforeStart);
+        return new PlacementPhaseChange(
+            ordered,
+            destination == PlacementPhase.BeforeStart
+                ? beforeCount - 1
+                : beforeCount,
+            Changed: true);
     }
 
     public static void ValidateMinimumSpacing(

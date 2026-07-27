@@ -160,7 +160,7 @@ public partial class DebugPage
             {
                 StartState = "Loaded match",
                 EndState = "Verified lobby",
-                Route = "Roblox accessibility navigation",
+                Route = "Vision-detected in-match lobby door",
             },
         };
         await RunDebugOperationAsync(

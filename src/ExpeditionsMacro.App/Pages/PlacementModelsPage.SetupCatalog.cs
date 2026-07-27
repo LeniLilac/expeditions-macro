@@ -278,11 +278,19 @@ public partial class PlacementModelsPage
             parent.IsExpanded = true;
             RebuildVisibleSetupNodes();
         }
-        FastSetupList.SelectedItem = node;
+        _changingSetupSelection = true;
+        try
+        {
+            FastSetupList.SelectedItem = node;
+        }
+        finally
+        {
+            _changingSetupSelection = false;
+        }
         if (node is not null)
         {
             FastSetupList.ScrollIntoView(node);
-            ApplySetup(node.Row);
+            ApplySelectedSetupNode(node);
         }
     }
 
@@ -320,6 +328,8 @@ public partial class PlacementModelsPage
 
     private void ApplySetup(PlacementSetupRow setup)
     {
+        using IDisposable suspension =
+            SuspendPlacementAutoSave();
         _selectedSetupTarget = setup.Route.Target;
         if (setup.Model is not null)
         {

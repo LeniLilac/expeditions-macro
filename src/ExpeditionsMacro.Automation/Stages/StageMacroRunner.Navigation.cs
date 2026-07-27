@@ -41,15 +41,19 @@ public sealed partial class StageMacroRunner
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = CaptureClient(window, detector);
             StageScreenMatch current = StageScreenDetector.Detect(frame);
+            string? recovery = detector.RecoveryState(frame);
+            StageScreenState selectorAwareState =
+                StageNavigationPolicy.ResolveGameModeSelectorState(
+                    current.State,
+                    recovery);
             StageScreenState? stableNavigation =
-                navigationTracker.Update(current.State);
+                navigationTracker.Update(selectorAwareState);
             if (stableNavigation ==
                 StageScreenState.GameModeSelector)
             {
                 return recovered;
             }
 
-            string? recovery = detector.RecoveryState(frame);
             string? stableRecovery = recoveryTracker.Update(
                 IsRootRecovery(recovery) ? recovery : null);
             if (stableRecovery is not null)
@@ -153,7 +157,9 @@ public sealed partial class StageMacroRunner
                 StageNavigationPolicy.SelectGameModeHandoffCommand(
                     stableNavigation ?? StageScreenState.None,
                     stableChangeMode is not null,
-                    recoveryTransitionPending);
+                    recoveryTransitionPending,
+                    selectorAwareState ==
+                        StageScreenState.GameModeSelector);
             switch (command)
             {
                 case GameModeHandoffCommand.Complete:
@@ -286,6 +292,10 @@ public sealed partial class StageMacroRunner
             ImageFrame frame = CaptureClient(window, detector);
             StageScreenMatch current =
                 StageScreenDetector.Detect(frame);
+            StageScreenState selectorAwareState =
+                StageNavigationPolicy.ResolveGameModeSelectorState(
+                    current.State,
+                    detector.RecoveryState(frame));
             bool hasChangeMode =
                 StageScreenDetector.PostMatchChangeModeAction(frame)
                 is not null;
@@ -299,7 +309,7 @@ public sealed partial class StageMacroRunner
                         frame));
             GameModeHandoffCommand command =
                 StageNavigationPolicy.SelectGameModeHandoffCommand(
-                    current.State,
+                    selectorAwareState,
                     hasChangeMode &&
                     stableChangeMode is not null);
             string? candidate = command is
@@ -353,12 +363,20 @@ public sealed partial class StageMacroRunner
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = CaptureClient(window, detector);
             last = StageScreenDetector.Detect(frame);
+            string? recovery = detector.RecoveryState(frame);
+            StageScreenState observedState =
+                expected == StageScreenState.GameModeSelector
+                    ? StageNavigationPolicy
+                        .ResolveGameModeSelectorState(
+                            last.State,
+                            recovery)
+                    : last.State;
             (int X, int Y)? action =
                 ExpectedNavigationAction(expected, last, frame);
             string? candidate =
                 StageNavigationPolicy.MatchesExpectedState(
                     expected,
-                    last.State,
+                    observedState,
                     expected != StageScreenState.PreviewReady ||
                     action is not null)
                     ? expected.ToString()
@@ -381,7 +399,6 @@ public sealed partial class StageMacroRunner
                 return last;
             }
 
-            string? recovery = detector.RecoveryState(frame);
             if (recoveryTracker.Update(
                     IsRootRecovery(recovery) ? recovery : null)
                 is string stableRecovery)

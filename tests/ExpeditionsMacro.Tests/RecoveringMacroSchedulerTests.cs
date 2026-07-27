@@ -77,6 +77,8 @@ public sealed class RecoveringMacroSchedulerTests
 
             Assert.Equal(2, executions);
             Assert.Equal(1, recovery.Restarts);
+            Assert.Equal(0, recovery.StartupRestarts);
+            Assert.Equal(1, recovery.RuntimeRestarts);
             Assert.Equal(1, recoverableFailures);
             MacroPlan saved =
                 await plans.LoadAsync(plan.Id) ??
@@ -158,6 +160,8 @@ public sealed class RecoveringMacroSchedulerTests
             Assert.Equal(2, preflights);
             Assert.Equal(1, executions);
             Assert.Equal(1, recovery.Restarts);
+            Assert.Equal(1, recovery.StartupRestarts);
+            Assert.Equal(0, recovery.RuntimeRestarts);
         }
         finally
         {
@@ -234,6 +238,8 @@ public sealed class RecoveringMacroSchedulerTests
             Assert.Equal(1, preflights);
             Assert.Equal(2, executions);
             Assert.Equal(1, recovery.Restarts);
+            Assert.Equal(0, recovery.StartupRestarts);
+            Assert.Equal(1, recovery.RuntimeRestarts);
         }
         finally
         {
@@ -308,6 +314,64 @@ public sealed class RecoveringMacroSchedulerTests
                 ["restart", "preflight", "task"],
                 order);
             Assert.Equal(1, recovery.Restarts);
+            Assert.Equal(1, recovery.StartupRestarts);
+            Assert.Equal(0, recovery.RuntimeRestarts);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task
+        StartupRestart_WithoutPreparationHookRetainsStrictLobbyReadiness()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            AppPaths paths = new(root);
+            MacroPlanRepository plans = new(paths);
+            MacroPlan plan = new()
+            {
+                Id = "startup-restart-no-preflight",
+                Name = "Startup restart without preflight",
+                Tasks =
+                [
+                    new MacroTaskDefinition
+                    {
+                        Id = "story-1",
+                        Kind = MacroTaskKind.Story,
+                        PresetId = "story",
+                        Name = "Story",
+                    },
+                ],
+            };
+            FakeRecovery recovery = new();
+            RecoveringMacroScheduler scheduler = new(
+                new MacroScheduler(plans),
+                plans,
+                recovery);
+            RobloxPrivateServerLaunchTarget target =
+                RobloxPrivateServerLaunchTarget.Parse(
+                    "https://www.roblox.com/share?code=Test_Server_123&type=Server");
+            using CancellationTokenSource cancellation = new();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => scheduler.RunAsync(
+                    plan,
+                    restartTarget: null,
+                    (_, _, _) =>
+                    {
+                        cancellation.Cancel();
+                        return Task.FromCanceled<ScheduledTaskResult>(
+                            cancellation.Token);
+                    },
+                    cancellationToken: cancellation.Token,
+                    startupRestartTarget: target));
+
+            Assert.Equal(0, recovery.StartupRestarts);
+            Assert.Equal(1, recovery.RuntimeRestarts);
         }
         finally
         {
@@ -370,7 +434,12 @@ public sealed class RecoveringMacroSchedulerTests
             _onRestart = onRestart;
         }
 
-        public int Restarts { get; private set; }
+        public int Restarts =>
+            StartupRestarts + RuntimeRestarts;
+
+        public int StartupRestarts { get; private set; }
+
+        public int RuntimeRestarts { get; private set; }
 
         public Task LaunchAsync(
             RobloxPrivateServerLaunchTarget target,
@@ -383,8 +452,24 @@ public sealed class RecoveringMacroSchedulerTests
             Action<MacroEvent>? log = null,
             CancellationToken cancellationToken = default)
         {
-            Restarts++;
+            RuntimeRestarts++;
             _onRestart?.Invoke();
+            return RestartedWindow();
+        }
+
+        public Task<RobloxWindow> RestartForStartupAsync(
+            RobloxPrivateServerLaunchTarget target,
+            IProgress<MacroProgress>? progress = null,
+            Action<MacroEvent>? log = null,
+            CancellationToken cancellationToken = default)
+        {
+            StartupRestarts++;
+            _onRestart?.Invoke();
+            return RestartedWindow();
+        }
+
+        private static Task<RobloxWindow> RestartedWindow()
+        {
             return Task.FromResult(
                 new RobloxWindow(
                     1,

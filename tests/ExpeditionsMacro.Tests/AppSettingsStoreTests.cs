@@ -454,4 +454,61 @@ public sealed class AppSettingsStoreTests
             if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
         }
     }
+
+    [Fact]
+    public async Task ExplicitlyUnsetGameBindingsPersistAcrossStoreRestart()
+    {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            $"expeditions-settings-{Guid.NewGuid():N}");
+        try
+        {
+            AppSettingsStore firstProcess =
+                new(new AppPaths(root));
+            await firstProcess.SaveAsync(
+                new AppSettings
+                {
+                    PlayMenuKey = string.Empty,
+                    UnitMenuKey = string.Empty,
+                    AreasMenuKey = string.Empty,
+                    CancelPlacementKey = string.Empty,
+                    ChangeUnitTargetingKey = string.Empty,
+                    UpgradeUnitKey = string.Empty,
+                    AutoUpgradeUnitKey = string.Empty,
+                    ToggleAutoUpgradePlacedUnitsKey =
+                        string.Empty,
+                    ShiftLockVirtualKey = 0,
+                });
+
+            AppSettingsStore restartedProcess =
+                new(new AppPaths(root));
+            AppSettings loaded =
+                await restartedProcess.LoadAsync();
+
+            Assert.Equal(string.Empty, loaded.PlayMenuKey);
+            Assert.Equal(string.Empty, loaded.UnitMenuKey);
+            Assert.Equal(string.Empty, loaded.AreasMenuKey);
+            Assert.Equal(
+                string.Empty,
+                loaded.CancelPlacementKey);
+            Assert.Equal(
+                string.Empty,
+                loaded.ChangeUnitTargetingKey);
+            Assert.Equal(string.Empty, loaded.UpgradeUnitKey);
+            Assert.Equal(
+                string.Empty,
+                loaded.AutoUpgradeUnitKey);
+            Assert.Equal(
+                string.Empty,
+                loaded.ToggleAutoUpgradePlacedUnitsKey);
+            Assert.Equal(0, loaded.ShiftLockVirtualKey);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
 }

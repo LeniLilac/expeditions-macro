@@ -128,6 +128,46 @@ public partial class SettingsKeyBindingsPanel : UserControl
 
     private void ShiftLockButton_Click(object sender, RoutedEventArgs e) => BeginCapture(BindingTarget.ShiftLock, ShiftLockButton);
 
+    private async void ClearBindingButton_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_busy ||
+            _saving ||
+            _captureTarget != BindingTarget.None ||
+            sender is not Button { Tag: string targetName } ||
+            !Enum.TryParse(
+                targetName,
+                ignoreCase: false,
+                out BindingTarget target) ||
+            target is BindingTarget.None or BindingTarget.Macro)
+        {
+            return;
+        }
+
+        _saving = true;
+        UpdateButtons();
+        try
+        {
+            await ClearBindingAsync(target);
+            Refresh();
+            StatusFor(target).Text =
+                $"{BindingLabel(target)} is now Not set.";
+            BindingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+        catch (Exception error)
+        {
+            Refresh();
+            StatusFor(target).Text =
+                $"Could not unset the key: {error.Message}";
+        }
+        finally
+        {
+            _saving = false;
+            UpdateButtons();
+        }
+    }
+
     private void BeginCapture(BindingTarget target, Button button)
     {
         if (_busy || _saving) return;
@@ -307,7 +347,82 @@ public partial class SettingsKeyBindingsPanel : UserControl
             _captureTarget is BindingTarget.None or
                 BindingTarget.ToggleAutoUpgradePlacedUnits;
         ShiftLockButton.IsEnabled = enabled && _captureTarget is BindingTarget.None or BindingTarget.ShiftLock;
+        bool clearEnabled =
+            enabled &&
+            _captureTarget == BindingTarget.None;
+        SetClearButtonState(ClearPlayButton, BindingTarget.Play, clearEnabled);
+        SetClearButtonState(ClearUnitButton, BindingTarget.Unit, clearEnabled);
+        SetClearButtonState(ClearAreasButton, BindingTarget.Areas, clearEnabled);
+        SetClearButtonState(ClearCancelPlacementButton, BindingTarget.CancelPlacement, clearEnabled);
+        SetClearButtonState(ClearTargetingButton, BindingTarget.Targeting, clearEnabled);
+        SetClearButtonState(ClearUpgradeButton, BindingTarget.Upgrade, clearEnabled);
+        SetClearButtonState(ClearAutoUpgradeUnitButton, BindingTarget.AutoUpgradeUnit, clearEnabled);
+        SetClearButtonState(ClearToggleAutoUpgradePlacedUnitsButton, BindingTarget.ToggleAutoUpgradePlacedUnits, clearEnabled);
+        SetClearButtonState(ClearShiftLockButton, BindingTarget.ShiftLock, clearEnabled);
     }
+
+    private void SetClearButtonState(
+        Button button,
+        BindingTarget target,
+        bool enabled)
+    {
+        bool configured = IsBindingConfigured(target);
+        button.Visibility = configured
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        button.IsEnabled = enabled && configured;
+    }
+
+    private bool IsBindingConfigured(
+        BindingTarget target) => target switch
+        {
+            BindingTarget.Play =>
+                !string.IsNullOrWhiteSpace(
+                    Services.Settings.PlayMenuKey),
+            BindingTarget.Unit =>
+                !string.IsNullOrWhiteSpace(
+                    Services.Settings.UnitMenuKey),
+            BindingTarget.Areas =>
+                !string.IsNullOrWhiteSpace(
+                    Services.Settings.AreasMenuKey),
+            BindingTarget.CancelPlacement =>
+                !string.IsNullOrWhiteSpace(
+                    Services.Settings.CancelPlacementKey),
+            BindingTarget.Targeting =>
+                !string.IsNullOrWhiteSpace(
+                    Services.Settings.ChangeUnitTargetingKey),
+            BindingTarget.Upgrade =>
+                !string.IsNullOrWhiteSpace(
+                    Services.Settings.UpgradeUnitKey),
+            BindingTarget.AutoUpgradeUnit =>
+                !string.IsNullOrWhiteSpace(
+                    Services.Settings.AutoUpgradeUnitKey),
+            BindingTarget.ToggleAutoUpgradePlacedUnits =>
+                !string.IsNullOrWhiteSpace(
+                    Services.Settings
+                        .ToggleAutoUpgradePlacedUnitsKey),
+            BindingTarget.ShiftLock =>
+                Services.Settings.ShiftLockVirtualKey != 0,
+            _ => false,
+        };
+
+    private static string BindingLabel(
+        BindingTarget target) => target switch
+        {
+            BindingTarget.Play => "Toggle Play Menu",
+            BindingTarget.Unit => "Toggle Unit Inventory",
+            BindingTarget.Areas => "Toggle Areas Menu",
+            BindingTarget.CancelPlacement =>
+                "Toggle Cancel Unit Placement",
+            BindingTarget.Targeting => "Change Unit Targeting",
+            BindingTarget.Upgrade => "Upgrade Unit",
+            BindingTarget.AutoUpgradeUnit => "Auto Upgrade Unit",
+            BindingTarget.ToggleAutoUpgradePlacedUnits =>
+                "Toggle Auto Upgrade Placed Units",
+            BindingTarget.ShiftLock => "Toggle Shift Lock",
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(target)),
+        };
 
     private TextBlock StatusFor(BindingTarget target) => target switch
     {

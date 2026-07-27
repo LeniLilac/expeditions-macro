@@ -9,49 +9,14 @@ namespace ExpeditionsMacro.App.Pages;
 
 public partial class MacroPage
 {
-    private async void SavePlan_Click(
-        object sender,
-        RoutedEventArgs e)
-    {
-        try
-        {
-            string webhook = CurrentWebhook();
-            string discordUserId =
-                DiscordUserIdText.Text.Trim();
-            ValidateDiscord(webhook, discordUserId);
-            PrivateServerRecoverySelection
-                privateServerRecovery =
-                    ReadPrivateServerRecoverySelection();
-            MacroPlan plan =
-                await SavePlanInternalAsync();
-            await SaveReportingSettingsAsync(
-                webhook,
-                discordUserId);
-            await SavePrivateServerRecoverySettingsAsync(
-                privateServerRecovery);
-            PhaseText.Text =
-                $"Plan '{plan.Name}' saved locally.";
-        }
-        catch (Exception error)
-        {
-            PhaseText.Text = error.Message;
-        }
-    }
-
     private async Task<MacroPlan>
         SavePlanInternalAsync()
     {
         MacroPlan plan = BuildPlan();
-        await _services.MacroPlans.SaveAsync(plan);
-        await _services.UpdateSettingsAsync(
-            settings => settings with
-            {
-                SelectedMacroPlanId = plan.Id,
-            });
-        await RefreshPlansAsync();
-        PlanCombo.SelectedItem =
-            _plans.FirstOrDefault(
-                value => value.Id == plan.Id);
+        _currentPlanId = plan.Id;
+        await _planAutoSave.SaveNowAsync(
+            plan,
+            _persistedPlanId);
         return plan;
     }
 
@@ -92,55 +57,129 @@ public partial class MacroPage
         {
             return;
         }
-        ApplyPlan(plan);
-        await _services.UpdateSettingsAsync(
-            settings => settings with
+        _changingPlan = true;
+        try
+        {
+            try
             {
-                SelectedMacroPlanId = plan.Id,
-            });
+                await _planAutoSave.FlushAsync();
+            }
+            catch (Exception error)
+            {
+                RestoreCurrentPlanSelection();
+                ShowPlanBlocksStatus(
+                    $"Could not save: {error.Message}");
+                return;
+            }
+
+            ApplyPlan(plan);
+            try
+            {
+                await _services.UpdateSettingsAsync(
+                    settings => settings with
+                    {
+                        SelectedMacroPlanId =
+                            plan.Id,
+                    });
+            }
+            catch (Exception error)
+            {
+                ShowPlanBlocksStatus(
+                    $"Plan opened, but its selection could not be saved: {error.Message}");
+            }
+        }
+        finally
+        {
+            _changingPlan = false;
+        }
     }
 
-    private void NewPlan_Click(
+    private void RestoreCurrentPlanSelection()
+    {
+        bool previousLoading = _loading;
+        _loading = true;
+        try
+        {
+            PlanCombo.SelectedItem =
+                _plans.FirstOrDefault(plan =>
+                    string.Equals(
+                        plan.Id,
+                        _currentPlanId,
+                        StringComparison
+                            .OrdinalIgnoreCase));
+        }
+        finally
+        {
+            _loading = previousLoading;
+        }
+    }
+
+    private async void NewPlan_Click(
         object sender,
         RoutedEventArgs e)
     {
-        PlanCombo.SelectedItem = null;
-        ApplyNewPlan();
+        _changingPlan = true;
+        try
+        {
+            await _planAutoSave.FlushAsync();
+            PlanCombo.SelectedItem = null;
+            ApplyNewPlan();
+            ShowPlanBlocksStatus(
+                "Add a task to create the new plan.");
+        }
+        catch (Exception error)
+        {
+            ShowPlanBlocksStatus(
+                $"Could not save: {error.Message}");
+        }
+        finally
+        {
+            _changingPlan = false;
+        }
     }
 
     private void ApplyNewPlan()
     {
-        PlanNameText.Text = "Daily rotation";
-        TaskRows.Clear();
-        LoopEditor.SetTasks(TaskRows);
-        EmptyTasksText.Visibility =
-            Visibility.Visible;
-        LoopEditor.Apply([], []);
-        ResetTaskEditor();
-        ApplyTotals();
+        WithoutPlanAutoSave(() =>
+        {
+            PlanNameText.Text = "Daily rotation";
+            TaskRows.Clear();
+            LoopEditor.SetTasks(TaskRows);
+            EmptyTasksText.Visibility =
+                Visibility.Visible;
+            LoopEditor.Apply([], []);
+            ResetTaskEditor();
+            ApplyTotals();
+        });
+        ApplyPlanIdentity(id: null);
     }
 
     private void ApplyPlan(MacroPlan plan)
     {
-        PlanNameText.Text = plan.Name;
-        TaskRows.Clear();
-        foreach (MacroTaskDefinition definition in
-                 plan.Tasks.OrderBy(
-                     task => task.Priority))
+        WithoutPlanAutoSave(() =>
         {
-            TaskRows.Add(new MacroTaskRow
+            PlanNameText.Text = plan.Name;
+            TaskRows.Clear();
+            foreach (MacroTaskDefinition definition in
+                     plan.Tasks.OrderBy(
+                         task => task.Priority))
             {
-                Definition = definition,
-                Progress =
-                    plan.ProgressFor(definition.Id),
-            });
-        }
-        ReindexRows();
-        LoopEditor.Apply(
-            plan.EffectiveLoops(),
-            plan.EffectiveLoopStates());
-        ResetTaskEditor();
-        ApplyTotals();
+                TaskRows.Add(new MacroTaskRow
+                {
+                    Definition = definition,
+                    Progress =
+                        plan.ProgressFor(
+                            definition.Id),
+                });
+            }
+            ReindexRows();
+            LoopEditor.Apply(
+                plan.EffectiveLoops(),
+                plan.EffectiveLoopStates());
+            ResetTaskEditor();
+            ApplyTotals();
+        });
+        ApplyPlanIdentity(plan.Id);
     }
 
     private void ApplyPlanProgress(
@@ -187,11 +226,16 @@ public partial class MacroPage
         try
         {
             MacroPlan reset =
-                await _services.Scheduler
-                    .ResetProgressAsync(BuildPlan());
+                BuildPlan().ResetProgress();
+            _currentPlanId = reset.Id;
+            await _planAutoSave
+                .SaveNowAsync(
+                    reset,
+                    _persistedPlanId);
             ApplyPlan(reset);
             PhaseText.Text =
                 "Plan progress reset.";
+            ShowPlanBlocksStatus("Saved.");
         }
         catch (Exception error)
         {

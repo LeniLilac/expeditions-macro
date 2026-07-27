@@ -42,19 +42,32 @@ public sealed class RecoveringMacroScheduler
     {
         MacroPlan plan = initialPlan;
         RobloxRestartCircuitBreaker circuitBreaker = new();
-        bool operationPrepared = false;
+        bool operationPrepared = prepareSession is null;
         if (startupRestartTarget is not null)
         {
             log?.Invoke(new MacroEvent(
                 DateTimeOffset.Now,
                 MacroEventLevel.Information,
-                "Macro start is establishing a fresh private-server Lobby before navigation.",
+                "Macro start is establishing a fresh private-server session before startup checks.",
                 "roblox_startup_restart"));
-            await _recovery.RestartAsync(
-                startupRestartTarget,
-                progress,
-                log,
-                cancellationToken).ConfigureAwait(false);
+            if (operationPrepared)
+            {
+                await _recovery.RestartAsync(
+                    startupRestartTarget,
+                    progress,
+                    log,
+                    cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                // GB-028: noncanonical UI Scale can keep strict Lobby
+                // recognition below threshold until preflight corrects it.
+                await _recovery.RestartForStartupAsync(
+                    startupRestartTarget,
+                    progress,
+                    log,
+                    cancellationToken).ConfigureAwait(false);
+            }
         }
         while (true)
         {
@@ -120,11 +133,24 @@ public sealed class RecoveringMacroScheduler
                 }
                 try
                 {
-                    await _recovery.RestartAsync(
-                        restartTarget,
-                        progress,
-                        log,
-                        cancellationToken).ConfigureAwait(false);
+                    if (operationPrepared)
+                    {
+                        await _recovery.RestartAsync(
+                            restartTarget,
+                            progress,
+                            log,
+                            cancellationToken).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        // A failed preflight still needs the scale-tolerant
+                        // startup handoff; task/runtime retries never do.
+                        await _recovery.RestartForStartupAsync(
+                            restartTarget,
+                            progress,
+                            log,
+                            cancellationToken).ConfigureAwait(false);
+                    }
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {

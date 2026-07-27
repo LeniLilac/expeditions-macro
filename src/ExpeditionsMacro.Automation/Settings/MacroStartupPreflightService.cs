@@ -1,5 +1,4 @@
 using ExpeditionsMacro.Automation.Camera;
-using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Runtime;
@@ -15,8 +14,7 @@ public sealed partial class MacroStartupPreflightService
     private readonly IRobloxAutomation _automation;
     private readonly GameSettingsNormalizer _normalizer;
     private readonly UiScaleNormalizer _uiScale;
-    private readonly AccessibilityNavigationController
-        _accessibility;
+    private readonly SettingsPanelNavigator _settingsPanel;
     private readonly Func<DateTimeOffset> _utcNow;
     private readonly Func<
         TimeSpan,
@@ -61,11 +59,11 @@ public sealed partial class MacroStartupPreflightService
             automation,
             utcNow,
             delay);
-        _accessibility =
-            new AccessibilityNavigationController(
-                automation,
-                ValidateWindow,
-                delay);
+        _settingsPanel = new SettingsPanelNavigator(
+            automation,
+            ValidateWindow,
+            utcNow,
+            delay);
     }
 
     public async Task<GameSettingsNormalizationResult>
@@ -120,13 +118,9 @@ public sealed partial class MacroStartupPreflightService
             detector,
             TimeSpan.FromSeconds(12),
             cancellationToken).ConfigureAwait(false);
-        await OpenSettingsPanelAsync(
-            window,
-            cancellationToken).ConfigureAwait(false);
         GameSettingsPanelMatch panel =
-            await WaitForPanelAsync(
+            await OpenSettingsPanelAsync(
                 window,
-                canonicalScale: false,
                 cancellationToken).ConfigureAwait(false);
         if (!GameSettingsScreenDetector
                 .IsCanonicalUiScale(
@@ -304,114 +298,18 @@ public sealed partial class MacroStartupPreflightService
 
     private async Task CloseSettingsPanelAsync(
         RobloxWindow window,
-        CancellationToken cancellationToken)
-    {
-        await _accessibility.RunEnabledAsync(
-            window,
-            async token =>
-            {
-                await _accessibility.TapAsync(
-                    window,
-                    RobloxKeyboardKey.RightArrow,
-                    token).ConfigureAwait(false);
-                await _accessibility.TapAsync(
-                    window,
-                    RobloxKeyboardKey.Enter,
-                    token).ConfigureAwait(false);
-            },
-            cancellationToken).ConfigureAwait(false);
-        await WaitForSettingsClosedAsync(
+        CancellationToken cancellationToken) =>
+        await _settingsPanel.CloseAsync(
             window,
             cancellationToken).ConfigureAwait(false);
-    }
 
     private async Task<GameSettingsPanelMatch>
         OpenSettingsPanelAsync(
         RobloxWindow window,
-        CancellationToken cancellationToken)
-    {
-        await _accessibility.RunEnabledAsync(
+        CancellationToken cancellationToken) =>
+        await _settingsPanel.OpenAsync(
             window,
-            async token =>
-            {
-                await _accessibility.TapAsync(
-                    window,
-                    RobloxKeyboardKey.RightArrow,
-                    token).ConfigureAwait(false);
-                await _accessibility.TapAsync(
-                    window,
-                    RobloxKeyboardKey.Enter,
-                    token).ConfigureAwait(false);
-            },
             cancellationToken).ConfigureAwait(false);
-        return await WaitForPanelAsync(
-            window,
-            canonicalScale: false,
-            cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task<GameSettingsPanelMatch> WaitForPanelAsync(
-        RobloxWindow window,
-        bool canonicalScale,
-        CancellationToken cancellationToken)
-    {
-        DateTimeOffset deadline =
-            _utcNow() + TimeSpan.FromSeconds(7);
-        int stable = 0;
-        GameSettingsPanelMatch last = default;
-        while (_utcNow() < deadline)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            ValidateWindow(window);
-            last = GameSettingsScreenDetector.DetectPanel(
-                _automation.CaptureClient(window));
-            bool expected =
-                last.Visible &&
-                last.Settled &&
-                (!canonicalScale ||
-                 GameSettingsScreenDetector
-                     .IsCanonicalUiScale(
-                         last.UiScale));
-            stable = expected ? stable + 1 : 0;
-            if (stable >= 2) return last;
-            await _delay(
-                PollInterval,
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        throw new TimeoutException(
-            canonicalScale
-                ? $"Anime Expeditions UI Scale did not settle at 1.00 (last detected {last.UiScale:0.00})."
-                : "Anime Expeditions Settings did not finish opening.");
-    }
-
-    private async Task WaitForSettingsClosedAsync(
-        RobloxWindow window,
-        CancellationToken cancellationToken)
-    {
-        DateTimeOffset deadline =
-            _utcNow() + TimeSpan.FromSeconds(7);
-        int stable = 0;
-        while (_utcNow() < deadline)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            ValidateWindow(window);
-            GameSettingsPanelMatch panel =
-                GameSettingsScreenDetector.DetectPanel(
-                    _automation.CaptureClient(window));
-            stable =
-                !panel.Visible && panel.CloseX == 0
-                    ? stable + 1
-                    : 0;
-            if (stable >= 2) return;
-            await _delay(
-                PollInterval,
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        throw new RobloxUiUnavailableException(
-            "Anime Expeditions Settings did not finish closing.");
-    }
 
     private void ValidateWindow(RobloxWindow window)
     {

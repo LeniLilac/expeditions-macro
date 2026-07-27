@@ -12,7 +12,25 @@ public sealed class EventScreenDetectorTests
     [InlineData(
         "EventCatalog_BeginnerPathSelected.png",
         EventScreenState.EventCatalog)]
+    [InlineData(
+        "EventCatalog_BeginnerPathSelected_Current_01.png",
+        EventScreenState.EventCatalog)]
+    [InlineData(
+        "EventCatalog_BeginnerPathSelected_Current_02.png",
+        EventScreenState.EventCatalog)]
+    [InlineData(
+        "EventCatalog_BeginnerPathSelected_Current_03.png",
+        EventScreenState.EventCatalog)]
     [InlineData("EventHome.png", EventScreenState.EventHome)]
+    [InlineData(
+        "EventHome_BeginnerPathPresent_01.png",
+        EventScreenState.EventHome)]
+    [InlineData(
+        "EventHome_BeginnerPathPresent_02.png",
+        EventScreenState.EventHome)]
+    [InlineData(
+        "EventHome_BeginnerPathPresent_03.png",
+        EventScreenState.EventHome)]
     [InlineData("ActSelector.png", EventScreenState.ActSelector)]
     [InlineData("Act4Selector.png", EventScreenState.ActSelector)]
     [InlineData("Act1Detail.png", EventScreenState.ActDetail)]
@@ -74,25 +92,91 @@ public sealed class EventScreenDetectorTests
             EventScreenDetector.LaterActScroll);
     }
 
-    [Fact]
-    public void EventCatalog_LocatesVillainInvasionCard()
+    [Theory]
+    [InlineData("EventCatalog_BeginnerPathSelected.png")]
+    [InlineData(
+        "EventCatalog_BeginnerPathSelected_Current_01.png")]
+    [InlineData(
+        "EventCatalog_BeginnerPathSelected_Current_02.png")]
+    [InlineData(
+        "EventCatalog_BeginnerPathSelected_Current_03.png")]
+    public void EventCatalog_LocatesVillainInvasionCard(
+        string fileName)
     {
         EventScreenMatch match =
             EventScreenDetector.Detect(
-                Load(
-                    "EventCatalog_BeginnerPathSelected.png"));
+                Load(fileName));
 
         Assert.Equal(
             EventScreenState.EventCatalog,
             match.State);
-        Assert.InRange(
-            match.ActionX ?? -1,
-            85,
-            105);
-        Assert.InRange(
-            match.ActionY ?? -1,
-            175,
-            195);
+        Assert.Equal(94, match.ActionX);
+        Assert.Equal(183, match.ActionY);
+    }
+
+    [Theory]
+    [InlineData("EventHome.png")]
+    [InlineData("EventHome_BeginnerPathPresent_01.png")]
+    [InlineData("EventHome_BeginnerPathPresent_02.png")]
+    [InlineData("EventHome_BeginnerPathPresent_03.png")]
+    public void SelectedVillainEvent_UsesGameModeAction(
+        string fileName)
+    {
+        EventScreenMatch match =
+            EventScreenDetector.Detect(
+                Load(fileName));
+
+        Assert.Equal(
+            EventScreenState.EventHome,
+            match.State);
+        Assert.Equal(
+            EventScreenDetector.EventGameModeAction.X,
+            match.ActionX);
+        Assert.Equal(
+            EventScreenDetector.EventGameModeAction.Y,
+            match.ActionY);
+    }
+
+    [Fact]
+    public void EventCatalog_RejectsWideVillainTab()
+    {
+        ImageFrame frame = Load(
+            "EventCatalog_BeginnerPathSelected_Current_01.png")
+            .Clone();
+        FillRegion(
+            frame,
+            x: 17,
+            y: 160,
+            width: 11,
+            height: 44,
+            red: 200,
+            green: 20,
+            blue: 20);
+
+        Assert.NotEqual(
+            EventScreenState.EventCatalog,
+            EventScreenDetector.Detect(frame).State);
+    }
+
+    [Fact]
+    public void EventHome_RequiresSelectedVillainChevron()
+    {
+        ImageFrame frame = Load(
+            "EventHome_BeginnerPathPresent_01.png")
+            .Clone();
+        FillRegion(
+            frame,
+            x: 18,
+            y: 174,
+            width: 6,
+            height: 18,
+            red: 20,
+            green: 20,
+            blue: 20);
+
+        Assert.NotEqual(
+            EventScreenState.EventHome,
+            EventScreenDetector.Detect(frame).State);
     }
 
     [Theory]
@@ -268,4 +352,29 @@ public sealed class EventScreenDetectorTests
             Path.Combine(
                 TestPaths.EventDatasets,
                 name));
+
+    private static void FillRegion(
+        ImageFrame frame,
+        int x,
+        int y,
+        int width,
+        int height,
+        byte red,
+        byte green,
+        byte blue)
+    {
+        for (int row = y; row < y + height; row++)
+        {
+            for (int column = x;
+                 column < x + width;
+                 column++)
+            {
+                int pixel =
+                    (row * frame.Width + column) * 3;
+                frame.Pixels[pixel] = red;
+                frame.Pixels[pixel + 1] = green;
+                frame.Pixels[pixel + 2] = blue;
+            }
+        }
+    }
 }

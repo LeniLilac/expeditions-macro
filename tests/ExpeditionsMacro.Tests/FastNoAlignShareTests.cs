@@ -1,3 +1,7 @@
+using System.IO.Compression;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
 
@@ -140,12 +144,13 @@ public sealed class FastNoAlignShareTests
                         bundle.PlacementSetups)
                         .Steps)
                     .TargetingPriority);
-            Assert.False(
+            Assert.Equal(
+                UnitAutoUpgradePriority.Priority4,
                 Assert.Single(
                     Assert.Single(
                         bundle.PlacementSetups)
                         .Steps)
-                    .AutoUpgrade);
+                    .AutoUpgradePriority);
 
             FastNoAlignShareService importer =
                 Service(destinationRoot);
@@ -185,9 +190,10 @@ public sealed class FastNoAlignShareTests
                 UnitTargetingPriority.Strongest,
                 Assert.Single(importedSetup.Steps)
                     .TargetingPriority);
-            Assert.False(
+            Assert.Equal(
+                UnitAutoUpgradePriority.Priority4,
                 Assert.Single(importedSetup.Steps)
-                    .AutoUpgrade);
+                    .AutoUpgradePriority);
             Assert.Equal(
                 PlacementSetupCatalog.IdFor(target),
                 importedSetup.Id);
@@ -547,6 +553,78 @@ public sealed class FastNoAlignShareTests
             StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData(
+        false,
+        UnitAutoUpgradePriority.Off,
+        "off")]
+    [InlineData(
+        true,
+        UnitAutoUpgradePriority.Priority1,
+        "priority_1")]
+    public void LegacyAutoUpgradeBooleanInShareCode_LoadsAndNormalizes(
+        bool legacyValue,
+        UnitAutoUpgradePriority expected,
+        string normalized)
+    {
+        PlacementTarget target = new()
+        {
+            Mode = PlacementTargetMode.Expedition,
+            MapNumber = 2,
+        };
+        FastNoAlignShareBundle bundle = new()
+        {
+            Plan = Plan(
+                new MacroTaskDefinition
+                {
+                    Id = "expedition-task",
+                    Kind = MacroTaskKind.Expedition,
+                    Name = "Flower Forest",
+                    PlacementTarget = target,
+                }),
+            PlacementSetups =
+            [
+                Setup(target, team: 1),
+            ],
+        };
+        JsonObject legacyJson =
+            JsonNode.Parse(
+                JsonSerializer.Serialize(
+                    bundle,
+                    JsonFileStore.Options))!
+                .AsObject();
+        legacyJson["placement_setups"]!
+            .AsArray()[0]!
+            .AsObject()["steps"]!
+            .AsArray()[0]!
+            .AsObject()["auto_upgrade"] =
+                legacyValue;
+
+        FastNoAlignShareBundle decoded =
+            FastNoAlignShareCodec.Decode(
+                EncodeRawShareJson(legacyJson));
+        string normalizedCode =
+            FastNoAlignShareCodec.Encode(decoded);
+        JsonObject normalizedJson =
+            DecodeRawShareJson(normalizedCode);
+
+        Assert.Equal(
+            expected,
+            Assert.Single(
+                Assert.Single(
+                    decoded.PlacementSetups)
+                    .Steps)
+                .AutoUpgradePriority);
+        Assert.Equal(
+            normalized,
+            normalizedJson["placement_setups"]!
+                .AsArray()[0]!
+                .AsObject()["steps"]!
+                .AsArray()[0]!
+                .AsObject()["auto_upgrade"]!
+                .GetValue<string>());
+    }
+
     private static FastNoAlignShareService Service(
         string root)
     {
@@ -596,10 +674,48 @@ public sealed class FastNoAlignShareTests
                     Phase = PlacementPhase.BeforeStart,
                     TargetingPriority =
                         UnitTargetingPriority.Strongest,
-                    AutoUpgrade = false,
+                    AutoUpgradePriority =
+                        UnitAutoUpgradePriority
+                            .Priority4,
                 },
             ],
             CreatedAt = DateTimeOffset.UtcNow,
         };
+    }
+
+    private static string EncodeRawShareJson(
+        JsonObject json)
+    {
+        byte[] bytes =
+            Encoding.UTF8.GetBytes(
+                json.ToJsonString());
+        using MemoryStream compressed = new();
+        using (BrotliStream brotli = new(
+                   compressed,
+                   CompressionLevel.SmallestSize,
+                   leaveOpen: true))
+        {
+            brotli.Write(bytes);
+        }
+        return FastNoAlignShareCodec.Prefix +
+            Convert.ToBase64String(
+                compressed.ToArray());
+    }
+
+    private static JsonObject DecodeRawShareJson(
+        string code)
+    {
+        byte[] compressed =
+            Convert.FromBase64String(
+                code[
+                    FastNoAlignShareCodec
+                        .Prefix.Length..]);
+        using MemoryStream source =
+            new(compressed);
+        using BrotliStream brotli = new(
+            source,
+            CompressionMode.Decompress);
+        return JsonNode.Parse(brotli)!
+            .AsObject();
     }
 }

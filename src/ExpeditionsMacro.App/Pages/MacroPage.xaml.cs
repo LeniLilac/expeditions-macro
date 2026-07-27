@@ -43,13 +43,18 @@ public partial class MacroPage : UserControl, IAppPage
     public MacroPage(AppServices services)
     {
         _services = services;
+        _planAutoSave = new(
+            PersistPlanAsync);
+        _suppressPlanAutoSave = true;
         InitializeComponent();
+        _suppressPlanAutoSave = false;
+        InitializePlanAutoSave();
         InitializeTaskDialog();
         InitializeDashboard();
         DataContext = this;
         LoopEditor.SetTasks(TaskRows);
         LoopEditor.ValueChanged +=
-            (_, _) => ReindexRows();
+            LoopEditor_ValueChanged;
         LoopEditor.EditTaskRequested +=
             (_, args) => BeginTaskEdit(args.Task);
         LoopEditor.RemoveTaskRequested +=
@@ -87,6 +92,16 @@ public partial class MacroPage : UserControl, IAppPage
 
     public async Task OnShownAsync()
     {
+        try
+        {
+            await _planAutoSave.FlushAsync();
+        }
+        catch (Exception error)
+        {
+            ShowPlanBlocksStatus(
+                $"Could not save: {error.Message}");
+            return;
+        }
         _loading = true;
         try
         {
@@ -130,7 +145,9 @@ public partial class MacroPage : UserControl, IAppPage
         ShareCodeText.Text = string.Empty;
         SharePlanStatusText.Text = string.Empty;
         ClearPrivateServerRecoverySnapshot();
-        PopulateSnapshotTasks(planState);
+        WithoutPlanAutoSave(
+            () => PopulateSnapshotTasks(
+                planState));
         UpdateLayout();
         SetActiveWorkspaceSnapshotScroll(showEnd);
     }

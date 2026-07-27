@@ -53,6 +53,7 @@ internal static partial class NativeMethods
     internal const uint DibRgbColors = 0;
     internal const uint CryptprotectUiForbidden = 0x1;
     internal const uint DwmwaExtendedFrameBounds = 9;
+    internal const uint GwOwner = 4;
     internal const int WmGetMinMaxInfo = 0x0024;
 
     internal delegate bool EnumWindowsProc(nint window, nint parameter);
@@ -268,6 +269,9 @@ internal static partial class NativeMethods
 
     [LibraryImport("user32.dll")]
     internal static partial nint GetParent(nint window);
+
+    [LibraryImport("user32.dll")]
+    internal static partial nint GetWindow(nint window, uint command);
 
     [LibraryImport(
         "user32.dll",

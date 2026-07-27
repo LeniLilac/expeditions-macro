@@ -52,8 +52,74 @@ public sealed class PlacementAuthoringTests
             PlacementAuthoringRules
                 .DefaultAfterStartDelayMilliseconds,
             legacy.DefaultAfterStartDelayMilliseconds);
-        Assert.True(Assert.Single(legacy.Steps).AutoUpgrade);
+        Assert.Equal(
+            UnitAutoUpgradePriority.Off,
+            Assert.Single(legacy.Steps)
+                .AutoUpgradePriority);
         legacy.Validate();
+    }
+
+    [Theory]
+    [InlineData(
+        false,
+        UnitAutoUpgradePriority.Off,
+        "off")]
+    [InlineData(
+        true,
+        UnitAutoUpgradePriority.Priority1,
+        "priority_1")]
+    public void LegacyAutoUpgradeBoolean_LoadsAndNormalizesOnSave(
+        bool legacyValue,
+        UnitAutoUpgradePriority expected,
+        string normalized)
+    {
+        PlacementModel current = Placement(
+            CameraPreparationMode.CameraModel,
+            target: null,
+            Step(PlacementPhase.BeforeStart, 1));
+        JsonObject json = SerializeObject(current);
+        json["steps"]!.AsArray()[0]!
+            .AsObject()["auto_upgrade"] =
+                legacyValue;
+
+        PlacementModel legacy =
+            Deserialize<PlacementModel>(json);
+        JsonObject normalizedJson =
+            SerializeObject(legacy);
+
+        Assert.Equal(
+            expected,
+            Assert.Single(legacy.Steps)
+                .AutoUpgradePriority);
+        Assert.Equal(
+            normalized,
+            normalizedJson["steps"]!
+                .AsArray()[0]!
+                .AsObject()["auto_upgrade"]!
+                .GetValue<string>());
+        legacy.Validate();
+    }
+
+    [Fact]
+    public void PlacementStep_RejectsUnknownAutoUpgradePriority()
+    {
+        PlacementStep invalid =
+            Step(
+                PlacementPhase.BeforeStart,
+                1) with
+            {
+                AutoUpgradePriority =
+                    (UnitAutoUpgradePriority)7,
+            };
+
+        InvalidDataException error =
+            Assert.Throws<InvalidDataException>(
+                () => invalid.Validate(808, 611));
+
+        Assert.Contains(
+            "Auto Upgrade priority",
+            error.Message,
+            StringComparison.Ordinal);
     }
 
     [Fact]

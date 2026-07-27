@@ -23,7 +23,7 @@ internal sealed class UiScaleNormalizer
         TimeSpan,
         CancellationToken,
         Task> _delay;
-    private readonly AccessibilityNavigationController _navigation;
+    private readonly SettingsPanelNavigator _settingsPanel;
 
     public UiScaleNormalizer(
         IRobloxAutomation automation,
@@ -33,9 +33,10 @@ internal sealed class UiScaleNormalizer
         _automation = automation;
         _utcNow = utcNow;
         _delay = delay;
-        _navigation = new AccessibilityNavigationController(
+        _settingsPanel = new SettingsPanelNavigator(
             automation,
             ValidateWindow,
+            utcNow,
             delay);
     }
 
@@ -43,22 +44,8 @@ internal sealed class UiScaleNormalizer
         RobloxWindow window,
         CancellationToken cancellationToken)
     {
-        await _navigation.RunEnabledAsync(
-            window,
-            async token =>
-            {
-                await _navigation.TapAsync(
-                    window,
-                    RobloxKeyboardKey.RightArrow,
-                    token).ConfigureAwait(false);
-                await _navigation.TapAsync(
-                    window,
-                    RobloxKeyboardKey.Enter,
-                    token).ConfigureAwait(false);
-            },
-            cancellationToken).ConfigureAwait(false);
         GameSettingsPanelMatch initial =
-            await WaitForSettledPanelAsync(
+            await _settingsPanel.OpenAsync(
                 window,
                 cancellationToken).ConfigureAwait(false);
         bool changed =
@@ -112,19 +99,8 @@ internal sealed class UiScaleNormalizer
             }
         }
 
-        await _navigation.RunEnabledAsync(
+        await _settingsPanel.CloseAsync(
             window,
-            async token =>
-            {
-                await _navigation.TapAsync(
-                    window,
-                    RobloxKeyboardKey.RightArrow,
-                    token).ConfigureAwait(false);
-                await _navigation.TapAsync(
-                    window,
-                    RobloxKeyboardKey.Enter,
-                    token).ConfigureAwait(false);
-            },
             cancellationToken).ConfigureAwait(false);
         return changed;
     }
@@ -289,35 +265,6 @@ internal sealed class UiScaleNormalizer
             "Anime Expeditions did not expose a stable UI Scale input.");
     }
 
-    private async Task<GameSettingsPanelMatch>
-        WaitForSettledPanelAsync(
-        RobloxWindow window,
-        CancellationToken cancellationToken)
-    {
-        DateTimeOffset deadline =
-            _utcNow() + TimeSpan.FromSeconds(7);
-        int stable = 0;
-        while (_utcNow() < deadline)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            ValidateWindow(window);
-            GameSettingsPanelMatch panel =
-                GameSettingsScreenDetector.DetectPanel(
-                    _automation.CaptureClient(window));
-            stable =
-                panel.Visible && panel.Settled
-                    ? stable + 1
-                    : 0;
-            if (stable >= 2) return panel;
-            await _delay(
-                PollInterval,
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        throw new RobloxUiUnavailableException(
-            "Anime Expeditions Settings did not settle after selecting Misc.");
-    }
-
     private async Task EnterScaleValueAsync(
         RobloxWindow window,
         double value,
@@ -325,7 +272,7 @@ internal sealed class UiScaleNormalizer
     {
         for (int index = 0; index < 8; index++)
         {
-            await _navigation.TapAsync(
+            await TapAsync(
                 window,
                 RobloxKeyboardKey.Backspace,
                 cancellationToken).ConfigureAwait(false);
@@ -333,14 +280,29 @@ internal sealed class UiScaleNormalizer
         foreach (char character in
                  UiScaleFeedbackPolicy.Format(value))
         {
-            await _navigation.TapAsync(
+            await TapAsync(
                 window,
                 ScaleKey(character),
                 cancellationToken).ConfigureAwait(false);
         }
-        await _navigation.TapAsync(
+        await TapAsync(
             window,
             RobloxKeyboardKey.Enter,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task TapAsync(
+        RobloxWindow window,
+        RobloxKeyboardKey key,
+        CancellationToken cancellationToken)
+    {
+        ValidateWindow(window);
+        await _automation.TapKeyboardKeyAsync(
+            window,
+            key,
+            cancellationToken).ConfigureAwait(false);
+        await _delay(
+            TimeSpan.FromMilliseconds(500),
             cancellationToken).ConfigureAwait(false);
     }
 

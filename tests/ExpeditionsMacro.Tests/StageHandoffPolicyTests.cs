@@ -1,4 +1,5 @@
 using ExpeditionsMacro.Automation.Stages;
+using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Stages;
 
 namespace ExpeditionsMacro.Tests;
@@ -79,5 +80,57 @@ public sealed class StageHandoffPolicyTests
                 recoveryTransitionPending: true);
 
         Assert.Equal(GameModeHandoffCommand.Wait, actual);
+    }
+
+    [Fact]
+    public void LockedRaidSelector_UsesStableSharedPlayEvidenceWithoutRetryingTheKey()
+    {
+        StableStateTracker<StageScreenState> tracker = new(2);
+        StageScreenState first =
+            StageNavigationPolicy.ResolveGameModeSelectorState(
+                StageScreenState.None,
+                "play");
+
+        Assert.Equal(
+            StageScreenState.None,
+            tracker.Update(first));
+        Assert.True(tracker.HasPendingCandidate);
+        Assert.Equal(
+            GameModeHandoffCommand.Wait,
+            StageNavigationPolicy.SelectGameModeHandoffCommand(
+                StageScreenState.None,
+                hasStageChangeModeAction: false,
+                selectorEvidencePending: true));
+
+        StageScreenState? stable = tracker.Update(
+            StageNavigationPolicy.ResolveGameModeSelectorState(
+                StageScreenState.None,
+                "play"));
+
+        Assert.Equal(StageScreenState.GameModeSelector, stable);
+    }
+
+    [Theory]
+    [InlineData(StageScreenState.None, "lobby", StageScreenState.None)]
+    [InlineData(StageScreenState.None, "disconnect", StageScreenState.None)]
+    [InlineData(StageScreenState.None, "afk", StageScreenState.None)]
+    [InlineData(
+        StageScreenState.PostMatchPreview,
+        "play",
+        StageScreenState.PostMatchPreview)]
+    [InlineData(
+        StageScreenState.RaidSelector,
+        "play",
+        StageScreenState.RaidSelector)]
+    public void SharedPlayEvidence_DoesNotOverrideOtherRecoveryOrOwnedStageStates(
+        StageScreenState stageState,
+        string recoveryState,
+        StageScreenState expected)
+    {
+        Assert.Equal(
+            expected,
+            StageNavigationPolicy.ResolveGameModeSelectorState(
+                stageState,
+                recoveryState));
     }
 }

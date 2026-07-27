@@ -18,7 +18,7 @@ The optional Discord webhook reports monitoring start, match attempts, Victory o
 
 ## Detection and input safety
 
-The workflow recognizes the game-mode selector, active and unavailable Challenge lists, available and cooldown details, both preview layouts, Start Game, Victory, and Defeat. It uses stable panel geometry, headings, dividers, button shapes, and map thumbnails instead of player names, reward rarity colors, or changing background artwork.
+The workflow recognizes the game-mode selector, active and unavailable Challenge lists, available and cooldown details, both preview layouts, Start Game, Victory, and Defeat. It uses stable panel geometry, headings, dividers, button shapes, and map thumbnails instead of player names, reward rarity colors, or changing background artwork. After **Select Stage**, the party panel can appear before its green **Start** action becomes live. The runner keeps observing within a bounded wait and requires the Start coordinate to remain stable across the configured confirmations; another action such as **Change Gamemode** cannot satisfy that wait.
 
 Selector rows are clicked through their map artwork, away from reward icons that open item tooltips. Every transition is consumed only from its expected runner state; shared Start Game and Defeat visuals are not sufficient by themselves to begin Challenge automation.
 

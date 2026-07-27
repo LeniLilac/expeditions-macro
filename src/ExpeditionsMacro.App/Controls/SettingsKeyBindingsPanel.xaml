@@ -28,7 +28,7 @@
         </Grid>
 
         <Grid Margin="0,14,0,0">
-            <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
+            <StackPanel Margin="0,0,204,0" VerticalAlignment="Center">
                 <TextBlock Style="{StaticResource FieldLabel}" Text="Toggle Play Menu key" />
                 <TextBlock x:Name="PlayStatusText"
                            Margin="0,5,0,0"
@@ -36,16 +36,32 @@
                            TextWrapping="Wrap"
                            Text="Required before a macro can start." />
             </StackPanel>
-            <Button x:Name="PlayButton"
-                    Width="160"
-                    HorizontalAlignment="Right"
-                    controls:Lucide.Icon="Keyboard"
-                    Content="Set key"
-                    Click="PlayButton_Click" />
+            <StackPanel HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                <Button x:Name="ClearPlayButton"
+                        Width="36"
+                        MinWidth="36"
+                        Height="36"
+                        Margin="0,0,8,0"
+                        Style="{StaticResource IconButton}"
+                        IsEnabled="False"
+                        Visibility="Collapsed"
+                        controls:Lucide.Icon="X"
+                        AutomationProperties.Name="Unset Toggle Play Menu key"
+                        ToolTip="Unset Toggle Play Menu key"
+                        Tag="Play"
+                        Click="ClearBindingButton_Click" />
+                <Button x:Name="PlayButton"
+                        Width="152"
+                        controls:Lucide.Icon="Keyboard"
+                        Content="Not set"
+                        Click="PlayButton_Click" />
+            </StackPanel>
         </Grid>
 
         <Grid Margin="0,14,0,0">
-            <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
+            <StackPanel Margin="0,0,204,0" VerticalAlignment="Center">
                 <TextBlock Style="{StaticResource FieldLabel}" Text="Toggle Unit Inventory key" />
                 <TextBlock x:Name="UnitStatusText"
                            Margin="0,5,0,0"
@@ -53,16 +69,32 @@
                            TextWrapping="Wrap"
                            Text="Required only when a preset changes the active team." />
             </StackPanel>
-            <Button x:Name="UnitButton"
-                    Width="160"
-                    HorizontalAlignment="Right"
-                    controls:Lucide.Icon="Keyboard"
-                    Content="Set key"
-                    Click="UnitButton_Click" />
+            <StackPanel HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                <Button x:Name="ClearUnitButton"
+                        Width="36"
+                        MinWidth="36"
+                        Height="36"
+                        Margin="0,0,8,0"
+                        Style="{StaticResource IconButton}"
+                        IsEnabled="False"
+                        Visibility="Collapsed"
+                        controls:Lucide.Icon="X"
+                        AutomationProperties.Name="Unset Toggle Unit Inventory key"
+                        ToolTip="Unset Toggle Unit Inventory key"
+                        Tag="Unit"
+                        Click="ClearBindingButton_Click" />
+                <Button x:Name="UnitButton"
+                        Width="152"
+                        controls:Lucide.Icon="Keyboard"
+                        Content="Not set"
+                        Click="UnitButton_Click" />
+            </StackPanel>
         </Grid>
 
         <Grid Margin="0,14,0,0">
-            <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
+            <StackPanel Margin="0,0,204,0" VerticalAlignment="Center">
                 <TextBlock Style="{StaticResource FieldLabel}" Text="Toggle Areas Menu key" />
                 <TextBlock x:Name="AreasStatusText"
                            Margin="0,5,0,0"
@@ -70,16 +102,32 @@
                            TextWrapping="Wrap"
                            Text="Required only by the experimental resource-refuel Debug tools." />
             </StackPanel>
-            <Button x:Name="AreasButton"
-                    Width="160"
-                    HorizontalAlignment="Right"
-                    controls:Lucide.Icon="Keyboard"
-                    Content="Set key"
-                    Click="AreasButton_Click" />
+            <StackPanel HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                <Button x:Name="ClearAreasButton"
+                        Width="36"
+                        MinWidth="36"
+                        Height="36"
+                        Margin="0,0,8,0"
+                        Style="{StaticResource IconButton}"
+                        IsEnabled="False"
+                        Visibility="Collapsed"
+                        controls:Lucide.Icon="X"
+                        AutomationProperties.Name="Unset Toggle Areas Menu key"
+                        ToolTip="Unset Toggle Areas Menu key"
+                        Tag="Areas"
+                        Click="ClearBindingButton_Click" />
+                <Button x:Name="AreasButton"
+                        Width="152"
+                        controls:Lucide.Icon="Keyboard"
+                        Content="Not set"
+                        Click="AreasButton_Click" />
+            </StackPanel>
         </Grid>
 
         <Grid Margin="0,14,0,0">
-            <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
+            <StackPanel Margin="0,0,204,0" VerticalAlignment="Center">
                 <TextBlock Style="{StaticResource FieldLabel}" Text="Toggle Cancel Unit Placement key" />
                 <TextBlock x:Name="CancelPlacementStatusText"
                            Margin="0,5,0,0"
@@ -87,16 +135,32 @@
                            TextWrapping="Wrap"
                            Text="Defaults to Z. Match Anime Expeditions' Toggle Cancel Unit Placement binding." />
             </StackPanel>
-            <Button x:Name="CancelPlacementButton"
-                    Width="160"
-                    HorizontalAlignment="Right"
-                    controls:Lucide.Icon="Keyboard"
-                    Content="Z"
-                    Click="CancelPlacementButton_Click" />
+            <StackPanel HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                <Button x:Name="ClearCancelPlacementButton"
+                        Width="36"
+                        MinWidth="36"
+                        Height="36"
+                        Margin="0,0,8,0"
+                        Style="{StaticResource IconButton}"
+                        IsEnabled="False"
+                        Visibility="Collapsed"
+                        controls:Lucide.Icon="X"
+                        AutomationProperties.Name="Unset Toggle Cancel Unit Placement key"
+                        ToolTip="Unset Toggle Cancel Unit Placement key"
+                        Tag="CancelPlacement"
+                        Click="ClearBindingButton_Click" />
+                <Button x:Name="CancelPlacementButton"
+                        Width="152"
+                        controls:Lucide.Icon="Keyboard"
+                        Content="Z"
+                        Click="CancelPlacementButton_Click" />
+            </StackPanel>
         </Grid>
 
         <Grid Margin="0,14,0,0">
-            <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
+            <StackPanel Margin="0,0,204,0" VerticalAlignment="Center">
                 <TextBlock Style="{StaticResource FieldLabel}" Text="Change Unit Targeting key" />
                 <TextBlock x:Name="TargetingStatusText"
                            Margin="0,5,0,0"
@@ -104,16 +168,32 @@
                            TextWrapping="Wrap"
                            Text="Required before a macro can start." />
             </StackPanel>
-            <Button x:Name="TargetingButton"
-                    Width="160"
-                    HorizontalAlignment="Right"
-                    controls:Lucide.Icon="Keyboard"
-                    Content="Set key"
-                    Click="TargetingButton_Click" />
+            <StackPanel HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                <Button x:Name="ClearTargetingButton"
+                        Width="36"
+                        MinWidth="36"
+                        Height="36"
+                        Margin="0,0,8,0"
+                        Style="{StaticResource IconButton}"
+                        IsEnabled="False"
+                        Visibility="Collapsed"
+                        controls:Lucide.Icon="X"
+                        AutomationProperties.Name="Unset Change Unit Targeting key"
+                        ToolTip="Unset Change Unit Targeting key"
+                        Tag="Targeting"
+                        Click="ClearBindingButton_Click" />
+                <Button x:Name="TargetingButton"
+                        Width="152"
+                        controls:Lucide.Icon="Keyboard"
+                        Content="Not set"
+                        Click="TargetingButton_Click" />
+            </StackPanel>
         </Grid>
 
         <Grid Margin="0,14,0,0">
-            <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
+            <StackPanel Margin="0,0,204,0" VerticalAlignment="Center">
                 <TextBlock Style="{StaticResource FieldLabel}" Text="Upgrade Unit key" />
                 <TextBlock x:Name="UpgradeStatusText"
                            Margin="0,5,0,0"
@@ -121,16 +201,32 @@
                            TextWrapping="Wrap"
                            Text="Required before a macro can start." />
             </StackPanel>
-            <Button x:Name="UpgradeButton"
-                    Width="160"
-                    HorizontalAlignment="Right"
-                    controls:Lucide.Icon="Keyboard"
-                    Content="Set key"
-                    Click="UpgradeButton_Click" />
+            <StackPanel HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                <Button x:Name="ClearUpgradeButton"
+                        Width="36"
+                        MinWidth="36"
+                        Height="36"
+                        Margin="0,0,8,0"
+                        Style="{StaticResource IconButton}"
+                        IsEnabled="False"
+                        Visibility="Collapsed"
+                        controls:Lucide.Icon="X"
+                        AutomationProperties.Name="Unset Upgrade Unit key"
+                        ToolTip="Unset Upgrade Unit key"
+                        Tag="Upgrade"
+                        Click="ClearBindingButton_Click" />
+                <Button x:Name="UpgradeButton"
+                        Width="152"
+                        controls:Lucide.Icon="Keyboard"
+                        Content="Not set"
+                        Click="UpgradeButton_Click" />
+            </StackPanel>
         </Grid>
 
         <Grid Margin="0,14,0,0">
-            <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
+            <StackPanel Margin="0,0,204,0" VerticalAlignment="Center">
                 <TextBlock Style="{StaticResource FieldLabel}" Text="Auto Upgrade Unit key" />
                 <TextBlock x:Name="AutoUpgradeUnitStatusText"
                            Margin="0,5,0,0"
@@ -138,16 +234,32 @@
                            TextWrapping="Wrap"
                            Text="Required before a macro can start." />
             </StackPanel>
-            <Button x:Name="AutoUpgradeUnitButton"
-                    Width="160"
-                    HorizontalAlignment="Right"
-                    controls:Lucide.Icon="Keyboard"
-                    Content="Set key"
-                    Click="AutoUpgradeUnitButton_Click" />
+            <StackPanel HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                <Button x:Name="ClearAutoUpgradeUnitButton"
+                        Width="36"
+                        MinWidth="36"
+                        Height="36"
+                        Margin="0,0,8,0"
+                        Style="{StaticResource IconButton}"
+                        IsEnabled="False"
+                        Visibility="Collapsed"
+                        controls:Lucide.Icon="X"
+                        AutomationProperties.Name="Unset Auto Upgrade Unit key"
+                        ToolTip="Unset Auto Upgrade Unit key"
+                        Tag="AutoUpgradeUnit"
+                        Click="ClearBindingButton_Click" />
+                <Button x:Name="AutoUpgradeUnitButton"
+                        Width="152"
+                        controls:Lucide.Icon="Keyboard"
+                        Content="Not set"
+                        Click="AutoUpgradeUnitButton_Click" />
+            </StackPanel>
         </Grid>
 
         <Grid Margin="0,14,0,0">
-            <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
+            <StackPanel Margin="0,0,204,0" VerticalAlignment="Center">
                 <TextBlock Style="{StaticResource FieldLabel}" Text="Toggle Auto Upgrade Placed Units key" />
                 <TextBlock x:Name="ToggleAutoUpgradePlacedUnitsStatusText"
                            Margin="0,5,0,0"
@@ -155,16 +267,32 @@
                            TextWrapping="Wrap"
                            Text="Required before a macro can start." />
             </StackPanel>
-            <Button x:Name="ToggleAutoUpgradePlacedUnitsButton"
-                    Width="160"
-                    HorizontalAlignment="Right"
-                    controls:Lucide.Icon="Keyboard"
-                    Content="Set key"
-                    Click="ToggleAutoUpgradePlacedUnitsButton_Click" />
+            <StackPanel HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                <Button x:Name="ClearToggleAutoUpgradePlacedUnitsButton"
+                        Width="36"
+                        MinWidth="36"
+                        Height="36"
+                        Margin="0,0,8,0"
+                        Style="{StaticResource IconButton}"
+                        IsEnabled="False"
+                        Visibility="Collapsed"
+                        controls:Lucide.Icon="X"
+                        AutomationProperties.Name="Unset Toggle Auto Upgrade Placed Units key"
+                        ToolTip="Unset Toggle Auto Upgrade Placed Units key"
+                        Tag="ToggleAutoUpgradePlacedUnits"
+                        Click="ClearBindingButton_Click" />
+                <Button x:Name="ToggleAutoUpgradePlacedUnitsButton"
+                        Width="152"
+                        controls:Lucide.Icon="Keyboard"
+                        Content="Not set"
+                        Click="ToggleAutoUpgradePlacedUnitsButton_Click" />
+            </StackPanel>
         </Grid>
 
         <Grid Margin="0,14,0,0">
-            <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
+            <StackPanel Margin="0,0,204,0" VerticalAlignment="Center">
                 <TextBlock Style="{StaticResource FieldLabel}" Text="Toggle Shift Lock key" />
                 <TextBlock x:Name="ShiftLockStatusText"
                            Margin="0,5,0,0"
@@ -172,12 +300,28 @@
                            TextWrapping="Wrap"
                            Text="Defaults to Left Ctrl. Match Anime Expeditions' Toggle Shift Lock binding." />
             </StackPanel>
-            <Button x:Name="ShiftLockButton"
-                    Width="160"
-                    HorizontalAlignment="Right"
-                    controls:Lucide.Icon="Keyboard"
-                    Content="Left Ctrl"
-                    Click="ShiftLockButton_Click" />
+            <StackPanel HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                <Button x:Name="ClearShiftLockButton"
+                        Width="36"
+                        MinWidth="36"
+                        Height="36"
+                        Margin="0,0,8,0"
+                        Style="{StaticResource IconButton}"
+                        IsEnabled="False"
+                        Visibility="Collapsed"
+                        controls:Lucide.Icon="X"
+                        AutomationProperties.Name="Unset Toggle Shift Lock key"
+                        ToolTip="Unset Toggle Shift Lock key"
+                        Tag="ShiftLock"
+                        Click="ClearBindingButton_Click" />
+                <Button x:Name="ShiftLockButton"
+                        Width="152"
+                        controls:Lucide.Icon="Keyboard"
+                        Content="Left Ctrl"
+                        Click="ShiftLockButton_Click" />
+            </StackPanel>
         </Grid>
     </StackPanel>
 </UserControl>

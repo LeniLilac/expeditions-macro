@@ -125,27 +125,17 @@ public sealed partial class ChallengeMacroRunner
             stage.Value.X,
             stage.Value.Y,
             cancellationToken).ConfigureAwait(false);
-        ImageFrame preview = await WaitForScreenAsync(
+        (_, ChallengeScreenMatch preview) =
+            await WaitForPreviewStartAsync(
             window,
             navigationPreset,
             detector,
-            ChallengeScreenState.PreviewReady,
-            TimeSpan.FromSeconds(15),
             Report,
             cancellationToken).ConfigureAwait(false);
-        (int X, int Y)? start =
-            ChallengeScreenDetector.ActionFor(
-                ChallengeScreenState.PreviewReady,
-                preview);
-        if (start is null)
-        {
-            throw new InvalidOperationException(
-                "The Challenge preview Start button could not be located.");
-        }
         await ClickAsync(
             window,
-            start.Value.X,
-            start.Value.Y,
+            preview.ActionX!.Value,
+            preview.ActionY!.Value,
             cancellationToken).ConfigureAwait(false);
         await WaitForPrestartAfterPreviewAsync(
             window,

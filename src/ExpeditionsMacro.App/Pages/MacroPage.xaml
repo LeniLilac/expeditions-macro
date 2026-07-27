@@ -262,13 +262,14 @@
                             <ColumnDefinition Width="18" />
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock VerticalAlignment="Center" Style="{StaticResource FieldLabel}" Text="Plan" />
                         <ComboBox x:Name="PlanCombo" Grid.Column="1" DisplayMemberPath="Name" SelectionChanged="PlanCombo_SelectionChanged" />
-                        <TextBox x:Name="PlanNameText" Grid.Column="3" Text="Daily rotation" />
-                        <Button Grid.Column="4" Margin="8,0,0,0" icons:Lucide.Icon="Save" Content="Save plan" Click="SavePlan_Click" />
-                        <Button Grid.Column="5" Margin="8,0,0,0" icons:Lucide.Icon="Plus" Content="New" Click="NewPlan_Click" />
+                        <TextBox x:Name="PlanNameText"
+                                 Grid.Column="3"
+                                 Text="Daily rotation"
+                                 TextChanged="PlanNameText_TextChanged" />
+                        <Button Grid.Column="4" Margin="8,0,0,0" icons:Lucide.Icon="Plus" Content="New" Click="NewPlan_Click" />
                     </Grid>
                 </Border>
 

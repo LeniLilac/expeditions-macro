@@ -279,6 +279,68 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public void AppSettings_ExplicitlyUnsetGameBindingsStayOptionalUntilUsed()
+    {
+        AppSettings settings = new()
+        {
+            PlayMenuKey = string.Empty,
+            UnitMenuKey = string.Empty,
+            AreasMenuKey = string.Empty,
+            CancelPlacementKey = string.Empty,
+            ChangeUnitTargetingKey = string.Empty,
+            UpgradeUnitKey = string.Empty,
+            AutoUpgradeUnitKey = string.Empty,
+            ToggleAutoUpgradePlacedUnitsKey = string.Empty,
+            ShiftLockVirtualKey = 0,
+        };
+
+        AppSettings.ValidateControlKeySet(
+            settings,
+            requireUnitActionKeys: false);
+        Assert.Null(
+            AppSettings.ParseOptionalCancelPlacementKey(
+                settings.CancelPlacementKey,
+                settings.MacroHotkeyVirtualKey,
+                settings.PlayMenuKey,
+                settings.UnitMenuKey,
+                settings.AreasMenuKey,
+                settings.ShiftLockVirtualKey));
+        Assert.Throws<InvalidDataException>(
+            () => AppSettings.ParseCancelPlacementKey(
+                settings.CancelPlacementKey,
+                settings.MacroHotkeyVirtualKey,
+                settings.PlayMenuKey,
+                settings.UnitMenuKey,
+                settings.AreasMenuKey,
+                settings.ShiftLockVirtualKey));
+        Assert.Throws<InvalidDataException>(
+            () => AppSettings.ParseShiftLockKey(
+                settings.ShiftLockVirtualKey,
+                settings.MacroHotkeyVirtualKey,
+                settings.PlayMenuKey,
+                settings.UnitMenuKey,
+                settings.AreasMenuKey,
+                settings.CancelPlacementKey));
+    }
+
+    [Fact]
+    public void AppSettings_UnitActionParsersRequireOnlyTheRequestedAction()
+    {
+        AppSettings settings = new()
+        {
+            ChangeUnitTargetingKey = "t",
+            AutoUpgradeUnitKey = string.Empty,
+        };
+
+        Assert.Equal(
+            'T',
+            AppSettings.ParseChangeUnitTargetingKey(settings));
+        Assert.Throws<InvalidDataException>(
+            () => AppSettings.ParseAutoUpgradeUnitKey(
+                settings));
+    }
+
+    [Fact]
     public void AppSettings_RequiredUnitActionKeysDefaultEmpty()
     {
         AppSettings settings = new();

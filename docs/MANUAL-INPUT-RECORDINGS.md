@@ -56,6 +56,12 @@ and stops if the actual event time differs from its recording by more
 than 10 milliseconds. This makes timing drift a visible safe failure
 instead of silently slowing or compressing the route.
 
+The recorder excludes only the global macro start/stop hotkey. Any
+physical game-action key pressed while recording, including Auto Upgrade
+Unit, is part of the saved sequence and is replayed at the same moments.
+Changing or unsetting an Expeditions Macro control binding later does not
+rewrite an existing recording.
+
 ## Input and cleanup boundary
 
 `IManualInputRecorder` and `IManualInputPlayback` remain behind the same

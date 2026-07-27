@@ -29,7 +29,6 @@ public partial class PlacementFastEditorView : UserControl
             FastTimingEditor_ApplyRequested;
     }
 
-    public event RoutedEventHandler? SaveRequested;
     public event RoutedEventHandler? PrepareRequested;
     public event RoutedEventHandler? PositionRequested;
     public event RoutedEventHandler? TestRequested;
@@ -193,11 +192,6 @@ public partial class PlacementFastEditorView : UserControl
             FastStopButton.Focus();
         }
     }
-
-    private void Save_Click(
-        object sender,
-        RoutedEventArgs e) =>
-        SaveRequested?.Invoke(sender, e);
 
     private void FastPrepare_Click(
         object sender,

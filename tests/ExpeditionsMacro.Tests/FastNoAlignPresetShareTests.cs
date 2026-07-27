@@ -411,7 +411,9 @@ public sealed class FastNoAlignPresetShareTests
         Assert.Equal(
             UnitTargetingPriority.Strongest,
             before.TargetingPriority);
-        Assert.False(before.AutoUpgrade);
+        Assert.Equal(
+            UnitAutoUpgradePriority.Off,
+            before.AutoUpgradePriority);
         PlacementStep after = setup.Steps[1];
         Assert.Equal(4, after.UnitKey);
         Assert.Equal(607, after.X);
@@ -422,7 +424,9 @@ public sealed class FastNoAlignPresetShareTests
         Assert.Equal(
             45_678,
             after.DelayAfterStartMilliseconds);
-        Assert.True(after.AutoUpgrade);
+        Assert.Equal(
+            UnitAutoUpgradePriority.Priority6,
+            after.AutoUpgradePriority);
     }
 
     private static PlacementModel Setup(
@@ -453,7 +457,8 @@ public sealed class FastNoAlignPresetShareTests
                     Phase = PlacementPhase.BeforeStart,
                     TargetingPriority =
                         UnitTargetingPriority.Strongest,
-                    AutoUpgrade = false,
+                    AutoUpgradePriority =
+                        UnitAutoUpgradePriority.Off,
                 },
                 new PlacementStep
                 {
@@ -466,7 +471,9 @@ public sealed class FastNoAlignPresetShareTests
                         45_678,
                     TargetingPriority =
                         UnitTargetingPriority.First,
-                    AutoUpgrade = true,
+                    AutoUpgradePriority =
+                        UnitAutoUpgradePriority
+                            .Priority6,
                 },
             ],
             CreatedAt = DateTimeOffset.UtcNow,

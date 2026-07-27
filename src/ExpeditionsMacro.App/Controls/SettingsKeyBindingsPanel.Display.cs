@@ -51,7 +51,7 @@ public partial class SettingsKeyBindingsPanel
             if (_captureTarget != BindingTarget.Play)
             {
                 PlayButton.Content = empty
-                    ? "Set key"
+                    ? "Not set"
                     : services.Settings.PlayMenuKey;
             }
             PlayStatusText.Text = empty
@@ -91,7 +91,7 @@ public partial class SettingsKeyBindingsPanel
             if (_captureTarget != BindingTarget.Unit)
             {
                 UnitButton.Content = empty
-                    ? "Set key"
+                    ? "Not set"
                     : services.Settings.UnitMenuKey;
             }
             UnitStatusText.Text = empty
@@ -131,7 +131,7 @@ public partial class SettingsKeyBindingsPanel
             if (_captureTarget != BindingTarget.Areas)
             {
                 AreasButton.Content = empty
-                    ? "Set key"
+                    ? "Not set"
                     : services.Settings.AreasMenuKey;
             }
             AreasStatusText.Text = empty
@@ -173,17 +173,25 @@ public partial class SettingsKeyBindingsPanel
         }
         catch (InvalidDataException error)
         {
+            bool empty = string.IsNullOrWhiteSpace(
+                services.Settings.CancelPlacementKey);
             if (_captureTarget !=
                 BindingTarget.CancelPlacement)
             {
                 CancelPlacementButton.Content =
-                    services.Settings
-                        .CancelPlacementKey;
+                    empty
+                        ? "Not set"
+                        : services.Settings
+                            .CancelPlacementKey;
             }
             CancelPlacementStatusText.Text =
-                error.Message;
+                empty
+                    ? "Required only when a placement setup uses placement steps."
+                    : error.Message;
             CancelPlacementDiagnostic =
-                "Conflict";
+                empty
+                    ? "Not set"
+                    : "Conflict";
         }
     }
 
@@ -194,6 +202,7 @@ public partial class SettingsKeyBindingsPanel
             "Change Unit Targeting",
             TargetingButton,
             TargetingStatusText,
+            "Required only when a placement step changes targeting from First.",
             value => TargetingDiagnostic = value);
 
     private void UpdateUpgradeDisplay() =>
@@ -203,6 +212,7 @@ public partial class SettingsKeyBindingsPanel
             "Upgrade Unit",
             UpgradeButton,
             UpgradeStatusText,
+            "Required only when a macro workflow uses Upgrade Unit.",
             value => UpgradeDiagnostic = value);
 
     private void UpdateAutoUpgradeDisplay() =>
@@ -212,6 +222,7 @@ public partial class SettingsKeyBindingsPanel
             "Auto Upgrade Unit",
             AutoUpgradeUnitButton,
             AutoUpgradeUnitStatusText,
+            "Required only when a placement step selects Auto Upgrade Priority 1 through 6.",
             value => AutoUpgradeDiagnostic = value);
 
     private void UpdateToggleAutoUpgradePlacedUnitsDisplay() =>
@@ -222,6 +233,7 @@ public partial class SettingsKeyBindingsPanel
             "Toggle Auto Upgrade Placed Units",
             ToggleAutoUpgradePlacedUnitsButton,
             ToggleAutoUpgradePlacedUnitsStatusText,
+            "Required only when a macro workflow toggles Auto Upgrade for placed units.",
             value =>
                 ToggleAutoUpgradePlacedUnitsDiagnostic =
                     value);
@@ -232,6 +244,7 @@ public partial class SettingsKeyBindingsPanel
         string bindingName,
         System.Windows.Controls.Button button,
         System.Windows.Controls.TextBlock status,
+        string unsetStatus,
         Action<string> setDiagnostic)
     {
         string candidate = configuredValue.Trim();
@@ -263,11 +276,11 @@ public partial class SettingsKeyBindingsPanel
             if (_captureTarget != target)
             {
                 button.Content = empty
-                    ? "Set key"
+                    ? "Not set"
                     : configuredValue;
             }
             status.Text = empty
-                ? "Required before a macro can start."
+                ? unsetStatus
                 : error.Message;
             setDiagnostic(empty
                 ? "Not set"
@@ -278,6 +291,17 @@ public partial class SettingsKeyBindingsPanel
     private void UpdateShiftLockDisplay()
     {
         AppServices services = Services;
+        if (services.Settings.ShiftLockVirtualKey == 0)
+        {
+            if (_captureTarget != BindingTarget.ShiftLock)
+            {
+                ShiftLockButton.Content = "Not set";
+            }
+            ShiftLockStatusText.Text =
+                "Required only when camera preparation uses Toggle Shift Lock.";
+            ShiftLockDiagnostic = "Not set";
+            return;
+        }
         string display = KeyboardKey.GetDisplayName(
             services.Settings.ShiftLockVirtualKey);
         try

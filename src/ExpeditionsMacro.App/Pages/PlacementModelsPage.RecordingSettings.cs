@@ -53,7 +53,6 @@ public partial class PlacementModelsPage
         }
 
         _fastManualRecordingId = recordingId;
-        FastStatusText.Text =
-            "Recording updated. Save setup to keep it.";
+        SchedulePlacementAutoSave();
     }
 }

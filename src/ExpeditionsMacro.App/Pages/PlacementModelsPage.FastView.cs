@@ -29,9 +29,6 @@ public partial class PlacementModelsPage
     private ComboBox TargetVariantCombo =>
         FastEditorPanel.TargetVariantCombo;
 
-    private Button FastSaveButton =>
-        FastEditorPanel.FastSaveButton;
-
     private Image PlacementScreenshot =>
         FastEditorPanel.PlacementScreenshot;
 
@@ -97,7 +94,6 @@ public partial class PlacementModelsPage
 
     private void WireFastEditorEvents()
     {
-        FastEditorPanel.SaveRequested += Save_Click;
         FastEditorPanel.PrepareRequested += FastPrepare_Click;
         FastEditorPanel.PositionRequested +=
             FastPosition_Click;

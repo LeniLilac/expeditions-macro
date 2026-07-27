@@ -35,8 +35,88 @@ public partial class PlacementModelsPage
                 e.InsertAfter))
         {
             FastStatusText.Text =
-                "Placement order changed. Save setup to keep it.";
+                "Placement order changed.";
         }
+    }
+
+    private bool NormalizeChangedStepPhase(
+        PlacementStepRow row)
+    {
+        int sourceIndex = _steps.IndexOf(row);
+        if (sourceIndex < 0 ||
+            !Enum.IsDefined(row.Phase))
+        {
+            return false;
+        }
+        if (FastWorkflow &&
+            row.Phase ==
+                PlacementPhase.BeforeStart &&
+            PlacementAuthoringRules
+                .IsCoveredByStartDialog(
+                    row.X,
+                    row.Y))
+        {
+            _normalizingPlacementStepPhase = true;
+            try
+            {
+                row.Phase =
+                    PlacementPhase.AfterStart;
+            }
+            finally
+            {
+                _normalizingPlacementStepPhase = false;
+            }
+            FastStatusText.Text =
+                "That point is covered by the Start Game dialog. Move it outside the dialog or keep it After Start.";
+            return false;
+        }
+
+        PlacementStep[] original =
+            _steps.Select(step => step.ToModel())
+                .ToArray();
+        original[sourceIndex] =
+            original[sourceIndex] with
+            {
+                Phase =
+                    row.Phase ==
+                        PlacementPhase.BeforeStart
+                        ? PlacementPhase.AfterStart
+                        : PlacementPhase.BeforeStart,
+            };
+        PlacementPhaseChange change =
+            PlacementAuthoringRules
+                .ChangePhaseForAuthoring(
+                    original,
+                    sourceIndex,
+                    row.Phase);
+        if (!change.Changed)
+        {
+            return false;
+        }
+
+        if (change.ChangedIndex != sourceIndex)
+        {
+            using (SuspendPlacementAutoSave())
+            {
+                _steps.Move(
+                    sourceIndex,
+                    change.ChangedIndex);
+            }
+        }
+        UpdateFastPlacementCount();
+        ActiveStepsSelector.SelectedItem = row;
+        if (FastWorkflow)
+        {
+            FastStepsList.ScrollIntoView(row);
+            FastStatusText.Text =
+                $"Unit {row.UnitKey} moved to {row.PhaseLabel}.";
+        }
+        else
+        {
+            StatusText.Text =
+                $"Unit {row.UnitKey} moved to {row.PhaseLabel}.";
+        }
+        return true;
     }
 
     private bool MoveStepWithinPhase(
@@ -106,7 +186,7 @@ public partial class PlacementModelsPage
         {
             FastStepsList.ScrollIntoView(row);
             FastStatusText.Text =
-                "Placement order changed. Save setup to keep it.";
+                "Placement order changed.";
         }
     }
 }

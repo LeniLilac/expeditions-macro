@@ -21,8 +21,7 @@ public partial class MacroPage
         {
             ResetTaskEditor();
         }
-        ShowPlanBlocksStatus(
-            "Task removed. Save the plan to persist the change.");
+        QueuePlanAutoSave();
     }
 
     private void ResetTaskEditor()
