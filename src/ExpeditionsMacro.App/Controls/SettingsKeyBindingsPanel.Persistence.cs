@@ -88,11 +88,20 @@ public partial class SettingsKeyBindingsPanel
                 UpgradeUnitKey = key.ToString(),
             });
 
-    private Task ApplyAutoUpgradeAsync(char key) =>
+    private Task ApplyAutoUpgradeUnitAsync(char key) =>
         ApplySettingsAsync(
             settings => settings with
             {
-                ToggleAutoUpgradeUnitKey = key.ToString(),
+                AutoUpgradeUnitKey = key.ToString(),
+            });
+
+    private Task ApplyToggleAutoUpgradePlacedUnitsAsync(
+        char key) =>
+        ApplySettingsAsync(
+            settings => settings with
+            {
+                ToggleAutoUpgradePlacedUnitsKey =
+                    key.ToString(),
             });
 
     private Task ApplyShiftLockAsync(int virtualKey) =>

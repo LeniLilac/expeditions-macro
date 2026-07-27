@@ -1,4 +1,5 @@
 using System.Windows;
+using ExpeditionsMacro.App.Controls;
 using ExpeditionsMacro.App.Models;
 using ExpeditionsMacro.Core.Models;
 
@@ -6,15 +7,29 @@ namespace ExpeditionsMacro.App.Pages;
 
 public partial class PlacementModelsPage
 {
-    internal void SetSnapshotState()
+    internal void SetSnapshotState(
+        bool showRecordingSettings = false)
     {
         if (!FastWorkflow) return;
         _selectedModel = null;
         _selectedSetupTarget =
-            PlacementSetupCatalog.All[0].Target;
+            showRecordingSettings
+                ? PlacementSetupCatalog.All
+                    .Single(route =>
+                        route.Target.Mode ==
+                            PlacementTargetMode.Event &&
+                        route.Target.ActNumber ==
+                            (int)EventAct.Act1 &&
+                        route.Target.SpawnRoute ==
+                            EventSpawnRoute.Angle2)
+                    .Target
+                : PlacementSetupCatalog.All[0]
+                    .Target;
         ApplyFastTarget(_selectedSetupTarget);
         FastTeamCombo.SelectedIndex = 2;
         ResetFastTimingDefaults();
+        ResetFastRecordingSettings();
+        FastEditorPanel.ClearSnapshotSettings();
         _steps.Clear();
         InsertStepInPhaseOrder(new PlacementStepRow
         {
@@ -53,6 +68,29 @@ public partial class PlacementModelsPage
         FastStepsList.SelectedIndex = 1;
         FastStatusText.Text = string.Empty;
         UpdateFastPlacementCount();
+        if (showRecordingSettings)
+        {
+            const string recordingId =
+                "snapshot-event-angle-2";
+            _fastImpossibilityThresholdMinutes =
+                18;
+            _fastManualRecordingId =
+                recordingId;
+            FastEditorPanel.SetManualRecordingMode(
+                enabled: true,
+                recordingId,
+                [
+                    new ManualRecordingChoice(
+                        recordingId,
+                        "Event Act 1 Angle 2 run"),
+                ]);
+            FastEditorPanel.SetSnapshotSettings(
+                _fastPlacementIntervalMilliseconds,
+                _fastDefaultAfterStartDelayMilliseconds,
+                _fastImpossibilityThresholdMinutes,
+                recordingId,
+                "Event Act 1 Angle 2 run");
+        }
     }
 
     private void ApplyWorkflowMode()
@@ -60,18 +98,11 @@ public partial class PlacementModelsPage
         bool fast = FastWorkflow;
         ModelsList.ItemsSource =
             fast ? _setupRows : _models;
-        ModelsList.Visibility =
-            fast ? Visibility.Collapsed : Visibility.Visible;
-        FastSetupList.Visibility =
-            fast ? Visibility.Visible : Visibility.Collapsed;
+        ApplyCatalogContentVisibility();
         ModelsHeaderText.Text =
             fast
                 ? "PLACEMENT SETUP"
                 : "PLACEMENT MODELS";
-        NewModelButton.Visibility =
-            fast ? Visibility.Collapsed : Visibility.Visible;
-        DeleteModelButton.Visibility =
-            fast ? Visibility.Collapsed : Visibility.Visible;
         LegacyEditorPanel.Visibility =
             fast ? Visibility.Collapsed : Visibility.Visible;
         FastEditorPanel.Visibility =

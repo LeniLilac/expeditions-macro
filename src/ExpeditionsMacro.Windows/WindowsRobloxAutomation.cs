@@ -401,15 +401,12 @@ public sealed partial class WindowsRobloxAutomation : IRobloxAutomation, IDispos
     }
 
     private void MoveCursorWithRegisteredMotion(int x, int y, int nudgeX, string failureMessage)
-    {
-        if (!NativeMethods.SetCursorPos(x, y)) throw new Win32Exception(failureMessage);
-        EmitTrace(new WindowsAutomationTrace(DateTimeOffset.UtcNow, "mouse", "set_cursor", X: x, Y: y));
-        int delta = nudgeX < 0 ? -1 : 1;
-        NativeMethods.mouse_event(NativeMethods.MouseeventfMove, delta, 0, 0, 0);
-        EmitTrace(new WindowsAutomationTrace(DateTimeOffset.UtcNow, "mouse", "move", DeltaX: delta, DeltaY: 0, Flags: NativeMethods.MouseeventfMove));
-        NativeMethods.mouse_event(NativeMethods.MouseeventfMove, -delta, 0, 0, 0);
-        EmitTrace(new WindowsAutomationTrace(DateTimeOffset.UtcNow, "mouse", "move", DeltaX: -delta, DeltaY: 0, Flags: NativeMethods.MouseeventfMove));
-    }
+        => RegisteredCursorMotion.Move(
+            x,
+            y,
+            nudgeX,
+            failureMessage,
+            EmitTrace);
 
     private async Task ParkCursorWithAcknowledgedMotionAsync(ClientBounds bounds, CancellationToken cancellationToken)
     {

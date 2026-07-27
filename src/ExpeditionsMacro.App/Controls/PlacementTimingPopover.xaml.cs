@@ -6,17 +6,35 @@ namespace ExpeditionsMacro.App.Controls;
 
 public sealed class PlacementTimingApplyEventArgs(
     string placementIntervalText,
-    string defaultAfterStartDelayText) : EventArgs
+    string defaultAfterStartDelayText,
+    string impossibilityThresholdText,
+    bool useManualRecording,
+    string? manualRecordingId) : EventArgs
 {
     public string PlacementIntervalText { get; } =
         placementIntervalText;
 
     public string DefaultAfterStartDelayText { get; } =
         defaultAfterStartDelayText;
+
+    public string ImpossibilityThresholdText { get; } =
+        impossibilityThresholdText;
+
+    public bool UseManualRecording { get; } =
+        useManualRecording;
+
+    public string? ManualRecordingId { get; } =
+        manualRecordingId;
 }
+
+public sealed record ManualRecordingChoice(
+    string Id,
+    string Name);
 
 public partial class PlacementTimingPopover : UserControl
 {
+    private string? _manualRecordingId;
+
     public PlacementTimingPopover()
     {
         InitializeComponent();
@@ -27,7 +45,12 @@ public partial class PlacementTimingPopover : UserControl
 
     public void SetValues(
         int placementIntervalMilliseconds,
-        int defaultAfterStartDelayMilliseconds)
+        int defaultAfterStartDelayMilliseconds,
+        int impossibilityThresholdMinutes,
+        bool manualRecordingEnabled,
+        string? selectedRecordingId,
+        IReadOnlyList<ManualRecordingChoice>
+            recordings)
     {
         PlacementIntervalText.Text =
             placementIntervalMilliseconds.ToString(
@@ -37,9 +60,31 @@ public partial class PlacementTimingPopover : UserControl
                 .ToString(
                     "0.###",
                     CultureInfo.CurrentCulture);
+        ImpossibilityThresholdText.Text =
+            impossibilityThresholdMinutes.ToString(
+                CultureInfo.CurrentCulture);
+        ManualRecordingPanel.Visibility =
+            manualRecordingEnabled ||
+            !string.IsNullOrWhiteSpace(
+                selectedRecordingId)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        _manualRecordingId =
+            !string.IsNullOrWhiteSpace(
+                selectedRecordingId)
+                ? selectedRecordingId
+                : recordings.FirstOrDefault()?.Id;
+        UseManualRecordingCheck.IsChecked =
+            !string.IsNullOrWhiteSpace(
+                selectedRecordingId);
+        UpdateManualRecordingState();
         ShowError(string.Empty);
-        PlacementIntervalText.Focus();
-        PlacementIntervalText.SelectAll();
+        TextBox initialField =
+            UseManualRecordingCheck.IsChecked == true
+                ? ImpossibilityThresholdText
+                : PlacementIntervalText;
+        initialField.Focus();
+        initialField.SelectAll();
     }
 
     public void ShowError(string message)
@@ -58,5 +103,23 @@ public partial class PlacementTimingPopover : UserControl
             this,
             new PlacementTimingApplyEventArgs(
                 PlacementIntervalText.Text,
-                DefaultAfterStartDelayText.Text));
+                DefaultAfterStartDelayText.Text,
+                ImpossibilityThresholdText.Text,
+                UseManualRecordingCheck
+                    .IsChecked == true,
+                _manualRecordingId));
+
+    private void UseManualRecordingCheck_Changed(
+        object sender,
+        RoutedEventArgs e) =>
+        UpdateManualRecordingState();
+
+    private void UpdateManualRecordingState()
+    {
+        PlacementTimingFieldsPanel.Visibility =
+            UseManualRecordingCheck.IsChecked ==
+            true
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+    }
 }

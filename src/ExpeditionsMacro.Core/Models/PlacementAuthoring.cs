@@ -127,13 +127,23 @@ public sealed record PlacementTarget
 
     public int ActNumber { get; init; }
 
+    public EventSpawnRoute SpawnRoute { get; init; } =
+        EventSpawnRoute.Angle1;
+
     public void Validate()
     {
         if (!Enum.IsDefined(Mode) ||
-            !Enum.IsDefined(StoryRunKind))
+            !Enum.IsDefined(StoryRunKind) ||
+            !Enum.IsDefined(SpawnRoute))
         {
             throw new InvalidDataException(
                 "The placement route is invalid.");
+        }
+        if (Mode != PlacementTargetMode.Event &&
+            SpawnRoute != EventSpawnRoute.Angle1)
+        {
+            throw new InvalidDataException(
+                "Alternate spawn routes are only valid for Event placements.");
         }
 
         switch (Mode)
@@ -174,6 +184,12 @@ public sealed record PlacementTarget
                     (int)EventModeId.VillainInvasion,
                     "Event mode");
                 RequireRange(ActNumber, 1, 4, "Event act");
+                if (ActNumber != (int)EventAct.Act1 &&
+                    SpawnRoute != EventSpawnRoute.Angle1)
+                {
+                    throw new InvalidDataException(
+                        "Only Villain Invasion Act 1 supports alternate spawn routes.");
+                }
                 break;
             default:
                 throw new InvalidDataException(
@@ -185,7 +201,8 @@ public sealed record PlacementTarget
         Mode == other.Mode &&
         MapNumber == other.MapNumber &&
         StoryRunKind == other.StoryRunKind &&
-        ActNumber == other.ActNumber;
+        ActNumber == other.ActNumber &&
+        SpawnRoute == other.SpawnRoute;
 
     public static PlacementTarget ForExpedition(
         ExpeditionPreset preset) =>
@@ -233,6 +250,7 @@ public sealed record PlacementTarget
             Mode = PlacementTargetMode.Event,
             MapNumber = (int)preset.Mode,
             ActNumber = (int)preset.Act,
+            SpawnRoute = preset.SpawnRoute,
         };
 
     private static void RequireRange(

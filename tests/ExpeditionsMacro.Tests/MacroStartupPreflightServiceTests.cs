@@ -9,10 +9,11 @@ using ExpeditionsMacro.Vision.Settings;
 
 namespace ExpeditionsMacro.Tests;
 
-public sealed class MacroStartupPreflightServiceTests
+public sealed partial class MacroStartupPreflightServiceTests
 {
     [Fact]
-    public async Task DisabledNormalization_StillRequiresStableLobby()
+    public async Task
+        PreparationChecksDisabled_RequiresStableLobbyWithoutSettingsInput()
     {
         TestFrames frames = new();
         PreflightAutomation automation =
@@ -24,7 +25,8 @@ public sealed class MacroStartupPreflightServiceTests
         GameSettingsNormalizationResult result =
             await service.RunAsync(
                 new LobbyDetector(frames.Lobby),
-                normalizeSettings: false,
+                normalizeUiScale: false,
+                normalizeGameSettings: false,
                 progress: null,
                 log: null,
                 CancellationToken.None);
@@ -34,6 +36,7 @@ public sealed class MacroStartupPreflightServiceTests
         Assert.Empty(automation.Clicks);
         Assert.Empty(automation.Keys);
         Assert.Empty(automation.Drags);
+        Assert.Empty(automation.AppliedScaleValues);
         Assert.Equal(0, automation.PitchPreparationCount);
         Assert.Equal((808, 611), automation.ResizeRequest);
     }
@@ -51,7 +54,8 @@ public sealed class MacroStartupPreflightServiceTests
         GameSettingsNormalizationResult result =
             await service.RunAsync(
                 new LobbyDetector(frames.EventThemeLobby),
-                normalizeSettings: false,
+                normalizeUiScale: false,
+                normalizeGameSettings: false,
                 progress: null,
                 log: null,
                 CancellationToken.None);
@@ -60,6 +64,7 @@ public sealed class MacroStartupPreflightServiceTests
         Assert.False(result.UiScaleChanged);
         Assert.Empty(automation.Clicks);
         Assert.Empty(automation.Keys);
+        Assert.Equal(0, automation.PitchPreparationCount);
     }
 
     [Fact]
@@ -79,7 +84,8 @@ public sealed class MacroStartupPreflightServiceTests
             await Assert.ThrowsAsync<RobloxUiUnavailableException>(
                 () => service.RunAsync(
                     new LobbyDetector(frames.Lobby),
-                    normalizeSettings: true,
+                    normalizeUiScale: true,
+                    normalizeGameSettings: true,
                     progress: null,
                     log: null,
                     CancellationToken.None));
@@ -185,7 +191,8 @@ public sealed class MacroStartupPreflightServiceTests
                 new LobbyDetector(
                     frames.Lobby,
                     alwaysLobby: true),
-                normalizeSettings: false,
+                normalizeUiScale: false,
+                normalizeGameSettings: false,
                 progress: null,
                 log: null,
                 CancellationToken.None));
@@ -218,7 +225,8 @@ public sealed class MacroStartupPreflightServiceTests
         GameSettingsNormalizationResult result =
             await service.RunAsync(
                 new LobbyDetector(frames.Lobby),
-                normalizeSettings: true,
+                normalizeUiScale: true,
+                normalizeGameSettings: true,
                 progress: null,
                 log: null,
                 CancellationToken.None);
@@ -234,7 +242,7 @@ public sealed class MacroStartupPreflightServiceTests
     }
 
     [Fact]
-    public async Task NonCanonicalScale_UsesAccessibilityKeysThenReopensSettings()
+    public async Task NonCanonicalScale_UsesDetectedInputThenReopensSettings()
     {
         TestFrames frames = new();
         PreflightAutomation automation =
@@ -249,7 +257,8 @@ public sealed class MacroStartupPreflightServiceTests
         GameSettingsNormalizationResult result =
             await service.RunAsync(
                 new LobbyDetector(frames.Lobby),
-                normalizeSettings: true,
+                normalizeUiScale: true,
+                normalizeGameSettings: true,
                 progress: null,
                 log: null,
                 CancellationToken.None);
@@ -263,33 +272,23 @@ public sealed class MacroStartupPreflightServiceTests
         Assert.Contains(
             RobloxKeyboardKey.Digit1,
             automation.Keys);
+        GameSettingsUiScaleInputMatch input =
+            GameSettingsNavigationDetector
+                .DetectUiScaleInput(frames.Scale080);
+        Assert.Contains(
+            (input.ActionX, input.ActionY),
+            automation.Clicks);
         Assert.Equal(
-            2,
-            clock.Delays.Count(
-                delay =>
-                    delay == TimeSpan.FromSeconds(1)));
-        Assert.True(
-            clock.Delays.Count(
-                delay =>
-                    delay ==
-                    TimeSpan.FromMilliseconds(500)) >= 28);
-        SequenceAssertions.ContainsContiguous(
-            automation.Keys,
-            [
-                RobloxKeyboardKey.Backslash,
-                RobloxKeyboardKey.RightArrow,
-                RobloxKeyboardKey.Enter,
-                RobloxKeyboardKey.LeftArrow,
-                .. Enumerable.Repeat(
-                    RobloxKeyboardKey.DownArrow,
-                    7),
-                RobloxKeyboardKey.Enter,
-                RobloxKeyboardKey.RightArrow,
-                RobloxKeyboardKey.DownArrow,
-                RobloxKeyboardKey.DownArrow,
-                RobloxKeyboardKey.LeftArrow,
-                RobloxKeyboardKey.Enter,
-            ]);
+            8,
+            automation.Keys.Count(
+                key =>
+                    key == RobloxKeyboardKey.Backspace));
+        Assert.DoesNotContain(
+            RobloxKeyboardKey.DownArrow,
+            automation.Keys);
+        Assert.DoesNotContain(
+            RobloxKeyboardKey.LeftArrow,
+            automation.Keys);
         Assert.Same(frames.Lobby, automation.CurrentFrame);
     }
 
@@ -333,6 +332,15 @@ public sealed class MacroStartupPreflightServiceTests
         Assert.Contains(
             RobloxKeyboardKey.Period,
             automation.Keys);
+        GameSettingsUiScaleInputMatch input =
+            GameSettingsNavigationDetector
+                .DetectUiScaleInput(frames.Scale120);
+        Assert.Equal(
+            2,
+            automation.Clicks.Count(
+                point =>
+                    point ==
+                    (input.ActionX, input.ActionY)));
         Assert.Same(
             frames.NonLobby,
             automation.CurrentFrame);
@@ -386,6 +394,9 @@ public sealed class MacroStartupPreflightServiceTests
 
         public List<TimeSpan> Delays { get; } = [];
 
+        public void Advance(TimeSpan duration) =>
+            UtcNow += duration;
+
         public Task DelayAsync(
             TimeSpan duration,
             CancellationToken cancellationToken)
@@ -404,7 +415,6 @@ public sealed class MacroStartupPreflightServiceTests
         private readonly TestFrames _frames;
         private ClientBounds _client =
             new(0, 0, 808, 611);
-        private bool _scaleInputReady;
         private bool _editingScale;
         private string _scaleInput = string.Empty;
         private bool _scaleNormalized;
@@ -412,9 +422,6 @@ public sealed class MacroStartupPreflightServiceTests
         private bool _accessibilityEnabled;
         private bool _navigationAtRoot;
         private bool _navigationAtSettingsButton;
-        private bool _miscSelected;
-        private int _miscDownCount;
-        private int _scaleNavigationStep;
         private readonly ImageFrame _closedFrame;
 
         public PreflightAutomation(
@@ -570,6 +577,33 @@ public sealed class MacroStartupPreflightServiceTests
                 CurrentFrame = _frames.Miscellaneous;
                 return Task.CompletedTask;
             }
+            GameSettingsNavigationActionMatch miscAction =
+                GameSettingsNavigationDetector
+                    .DetectPageAction(
+                        CurrentFrame,
+                        GameSettingsPage.Miscellaneous);
+            if (miscAction.Available &&
+                (x, y) ==
+                (
+                    miscAction.ActionX,
+                    miscAction.ActionY))
+            {
+                CurrentFrame = _frames.Miscellaneous;
+                return Task.CompletedTask;
+            }
+            GameSettingsUiScaleInputMatch scaleInput =
+                GameSettingsNavigationDetector
+                    .DetectUiScaleInput(CurrentFrame);
+            if (scaleInput.Available &&
+                (x, y) ==
+                (
+                    scaleInput.ActionX,
+                    scaleInput.ActionY))
+            {
+                _editingScale = true;
+                _scaleInput = string.Empty;
+                return Task.CompletedTask;
+            }
             if ((x, y) == (638, 222))
             {
                 CurrentFrame = GameplayFrameAfterToggle;
@@ -649,8 +683,6 @@ public sealed class MacroStartupPreflightServiceTests
                 {
                     _navigationAtRoot = true;
                     _navigationAtSettingsButton = false;
-                    _miscDownCount = 0;
-                    _scaleNavigationStep = 0;
                 }
             }
             else if (_accessibilityEnabled &&
@@ -666,56 +698,11 @@ public sealed class MacroStartupPreflightServiceTests
             {
                 _navigationAtSettingsButton = false;
                 _settingsOpen = !_settingsOpen;
-                _miscSelected = false;
-                _scaleInputReady = false;
                 CurrentFrame = _settingsOpen
                     ? _scaleNormalized
                         ? _frames.Gameplay
                         : SettingsOpenFrame
                     : _closedFrame;
-            }
-            else if (_accessibilityEnabled &&
-                     _settingsOpen &&
-                     !_miscSelected &&
-                     key == RobloxKeyboardKey.DownArrow)
-            {
-                _miscDownCount++;
-            }
-            else if (_accessibilityEnabled &&
-                     _settingsOpen &&
-                     !_miscSelected &&
-                     key == RobloxKeyboardKey.Enter &&
-                     _miscDownCount >= 7)
-            {
-                _miscSelected = true;
-                _scaleNavigationStep = 0;
-            }
-            else if (_accessibilityEnabled &&
-                     _miscSelected &&
-                     key == RobloxKeyboardKey.RightArrow)
-            {
-                _scaleNavigationStep = 1;
-            }
-            else if (_accessibilityEnabled &&
-                     _miscSelected &&
-                     key == RobloxKeyboardKey.DownArrow &&
-                     _scaleNavigationStep is 1 or 2)
-            {
-                _scaleNavigationStep++;
-            }
-            else if (_accessibilityEnabled &&
-                     _miscSelected &&
-                     key == RobloxKeyboardKey.LeftArrow &&
-                     _scaleNavigationStep == 3)
-            {
-                _scaleInputReady = true;
-            }
-            else if (key == RobloxKeyboardKey.Enter &&
-                     _scaleInputReady &&
-                     !_editingScale)
-            {
-                _editingScale = true;
-                _scaleInput = string.Empty;
             }
             else if (key == RobloxKeyboardKey.Enter &&
                      _editingScale)
@@ -729,9 +716,9 @@ public sealed class MacroStartupPreflightServiceTests
                         .DetectPanel(CurrentFrame);
                 _scaleNormalized =
                     panel.Visible &&
-                    Math.Abs(panel.UiScale - 1) <=
                     GameSettingsScreenDetector
-                        .CanonicalScaleTolerance;
+                        .IsCanonicalUiScale(
+                            panel.UiScale);
                 _editingScale = false;
             }
             else if (key == RobloxKeyboardKey.Backspace &&

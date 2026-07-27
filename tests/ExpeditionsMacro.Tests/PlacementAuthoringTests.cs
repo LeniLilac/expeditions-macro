@@ -27,6 +27,9 @@ public sealed class PlacementAuthoringTests
         json["steps"]!.AsArray()[0]!
             .AsObject()
             .Remove("delay_after_start_milliseconds");
+        json["steps"]!.AsArray()[0]!
+            .AsObject()
+            .Remove("auto_upgrade");
 
         PlacementModel legacy = Deserialize<PlacementModel>(json);
 
@@ -49,6 +52,7 @@ public sealed class PlacementAuthoringTests
             PlacementAuthoringRules
                 .DefaultAfterStartDelayMilliseconds,
             legacy.DefaultAfterStartDelayMilliseconds);
+        Assert.True(Assert.Single(legacy.Steps).AutoUpgrade);
         legacy.Validate();
     }
 
@@ -516,7 +520,7 @@ public sealed class PlacementAuthoringTests
         IReadOnlyList<PlacementSetupRoute> routes =
             PlacementSetupCatalog.All;
 
-        Assert.Equal(56, routes.Count);
+        Assert.Equal(57, routes.Count);
         Assert.Equal(
             routes.Count,
             routes.Select(route => route.ModelId)
@@ -554,10 +558,59 @@ public sealed class PlacementAuthoringTests
                 route.Target.Mode ==
                 PlacementTargetMode.Raid));
         Assert.Equal(
-            4,
+            5,
             routes.Count(route =>
                 route.Target.Mode ==
                 PlacementTargetMode.Event));
+    }
+
+    [Fact]
+    public void EventActOneAngles_AreDistinctPlacementRoutes()
+    {
+        PlacementTarget angleOne = new()
+        {
+            Mode = PlacementTargetMode.Event,
+            MapNumber =
+                (int)EventModeId.VillainInvasion,
+            ActNumber = (int)EventAct.Act1,
+            SpawnRoute = EventSpawnRoute.Angle1,
+        };
+        PlacementTarget angleTwo = angleOne with
+        {
+            SpawnRoute = EventSpawnRoute.Angle2,
+        };
+
+        Assert.False(angleOne.Matches(angleTwo));
+        Assert.NotEqual(
+            PlacementSetupCatalog.IdFor(angleOne),
+            PlacementSetupCatalog.IdFor(angleTwo));
+        Assert.Contains(
+            "Angle 2",
+            PlacementSetupCatalog.NameFor(angleTwo),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LegacyEventTarget_DefaultsToActOneAngleOne()
+    {
+        PlacementTarget current = new()
+        {
+            Mode = PlacementTargetMode.Event,
+            MapNumber =
+                (int)EventModeId.VillainInvasion,
+            ActNumber = (int)EventAct.Act1,
+            SpawnRoute = EventSpawnRoute.Angle2,
+        };
+        JsonObject json = SerializeObject(current);
+        json.Remove("spawn_route");
+
+        PlacementTarget legacy =
+            Deserialize<PlacementTarget>(json);
+
+        Assert.Equal(
+            EventSpawnRoute.Angle1,
+            legacy.SpawnRoute);
+        legacy.Validate();
     }
 
     private static PlacementModel Placement(

@@ -206,6 +206,7 @@ public partial class MacroPage
                 target.MapNumber,
             Act = (EventAct)
                 target.ActNumber,
+            SpawnRoute = target.SpawnRoute,
             PlacementModelId = placement.Id,
             TeamSlot = placement.TeamSlot,
             DefeatRetries = task.DefeatRetries,
@@ -239,6 +240,10 @@ public partial class MacroPage
             model.ValidateCompatibility(
                 CameraPreparationMode.FastNoAlign,
                 target);
+            await ValidateManualRecordingDependencyAsync(
+                    model,
+                    cancellationToken)
+                .ConfigureAwait(false);
             return model;
         }
 
@@ -247,6 +252,36 @@ public partial class MacroPage
             candidates.Select(route => route.Name));
         throw new InvalidOperationException(
             $"Configure {names} in Placement Setup before starting this plan.");
+    }
+
+    private async Task
+        ValidateManualRecordingDependencyAsync(
+            PlacementModel model,
+            CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(
+                model.ManualInputRecordingId))
+        {
+            return;
+        }
+
+        if (!_services.Settings
+                .ManualInputRecordingEnabled)
+        {
+            throw new InvalidOperationException(
+                $"{model.Name} uses a manual recording, but Advanced manual recordings are disabled. Re-enable them in Settings or turn off Use manual recording for this Placement Setup route.");
+        }
+
+        ManualInputRecording? recording =
+            await _services.ManualRecordings.LoadAsync(
+                    model.ManualInputRecordingId,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        if (recording is null)
+        {
+            throw new InvalidOperationException(
+                $"{model.Name} references a manual recording that no longer exists. Select an available recording or turn off Use manual recording in Placement Setup.");
+        }
     }
 
     private static PlacementTarget RequireTarget(

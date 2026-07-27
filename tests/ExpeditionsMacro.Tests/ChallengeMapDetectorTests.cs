@@ -105,7 +105,10 @@ public sealed class ChallengeMapDetectorTests
         Assert.False(detector.SupportsChallengeMaps);
         InvalidOperationException error = Assert.Throws<InvalidOperationException>(
             () => detector.ChallengeMapForType(frame, ChallengeType.Trait));
-        Assert.Contains("Update the detector pack in Settings or reinstall Expeditions Macro", error.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            "Reinstall or update Expeditions Macro from a complete release package",
+            error.Message,
+            StringComparison.Ordinal);
         Assert.DoesNotContain("thumbnail", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -137,7 +140,10 @@ public sealed class ChallengeMapDetectorTests
             'P'));
 
         Assert.Contains("does not include the Challenge map references", error.Message, StringComparison.Ordinal);
-        Assert.Contains("Update the detector pack in Settings or reinstall Expeditions Macro", error.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            "Reinstall or update Expeditions Macro from a complete release package",
+            error.Message,
+            StringComparison.Ordinal);
     }
 
     private static async Task<IDetectorPack> LoadDetectorAsync(string? directory = null)

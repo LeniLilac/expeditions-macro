@@ -14,6 +14,12 @@ public sealed class MacroPlanTaskRequestedEventArgs(
     public MacroTaskRow Task { get; } = task;
 }
 
+public sealed class MacroPlanLoopRequestedEventArgs(
+    MacroPlanLoopBlockNode loop) : EventArgs
+{
+    public MacroPlanLoopBlockNode Loop { get; } = loop;
+}
+
 public partial class MacroPlanLoopEditor :
     UserControl
 {
@@ -23,6 +29,7 @@ public partial class MacroPlanLoopEditor :
     public MacroPlanLoopEditor()
     {
         InitializeComponent();
+        InitializeLoopSettings();
         StructureTree.ItemsSource = RootBlocks;
         RootDropZone.Visibility =
             Visibility.Collapsed;
@@ -39,8 +46,13 @@ public partial class MacroPlanLoopEditor :
         MacroPlanTaskRequestedEventArgs>?
         RemoveTaskRequested;
 
+    public event EventHandler<
+        MacroPlanLoopRequestedEventArgs>?
+        AddTaskRequested;
+
     public ObservableCollection<MacroPlanBlockNode>
-        RootBlocks { get; } = [];
+        RootBlocks
+    { get; } = [];
 
     public IReadOnlyList<MacroTaskRow>
         OrderedTaskRows =>
@@ -180,15 +192,106 @@ public partial class MacroPlanLoopEditor :
         UpdateState();
     }
 
-    private void AddLoop_Click(
-        object sender,
-        RoutedEventArgs e)
+    public void AddLoopBlock()
     {
+        if (!_interactionEnabled)
+        {
+            return;
+        }
         MacroPlanLoopBlockNode loop =
             MacroPlanStructure.AddLoopBlock(
                 RootBlocks);
         Subscribe(loop);
         CompleteChange();
+    }
+
+    public IReadOnlyList<MacroPlanLoopBlockNode>
+        LoopBlocks =>
+        MacroPlanStructure.FlattenLoops(
+            RootBlocks);
+
+    public MacroPlanLoopBlockNode? ParentLoopFor(
+        MacroTaskRow row)
+    {
+        MacroPlanTaskBlockNode? node =
+            MacroPlanStructure.FlattenTasks(
+                    RootBlocks)
+                .FirstOrDefault(candidate =>
+                    string.Equals(
+                        candidate.TaskRow
+                            .Definition.Id,
+                        row.Definition.Id,
+                        StringComparison
+                            .OrdinalIgnoreCase));
+        if (node is null ||
+            !MacroPlanStructureMove.TryFindOwner(
+                RootBlocks,
+                node,
+                out _,
+                out MacroPlanLoopBlockNode? parent))
+        {
+            return null;
+        }
+        return parent;
+    }
+
+    public bool TryPlaceTask(
+        MacroTaskRow row,
+        MacroPlanLoopBlockNode? destination,
+        out string error)
+    {
+        MacroPlanTaskBlockNode? node =
+            MacroPlanStructure.FlattenTasks(
+                    RootBlocks)
+                .FirstOrDefault(candidate =>
+                    string.Equals(
+                        candidate.TaskRow
+                            .Definition.Id,
+                        row.Definition.Id,
+                        StringComparison
+                            .OrdinalIgnoreCase));
+        if (node is null)
+        {
+            error =
+                "The task could not be found in the plan.";
+            return false;
+        }
+        MacroPlanLoopBlockNode? current =
+            ParentLoopFor(row);
+        if (ReferenceEquals(current, destination))
+        {
+            error = string.Empty;
+            return true;
+        }
+        bool moved = destination is null
+            ? MacroPlanStructureMove.TryMoveToRoot(
+                RootBlocks,
+                node,
+                out error)
+            : MacroPlanStructureMove.TryMoveInside(
+                RootBlocks,
+                node,
+                destination,
+                out error);
+        if (moved)
+        {
+            CompleteChange();
+        }
+        return moved;
+    }
+
+    private void AddTaskToLoop_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is
+            MacroPlanLoopBlockNode loop)
+        {
+            AddTaskRequested?.Invoke(
+                this,
+                new MacroPlanLoopRequestedEventArgs(
+                    loop));
+        }
     }
 
     private void RemoveLoop_Click(
@@ -280,18 +383,10 @@ public partial class MacroPlanLoopEditor :
 
     private void UpdateState()
     {
-        bool hasLoops =
-            MacroPlanStructure.FlattenLoops(
-                RootBlocks).Count != 0;
-        LoopHeading.Visibility = hasLoops
-            ? Visibility.Visible
-            : Visibility.Collapsed;
         StructureTree.Visibility =
             RootBlocks.Count == 0
                 ? Visibility.Collapsed
                 : Visibility.Visible;
-        AddLoopButton.IsEnabled =
-            _interactionEnabled;
         StructureTree.IsEnabled =
             _interactionEnabled;
     }

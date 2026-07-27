@@ -184,7 +184,33 @@ public static class PlacementSetupCatalog
                 $"setup-raid-map-1-act-{act}");
         }
 
-        for (int act = 1; act <= 4; act++)
+        Add(
+            routes,
+            new PlacementTarget
+            {
+                Mode = PlacementTargetMode.Event,
+                MapNumber =
+                    (int)EventModeId.VillainInvasion,
+                ActNumber = (int)EventAct.Act1,
+                SpawnRoute = EventSpawnRoute.Angle1,
+            },
+            "Event",
+            "Villain Invasion · Act 1 · Angle 1",
+            "setup-event-villain-invasion-act-1");
+        Add(
+            routes,
+            new PlacementTarget
+            {
+                Mode = PlacementTargetMode.Event,
+                MapNumber =
+                    (int)EventModeId.VillainInvasion,
+                ActNumber = (int)EventAct.Act1,
+                SpawnRoute = EventSpawnRoute.Angle2,
+            },
+            "Event",
+            "Villain Invasion · Act 1 · Angle 2",
+            "setup-event-villain-invasion-act-1-angle-2");
+        for (int act = 2; act <= 4; act++)
         {
             Add(
                 routes,

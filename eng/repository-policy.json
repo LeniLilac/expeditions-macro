@@ -20,7 +20,7 @@
   "lineDebt": [
     {
       "path": "src/ExpeditionsMacro.Automation/Challenges/ChallengeMacroRunner.cs",
-      "maxLines": 825,
+      "maxLines": 777,
       "reason": "Existing mode-runner orchestration debt; extract state-specific workflow services when touched."
     },
     {
@@ -30,17 +30,17 @@
     },
     {
       "path": "src/ExpeditionsMacro.Automation/Expeditions/ExpeditionMacroRunner.cs",
-      "maxLines": 1005,
+      "maxLines": 973,
       "reason": "Existing mode-runner orchestration debt; extract state-specific workflow services when touched."
     },
     {
       "path": "src/ExpeditionsMacro.Windows/WindowsRobloxAutomation.cs",
-      "maxLines": 797,
+      "maxLines": 794,
       "reason": "Existing Windows adapter debt; separate window, capture, keyboard, pointer, and diagnostics concerns."
     },
     {
       "path": "src/ExpeditionsMacro.Automation/Stages/StageMacroRunner.cs",
-      "maxLines": 515,
+      "maxLines": 505,
       "reason": "Existing shared Story/Raid orchestration debt; extract navigation and terminal handoff services."
     },
     {

@@ -54,6 +54,45 @@ public sealed class CurrentExpeditionSelectorTests
         Assert.InRange(stageY, 582, 596);
     }
 
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void Selector_ToleratesSharedVerticalPhaseAndGreenLighting()
+    {
+        if (!Directory.Exists(TestPaths.Datasets))
+        {
+            return;
+        }
+        CompiledDetectorPack pack = LoadPack();
+        ImageFrame image = ImageCodec.Load(
+            Path.Combine(
+                TestPaths.Datasets,
+                "Expedition_Map_Select_Selection_Regression",
+                "Map1_GreenLightingVerticalPhase.png"));
+
+        IReadOnlyDictionary<string, double> scores =
+            pack.ScoreStates(image);
+        Assert.Equal(
+            "map_select",
+            pack.RecoveryState(image));
+        Assert.Equal(
+            "map_select",
+            pack.Classify(scores));
+        Assert.Equal(1, pack.SelectedMap(image));
+        Assert.Equal(
+            1,
+            pack.SelectedDifficulty(image));
+        Assert.Equal(
+            (82, 123),
+            pack.ActionFor("map_1", image));
+
+        (int stageX, int stageY) =
+            pack.ActionFor(
+                "select_stage",
+                image);
+        Assert.InRange(stageX, 245, 263);
+        Assert.InRange(stageY, 582, 596);
+    }
+
     private static CompiledDetectorPack LoadPack()
     {
         DetectorPackManifest manifest =

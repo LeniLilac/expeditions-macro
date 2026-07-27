@@ -9,7 +9,8 @@ public static class GameSettingsScreenDetector
 {
     public const int ClientWidth = 808;
     public const int ClientHeight = 611;
-    public const double CanonicalScaleTolerance = 0.015;
+    public const double MinimumCanonicalUiScale = 0.98;
+    public const double MaximumCanonicalUiScale = 1.02;
     public const int SettingsButtonX = 232;
     public const int SettingsButtonY = 34;
     public const int UnitsScrollbarTopY = 185;
@@ -126,8 +127,7 @@ public static class GameSettingsScreenDetector
         GameSettingsPanelMatch panel = DetectPanel(image);
         if (!panel.Visible ||
             !panel.Settled ||
-            Math.Abs(panel.UiScale - 1) >
-                CanonicalScaleTolerance)
+            !IsCanonicalUiScale(panel.UiScale))
         {
             return TracePage(
                 new GameSettingsPageMatch(
@@ -170,6 +170,14 @@ public static class GameSettingsScreenDetector
                     ranked[0].Score);
         return TracePage(match);
     }
+
+    public static bool IsCanonicalUiScale(
+        double uiScale) =>
+        double.IsFinite(uiScale) &&
+        uiScale >=
+            MinimumCanonicalUiScale - 1e-9 &&
+        uiScale <=
+            MaximumCanonicalUiScale + 1e-9;
 
     public static GameSettingToggleMatch DetectToggle(
         ImageFrame image,

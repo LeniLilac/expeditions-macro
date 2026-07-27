@@ -1,3 +1,4 @@
+using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
@@ -7,6 +8,38 @@ namespace ExpeditionsMacro.Automation.Challenges;
 
 public sealed partial class ChallengeMacroRunner
 {
+    private async Task<IReadOnlyDictionary<
+        ChallengeMapId,
+        ManualInputRecording>> ResolveManualRecordingsAsync(
+        ChallengePreset preset,
+        IReadOnlyDictionary<
+            ChallengeMapId,
+            ChallengeMapRuntimeModels> mapModels,
+        CancellationToken cancellationToken)
+    {
+        Dictionary<ChallengeMapId, ManualInputRecording>
+            recordings = [];
+        foreach (ChallengeMapProfile profile in
+                 preset.Maps)
+        {
+            ChallengeMapRuntimeModels models =
+                mapModels[profile.Map];
+            ManualInputRecording? recording =
+                await ManualInputMatchPlayback.ResolveAsync(
+                        _manualInputs,
+                        models.PrestartPlacement,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            if (recording is not null)
+            {
+                recordings.Add(
+                    profile.Map,
+                    recording);
+            }
+        }
+        return recordings;
+    }
+
     private async Task PrepareCameraAsync(
         RobloxWindow window,
         ChallengePreset preset,
@@ -180,6 +213,35 @@ public sealed partial class ChallengeMacroRunner
         {
             throw new InvalidDataException(
                 $"The {Label(profile.Map)} camera model uses a different Roblox client size.");
+        }
+    }
+
+    private static char ValidatePlayMenuKey(
+        char value)
+    {
+        char normalized =
+            char.ToUpperInvariant(value);
+        if (!char.IsAsciiLetter(normalized))
+        {
+            throw new InvalidDataException(
+                "Scroll down to Controls on the Dashboard, then set Toggle Play Menu key to match Anime Expeditions' Toggle Play Menu binding.");
+        }
+        return normalized;
+    }
+
+    private static void ValidateTeamKey(
+        bool required,
+        char? value)
+    {
+        if (!required)
+        {
+            return;
+        }
+        if (value is null ||
+            !char.IsAsciiLetter(value.Value))
+        {
+            throw new InvalidDataException(
+                "Scroll down to Controls on the Dashboard, then set Toggle Unit Inventory key to match Anime Expeditions' Toggle Unit Inventory binding before using a saved team.");
         }
     }
 }

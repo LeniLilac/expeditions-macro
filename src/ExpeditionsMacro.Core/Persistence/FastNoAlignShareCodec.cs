@@ -26,7 +26,7 @@ public static class FastNoAlignShareCodec
         if (json.Length > MaximumJsonBytes)
         {
             throw new InvalidDataException(
-                "The Fast no align plan is too large to share as text.");
+                "The Fast no align plan and its referenced presets or placement setups are too large to share as text.");
         }
 
         using MemoryStream compressed = new();
@@ -46,7 +46,7 @@ public static class FastNoAlignShareCodec
         if (code.Length > MaximumCodeCharacters)
         {
             throw new InvalidDataException(
-                "The Fast no align share code is too large.");
+                "The Fast no align plan and its referenced presets or placement setups produce a share code that is too large.");
         }
         return code;
     }

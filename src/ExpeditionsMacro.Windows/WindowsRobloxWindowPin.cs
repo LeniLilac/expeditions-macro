@@ -26,13 +26,8 @@ public sealed class WindowsRobloxWindowPin : IDisposable
         new(-2);
 
     private readonly object _gate = new();
-    private PinnedWindowState? _state;
-
-    private sealed record PinnedWindowState(
-        nint Source,
-        nint OriginalStyle,
-        nint OriginalExtendedStyle,
-        WindowBounds OriginalBounds);
+    private PinnedRobloxWindowState? _state;
+    private PinnedRobloxWindowState? _autoMinimizedState;
 
     public bool IsPinned
     {
@@ -57,6 +52,33 @@ public sealed class WindowsRobloxWindowPin : IDisposable
         }
     }
 
+    public bool IsForegroundSession(
+        nint owner)
+    {
+        lock (_gate)
+        {
+            nint foreground =
+                NativeMethods.GetForegroundWindow();
+            if (owner == nint.Zero ||
+                foreground == nint.Zero ||
+                !NativeMethods.IsWindow(owner) ||
+                !NativeMethods.IsWindow(foreground))
+            {
+                return false;
+            }
+
+            nint source =
+                _state is { } state &&
+                NativeMethods.IsWindow(state.Source)
+                    ? state.Source
+                    : nint.Zero;
+            return IsForegroundWindowAllowed(
+                owner,
+                source,
+                foreground);
+        }
+    }
+
     public void Pin(
         nint source,
         WindowBounds screenBounds)
@@ -74,7 +96,10 @@ public sealed class WindowsRobloxWindowPin : IDisposable
             }
 
             if (_state is not null &&
-                !TryUnpinCore(out string error))
+                !TryUnpinCore(
+                    PinnedWindowReleaseDisposition
+                        .Restore,
+                    out string error))
             {
                 throw new InvalidOperationException(error);
             }
@@ -91,13 +116,26 @@ public sealed class WindowsRobloxWindowPin : IDisposable
                     "Roblox is still embedded by an older macro instance. " +
                     "Close that macro, restart Roblox, and try again.");
             }
-            PinnedWindowState state = new(
-                source,
-                originalStyle,
-                NativeWindowProperties.Read(
+            PinnedRobloxWindowState state;
+            if (_autoMinimizedState is { } minimized &&
+                minimized.Source == source)
+            {
+                state = minimized;
+                _ = NativeMethods.ShowWindowAsync(
                     source,
-                    NativeMethods.GwlExStyle),
-                ReadBounds(source));
+                    NativeMethods.SwShowNoActivate);
+            }
+            else
+            {
+                _autoMinimizedState = null;
+                state = new PinnedRobloxWindowState(
+                    source,
+                    originalStyle,
+                    NativeWindowProperties.Read(
+                        source,
+                        NativeMethods.GwlExStyle),
+                    ReadBounds(source));
+            }
             try
             {
                 NativeWindowProperties.Write(
@@ -119,10 +157,13 @@ public sealed class WindowsRobloxWindowPin : IDisposable
                     screenBounds,
                     frameChanged: true);
                 _state = state;
+                _autoMinimizedState = null;
             }
             catch
             {
-                TryRestoreState(state);
+                WindowsPinnedWindowRelease
+                    .TryRestoreAfterPinFailure(
+                        state);
                 throw;
             }
         }
@@ -149,7 +190,48 @@ public sealed class WindowsRobloxWindowPin : IDisposable
     {
         lock (_gate)
         {
-            return TryUnpinCore(out error);
+            return TryUnpinCore(
+                PinnedWindowReleaseDisposition
+                    .Restore,
+                out error);
+        }
+    }
+
+    public bool TryUnpinAndMinimize(
+        out string error)
+    {
+        lock (_gate)
+        {
+            return TryUnpinCore(
+                PinnedWindowReleaseDisposition
+                    .MinimizeRetained,
+                out error);
+        }
+    }
+
+    public bool TrySuspend(out string error)
+    {
+        lock (_gate)
+        {
+            if (_state is not { } state)
+            {
+                error = string.Empty;
+                return true;
+            }
+
+            nint foreground =
+                NativeMethods.GetForegroundWindow();
+            nint insertAfter =
+                foreground != nint.Zero &&
+                foreground != state.Source &&
+                NativeMethods.IsWindow(foreground)
+                    ? foreground
+                    : HwndNotTopmost;
+            return TryUnpinCore(
+                insertAfter,
+                PinnedWindowReleaseDisposition
+                    .SuspendBehindForeground,
+                out error);
         }
     }
 
@@ -186,17 +268,54 @@ public sealed class WindowsRobloxWindowPin : IDisposable
             WsExTopmost;
     }
 
+    internal static bool IsForegroundWindowAllowed(
+        nint owner,
+        nint source,
+        nint foreground) =>
+        owner != nint.Zero &&
+        foreground != nint.Zero &&
+        (foreground == owner ||
+         (source != nint.Zero &&
+          foreground == source));
+
     private bool TryUnpinCore(
+        PinnedWindowReleaseDisposition disposition,
+        out string error) =>
+        TryUnpinCore(
+            HwndNotTopmost,
+            disposition,
+            out error);
+
+    private bool TryUnpinCore(
+        nint insertAfter,
+        PinnedWindowReleaseDisposition disposition,
         out string error)
     {
         if (_state is not { } state)
         {
+            if (disposition ==
+                    PinnedWindowReleaseDisposition
+                        .Restore &&
+                _autoMinimizedState is { } minimized &&
+                NativeMethods.IsWindow(minimized.Source) &&
+                !WindowsPinnedWindowRelease.TryRestoreNormal(
+                    minimized,
+                    out error))
+            {
+                return false;
+            }
+            if (disposition ==
+                PinnedWindowReleaseDisposition.Restore)
+            {
+                _autoMinimizedState = null;
+            }
             error = string.Empty;
             return true;
         }
         if (!NativeMethods.IsWindow(state.Source))
         {
             _state = null;
+            _autoMinimizedState = null;
             error = string.Empty;
             return true;
         }
@@ -211,7 +330,10 @@ public sealed class WindowsRobloxWindowPin : IDisposable
                 state.Source,
                 NativeMethods.GwlExStyle,
                 state.OriginalExtendedStyle);
-            RestoreBounds(state);
+            WindowsPinnedWindowRelease.Restore(
+                state,
+                insertAfter,
+                disposition);
             if (!TryReadTopmost(
                     state.Source,
                     out bool topmost) ||
@@ -223,6 +345,12 @@ public sealed class WindowsRobloxWindowPin : IDisposable
                 return false;
             }
             _state = null;
+            _autoMinimizedState =
+                disposition ==
+                    PinnedWindowReleaseDisposition
+                        .MinimizeRetained
+                    ? state
+                    : null;
             error = string.Empty;
             return true;
         }
@@ -238,7 +366,7 @@ public sealed class WindowsRobloxWindowPin : IDisposable
     }
 
     private static bool TryIsPinnedCore(
-        PinnedWindowState? state)
+        PinnedRobloxWindowState? state)
     {
         if (state is null ||
             !NativeMethods.IsWindow(state.Source) ||
@@ -343,7 +471,7 @@ public sealed class WindowsRobloxWindowPin : IDisposable
         }
         _ = NativeMethods.ShowWindowAsync(
             source,
-            NativeMethods.SwShow);
+            NativeMethods.SwShowNoActivate);
     }
 
     private static WindowBounds ReadBounds(
@@ -364,47 +492,4 @@ public sealed class WindowsRobloxWindowPin : IDisposable
             bounds.Bottom - bounds.Top);
     }
 
-    private static void TryRestoreState(
-        PinnedWindowState state)
-    {
-        try
-        {
-            NativeWindowProperties.Write(
-                state.Source,
-                NativeMethods.GwlStyle,
-                state.OriginalStyle);
-            NativeWindowProperties.Write(
-                state.Source,
-                NativeMethods.GwlExStyle,
-                state.OriginalExtendedStyle);
-            RestoreBounds(state);
-        }
-        catch
-        {
-            // The original pin failure is more actionable.
-        }
-    }
-
-    private static void RestoreBounds(
-        PinnedWindowState state)
-    {
-        if (!NativeMethods.SetWindowPos(
-            state.Source,
-            HwndNotTopmost,
-            state.OriginalBounds.X,
-            state.OriginalBounds.Y,
-            state.OriginalBounds.Width,
-            state.OriginalBounds.Height,
-            NativeMethods.SwpNoActivate |
-            NativeMethods.SwpFrameChanged |
-            NativeMethods.SwpShowWindow))
-        {
-            throw new Win32Exception(
-                Marshal.GetLastPInvokeError(),
-                "Windows could not restore the Roblox window bounds.");
-        }
-        _ = NativeMethods.ShowWindowAsync(
-            state.Source,
-            NativeMethods.SwRestore);
-    }
 }

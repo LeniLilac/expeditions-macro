@@ -22,9 +22,14 @@ if (-not $artifacts.StartsWith($repository, [System.StringComparison]::OrdinalIg
 & (Join-Path $repository 'scripts\Test-RepositoryPolicy.ps1') -RepositoryRoot $repository
 
 $publish = Join-Path $artifacts 'publish\ExpeditionsMacro'
+$portableStage = Join-Path $artifacts 'portable'
+$portableRootExecutable = Join-Path $portableStage 'ExpeditionsMacro.exe'
+$portableDependencies = Join-Path $portableStage 'ExpeditionsMacro'
 $release = Join-Path $artifacts 'release'
+$detectorPackId = 'anime-expeditions-expeditions'
+$detectorPackVersion = '1.0.2'
 if (Test-Path -LiteralPath $artifacts) { Remove-Item -LiteralPath $artifacts -Recurse -Force }
-New-Item -ItemType Directory -Force -Path $publish, $release | Out-Null
+New-Item -ItemType Directory -Force -Path $publish, $portableStage, $release | Out-Null
 
 & $DotNetPath restore (Join-Path $repository 'ExpeditionsMacro.slnx') --locked-mode
 if ($LASTEXITCODE -ne 0) { throw 'dotnet restore failed.' }
@@ -40,6 +45,7 @@ if (-not $SkipTests) {
 & $DotNetPath publish (Join-Path $repository 'src\ExpeditionsMacro.App\ExpeditionsMacro.App.csproj') `
     -c Release -r win-x64 --self-contained true --no-restore `
     -p:Version=$Version -p:PublishReadyToRun=true -p:DebugType=None -p:DebugSymbols=false `
+    "-p:PortableRootAppHostPath=$portableRootExecutable" `
     -o $publish
 if ($LASTEXITCODE -ne 0) { throw 'Application publish failed.' }
 
@@ -89,17 +95,51 @@ Copy-Item -LiteralPath (Join-Path $repository 'NOTICE.md') -Destination $publish
 Copy-Item -LiteralPath (Join-Path $repository 'PRIVACY.md') -Destination $publish
 Copy-Item -LiteralPath (Join-Path $repository 'THIRD-PARTY-NOTICES.md') -Destination $publish
 
-$portable = Join-Path $release "ExpeditionsMacro-$Version-win-x64.zip"
-# Keep one application directory inside the ZIP. Some extraction tools unpack
-# archive-root files directly into the selected directory, which otherwise
-# scatters the self-contained runtime beside unrelated user files.
-Compress-Archive -Path $publish -DestinationPath $portable -CompressionLevel Optimal
+$bundledDetectorRoot = Join-Path $publish "Resources\DetectorPacks\$detectorPackId\$detectorPackVersion"
+$bundledDetectorManifestPath = Join-Path $bundledDetectorRoot 'manifest.json'
+if (-not (Test-Path -LiteralPath $bundledDetectorManifestPath -PathType Leaf)) {
+    throw 'The published application is missing its bundled detector manifest.'
+}
+$bundledDetectorManifest = Get-Content -Raw -LiteralPath $bundledDetectorManifestPath | ConvertFrom-Json
+if ($bundledDetectorManifest.pack_id -ne $detectorPackId -or
+    $bundledDetectorManifest.version -ne $detectorPackVersion) {
+    throw 'The published detector manifest identity does not match the required bundled release data.'
+}
+$bundledDetectorPrefix = [System.IO.Path]::GetFullPath($bundledDetectorRoot) + [System.IO.Path]::DirectorySeparatorChar
+foreach ($file in $bundledDetectorManifest.files) {
+    $payload = [System.IO.Path]::GetFullPath(
+        (Join-Path $bundledDetectorRoot $file.path.Replace('/', [System.IO.Path]::DirectorySeparatorChar)))
+    if (-not $payload.StartsWith(
+            $bundledDetectorPrefix,
+            [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "The bundled detector manifest contains an unsafe path: $($file.path)"
+    }
+    $info = Get-Item -LiteralPath $payload -ErrorAction SilentlyContinue
+    if (-not $info -or $info.Length -ne [long]$file.bytes) {
+        throw "The published detector payload is missing or has the wrong size: $($file.path)"
+    }
+    $hash = (Get-FileHash -LiteralPath $payload -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($hash -ne $file.sha256.ToLowerInvariant()) {
+        throw "The published detector payload failed its SHA-256 check: $($file.path)"
+    }
+}
 
-$packVersion = '1.0.2'
-$packId = 'anime-expeditions-expeditions'
-$packRoot = Join-Path $repository "detector-packs\$packId\$packVersion"
-$packArchive = Join-Path $release "$packId-$packVersion.zip"
-Compress-Archive -Path (Join-Path $packRoot '*') -DestinationPath $packArchive -CompressionLevel Optimal
+New-Item -ItemType Directory -Force -Path $portableDependencies | Out-Null
+foreach ($item in @(Get-ChildItem -LiteralPath $publish -Force)) {
+    if ($item.Name -eq 'ExpeditionsMacro.exe') { continue }
+    Copy-Item -LiteralPath $item.FullName -Destination $portableDependencies -Recurse -Force
+}
+if (-not (Test-Path -LiteralPath $portableRootExecutable -PathType Leaf)) {
+    throw 'The portable root apphost was not created.'
+}
+if (-not (Test-Path -LiteralPath (Join-Path $portableDependencies 'ExpeditionsMacro.dll') -PathType Leaf)) {
+    throw 'The portable dependency directory is missing ExpeditionsMacro.dll.'
+}
+
+$portable = Join-Path $release "ExpeditionsMacro-$Version-win-x64.zip"
+# Keep the discoverable native apphost at the ZIP root while containing every
+# managed, native, and content dependency in one adjacent application folder.
+Compress-Archive -Path (Join-Path $portableStage '*') -DestinationPath $portable -CompressionLevel Optimal
 
 $dependencyInventory = Join-Path $release 'dependencies.json'
 & $DotNetPath list (Join-Path $repository 'ExpeditionsMacro.slnx') package --include-transitive --format json | Set-Content -LiteralPath $dependencyInventory -Encoding UTF8
@@ -121,7 +161,7 @@ if (-not $SkipInstaller) {
         if ($LASTEXITCODE -ne 0) { throw 'Inno Setup compilation failed.' }
     }
     else {
-        Write-Warning 'Inno Setup 6 was not found. Portable and detector archives were still created.'
+        Write-Warning 'Inno Setup 6 was not found. The portable archive was still created.'
     }
 }
 

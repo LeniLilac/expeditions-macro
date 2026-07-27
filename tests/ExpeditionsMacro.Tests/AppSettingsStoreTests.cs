@@ -27,9 +27,16 @@ public sealed class AppSettingsStoreTests
                 await new AppSettingsStore(paths).LoadAsync();
 
             Assert.True(
+                loaded.AutoCheckUiScaleOnStart);
+            Assert.True(
                 loaded.AutoCheckGameSettingsOnStart);
             Assert.True(
                 loaded.RestartRobloxAtMacroStart);
+            Assert.True(
+                loaded.RestartRobloxWithPrivateServer);
+            Assert.Equal(
+                AppSettings.CurrentSchemaVersion,
+                loaded.SchemaVersion);
             Assert.Equal(
                 AppSettings.DefaultCancelPlacementKey,
                 loaded.CancelPlacementKey);
@@ -41,7 +48,271 @@ public sealed class AppSettingsStoreTests
                 loaded.UpgradeUnitKey);
             Assert.Equal(
                 string.Empty,
-                loaded.ToggleAutoUpgradeUnitKey);
+                loaded.AutoUpgradeUnitKey);
+            Assert.Equal(
+                string.Empty,
+                loaded.ToggleAutoUpgradePlacedUnitsKey);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task LegacySafetyDefaults_AreForcedOnOnceThenRespectUserChanges()
+    {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            $"expeditions-settings-{Guid.NewGuid():N}");
+        try
+        {
+            AppPaths paths = new(root);
+            paths.EnsureCreated();
+            await File.WriteAllTextAsync(
+                paths.SettingsFile,
+                """
+                {
+                  "schema_version": 1,
+                  "restart_roblox_with_private_server": false,
+                  "restart_roblox_at_macro_start": false,
+                  "auto_check_game_settings_on_start": false
+                }
+                """);
+            AppSettingsStore store = new(paths);
+
+            AppSettings migrated = await store.LoadAsync();
+
+            Assert.True(
+                migrated.RestartRobloxWithPrivateServer);
+            Assert.True(
+                migrated.RestartRobloxAtMacroStart);
+            Assert.True(
+                migrated.AutoCheckUiScaleOnStart);
+            Assert.True(
+                migrated.AutoCheckGameSettingsOnStart);
+            Assert.Equal(
+                AppSettings.CurrentSchemaVersion,
+                migrated.SchemaVersion);
+            string normalized =
+                await File.ReadAllTextAsync(
+                    paths.SettingsFile);
+            Assert.Contains(
+                "\"schema_version\": 3",
+                normalized,
+                StringComparison.Ordinal);
+
+            await store.SaveAsync(
+                migrated with
+                {
+                    RestartRobloxWithPrivateServer = false,
+                    RestartRobloxAtMacroStart = false,
+                    AutoCheckUiScaleOnStart = false,
+                    AutoCheckGameSettingsOnStart = false,
+                });
+            AppSettings reloaded = await store.LoadAsync();
+
+            Assert.False(
+                reloaded.RestartRobloxWithPrivateServer);
+            Assert.False(
+                reloaded.RestartRobloxAtMacroStart);
+            Assert.False(
+                reloaded.AutoCheckUiScaleOnStart);
+            Assert.False(
+                reloaded.AutoCheckGameSettingsOnStart);
+            Assert.Equal(
+                AppSettings.CurrentSchemaVersion,
+                reloaded.SchemaVersion);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task
+        SchemaTwoCombinedPreparationChoice_MigratesToBothChecks()
+    {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            $"expeditions-settings-{Guid.NewGuid():N}");
+        try
+        {
+            AppPaths paths = new(root);
+            paths.EnsureCreated();
+            await File.WriteAllTextAsync(
+                paths.SettingsFile,
+                """
+                {
+                  "schema_version": 2,
+                  "auto_check_game_settings_on_start": false
+                }
+                """);
+
+            AppSettings migrated =
+                await new AppSettingsStore(paths).LoadAsync();
+
+            Assert.False(
+                migrated.AutoCheckUiScaleOnStart);
+            Assert.False(
+                migrated.AutoCheckGameSettingsOnStart);
+            Assert.Equal(
+                AppSettings.CurrentSchemaVersion,
+                migrated.SchemaVersion);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task IndependentPreparationChoices_PersistSeparately()
+    {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            $"expeditions-settings-{Guid.NewGuid():N}");
+        try
+        {
+            AppSettingsStore store =
+                new(new AppPaths(root));
+            await store.SaveAsync(
+                new AppSettings
+                {
+                    AutoCheckUiScaleOnStart = false,
+                    AutoCheckGameSettingsOnStart = true,
+                });
+
+            AppSettings loaded = await store.LoadAsync();
+
+            Assert.False(
+                loaded.AutoCheckUiScaleOnStart);
+            Assert.True(
+                loaded.AutoCheckGameSettingsOnStart);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task NewSettings_StartEnabledAndAlreadyMigrated()
+    {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            $"expeditions-settings-{Guid.NewGuid():N}");
+        try
+        {
+            AppSettings loaded =
+                await new AppSettingsStore(
+                    new AppPaths(root)).LoadAsync();
+
+            Assert.True(
+                loaded.RestartRobloxWithPrivateServer);
+            Assert.True(
+                loaded.RestartRobloxAtMacroStart);
+            Assert.True(
+                loaded.AutoCheckUiScaleOnStart);
+            Assert.True(
+                loaded.AutoCheckGameSettingsOnStart);
+            Assert.Equal(
+                AppSettings.CurrentSchemaVersion,
+                loaded.SchemaVersion);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task RetiredDetectorUpdateSettings_AreIgnoredAndOmitted()
+    {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            $"expeditions-settings-{Guid.NewGuid():N}");
+        try
+        {
+            AppPaths paths = new(root);
+            paths.EnsureCreated();
+            await File.WriteAllTextAsync(
+                paths.SettingsFile,
+                """
+                {
+                  "check_detector_updates": true,
+                  "last_detector_update_check": "2026-07-27T08:00:00+00:00"
+                }
+                """);
+            AppSettingsStore store = new(paths);
+
+            AppSettings loaded = await store.LoadAsync();
+            await store.SaveAsync(loaded);
+            string normalized =
+                await File.ReadAllTextAsync(
+                    paths.SettingsFile);
+
+            Assert.DoesNotContain(
+                "check_detector_updates",
+                normalized,
+                StringComparison.Ordinal);
+            Assert.DoesNotContain(
+                "last_detector_update_check",
+                normalized,
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task LegacyAutoUpgradeToggleKey_LoadsAsPlacedUnitsBinding()
+    {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            $"expeditions-settings-{Guid.NewGuid():N}");
+        try
+        {
+            AppPaths paths = new(root);
+            paths.EnsureCreated();
+            await File.WriteAllTextAsync(
+                paths.SettingsFile,
+                """
+                {
+                  "toggle_auto_upgrade_unit_key": "K"
+                }
+                """);
+
+            AppSettings loaded =
+                await new AppSettingsStore(paths).LoadAsync();
+
+            Assert.Equal(
+                "K",
+                loaded.ToggleAutoUpgradePlacedUnitsKey);
+            Assert.Equal(
+                string.Empty,
+                loaded.AutoUpgradeUnitKey);
         }
         finally
         {
@@ -119,13 +390,15 @@ public sealed class AppSettingsStoreTests
                 RestartRobloxWithPrivateServer = true,
                 RestartRobloxAtMacroStart = false,
                 DebugModeEnabled = true,
+                ManualInputRecordingEnabled = true,
                 DiscordErrorUserId = "123456789012345678",
                 ShiftLockVirtualKey = KeyboardKey.RightShift,
                 AreasMenuKey = "G",
                 CancelPlacementKey = "X",
                 ChangeUnitTargetingKey = "T",
                 UpgradeUnitKey = "Y",
-                ToggleAutoUpgradeUnitKey = "V",
+                AutoUpgradeUnitKey = "B",
+                ToggleAutoUpgradePlacedUnitsKey = "V",
                 ResourceRefuelDebug =
                     new ResourceRefuelDebugSettings
                     {
@@ -146,6 +419,10 @@ public sealed class AppSettingsStoreTests
             Assert.False(loaded.RestartRobloxAtMacroStart);
             Assert.True(loaded.DebugModeEnabled);
             Assert.True(
+                loaded.ManualInputRecordingEnabled);
+            Assert.True(
+                loaded.AutoCheckUiScaleOnStart);
+            Assert.True(
                 loaded.AutoCheckGameSettingsOnStart);
             Assert.True(loaded.FastNoAlignEnabled);
             Assert.Equal("123456789012345678", loaded.DiscordErrorUserId);
@@ -159,8 +436,11 @@ public sealed class AppSettingsStoreTests
                 "Y",
                 loaded.UpgradeUnitKey);
             Assert.Equal(
+                "B",
+                loaded.AutoUpgradeUnitKey);
+            Assert.Equal(
                 "V",
-                loaded.ToggleAutoUpgradeUnitKey);
+                loaded.ToggleAutoUpgradePlacedUnitsKey);
             Assert.Equal(
                 4321,
                 loaded.ResourceRefuelDebug

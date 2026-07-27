@@ -33,6 +33,12 @@ public partial class SettingsKeyBindingsPanel : UserControl
 
     public string AutoUpgradeDiagnostic { get; private set; } = "Not set";
 
+    public string ToggleAutoUpgradePlacedUnitsDiagnostic
+    {
+        get;
+        private set;
+    } = "Not set";
+
     public string ShiftLockDiagnostic { get; private set; } = "Left Ctrl";
 
     public string HotkeyDisplayName => _services?.Hotkey.DisplayName ?? "F6";
@@ -62,6 +68,7 @@ public partial class SettingsKeyBindingsPanel : UserControl
         UpdateTargetingDisplay();
         UpdateUpgradeDisplay();
         UpdateAutoUpgradeDisplay();
+        UpdateToggleAutoUpgradePlacedUnitsDisplay();
         UpdateShiftLockDisplay();
         UpdateButtons();
     }
@@ -105,12 +112,19 @@ public partial class SettingsKeyBindingsPanel : UserControl
             BindingTarget.Upgrade,
             UpgradeButton);
 
-    private void AutoUpgradeButton_Click(
+    private void AutoUpgradeUnitButton_Click(
         object sender,
         RoutedEventArgs e) =>
         BeginCapture(
-            BindingTarget.AutoUpgrade,
-            AutoUpgradeButton);
+            BindingTarget.AutoUpgradeUnit,
+            AutoUpgradeUnitButton);
+
+    private void ToggleAutoUpgradePlacedUnitsButton_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        BeginCapture(
+            BindingTarget.ToggleAutoUpgradePlacedUnits,
+            ToggleAutoUpgradePlacedUnitsButton);
 
     private void ShiftLockButton_Click(object sender, RoutedEventArgs e) => BeginCapture(BindingTarget.ShiftLock, ShiftLockButton);
 
@@ -125,7 +139,8 @@ public partial class SettingsKeyBindingsPanel : UserControl
             BindingTarget.CancelPlacement or
             BindingTarget.Targeting or
             BindingTarget.Upgrade or
-            BindingTarget.AutoUpgrade
+            BindingTarget.AutoUpgradeUnit or
+            BindingTarget.ToggleAutoUpgradePlacedUnits
                 ? "Press a letter..."
                 : "Press a key...";
         StatusFor(target).Text = target switch
@@ -137,7 +152,8 @@ public partial class SettingsKeyBindingsPanel : UserControl
             BindingTarget.CancelPlacement => "Press the letter assigned to Toggle Cancel Unit Placement. Escape cancels.",
             BindingTarget.Targeting => "Press the letter assigned to Change Unit Targeting. Escape cancels.",
             BindingTarget.Upgrade => "Press the letter assigned to Upgrade Unit. Escape cancels.",
-            BindingTarget.AutoUpgrade => "Press the letter assigned to Toggle Auto Upgrade Unit. Escape cancels.",
+            BindingTarget.AutoUpgradeUnit => "Press the letter assigned to Auto Upgrade Unit. Escape cancels.",
+            BindingTarget.ToggleAutoUpgradePlacedUnits => "Press the letter assigned to Toggle Auto Upgrade Placed Units. Escape cancels.",
             _ => "Press the key assigned to Toggle Shift Lock, including left/right Shift or Ctrl. Escape cancels.",
         };
         Keyboard.Focus(button);
@@ -164,7 +180,8 @@ public partial class SettingsKeyBindingsPanel : UserControl
             BindingTarget.CancelPlacement or
             BindingTarget.Targeting or
             BindingTarget.Upgrade or
-            BindingTarget.AutoUpgrade)
+            BindingTarget.AutoUpgradeUnit or
+            BindingTarget.ToggleAutoUpgradePlacedUnits)
         {
             if (virtualKey is < 0x41 or > 0x5A)
             {
@@ -219,8 +236,13 @@ public partial class SettingsKeyBindingsPanel : UserControl
                     await ApplyUpgradeAsync(
                         (char)virtualKey);
                     break;
-                case BindingTarget.AutoUpgrade:
-                    await ApplyAutoUpgradeAsync(
+                case BindingTarget.AutoUpgradeUnit:
+                    await ApplyAutoUpgradeUnitAsync(
+                        (char)virtualKey);
+                    break;
+                case BindingTarget
+                    .ToggleAutoUpgradePlacedUnits:
+                    await ApplyToggleAutoUpgradePlacedUnitsAsync(
                         (char)virtualKey);
                     break;
                 case BindingTarget.ShiftLock:
@@ -277,9 +299,13 @@ public partial class SettingsKeyBindingsPanel : UserControl
         UpgradeButton.IsEnabled = enabled &&
             _captureTarget is BindingTarget.None or
                 BindingTarget.Upgrade;
-        AutoUpgradeButton.IsEnabled = enabled &&
+        AutoUpgradeUnitButton.IsEnabled = enabled &&
             _captureTarget is BindingTarget.None or
-                BindingTarget.AutoUpgrade;
+                BindingTarget.AutoUpgradeUnit;
+        ToggleAutoUpgradePlacedUnitsButton.IsEnabled =
+            enabled &&
+            _captureTarget is BindingTarget.None or
+                BindingTarget.ToggleAutoUpgradePlacedUnits;
         ShiftLockButton.IsEnabled = enabled && _captureTarget is BindingTarget.None or BindingTarget.ShiftLock;
     }
 
@@ -293,7 +319,10 @@ public partial class SettingsKeyBindingsPanel : UserControl
             CancelPlacementStatusText,
         BindingTarget.Targeting => TargetingStatusText,
         BindingTarget.Upgrade => UpgradeStatusText,
-        BindingTarget.AutoUpgrade => AutoUpgradeStatusText,
+        BindingTarget.AutoUpgradeUnit =>
+            AutoUpgradeUnitStatusText,
+        BindingTarget.ToggleAutoUpgradePlacedUnits =>
+            ToggleAutoUpgradePlacedUnitsStatusText,
         BindingTarget.ShiftLock => ShiftLockStatusText,
         _ => throw new ArgumentOutOfRangeException(nameof(target)),
     };
@@ -310,7 +339,8 @@ public partial class SettingsKeyBindingsPanel : UserControl
         CancelPlacement,
         Targeting,
         Upgrade,
-        AutoUpgrade,
+        AutoUpgradeUnit,
+        ToggleAutoUpgradePlacedUnits,
         ShiftLock,
     }
 }

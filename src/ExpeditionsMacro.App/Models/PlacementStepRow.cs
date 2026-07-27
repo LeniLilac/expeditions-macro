@@ -18,6 +18,7 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
     private int _delayAfterStartMilliseconds;
     private PlacementPhase _phase;
     private UnitTargetingPriority _targetingPriority;
+    private bool _autoUpgrade = true;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -76,6 +77,12 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         }
     }
 
+    public bool AutoUpgrade
+    {
+        get => _autoUpgrade;
+        set => Set(ref _autoUpgrade, value);
+    }
+
     public string PhaseLabel =>
         Phase == PlacementPhase.BeforeStart
             ? "Before Start"
@@ -105,6 +112,7 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         DelayAfterStartMilliseconds =
             DelayAfterStartMilliseconds,
         TargetingPriority = TargetingPriority,
+        AutoUpgrade = AutoUpgrade,
     };
 
     public static PlacementStepRow FromModel(PlacementStep step) => new()
@@ -117,6 +125,7 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         DelayAfterStartMilliseconds =
             step.DelayAfterStartMilliseconds,
         TargetingPriority = step.TargetingPriority,
+        AutoUpgrade = step.AutoUpgrade,
     };
 
     private bool Set<T>(

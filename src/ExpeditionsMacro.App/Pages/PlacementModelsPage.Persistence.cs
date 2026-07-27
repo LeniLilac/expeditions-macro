@@ -31,7 +31,9 @@ public partial class PlacementModelsPage
 
     private PlacementModel BuildModel()
     {
-        if (_steps.Count == 0)
+        if (_steps.Count == 0 &&
+            string.IsNullOrWhiteSpace(
+                _fastManualRecordingId))
         {
             throw new InvalidOperationException(
                 "Add at least one placement.");
@@ -87,6 +89,14 @@ public partial class PlacementModelsPage
                     ? _fastDefaultAfterStartDelayMilliseconds
                     : PlacementAuthoringRules
                         .DefaultAfterStartDelayMilliseconds,
+            ManualInputRecordingId =
+                FastWorkflow
+                    ? _fastManualRecordingId
+                    : null,
+            ImpossibilityThresholdMinutes =
+                FastWorkflow
+                    ? _fastImpossibilityThresholdMinutes
+                    : 0,
             Steps =
                 PlacementAuthoringRules
                     .OrderForAuthoring(

@@ -22,6 +22,7 @@ public sealed partial class StageMacroRunner
         Stopwatch matchRuntime,
         int stableDetections,
         char cancelPlacementKey,
+        bool manualPlayback,
         CancellationToken cancellationToken)
     {
         PlacementModel? afterStartModel =
@@ -29,10 +30,12 @@ public sealed partial class StageMacroRunner
                 ? models.PrestartPlacement
                 : models.DelayedPlacement;
         IReadOnlyList<PlacementStep> afterStart =
-            PlacementExecutionPlan.AfterStart(
-                cameraMode,
-                models.PrestartPlacement,
-                models.DelayedPlacement);
+            manualPlayback
+                ? []
+                : PlacementExecutionPlan.AfterStart(
+                    cameraMode,
+                    models.PrestartPlacement,
+                    models.DelayedPlacement);
         int delaySeconds =
             cameraMode == CameraPreparationMode.FastNoAlign
                 ? 0
@@ -50,6 +53,8 @@ public sealed partial class StageMacroRunner
             matchRuntime,
             stableDetections,
             cancelPlacementKey,
+            models.PrestartPlacement ??
+                models.DelayedPlacement,
             cancellationToken);
     }
 
@@ -65,6 +70,7 @@ public sealed partial class StageMacroRunner
         Stopwatch matchRuntime,
         int stableDetections,
         char cancelPlacementKey,
+        PlacementModel? runtimePolicyPlacement,
         CancellationToken cancellationToken)
     {
         bool fast =
@@ -79,6 +85,13 @@ public sealed partial class StageMacroRunner
         InactivityKeepAlive keepAlive = new();
         TimeSpan? matchLimit =
             MatchRuntimePolicy.StageLimit(story, raid);
+        if (runtimePolicyPlacement is not null)
+        {
+            matchLimit =
+                MatchRuntimePolicy.ForPlacement(
+                    runtimePolicyPlacement,
+                    matchLimit);
+        }
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();

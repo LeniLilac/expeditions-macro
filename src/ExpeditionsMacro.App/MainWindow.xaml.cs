@@ -30,6 +30,7 @@ public partial class MainWindow : Window
         _services = services;
         _snapshotMode = snapshotMode;
         InitializeComponent();
+        InitializeNavigationRail();
         _macroPage = new MacroPage(services);
         _macroPage.SetNativeDockingEnabled(
             !snapshotMode);
@@ -43,6 +44,7 @@ public partial class MainWindow : Window
             ["Raid"] = new RaidPage(services),
             ["Camera Models"] = new CameraModelsPage(services),
             ["Placement Setup"] = new PlacementModelsPage(services),
+            ["Recordings"] = new ManualRecordingsPage(services),
             ["Debug"] = new DebugPage(services),
             ["Settings"] = new SettingsPage(services),
         };
@@ -55,12 +57,12 @@ public partial class MainWindow : Window
         if (!snapshotMode)
         {
             Loaded += async (_, _) =>
-            {
                 await ShowPageAsync("Dashboard");
-                if (_pages["Settings"] is SettingsPage settings) await settings.CheckForUpdatesAsync(automatic: true);
-            };
         }
         StateChanged += Window_StateChanged;
+        SourceInitialized +=
+            Window_SourceInitialized;
+        Closed += Window_Closed;
     }
 
     private async void Navigation_Checked(object sender, RoutedEventArgs e)
@@ -103,54 +105,6 @@ public partial class MainWindow : Window
         EnsureWorkspaceSize(key);
     }
 
-    private void EnsureWorkspaceSize(string key)
-    {
-        if (_snapshotMode ||
-            WindowState != WindowState.Normal ||
-            !NeedsExpandedWorkspace(key))
-        {
-            return;
-        }
-
-        Rect workArea = SystemParameters.WorkArea;
-        double targetWidth = Math.Min(
-            1660,
-            workArea.Width);
-        double targetHeight = Math.Min(
-            1040,
-            workArea.Height);
-        if (Width >= targetWidth &&
-            Height >= targetHeight)
-        {
-            return;
-        }
-
-        double centerX = Left + ActualWidth / 2;
-        double centerY = Top + ActualHeight / 2;
-        Width = Math.Max(Width, targetWidth);
-        Height = Math.Max(Height, targetHeight);
-        Left = Math.Clamp(
-            centerX - Width / 2,
-            workArea.Left,
-            workArea.Right - Width);
-        Top = Math.Clamp(
-            centerY - Height / 2,
-            workArea.Top,
-            workArea.Bottom - Height);
-    }
-
-    private bool NeedsExpandedWorkspace(
-        string key) =>
-        string.Equals(
-            key,
-            "Dashboard",
-            StringComparison.OrdinalIgnoreCase) ||
-        (string.Equals(
-            key,
-            "Placement Setup",
-            StringComparison.OrdinalIgnoreCase) &&
-         _services.Settings.FastNoAlignEnabled);
-
     private void RestoreNavigationSelection()
     {
         RadioButton navigation =
@@ -164,6 +118,7 @@ public partial class MainWindow : Window
                 "Raid" => RaidNav,
                 "Camera Models" => CameraNav,
                 "Placement Setup" => PlacementNav,
+                "Recordings" => RecordingsNav,
                 "Debug" => DebugNav,
                 "Settings" => SettingsNav,
                 _ => DashboardNav,
@@ -184,7 +139,10 @@ public partial class MainWindow : Window
         bool showPageEnd = false,
         bool showDebugUtilities = false,
         MacroPlanSnapshotState macroPlanState =
-            MacroPlanSnapshotState.NestedLoops)
+            MacroPlanSnapshotState.NestedLoops,
+        ManualRecordingsSnapshotState
+            recordingsState =
+                ManualRecordingsSnapshotState.Ready)
     {
         RadioButton navigation = key switch
         {
@@ -196,6 +154,7 @@ public partial class MainWindow : Window
             "Raid" => RaidNav,
             "Camera Models" => CameraNav,
             "Placement Setup" => PlacementNav,
+            "Recordings" => RecordingsNav,
             "Debug" => DebugNav,
             "Settings" => SettingsNav,
             _ => throw new ArgumentOutOfRangeException(nameof(key), key, "Unknown snapshot page."),
@@ -216,7 +175,16 @@ public partial class MainWindow : Window
         if (_pages[key] is ChallengesPage challengePresets) challengePresets.SetSnapshotFastMode();
         if (_pages[key] is StoryPage story) story.SetSnapshotFastMode();
         if (_pages[key] is RaidPage raid) raid.SetSnapshotFastMode();
-        if (_pages[key] is PlacementModelsPage placement) placement.SetSnapshotState();
+        if (_pages[key] is PlacementModelsPage placement)
+        {
+            placement.SetSnapshotState(
+                showPageEnd);
+        }
+        if (_pages[key] is ManualRecordingsPage recordings)
+        {
+            recordings.SetSnapshotState(
+                recordingsState);
+        }
         if (_pages[key] is MacroPage macro)
         {
             macro.SetSnapshotScroll(
@@ -326,7 +294,36 @@ public partial class MainWindow : Window
     private void Coordinator_OperationFailed(object? sender, Exception error)
     {
         _services.Log.Error("Automation operation stopped.", error);
-        Dispatcher.BeginInvoke(() => MessageBox.Show(this, error.Message, "Operation stopped", MessageBoxButton.OK, MessageBoxImage.Error));
+        Dispatcher.BeginInvoke(() =>
+        {
+            bool suspended =
+                _macroPage
+                    .TrySuspendRobloxForOwnedDialog(
+                        out string pinError);
+            if (!suspended)
+            {
+                _services.Log.Warning(
+                    $"Roblox could not be suspended before showing the operation error: {pinError}");
+            }
+            try
+            {
+                Activate();
+                MessageBox.Show(
+                    this,
+                    error.Message,
+                    "Operation stopped",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                if (suspended)
+                {
+                    _macroPage
+                        .ResumeRobloxAfterOwnedDialog();
+                }
+            }
+        });
     }
 
     private void Hotkey_BindingChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(UpdateProductFooter);
@@ -350,6 +347,22 @@ public partial class MainWindow : Window
                 _pages["Debug"]))
         {
             DashboardNav.IsChecked = true;
+        }
+
+        bool recordingsVisible =
+            _snapshotMode ||
+            _services.Settings
+                .ManualInputRecordingEnabled;
+        RecordingsNav.Visibility =
+            recordingsVisible
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        if (!recordingsVisible &&
+            ReferenceEquals(
+                PageHost.Content,
+                _pages["Recordings"]))
+        {
+            PlacementNav.IsChecked = true;
         }
 
         bool cameraVisible =
@@ -397,6 +410,8 @@ public partial class MainWindow : Window
         {
             DashboardNav.IsChecked = true;
         }
+        SetNavigationRailCollapsed(
+            _navigationRailCollapsed);
     }
 
     private void UpdateProductFooter()

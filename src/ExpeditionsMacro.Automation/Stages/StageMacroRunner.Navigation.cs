@@ -8,6 +8,11 @@ namespace ExpeditionsMacro.Automation.Stages;
 
 public sealed partial class StageMacroRunner
 {
+    private static readonly TimeSpan NavigationTimeout =
+        TimeSpan.FromSeconds(12);
+    private static readonly TimeSpan RecoveryTimeout =
+        TimeSpan.FromSeconds(90);
+
     private async Task<bool> EnsureGameModeSelectorAsync(
         RobloxWindow window,
         StageMode mode,
@@ -85,13 +90,17 @@ public sealed partial class StageMacroRunner
                                 window,
                                 key,
                                 token),
-                        (timeout, token) => TryWaitForStateAsync(
+                        (
+                            timeout,
+                            initialOpenObservation,
+                            token) => TryWaitForStateAsync(
                             window,
                             StageScreenState.GameModeSelector,
                             timeout,
                             detector,
                             stableDetections,
-                            token),
+                            token,
+                            initialOpenObservation),
                         attempt => report?.Invoke(
                             "Recovery",
                             0,
@@ -262,12 +271,16 @@ public sealed partial class StageMacroRunner
             TimeSpan timeout,
             CancellationToken cancellationToken)
     {
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
         StableStateTracker<string> tracker = new(stableDetections);
         StableNavigationActionTracker<StageScreenState>
             actionTracker =
                 new(Math.Max(2, stableDetections));
-        while (DateTimeOffset.UtcNow < deadline)
+        ObservationWaitBudget budget = new(
+            timeout,
+            stableDetections);
+        while (budget.ShouldObserve(
+                   tracker.HasPendingCandidate ||
+                   actionTracker.HasPendingCandidate))
         {
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = CaptureClient(window, detector);
@@ -298,6 +311,7 @@ public sealed partial class StageMacroRunner
             {
                 return Enum.Parse<GameModeHandoffCommand>(stable);
             }
+            budget.MarkObserved();
             await Task.Delay(
                 180,
                 cancellationToken).ConfigureAwait(false);
@@ -311,9 +325,9 @@ public sealed partial class StageMacroRunner
         TimeSpan timeout,
         IDetectorPack detector,
         int stableDetections,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool initialExpectedObservation = false)
     {
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
         StageScreenMatch last = new(StageScreenState.None, 0);
         StableStateTracker<string> expectedTracker =
             new(stableDetections);
@@ -321,7 +335,20 @@ public sealed partial class StageMacroRunner
             new(Math.Max(2, stableDetections));
         StableStateTracker<string> recoveryTracker =
             new(stableDetections);
-        while (DateTimeOffset.UtcNow < deadline)
+        ObservationWaitBudget budget = new(
+            timeout,
+            stableDetections);
+        if (initialExpectedObservation &&
+            !RequiresStableAction(expected))
+        {
+            _ = expectedTracker.Update(
+                expected.ToString());
+            budget.MarkObserved();
+        }
+        while (budget.ShouldObserve(
+                   expectedTracker.HasPendingCandidate ||
+                   actionTracker.HasPendingCandidate ||
+                   recoveryTracker.HasPendingCandidate))
         {
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = CaptureClient(window, detector);
@@ -361,6 +388,7 @@ public sealed partial class StageMacroRunner
             {
                 throw new StageRecoveryException(stableRecovery);
             }
+            budget.MarkObserved();
             await Task.Delay(
                 180,
                 cancellationToken).ConfigureAwait(false);
@@ -375,7 +403,8 @@ public sealed partial class StageMacroRunner
         TimeSpan timeout,
         IDetectorPack detector,
         int stableDetections,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool initialExpectedObservation = false)
     {
         try
         {
@@ -385,7 +414,8 @@ public sealed partial class StageMacroRunner
                 timeout,
                 detector,
                 stableDetections,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                initialExpectedObservation).ConfigureAwait(false);
             return true;
         }
         catch (TimeoutException)

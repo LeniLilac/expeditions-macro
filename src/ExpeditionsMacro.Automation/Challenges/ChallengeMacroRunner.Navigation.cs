@@ -128,14 +128,19 @@ public sealed partial class ChallengeMacroRunner
                         candidate => string.Equals(detector.RecoveryState(candidate), "lobby", StringComparison.OrdinalIgnoreCase),
                         candidate => ChallengeScreenDetector.Detect(candidate).State == ChallengeScreenState.GameModeSelector,
                         (key, token) => _automation.TapLetterKeyAsync(window, key, token),
-                        async (timeout, token) => await TryWaitForScreenAsync(
+                        async (
+                            timeout,
+                            initialOpenObservation,
+                            token) => await TryWaitForScreenAsync(
                             window,
                             preset,
                             detector,
                             ChallengeScreenState.GameModeSelector,
                             timeout,
                             report,
-                            token).ConfigureAwait(false) is not null,
+                            token,
+                            initialOpenObservation)
+                            .ConfigureAwait(false) is not null,
                         attempt => report("Navigation", 0, $"Lobby recognized. Opening Play with {playMenuKey} (attempt {attempt}/{LobbyPlayNavigator.MaximumAttempts}).", recovery, null),
                         attempt => log($"The {playMenuKey} Play-menu key did not open navigation from the lobby (attempt {attempt}/{LobbyPlayNavigator.MaximumAttempts}).", MacroEventLevel.Warning, recovery, null),
                         cancellationToken).ConfigureAwait(false);

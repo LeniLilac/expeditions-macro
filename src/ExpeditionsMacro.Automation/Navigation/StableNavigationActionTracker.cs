@@ -19,6 +19,10 @@ internal sealed class StableNavigationActionTracker<TState>
         _coordinateTolerance = Math.Max(0, coordinateTolerance);
     }
 
+    public bool HasPendingCandidate =>
+        _count > 0 &&
+        _count < _required;
+
     public (int X, int Y)? Update(
         TState? state,
         (int X, int Y)? action)

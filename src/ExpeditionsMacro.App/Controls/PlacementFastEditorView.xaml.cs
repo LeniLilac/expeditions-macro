@@ -19,12 +19,19 @@ public partial class PlacementFastEditorView : UserControl
     public PlacementFastEditorView()
     {
         InitializeComponent();
+        FastRouteControls.UnitChanged +=
+            FastRouteControls_UnitChanged;
+        FastRouteControls.PhaseChanged +=
+            FastRouteControls_PhaseChanged;
+        FastRouteControls.RecordingChanged +=
+            FastRouteControls_RecordingChanged;
         FastTimingEditor.ApplyRequested +=
             FastTimingEditor_ApplyRequested;
     }
 
     public event RoutedEventHandler? SaveRequested;
     public event RoutedEventHandler? PrepareRequested;
+    public event RoutedEventHandler? PositionRequested;
     public event RoutedEventHandler? TestRequested;
     public event RoutedEventHandler? StopRequested;
     public event RoutedEventHandler? RemoveStepRequested;
@@ -32,6 +39,8 @@ public partial class PlacementFastEditorView : UserControl
     public event RoutedEventHandler? MoveStepDownRequested;
     public event RoutedEventHandler? UnitChanged;
     public event RoutedEventHandler? PhaseChanged;
+    public event SelectionChangedEventHandler?
+        ManualRecordingChanged;
     public event SelectionChangedEventHandler? ModeChanged;
     public event SelectionChangedEventHandler? RouteChanged;
     public event MouseButtonEventHandler? CanvasClicked;
@@ -41,18 +50,133 @@ public partial class PlacementFastEditorView : UserControl
     public event EventHandler<PlacementTimingApplyEventArgs>?
         TimingSettingsApplied;
 
+    internal ComboBox FastTeamCombo =>
+        FastRouteControls.TeamSelector;
+
+    internal RadioButton FastBeforeStartButton =>
+        FastRouteControls.BeforeStartSelector;
+
+    internal RadioButton FastAfterStartButton =>
+        FastRouteControls.AfterStartSelector;
+
+    internal RadioButton FastUnit1Button =>
+        FastRouteControls.Unit1Selector;
+
+    internal RadioButton FastUnit2Button =>
+        FastRouteControls.Unit2Selector;
+
+    internal RadioButton FastUnit3Button =>
+        FastRouteControls.Unit3Selector;
+
+    internal RadioButton FastUnit4Button =>
+        FastRouteControls.Unit4Selector;
+
+    internal RadioButton FastUnit5Button =>
+        FastRouteControls.Unit5Selector;
+
+    internal RadioButton FastUnit6Button =>
+        FastRouteControls.Unit6Selector;
+
+    internal ComboBox FastManualRecordingCombo =>
+        FastRouteControls.RecordingSelector;
+
+    internal string? SelectedManualRecordingId =>
+        FastRouteControls.SelectedRecordingId;
+
+    internal void SetManualRecordingMode(
+        bool enabled,
+        string? selectedRecordingId,
+        IReadOnlyList<ManualRecordingChoice>
+            recordings)
+    {
+        FastRouteControls.SetManualRecordingMode(
+            enabled,
+            selectedRecordingId,
+            recordings);
+        PlacementCanvas.IsHitTestVisible = !enabled;
+        PlacementCanvas.Cursor =
+            enabled
+                ? Cursors.Arrow
+                : Cursors.Cross;
+        PlacementMarkers.Visibility =
+            enabled
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        FastStepsHeadingText.Text =
+            enabled
+                ? "Manual playback"
+                : "Placement steps";
+        FastPlacementCountText.Visibility =
+            enabled
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        FastStepsList.Visibility =
+            enabled
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        FastManualRecordingHelp.Visibility =
+            enabled
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        Visibility authoringVisibility =
+            enabled
+                ? Visibility.Collapsed
+                : Visibility.Visible;
+        FastMoveUpButton.Visibility =
+            authoringVisibility;
+        FastMoveDownButton.Visibility =
+            authoringVisibility;
+        FastRemoveButton.Visibility =
+            authoringVisibility;
+    }
+
     public void SetTimingSettings(
         int placementIntervalMilliseconds,
-        int defaultAfterStartDelayMilliseconds) =>
+        int defaultAfterStartDelayMilliseconds,
+        int impossibilityThresholdMinutes,
+        bool manualRecordingEnabled,
+        string? selectedRecordingId,
+        IReadOnlyList<ManualRecordingChoice>
+            recordings) =>
         FastTimingEditor.SetValues(
             placementIntervalMilliseconds,
-            defaultAfterStartDelayMilliseconds);
+            defaultAfterStartDelayMilliseconds,
+            impossibilityThresholdMinutes,
+            manualRecordingEnabled,
+            selectedRecordingId,
+            recordings);
 
     public void ShowTimingError(string message) =>
         FastTimingEditor.ShowError(message);
 
     public void CloseTimingSettings() =>
         FastTimingPopup.IsOpen = false;
+
+    internal void SetSnapshotSettings(
+        int placementIntervalMilliseconds,
+        int defaultAfterStartDelayMilliseconds,
+        int impossibilityThresholdMinutes,
+        string recordingId,
+        string recordingName)
+    {
+        SnapshotTimingEditor.SetValues(
+            placementIntervalMilliseconds,
+            defaultAfterStartDelayMilliseconds,
+            impossibilityThresholdMinutes,
+            manualRecordingEnabled: true,
+            recordingId,
+            [
+                new ManualRecordingChoice(
+                    recordingId,
+                    recordingName),
+            ]);
+        SnapshotSettingsOverlay.Visibility =
+            Visibility.Visible;
+    }
+
+    internal void ClearSnapshotSettings() =>
+        SnapshotSettingsOverlay.Visibility =
+            Visibility.Collapsed;
 
     public void SetStepsInteractionEnabled(bool enabled)
     {
@@ -79,6 +203,11 @@ public partial class PlacementFastEditorView : UserControl
         object sender,
         RoutedEventArgs e) =>
         PrepareRequested?.Invoke(sender, e);
+
+    private void FastPosition_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        PositionRequested?.Invoke(sender, e);
 
     private void Test_Click(
         object sender,
@@ -129,6 +258,21 @@ public partial class PlacementFastEditorView : UserControl
         object sender,
         RoutedEventArgs e) =>
         PhaseChanged?.Invoke(sender, e);
+
+    private void FastRouteControls_UnitChanged(
+        object sender,
+        RoutedEventArgs e) =>
+        FastUnitButton_Checked(sender, e);
+
+    private void FastRouteControls_PhaseChanged(
+        object sender,
+        RoutedEventArgs e) =>
+        FastPhaseButton_Checked(sender, e);
+
+    private void FastRouteControls_RecordingChanged(
+        object sender,
+        SelectionChangedEventArgs e) =>
+        ManualRecordingChanged?.Invoke(sender, e);
 
     private void TargetModeCombo_SelectionChanged(
         object sender,

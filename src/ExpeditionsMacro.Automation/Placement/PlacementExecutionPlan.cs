@@ -2,8 +2,32 @@ using ExpeditionsMacro.Core.Models;
 
 namespace ExpeditionsMacro.Automation.Placement;
 
+public readonly record struct PlacementMatchExecutionPlan(
+    bool ManualPlayback,
+    IReadOnlyList<PlacementStep> BeforeStart,
+    IReadOnlyList<PlacementStep> AfterStart);
+
 public static class PlacementExecutionPlan
 {
+    public static PlacementMatchExecutionPlan ForMatch(
+        CameraPreparationMode mode,
+        PlacementModel? primary,
+        PlacementModel? delayed = null)
+    {
+        bool manualPlayback =
+            primary is not null &&
+            ManualInputRouteService.IsConfigured(primary);
+        return manualPlayback
+            ? new PlacementMatchExecutionPlan(
+                true,
+                [],
+                [])
+            : new PlacementMatchExecutionPlan(
+                false,
+                BeforeStart(mode, primary),
+                AfterStart(mode, primary, delayed));
+    }
+
     public static IReadOnlyList<PlacementStep> BeforeStart(
         CameraPreparationMode mode,
         PlacementModel? primary)

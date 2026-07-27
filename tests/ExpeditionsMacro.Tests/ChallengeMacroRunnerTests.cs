@@ -260,16 +260,25 @@ public sealed class ChallengeMacroRunnerTests
                 presses.Add(key);
                 return Task.CompletedTask;
             },
-            waitForOpen: (_, _) => Task.FromResult(false),
+            waitForOpen: (_, _, _) =>
+                Task.FromResult(false),
             keyAttemptStarted: null,
             keyAttemptMissed: keyMisses.Add,
             CancellationToken.None));
 
         Assert.Equal(['P', 'P', 'P'], presses);
         Assert.Equal([1, 2, 3], keyMisses);
-        Assert.Contains("Settings > Keybinds", error.Message, StringComparison.Ordinal);
+        Assert.Contains("Anime Expeditions Settings > Keybinds", error.Message, StringComparison.Ordinal);
         Assert.Contains("Toggle Play Menu", error.Message, StringComparison.Ordinal);
         Assert.Contains("set Toggle Play Menu to P", error.Message, StringComparison.Ordinal);
+        Assert.Contains(
+            "scroll down to Controls on the Expeditions Macro Dashboard",
+            error.Message,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "Expeditions Macro Settings",
+            error.Message,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -292,9 +301,10 @@ public sealed class ChallengeMacroRunnerTests
                 presses++;
                 return Task.CompletedTask;
             },
-            waitForOpen: (_, _) =>
+            waitForOpen: (_, initial, _) =>
             {
                 waits++;
+                Assert.True(initial);
                 return Task.FromResult(true);
             },
             keyAttemptStarted: null,
@@ -330,7 +340,7 @@ public sealed class ChallengeMacroRunnerTests
                 presses++;
                 return Task.CompletedTask;
             },
-            waitForOpen: (_, _) =>
+            waitForOpen: (_, _, _) =>
             {
                 waits++;
                 transitioned = true;

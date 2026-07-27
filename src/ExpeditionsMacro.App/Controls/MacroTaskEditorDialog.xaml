@@ -1,0 +1,239 @@
+<UserControl x:Class="ExpeditionsMacro.App.Controls.MacroTaskEditorDialog"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:icons="clr-namespace:ExpeditionsMacro.App.Controls"
+             Width="560"
+             MaxHeight="720">
+    <Border Margin="24"
+            Padding="18"
+            Background="{DynamicResource SurfaceBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="7">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid>
+                <TextBlock x:Name="TaskEditorTitleText"
+                           VerticalAlignment="Center"
+                           Style="{StaticResource SectionTitle}"
+                           Text="Add task" />
+                <Button x:Name="CloseTaskEditorButton"
+                        Width="32"
+                        MinWidth="32"
+                        Height="32"
+                        HorizontalAlignment="Right"
+                        Style="{StaticResource IconButton}"
+                        icons:Lucide.Icon="X"
+                        AutomationProperties.Name="Close task editor"
+                        ToolTip="Close" />
+            </Grid>
+
+            <ScrollViewer Grid.Row="1"
+                          Margin="0,14,0,0"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource FieldLabel}"
+                               Text="Add to" />
+                    <ComboBox x:Name="TaskDestinationCombo"
+                              Margin="0,7,0,0"
+                              AutomationProperties.Name="Task destination"
+                              DisplayMemberPath="Name" />
+
+                    <TextBlock Margin="0,16,0,0"
+                               Style="{StaticResource FieldLabel}"
+                               Text="Mode" />
+                    <ComboBox x:Name="TaskKindCombo"
+                              Visibility="Collapsed"
+                              DisplayMemberPath="Name" />
+                    <UniformGrid x:Name="TaskKindButtonGrid"
+                                 Margin="0,7,0,0"
+                                 Columns="5">
+                        <RadioButton x:Name="ChallengeTaskKindButton"
+                                     GroupName="TaskKind"
+                                     Margin="0,0,6,0"
+                                     Style="{StaticResource PlacementChoiceButton}"
+                                     Tag="Challenge"
+                                     Content="Challenge" />
+                        <RadioButton x:Name="ExpeditionTaskKindButton"
+                                     GroupName="TaskKind"
+                                     Margin="0,0,6,0"
+                                     Style="{StaticResource PlacementChoiceButton}"
+                                     Tag="Expedition"
+                                     Content="Expedition" />
+                        <RadioButton x:Name="StoryTaskKindButton"
+                                     GroupName="TaskKind"
+                                     Margin="0,0,6,0"
+                                     Style="{StaticResource PlacementChoiceButton}"
+                                     Tag="Story"
+                                     Content="Story" />
+                        <RadioButton x:Name="RaidTaskKindButton"
+                                     GroupName="TaskKind"
+                                     Margin="0,0,6,0"
+                                     Style="{StaticResource PlacementChoiceButton}"
+                                     Tag="Raid"
+                                     Content="Raid" />
+                        <RadioButton x:Name="EventTaskKindButton"
+                                     GroupName="TaskKind"
+                                     Margin="0"
+                                     Style="{StaticResource PlacementChoiceButton}"
+                                     Tag="Event"
+                                     Content="Event" />
+                    </UniformGrid>
+
+                    <Border Margin="0,10,0,0"
+                            Padding="12"
+                            Background="{DynamicResource RaisedBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="5">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource FieldLabel}"
+                                       Text="Schedule" />
+                            <Grid Margin="0,7,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition x:Name="TaskSelectionColumn"
+                                                      Width="*" />
+                                    <ColumnDefinition x:Name="TaskSelectionGapColumn"
+                                                      Width="12" />
+                                    <ColumnDefinition x:Name="TaskTargetColumn"
+                                                      Width="132" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel x:Name="TaskSelectionPanel">
+                                    <TextBlock x:Name="TaskSelectionLabel"
+                                               Style="{StaticResource Caption}"
+                                               Text="Route" />
+                                    <Grid Margin="0,5,0,0">
+                                        <ComboBox x:Name="TaskPresetCombo"
+                                                  AutomationProperties.Name="Task preset"
+                                                  DisplayMemberPath="DisplayName" />
+                                        <ComboBox x:Name="TaskRouteCombo"
+                                                  AutomationProperties.Name="Task route"
+                                                  DisplayMemberPath="Name"
+                                                  Visibility="Collapsed" />
+                                    </Grid>
+                                </StackPanel>
+                                <StackPanel x:Name="TaskTargetPanel"
+                                            Grid.Column="2">
+                                    <TextBlock x:Name="TaskTargetLabel"
+                                               Style="{StaticResource Caption}"
+                                               Text="Victories" />
+                                    <TextBox x:Name="TaskTargetText"
+                                             Margin="0,5,0,0"
+                                             AutomationProperties.Name="Task target"
+                                             Text="1" />
+                                </StackPanel>
+                            </Grid>
+
+                        </StackPanel>
+                    </Border>
+
+                    <Border x:Name="FastTaskOptionsPanel"
+                            Margin="0,10,0,0"
+                            Padding="12"
+                            Background="{DynamicResource RaisedBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="5"
+                            Visibility="Collapsed">
+                        <WrapPanel>
+                            <StackPanel x:Name="TaskDefeatRetriesPanel"
+                                        Width="118"
+                                        Margin="0,0,18,0">
+                                <TextBlock Style="{StaticResource FieldLabel}"
+                                           Text="Defeat retries" />
+                                <TextBox x:Name="TaskDefeatRetriesText"
+                                         Margin="0,7,0,0"
+                                         Text="0" />
+                            </StackPanel>
+                            <StackPanel x:Name="TaskChallengeTypesPanel">
+                                <TextBlock Style="{StaticResource FieldLabel}"
+                                           Text="Challenge types" />
+                                <UniformGrid Width="288"
+                                             Margin="0,7,0,0"
+                                             Columns="3">
+                                    <CheckBox x:Name="TaskTraitCheck"
+                                              Margin="0,0,6,0"
+                                              Style="{StaticResource PlacementMultiChoiceButton}"
+                                              IsChecked="True"
+                                              Content="Trait" />
+                                    <CheckBox x:Name="TaskStatCheck"
+                                              Margin="0,0,6,0"
+                                              Style="{StaticResource PlacementMultiChoiceButton}"
+                                              IsChecked="True"
+                                              Content="Stat" />
+                                    <CheckBox x:Name="TaskSpriteCheck"
+                                              Margin="0"
+                                              Style="{StaticResource PlacementMultiChoiceButton}"
+                                              IsChecked="True"
+                                              Content="Sprite" />
+                                </UniformGrid>
+                            </StackPanel>
+                            <StackPanel x:Name="TaskExpeditionOptionsPanel"
+                                        Orientation="Horizontal">
+                                <StackPanel Width="110"
+                                            Margin="0,0,16,0">
+                                    <TextBlock Style="{StaticResource FieldLabel}"
+                                               Text="Difficulty" />
+                                    <ComboBox x:Name="TaskDifficultyCombo"
+                                              Margin="0,7,0,0" />
+                                </StackPanel>
+                                <StackPanel Width="158"
+                                            Margin="0,0,16,0">
+                                    <TextBlock Style="{StaticResource FieldLabel}"
+                                               Text="Extraction" />
+                                    <CheckBox x:Name="TaskExtractCheck"
+                                              Margin="0,10,0,0"
+                                              IsChecked="True"
+                                              Content="At checkpoint" />
+                                </StackPanel>
+                                <StackPanel Width="164">
+                                    <TextBlock Style="{StaticResource FieldLabel}"
+                                               Text="Boss nodes first" />
+                                    <TextBox x:Name="TaskBossNodesText"
+                                             Margin="0,7,0,0"
+                                             Text="1" />
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel x:Name="TaskStoryOptionsPanel"
+                                        Width="150">
+                                <TextBlock Style="{StaticResource FieldLabel}"
+                                           Text="Story options" />
+                                <CheckBox x:Name="TaskHardModeCheck"
+                                          Margin="0,10,0,0"
+                                          Content="Hard mode" />
+                            </StackPanel>
+                        </WrapPanel>
+                    </Border>
+
+                    <TextBlock x:Name="TaskEditorStatusText"
+                               Margin="0,10,0,0"
+                               AutomationProperties.LiveSetting="Polite"
+                               Foreground="{DynamicResource ErrorBrush}"
+                               TextWrapping="Wrap"
+                               Visibility="Collapsed" />
+                </StackPanel>
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="2"
+                        Margin="0,16,0,0"
+                        HorizontalAlignment="Right"
+                        Orientation="Horizontal">
+                <Button x:Name="CancelTaskEditButton"
+                        Height="36"
+                        Content="Cancel" />
+                <Button x:Name="AddTaskButton"
+                        Height="36"
+                        Margin="8,0,0,0"
+                        Style="{StaticResource PrimaryButton}"
+                        icons:Lucide.Icon="Plus"
+                        Content="Add task" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ExpeditionsMacro.Automation.Scheduling;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
@@ -57,22 +58,46 @@ public sealed class MacroSchedulerTests
     }
 
     [Fact]
-    public void Selection_SkipsCompletedAndDisabledFiniteTasks_ButChallengeRemainsRecurring()
+    public void LegacyDisabledTask_DeserializesAsActiveAndIsOmittedFromNewJson()
     {
-        MacroTaskDefinition challenge = Task("challenge", MacroTaskKind.Challenge, priority: 3);
-        MacroTaskDefinition complete = Task("complete", MacroTaskKind.Expedition, priority: 1);
-        MacroTaskDefinition disabled = Task("disabled", MacroTaskKind.Raid, priority: 2) with { Enabled = false };
-        MacroPlan plan = Plan(complete, disabled, challenge) with
+        MacroTaskDefinition task =
+            Assert.IsType<MacroTaskDefinition>(
+                JsonSerializer.Deserialize<
+                    MacroTaskDefinition>(
+                    """
+                    {
+                      "id": "legacy-disabled",
+                      "kind": "raid",
+                      "preset_id": "legacy-preset",
+                      "name": "Legacy disabled task",
+                      "priority": 1,
+                      "enabled": false
+                    }
+                    """,
+                    JsonFileStore.Options));
+        MacroPlanLoopDefinition loop = new()
         {
-            Progress =
-            [
-                new MacroTaskProgress { TaskId = complete.Id, Completed = true },
-                new MacroTaskProgress { TaskId = disabled.Id },
-                new MacroTaskProgress { TaskId = challenge.Id, Completed = true },
-            ],
+            StartTaskId = task.Id,
+            StopTaskId = task.Id,
+            TotalRuns = 2,
+        };
+        MacroPlan plan = Plan(task) with
+        {
+            Loops = [loop],
         };
 
-        Assert.Equal(challenge, MacroScheduler.SelectNext(plan, DateTimeOffset.UtcNow));
+        plan.Validate();
+        Assert.Equal(
+            task,
+            MacroScheduler.SelectNext(
+                plan,
+                DateTimeOffset.UtcNow));
+        Assert.DoesNotContain(
+            "\"enabled\"",
+            JsonSerializer.Serialize(
+                task,
+                JsonFileStore.Options),
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -270,6 +295,51 @@ public sealed class MacroSchedulerTests
         Assert.Equal(
             ScheduledTaskContinuation.ReturnToLobby,
             continuation);
+    }
+
+    [Fact]
+    public async Task EventActOneAngleChange_ReturnsToLobby()
+    {
+        PlacementTarget angleOne = new()
+        {
+            Mode = PlacementTargetMode.Event,
+            MapNumber =
+                (int)EventModeId.VillainInvasion,
+            ActNumber = (int)EventAct.Act1,
+            SpawnRoute = EventSpawnRoute.Angle1,
+        };
+        MacroTaskDefinition current =
+            Task("event-angle-one", MacroTaskKind.Event, 1) with
+            {
+                TargetVictories = 1,
+                PlacementTarget = angleOne,
+            };
+        MacroTaskDefinition next =
+            Task("event-angle-two", MacroTaskKind.Event, 2) with
+            {
+                TargetVictories = 1,
+                PlacementTarget = angleOne with
+                {
+                    SpawnRoute =
+                        EventSpawnRoute.Angle2,
+                },
+            };
+        ScheduledTaskResult result = new(
+            1,
+            0,
+            TimeSpan.FromMinutes(3));
+
+        Assert.False(
+            MacroScheduler.CanRepeatStage(
+                current,
+                next,
+                result));
+        Assert.Equal(
+            ScheduledTaskContinuation.ReturnToLobby,
+            await ObserveContinuationAsync(
+                current,
+                next,
+                result));
     }
 
     [Fact]

@@ -209,22 +209,23 @@ internal static class MacroPlanStructure
                 members = FlattenTasks(loop.Children);
             int nestedLoopCount =
                 FlattenLoops(loop.Children).Count;
-            loop.BlockLabel = loop.Forever
-                ? $"Loop {loopOrder}: Forever"
-                : $"Loop {loopOrder}: Repeat " +
-                  $"{loop.AmountText}x";
+            loop.BlockLabel = $"Loop {loopOrder}";
             loop.MembershipText =
                 members.Count == 0
-                    ? "Empty loop. Drag tasks or loop blocks here."
+                    ? "No blocks yet"
                     : $"{members.Count} " +
                       $"task{Plural(members.Count)}, " +
                       $"{nestedLoopCount} nested " +
                       $"loop{Plural(nestedLoopCount)}";
             long completed =
                 loop.Progress.CompletedRuns;
+            string completedText =
+                $"{completed} run{Plural(completed)} " +
+                "completed.";
             loop.StatusText = loop.Forever
-                ? $"Run {completed} complete; repeats until stopped."
-                : $"{completed} runs completed.";
+                ? $"Forever · {completedText}"
+                : $"Repeat {loop.AmountText} times · " +
+                  completedText;
             RefreshLevel(
                 loop.Children,
                 depth + 1,
@@ -232,7 +233,7 @@ internal static class MacroPlanStructure
         }
     }
 
-    private static string Plural(int count) =>
+    private static string Plural(long count) =>
         count == 1
             ? string.Empty
             : "s";

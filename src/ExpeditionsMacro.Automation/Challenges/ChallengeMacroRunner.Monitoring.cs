@@ -96,7 +96,8 @@ public sealed partial class ChallengeMacroRunner
             {
                 MatchRuntimePolicy.ThrowIfExceeded(
                     matchRuntime.Elapsed,
-                    MatchRuntimePolicy.ChallengeLimit(),
+                    RuntimeLimit(
+                        models),
                     "Challenge match");
             }
             if (candidate == ChallengeScreenState.None &&
@@ -163,6 +164,19 @@ public sealed partial class ChallengeMacroRunner
                 preset.PollMilliseconds,
                 cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    private static TimeSpan RuntimeLimit(
+        ChallengeMapRuntimeModels models)
+    {
+        PlacementModel? placement =
+            models.PrestartPlacement ??
+            models.DelayedPlacement;
+        return placement is null
+            ? MatchRuntimePolicy.ChallengeLimit()
+            : MatchRuntimePolicy.ForPlacement(
+                placement,
+                MatchRuntimePolicy.ChallengeLimit())!.Value;
     }
 
     internal static string? DetectMatchRecoveryState(

@@ -11,6 +11,24 @@ namespace ExpeditionsMacro.Tests;
 public sealed class CoreModelTests
 {
     [Fact]
+    public void AppSettings_NewInstallSafetyDefaultsAreEnabledAndMigrated()
+    {
+        AppSettings settings = new();
+
+        Assert.True(
+            settings.RestartRobloxWithPrivateServer);
+        Assert.True(
+            settings.RestartRobloxAtMacroStart);
+        Assert.True(
+            settings.AutoCheckUiScaleOnStart);
+        Assert.True(
+            settings.AutoCheckGameSettingsOnStart);
+        Assert.Equal(
+            AppSettings.CurrentSchemaVersion,
+            settings.SchemaVersion);
+    }
+
+    [Fact]
     public void ScreenRegion_UsesHalfOpenBoundsAndTranslates()
     {
         ScreenRegion region = new(10, 20, 30, 40);
@@ -82,6 +100,8 @@ public sealed class CoreModelTests
         AppSettings settings = new();
 
         Assert.True(settings.AutoCaptureOnMacroError);
+        Assert.False(
+            settings.ManualInputRecordingEnabled);
         Assert.True(settings.IncludeLogsInDiagnosticArchives);
     }
 
@@ -152,11 +172,11 @@ public sealed class CoreModelTests
         InvalidDataException error = Assert.Throws<InvalidDataException>(() => AppSettings.ParsePlayMenuKey(string.Empty));
 
         Assert.Equal(
-            "1. Go to the Settings menu in game\n" +
-            "2. Go to the Keybinds section in settings\n" +
-            "3. Find the Toggle Play Menu keybind\n" +
-            "4. Set the keybind to a letter in game\n" +
-            "5. Enter the same keybind letter in the macro settings",
+            "1. Open Settings in Anime Expeditions\n" +
+            "2. Open the Keybinds section\n" +
+            "3. Set Toggle Play Menu to an A-Z letter\n" +
+            "4. Open the Dashboard in Expeditions Macro\n" +
+            "5. Scroll down to Controls and set Toggle Play Menu key to the same letter",
             error.Message);
     }
 
@@ -271,7 +291,10 @@ public sealed class CoreModelTests
             settings.UpgradeUnitKey);
         Assert.Equal(
             string.Empty,
-            settings.ToggleAutoUpgradeUnitKey);
+            settings.AutoUpgradeUnitKey);
+        Assert.Equal(
+            string.Empty,
+            settings.ToggleAutoUpgradePlacedUnitsKey);
         InvalidDataException error =
             Assert.Throws<InvalidDataException>(
                 () => AppSettings
@@ -293,7 +316,8 @@ public sealed class CoreModelTests
             AreasMenuKey = "U",
             ChangeUnitTargetingKey = " t ",
             UpgradeUnitKey = "y",
-            ToggleAutoUpgradeUnitKey = "g",
+            AutoUpgradeUnitKey = "b",
+            ToggleAutoUpgradePlacedUnitsKey = "g",
         };
 
         UnitActionKeys keys =
@@ -302,17 +326,22 @@ public sealed class CoreModelTests
 
         Assert.Equal('T', keys.ChangeTargeting);
         Assert.Equal('Y', keys.Upgrade);
-        Assert.Equal('G', keys.ToggleAutoUpgrade);
+        Assert.Equal('B', keys.AutoUpgrade);
+        Assert.Equal(
+            'G',
+            keys.ToggleAutoUpgradePlacedUnits);
     }
 
     [Theory]
-    [InlineData("P", "Y", "G")]
-    [InlineData("T", "T", "G")]
-    [InlineData("T", "Y", "Z")]
+    [InlineData("P", "Y", "B", "G")]
+    [InlineData("T", "T", "B", "G")]
+    [InlineData("T", "Y", "Y", "G")]
+    [InlineData("T", "Y", "B", "Z")]
     public void AppSettings_RequiredUnitActionKeysRejectEveryControlConflict(
         string targeting,
         string upgrade,
-        string autoUpgrade)
+        string autoUpgrade,
+        string toggleAutoUpgradePlacedUnits)
     {
         AppSettings settings = new()
         {
@@ -321,7 +350,9 @@ public sealed class CoreModelTests
             AreasMenuKey = "U",
             ChangeUnitTargetingKey = targeting,
             UpgradeUnitKey = upgrade,
-            ToggleAutoUpgradeUnitKey = autoUpgrade,
+            AutoUpgradeUnitKey = autoUpgrade,
+            ToggleAutoUpgradePlacedUnitsKey =
+                toggleAutoUpgradePlacedUnits,
         };
 
         Assert.Throws<InvalidDataException>(
@@ -343,7 +374,8 @@ public sealed class CoreModelTests
             ShiftLockVirtualKey = shiftLockKey,
             ChangeUnitTargetingKey = "T",
             UpgradeUnitKey = "Y",
-            ToggleAutoUpgradeUnitKey = "G",
+            AutoUpgradeUnitKey = "B",
+            ToggleAutoUpgradePlacedUnitsKey = "G",
         };
 
         Assert.Throws<InvalidDataException>(

@@ -143,7 +143,10 @@ public sealed partial class ExpeditionMacroRunner
                 {
                     MatchRuntimePolicy.ThrowIfExceeded(
                         matchRuntime.Elapsed,
-                        MatchRuntimePolicy.ExpeditionLimit(preset),
+                        MatchRuntimePolicy.ForPlacement(
+                            placement,
+                            MatchRuntimePolicy.ExpeditionLimit(
+                                preset)),
                         $"Expedition map {preset.MapNumber}, difficulty " +
                         $"{preset.Difficulty}");
                 }
@@ -157,7 +160,10 @@ public sealed partial class ExpeditionMacroRunner
             if (state is "defeat" or "victory") return new RunTerminal(state, frame.Clone());
             MatchRuntimePolicy.ThrowIfExceeded(
                 matchRuntime.Elapsed,
-                MatchRuntimePolicy.ExpeditionLimit(preset),
+                MatchRuntimePolicy.ForPlacement(
+                    placement,
+                    MatchRuntimePolicy.ExpeditionLimit(
+                        preset)),
                 $"Expedition map {preset.MapNumber}, difficulty " +
                 $"{preset.Difficulty}");
             if (state == "reward")

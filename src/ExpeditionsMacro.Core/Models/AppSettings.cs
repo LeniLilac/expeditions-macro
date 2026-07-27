@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace ExpeditionsMacro.Core.Models;
 
 public enum AppTheme
@@ -9,6 +11,11 @@ public enum AppTheme
 
 public sealed record AppSettings
 {
+    private const string ControlConflictGuidance =
+        " Scroll down to Controls on the Dashboard to choose different keys, and keep every game control matched to Anime Expeditions.";
+
+    public const int CurrentSchemaVersion = 3;
+
     public const int DefaultMacroHotkeyVirtualKey = 0x75;
 
     public const int DefaultShiftLockVirtualKey = KeyboardKey.LeftControl;
@@ -27,16 +34,20 @@ public sealed record AppSettings
 
     public const string DefaultUpgradeUnitKey = "";
 
-    public const string DefaultToggleAutoUpgradeUnitKey = "";
+    public const string DefaultAutoUpgradeUnitKey = "";
+
+    public const string
+        DefaultToggleAutoUpgradePlacedUnitsKey = "";
 
     public const string PlayMenuKeySetupInstructions =
-        "1. Go to the Settings menu in game\n" +
-        "2. Go to the Keybinds section in settings\n" +
-        "3. Find the Toggle Play Menu keybind\n" +
-        "4. Set the keybind to a letter in game\n" +
-        "5. Enter the same keybind letter in the macro settings";
+        "1. Open Settings in Anime Expeditions\n" +
+        "2. Open the Keybinds section\n" +
+        "3. Set Toggle Play Menu to an A-Z letter\n" +
+        "4. Open the Dashboard in Expeditions Macro\n" +
+        "5. Scroll down to Controls and set Toggle Play Menu key to the same letter";
 
-    public int SchemaVersion { get; init; } = 1;
+    public int SchemaVersion { get; init; } =
+        CurrentSchemaVersion;
 
     public AppTheme Theme { get; init; } = AppTheme.System;
 
@@ -54,7 +65,7 @@ public sealed record AppSettings
 
     public string EncryptedPrivateServerLink { get; init; } = string.Empty;
 
-    public bool RestartRobloxWithPrivateServer { get; init; }
+    public bool RestartRobloxWithPrivateServer { get; init; } = true;
 
     public bool RestartRobloxAtMacroStart { get; init; } = true;
 
@@ -68,13 +79,13 @@ public sealed record AppSettings
 
     public bool DebugModeEnabled { get; init; }
 
+    public bool AutoCheckUiScaleOnStart { get; init; } = true;
+
     public bool AutoCheckGameSettingsOnStart { get; init; } = true;
 
     public bool FastNoAlignEnabled { get; init; } = true;
 
-    public bool CheckDetectorUpdates { get; init; } = true;
-
-    public DateTimeOffset? LastDetectorUpdateCheck { get; init; }
+    public bool ManualInputRecordingEnabled { get; init; }
 
     public bool MinimizeDuringAutomation { get; init; }
 
@@ -97,8 +108,15 @@ public sealed record AppSettings
     public string UpgradeUnitKey { get; init; } =
         DefaultUpgradeUnitKey;
 
-    public string ToggleAutoUpgradeUnitKey { get; init; } =
-        DefaultToggleAutoUpgradeUnitKey;
+    public string AutoUpgradeUnitKey { get; init; } =
+        DefaultAutoUpgradeUnitKey;
+
+    [JsonPropertyName("toggle_auto_upgrade_unit_key")]
+    public string ToggleAutoUpgradePlacedUnitsKey
+    {
+        get;
+        init;
+    } = DefaultToggleAutoUpgradePlacedUnitsKey;
 
     public ResourceRefuelDebugSettings ResourceRefuelDebug { get; init; } = new();
 
@@ -114,11 +132,13 @@ public sealed record AppSettings
         if (!KeyboardKey.IsSupportedShiftLockKey(virtualKey))
         {
             throw new InvalidDataException(
-                "Choose Left/Right Shift, Left/Right Ctrl, or a supported letter, number, symbol, numpad, function, or common control key for Shift Lock.");
+                "Scroll down to Controls on the Dashboard and choose Left/Right Shift, Left/Right Ctrl, or a supported letter, number, symbol, numpad, function, or common control key for Toggle Shift Lock. Keep it matched to Anime Expeditions.");
         }
         if (virtualKey == macroHotkeyVirtualKey)
         {
-            throw new InvalidDataException($"The Toggle Shift Lock key and macro start/stop hotkey cannot both be {displayName}.");
+            throw new InvalidDataException(
+                $"The Toggle Shift Lock key and macro start/stop hotkey cannot both be {displayName}." +
+                ControlConflictGuidance);
         }
 
         foreach ((string Label, string? Value) binding in new[]
@@ -132,7 +152,9 @@ public sealed record AppSettings
             string candidate = binding.Value?.Trim() ?? string.Empty;
             if (candidate.Length == 1 && char.ToUpperInvariant(candidate[0]) == virtualKey)
             {
-                throw new InvalidDataException($"The Toggle Shift Lock key and {binding.Label} key cannot both be {displayName}.");
+                throw new InvalidDataException(
+                    $"The Toggle Shift Lock key and {binding.Label} key cannot both be {displayName}." +
+                    ControlConflictGuidance);
             }
         }
 
@@ -156,7 +178,8 @@ public sealed record AppSettings
         if (macroHotkeyVirtualKey == key)
         {
             throw new InvalidDataException(
-                $"The Toggle Play Menu key and macro start/stop hotkey cannot both be {key}. Choose different keys under Settings > Controls.");
+                $"The Toggle Play Menu key and macro start/stop hotkey cannot both be {key}." +
+                ControlConflictGuidance);
         }
 
         return key;
@@ -179,19 +202,23 @@ public sealed record AppSettings
         if (candidate.Length != 1 || !char.IsAsciiLetter(candidate[0]))
         {
             throw new InvalidDataException(
-                "Set the Toggle Unit Inventory key under Settings > Controls to the same letter assigned in Anime Expeditions.");
+                "Scroll down to Controls on the Dashboard, then set Toggle Unit Inventory key to the same letter assigned in Anime Expeditions.");
         }
 
         char key = char.ToUpperInvariant(candidate[0]);
         if (macroHotkeyVirtualKey == key)
         {
-            throw new InvalidDataException($"The Toggle Unit Inventory key and macro start/stop hotkey cannot both be {key}.");
+            throw new InvalidDataException(
+                $"The Toggle Unit Inventory key and macro start/stop hotkey cannot both be {key}." +
+                ControlConflictGuidance);
         }
 
         string play = playMenuKey?.Trim() ?? string.Empty;
         if (play.Length == 1 && char.ToUpperInvariant(play[0]) == key)
         {
-            throw new InvalidDataException("The Toggle Unit Inventory key and Toggle Play Menu key must be different.");
+            throw new InvalidDataException(
+                "The Toggle Unit Inventory key and Toggle Play Menu key must be different." +
+                ControlConflictGuidance);
         }
 
         string areas = areasMenuKey?.Trim() ?? string.Empty;
@@ -199,7 +226,8 @@ public sealed record AppSettings
             char.ToUpperInvariant(areas[0]) == key)
         {
             throw new InvalidDataException(
-                "The Toggle Unit Inventory key and Toggle Areas Menu key must be different.");
+                "The Toggle Unit Inventory key and Toggle Areas Menu key must be different." +
+                ControlConflictGuidance);
         }
 
         return key;
@@ -216,14 +244,15 @@ public sealed record AppSettings
             !char.IsAsciiLetter(candidate[0]))
         {
             throw new InvalidDataException(
-                "Set the Toggle Areas Menu key under Settings > Controls to the same letter assigned in Anime Expeditions.");
+                "Scroll down to Controls on the Dashboard, then set Toggle Areas Menu key to the same letter assigned in Anime Expeditions.");
         }
 
         char key = char.ToUpperInvariant(candidate[0]);
         if (macroHotkeyVirtualKey == key)
         {
             throw new InvalidDataException(
-                $"The Toggle Areas Menu key and macro start/stop hotkey cannot both be {key}.");
+                $"The Toggle Areas Menu key and macro start/stop hotkey cannot both be {key}." +
+                ControlConflictGuidance);
         }
 
         foreach ((string Label, string? Value) binding in new[]
@@ -237,7 +266,8 @@ public sealed record AppSettings
                 char.ToUpperInvariant(other[0]) == key)
             {
                 throw new InvalidDataException(
-                    $"The Toggle Areas Menu key and {binding.Label} key must be different.");
+                    $"The Toggle Areas Menu key and {binding.Label} key must be different." +
+                    ControlConflictGuidance);
             }
         }
 
@@ -257,19 +287,21 @@ public sealed record AppSettings
             !char.IsAsciiLetter(candidate[0]))
         {
             throw new InvalidDataException(
-                "Set the Toggle Cancel Unit Placement key under Settings > Controls to the same letter assigned in Anime Expeditions.");
+                "Scroll down to Controls on the Dashboard, then set Toggle Cancel Unit Placement key to the same letter assigned in Anime Expeditions.");
         }
 
         char key = char.ToUpperInvariant(candidate[0]);
         if (macroHotkeyVirtualKey == key)
         {
             throw new InvalidDataException(
-                $"The Toggle Cancel Unit Placement key and macro start/stop hotkey cannot both be {key}.");
+                $"The Toggle Cancel Unit Placement key and macro start/stop hotkey cannot both be {key}." +
+                ControlConflictGuidance);
         }
         if (shiftLockVirtualKey == key)
         {
             throw new InvalidDataException(
-                $"The Toggle Cancel Unit Placement key and Toggle Shift Lock key cannot both be {key}.");
+                $"The Toggle Cancel Unit Placement key and Toggle Shift Lock key cannot both be {key}." +
+                ControlConflictGuidance);
         }
 
         foreach ((string Label, string? Value) binding in new[]
@@ -285,7 +317,8 @@ public sealed record AppSettings
                 char.ToUpperInvariant(other[0]) == key)
             {
                 throw new InvalidDataException(
-                    $"The Toggle Cancel Unit Placement key and {binding.Label} key must be different.");
+                    $"The Toggle Cancel Unit Placement key and {binding.Label} key must be different." +
+                    ControlConflictGuidance);
             }
         }
 
@@ -307,8 +340,11 @@ public sealed record AppSettings
                 settings.UpgradeUnitKey,
                 "Upgrade Unit"),
             ParseRequiredLetter(
-                settings.ToggleAutoUpgradeUnitKey,
-                "Toggle Auto Upgrade Unit"));
+                settings.AutoUpgradeUnitKey,
+                "Auto Upgrade Unit"),
+            ParseRequiredLetter(
+                settings.ToggleAutoUpgradePlacedUnitsKey,
+                "Toggle Auto Upgrade Placed Units"));
     }
 
     public static void ValidateControlKeySet(
@@ -349,8 +385,13 @@ public sealed record AppSettings
             requireUnitActionKeys);
         AddLetter(
             bindings,
-            "Toggle Auto Upgrade Unit",
-            settings.ToggleAutoUpgradeUnitKey,
+            "Auto Upgrade Unit",
+            settings.AutoUpgradeUnitKey,
+            requireUnitActionKeys);
+        AddLetter(
+            bindings,
+            "Toggle Auto Upgrade Placed Units",
+            settings.ToggleAutoUpgradePlacedUnitsKey,
             requireUnitActionKeys);
 
         foreach ((string label, char key) in bindings)
@@ -358,12 +399,14 @@ public sealed record AppSettings
             if (settings.MacroHotkeyVirtualKey == key)
             {
                 throw new InvalidDataException(
-                    $"{label} and the macro start/stop hotkey cannot both be {key}.");
+                    $"{label} and the macro start/stop hotkey cannot both be {key}." +
+                    ControlConflictGuidance);
             }
             if (settings.ShiftLockVirtualKey == key)
             {
                 throw new InvalidDataException(
-                    $"{label} and Toggle Shift Lock cannot both be {key}.");
+                    $"{label} and Toggle Shift Lock cannot both be {key}." +
+                    ControlConflictGuidance);
             }
         }
 
@@ -377,7 +420,8 @@ public sealed record AppSettings
                 " and ",
                 duplicate.Select(binding => binding.Label));
             throw new InvalidDataException(
-                $"{names} cannot all use {duplicate.Key}. Choose different keys.");
+                $"{names} cannot all use {duplicate.Key}." +
+                ControlConflictGuidance);
         }
     }
 
@@ -402,7 +446,7 @@ public sealed record AppSettings
             !char.IsAsciiLetter(candidate[0]))
         {
             throw new InvalidDataException(
-                $"Set the {label} key under Settings > Controls to the same letter assigned in Anime Expeditions.");
+                $"Scroll down to Controls on the Dashboard, then set {label} key to the same letter assigned in Anime Expeditions.");
         }
         return char.ToUpperInvariant(candidate[0]);
     }
@@ -411,4 +455,5 @@ public sealed record AppSettings
 public readonly record struct UnitActionKeys(
     char ChangeTargeting,
     char Upgrade,
-    char ToggleAutoUpgrade);
+    char AutoUpgrade,
+    char ToggleAutoUpgradePlacedUnits);

@@ -13,7 +13,6 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <StackPanel Margin="0,0,0,28">
                 <TextBlock Style="{StaticResource PageTitle}" Text="Settings" />
@@ -83,7 +82,7 @@
                     <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
                     <StackPanel>
                         <TextBlock Style="{StaticResource SectionTitle}" Text="Local data" />
-                        <TextBlock Margin="0,5,24,0" Style="{StaticResource Caption}" Text="Models, presets, detector packs, secrets, and logs stay under your Windows profile." />
+                        <TextBlock Margin="0,5,24,0" Style="{StaticResource Caption}" Text="Models, presets, recordings, secrets, and logs stay under your Windows profile." />
                     </StackPanel>
                     <StackPanel Grid.Column="1">
                         <TextBox x:Name="DataPath" IsReadOnly="True" />
@@ -96,28 +95,6 @@
             </Border>
 
             <Border Grid.Row="6" Style="{StaticResource SectionDivider}">
-                <Grid>
-                    <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource SectionTitle}" Text="Detector pack" />
-                        <TextBlock Margin="0,5,24,0" Style="{StaticResource Caption}" Text="Compact references are loaded locally. An installed pack is never replaced during an active run." />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1">
-                        <Border Padding="12" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
-                            <StackPanel>
-                                <TextBlock x:Name="DetectorTitle" FontWeight="SemiBold" Text="Loading detector pack" />
-                                <TextBlock x:Name="DetectorDetail" Margin="0,4,0,0" Style="{StaticResource Caption}" />
-                            </StackPanel>
-                        </Border>
-                        <Grid Margin="0,10,0,0">
-                            <CheckBox x:Name="AutoUpdateCheck" VerticalAlignment="Center" Content="Check once per day" Checked="AutoUpdateCheck_Changed" Unchecked="AutoUpdateCheck_Changed" />
-                            <Button HorizontalAlignment="Right" icons:Lucide.Icon="RefreshCw" Content="Check for updates" Click="RefreshDetector_Click" />
-                        </Grid>
-                    </StackPanel>
-                </Grid>
-            </Border>
-
-            <Border Grid.Row="7" Style="{StaticResource SectionDivider}">
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
                     <StackPanel>
@@ -144,7 +121,9 @@
                             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
                             <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Upgrade Unit key" /><TextBlock x:Name="UpgradeUnitKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
                             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
-                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Auto Upgrade Unit key" /><TextBlock x:Name="AutoUpgradeUnitKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Auto Upgrade Unit key" /><TextBlock x:Name="AutoUpgradeUnitKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Auto Upgrade Placed Units key" /><TextBlock x:Name="ToggleAutoUpgradePlacedUnitsKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
                             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
                             <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Shift Lock key" /><TextBlock x:Name="ShiftLockKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
                             <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
@@ -154,7 +133,7 @@
                 </Grid>
             </Border>
 
-            <StackPanel Grid.Row="8" Width="640" HorizontalAlignment="Left">
+            <StackPanel Grid.Row="7" Width="640" HorizontalAlignment="Left">
                 <TextBlock Style="{StaticResource SectionTitle}" Text="Debug capture" />
                 <CheckBox x:Name="DebugModeCheck"
                           Margin="0,14,0,0"
@@ -165,6 +144,15 @@
                            Style="{StaticResource Caption}"
                            TextWrapping="Wrap"
                            Text="Shows a Debug tab with isolated navigation, team, detector, and live checkpoint tools." />
+                <CheckBox x:Name="ManualRecordingsCheck"
+                          Margin="0,14,0,0"
+                          Content="Enable advanced manual recordings"
+                          Checked="ManualRecordingsCheck_Changed"
+                          Unchecked="ManualRecordingsCheck_Changed" />
+                <TextBlock Margin="50,5,0,0"
+                           Style="{StaticResource Caption}"
+                           TextWrapping="Wrap"
+                           Text="Shows a Recordings tab and lets Fast no align placement setups replace normal placement steps with precisely timed keyboard and mouse playback." />
                 <TextBlock x:Name="DebugCaptureDescription" Margin="0,5,0,0" Style="{StaticResource Caption}" Text="Record the Roblox client at the standard 808 by 611 size. F6 starts and stops capture and saves a ZIP for bug reports." />
                 <CheckBox x:Name="AutoCaptureOnErrorCheck" Margin="0,14,0,0" Content="Automatically save 20 screenshots when a macro fails" Checked="AutoCaptureOnErrorCheck_Changed" Unchecked="AutoCaptureOnErrorCheck_Changed" />
                 <TextBlock Margin="50,5,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Keeps the latest 10 action-state frames, then captures 10 more at 0.5-second intervals after the failure. The 10 newest automatic error ZIPs are retained." />

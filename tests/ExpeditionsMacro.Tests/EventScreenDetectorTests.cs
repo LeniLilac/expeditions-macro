@@ -9,6 +9,9 @@ namespace ExpeditionsMacro.Tests;
 public sealed class EventScreenDetectorTests
 {
     [Theory]
+    [InlineData(
+        "EventCatalog_BeginnerPathSelected.png",
+        EventScreenState.EventCatalog)]
     [InlineData("EventHome.png", EventScreenState.EventHome)]
     [InlineData("ActSelector.png", EventScreenState.ActSelector)]
     [InlineData("Act4Selector.png", EventScreenState.ActSelector)]
@@ -69,6 +72,27 @@ public sealed class EventScreenDetectorTests
         Assert.Equal(
             (402, 560, 628, 560),
             EventScreenDetector.LaterActScroll);
+    }
+
+    [Fact]
+    public void EventCatalog_LocatesVillainInvasionCard()
+    {
+        EventScreenMatch match =
+            EventScreenDetector.Detect(
+                Load(
+                    "EventCatalog_BeginnerPathSelected.png"));
+
+        Assert.Equal(
+            EventScreenState.EventCatalog,
+            match.State);
+        Assert.InRange(
+            match.ActionX ?? -1,
+            85,
+            105);
+        Assert.InRange(
+            match.ActionY ?? -1,
+            175,
+            195);
     }
 
     [Theory]
@@ -224,6 +248,7 @@ public sealed class EventScreenDetectorTests
             EventScreenMatch match =
                 EventScreenDetector.Detect(frame);
             if (match.State is
+                EventScreenState.EventCatalog or
                 EventScreenState.EventHome or
                 EventScreenState.ActSelector or
                 EventScreenState.ActDetail)

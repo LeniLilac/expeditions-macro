@@ -19,6 +19,7 @@ public sealed class TeamScreenDetectorTests
     [InlineData("TeamList_Aligned_Team6_01.png", TeamScreenState.Teams)]
     [InlineData("TeamList_Aligned_Bottom_01.png", TeamScreenState.Teams)]
     [InlineData("TeamLoadConfirm_01.png", TeamScreenState.LoadConfirm)]
+    [InlineData("TeamLoadConfirm_Team4_TwoRows_01.png", TeamScreenState.LoadConfirm)]
     [InlineData("TeamLoadConfirm_Bottom_Team7_01.png", TeamScreenState.LoadConfirm)]
     [InlineData("TeamLoadConfirm_Bottom_Team8_01.png", TeamScreenState.LoadConfirm)]
     [InlineData("TeamEquipmentConfirm_01.png", TeamScreenState.EquipmentConfirm)]
@@ -92,6 +93,17 @@ public sealed class TeamScreenDetectorTests
             Enumerable.Range(1, 8).Select(TeamScreenDetector.ScrollThumbOffsetY));
         Assert.Equal((345, 331), TeamScreenDetector.LoadConfirmAction);
         Assert.Equal((319, 376), TeamScreenDetector.IncludeEquipmentAction);
+    }
+
+    [Fact]
+    public void Team4TwoRowLoadConfirm_UsesTheLiveConfirmAction()
+    {
+        TeamScreenMatch match = TeamScreenDetector.Detect(
+            Load("TeamLoadConfirm_Team4_TwoRows_01.png"));
+
+        Assert.Equal(TeamScreenState.LoadConfirm, match.State);
+        Assert.InRange(match.Confidence, 0.70, 1);
+        Assert.Equal((346, 331), (match.ActionX, match.ActionY));
     }
 
     [Theory]

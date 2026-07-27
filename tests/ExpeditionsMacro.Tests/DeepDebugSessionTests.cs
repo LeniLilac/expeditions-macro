@@ -47,6 +47,9 @@ public sealed class DeepDebugSessionTests
         {
             DeepDebugEnabled = true,
             DebugModeEnabled = true,
+            ManualInputRecordingEnabled = true,
+            AutoCheckUiScaleOnStart = false,
+            AutoCheckGameSettingsOnStart = true,
             EncryptedWebhook = "protected-secret-value",
             EncryptedPrivateServerLink =
                 "protected-private-server-value",
@@ -58,7 +61,8 @@ public sealed class DeepDebugSessionTests
             AreasMenuKey = "G",
             ChangeUnitTargetingKey = "T",
             UpgradeUnitKey = "Y",
-            ToggleAutoUpgradeUnitKey = "V",
+            AutoUpgradeUnitKey = "B",
+            ToggleAutoUpgradePlacedUnitsKey = "V",
             ShiftLockVirtualKey = KeyboardKey.RightControl,
             ResourceRefuelDebug =
                 new ResourceRefuelDebugSettings
@@ -122,10 +126,16 @@ public sealed class DeepDebugSessionTests
                 .GetProperty("upgrade_unit_key")
                 .GetString());
         Assert.Equal(
+            "B",
+            sanitized.RootElement
+                .GetProperty(
+                    "auto_upgrade_unit_key")
+                .GetString());
+        Assert.Equal(
             "V",
             sanitized.RootElement
                 .GetProperty(
-                    "toggle_auto_upgrade_unit_key")
+                    "toggle_auto_upgrade_placed_units_key")
                 .GetString());
         Assert.Equal(
             2468,
@@ -136,6 +146,21 @@ public sealed class DeepDebugSessionTests
         Assert.True(
             sanitized.RootElement
                 .GetProperty("debug_mode_enabled")
+                .GetBoolean());
+        Assert.True(
+            sanitized.RootElement
+                .GetProperty(
+                    "manual_input_recording_enabled")
+                .GetBoolean());
+        Assert.False(
+            sanitized.RootElement
+                .GetProperty(
+                    "auto_check_ui_scale_on_start")
+                .GetBoolean());
+        Assert.True(
+            sanitized.RootElement
+                .GetProperty(
+                    "auto_check_game_settings_on_start")
                 .GetBoolean());
         Assert.True(
             sanitized.RootElement

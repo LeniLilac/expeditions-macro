@@ -76,8 +76,4 @@ public interface IDetectorPackRepository
     Task<IReadOnlyList<DetectorPackManifest>> ListAsync(CancellationToken cancellationToken = default);
 
     Task<IDetectorPack?> LoadAsync(string packId, CancellationToken cancellationToken = default);
-
-    Task InstallAsync(Stream package, CancellationToken cancellationToken = default);
-
-    Task RollbackAsync(string packId, CancellationToken cancellationToken = default);
 }

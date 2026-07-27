@@ -145,7 +145,23 @@ public partial class PlacementModelsPage
                 3),
             "Raid Map 1 Act 3");
 
-        for (int act = 1; act <= 4; act++)
+        AddRootRoute(
+            FindSetup(
+                PlacementTargetMode.Event,
+                (int)EventModeId.VillainInvasion,
+                StoryRunKind.Act,
+                (int)EventAct.Act1,
+                EventSpawnRoute.Angle1),
+            "Event · Villain Invasion · Act 1 · Angle 1");
+        AddRootRoute(
+            FindSetup(
+                PlacementTargetMode.Event,
+                (int)EventModeId.VillainInvasion,
+                StoryRunKind.Act,
+                (int)EventAct.Act1,
+                EventSpawnRoute.Angle2),
+            "Event · Villain Invasion · Act 1 · Angle 2");
+        for (int act = 2; act <= 4; act++)
         {
             AddRootRoute(
                 FindSetup(
@@ -209,13 +225,16 @@ public partial class PlacementModelsPage
         PlacementTargetMode mode,
         int map,
         StoryRunKind runKind = StoryRunKind.Act,
-        int act = 0) =>
+        int act = 0,
+        EventSpawnRoute spawnRoute =
+            EventSpawnRoute.Angle1) =>
         _setupRows.First(row =>
             row.Route.Target.Mode == mode &&
             row.Route.Target.MapNumber == map &&
             (mode != PlacementTargetMode.Story ||
              row.Route.Target.StoryRunKind == runKind) &&
-            row.Route.Target.ActNumber == act);
+            row.Route.Target.ActNumber == act &&
+            row.Route.Target.SpawnRoute == spawnRoute);
 
     private static string MapName(int map) => map switch
     {

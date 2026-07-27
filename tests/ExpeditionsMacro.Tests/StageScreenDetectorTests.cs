@@ -218,6 +218,7 @@ public sealed class StageScreenDetectorTests
     [InlineData("TeamList_Aligned_Team6_01.png")]
     [InlineData("TeamList_Aligned_Bottom_01.png")]
     [InlineData("TeamLoadConfirm_01.png")]
+    [InlineData("TeamLoadConfirm_Team4_TwoRows_01.png")]
     [InlineData("TeamLoadConfirm_Bottom_Team7_01.png")]
     [InlineData("TeamLoadConfirm_Bottom_Team8_01.png")]
     [InlineData("TeamEquipmentConfirm_01.png")]

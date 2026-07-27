@@ -6,7 +6,6 @@ using System.Windows.Controls;
 using ExpeditionsMacro.App.Services;
 using ExpeditionsMacro.App.Windows;
 using ExpeditionsMacro.Automation.Diagnostics;
-using ExpeditionsMacro.Automation.Updates;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Models;
@@ -49,16 +48,18 @@ public partial class SettingsPage : UserControl, IAppPage
         else SettingsScroll.ScrollToTop();
     }
 
-    public async Task OnShownAsync()
+    public Task OnShownAsync()
     {
         _loading = true;
         ThemeCombo.SelectedItem = _services.Settings.Theme;
         MinimizeCheck.IsChecked = _services.Settings.MinimizeDuringAutomation;
-        AutoUpdateCheck.IsChecked = _services.Settings.CheckDetectorUpdates;
         AutoCaptureOnErrorCheck.IsChecked = _services.Settings.AutoCaptureOnMacroError;
         IncludeLogsCheck.IsChecked = _services.Settings.IncludeLogsInDiagnosticArchives;
         DeepDebugCheck.IsChecked = _services.Settings.DeepDebugEnabled;
         DebugModeCheck.IsChecked = _services.Settings.DebugModeEnabled;
+        ManualRecordingsCheck.IsChecked =
+            _services.Settings
+                .ManualInputRecordingEnabled;
         FastNoAlignCheck.IsChecked =
             _services.Settings.FastNoAlignEnabled;
         _loading = false;
@@ -69,8 +70,8 @@ public partial class SettingsPage : UserControl, IAppPage
         KeyBindingsPanel.Refresh();
         UpdateKeyBindingDiagnostics();
         UpdateDeepDebugStatus();
-        await RefreshDetectorAsync();
         UpdateCaptureState();
+        return Task.CompletedTask;
     }
 
     private async void ThemeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -213,6 +214,9 @@ public partial class SettingsPage : UserControl, IAppPage
             KeyBindingsPanel.UpgradeDiagnostic;
         AutoUpgradeUnitKeyDiagnosticText.Text =
             KeyBindingsPanel.AutoUpgradeDiagnostic;
+        ToggleAutoUpgradePlacedUnitsKeyDiagnosticText.Text =
+            KeyBindingsPanel
+                .ToggleAutoUpgradePlacedUnitsDiagnostic;
         ShiftLockKeyDiagnosticText.Text = KeyBindingsPanel.ShiftLockDiagnostic;
         DebugCaptureDescription.Text = $"Record the Roblox client at the standard 808 by 611 size. {KeyBindingsPanel.HotkeyDisplayName} starts and stops capture and saves a ZIP for bug reports.";
     }
@@ -376,71 +380,12 @@ public partial class SettingsPage : UserControl, IAppPage
         IncludeLogsCheck.IsEnabled = !busy;
         DeepDebugCheck.IsEnabled = !busy;
         DebugModeCheck.IsEnabled = !busy;
+        ManualRecordingsCheck.IsEnabled = !busy;
         FastNoAlignCheck.IsEnabled = !busy;
         KeyBindingsPanel.UpdateBusyState(busy);
         CaptureStopButton.IsEnabled = _captureOperationActive && busy;
         CaptureStopButton.Content = _services.Coordinator.State == OperationState.Armed ? "Cancel" : "Stop and save";
         UiScaleOverlayButton.IsEnabled = !busy && !_uiScaleOverlayChanging;
-    }
-
-    private async void RefreshDetector_Click(object sender, RoutedEventArgs e) => await CheckForUpdatesAsync(automatic: false);
-
-    private async void AutoUpdateCheck_Changed(object sender, RoutedEventArgs e)
-    {
-        if (_loading) return;
-        await _services.UpdateSettingsAsync(settings => settings with { CheckDetectorUpdates = AutoUpdateCheck.IsChecked == true });
-    }
-
-    public async Task CheckForUpdatesAsync(bool automatic)
-    {
-        if (_services.Coordinator.IsBusy) return;
-        if (automatic)
-        {
-            if (!_services.Settings.CheckDetectorUpdates) return;
-            if (_services.Settings.LastDetectorUpdateCheck is { } last && DateTimeOffset.UtcNow - last < TimeSpan.FromHours(24)) return;
-        }
-        try
-        {
-            IReadOnlyList<DetectorPackManifest> packs = await _services.DetectorPacks.ListAsync();
-            DetectorPackManifest? installed = packs.FirstOrDefault(pack => pack.PackId == "anime-expeditions-expeditions");
-            if (installed is null) return;
-            DetectorDetail.Text = "Checking GitHub Releases…";
-            await _services.UpdateSettingsAsync(settings => settings with { LastDetectorUpdateCheck = DateTimeOffset.UtcNow });
-            DetectorPackUpdate? update = await _services.DetectorUpdates.CheckAsync(installed.PackId, Version.Parse(installed.Version));
-            if (update is null)
-            {
-                DetectorDetail.Text = $"Version {installed.Version} is current.";
-                return;
-            }
-            MessageBoxResult answer = MessageBox.Show(
-                Window.GetWindow(this),
-                $"Detector pack {update.Version} is available. Install it now?\n\nThe current pack will be retained for rollback.",
-                "Detector update",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Information);
-            if (answer != MessageBoxResult.Yes)
-            {
-                DetectorDetail.Text = $"Version {update.Version} is available.";
-                return;
-            }
-            DetectorDetail.Text = $"Installing detector pack {update.Version}…";
-            await _services.DetectorUpdates.InstallAsync(update);
-            await RefreshDetectorAsync();
-        }
-        catch (Exception error)
-        {
-            DetectorDetail.Text = automatic ? "Automatic update check will retry later." : $"Update check failed: {error.Message}";
-        }
-    }
-
-    private async Task RefreshDetectorAsync()
-    {
-        IReadOnlyList<DetectorPackManifest> packs = await _services.DetectorPacks.ListAsync();
-        DetectorPackManifest? pack = packs.FirstOrDefault(value => value.PackId == "anime-expeditions-expeditions");
-        DetectorTitle.Text = pack is null ? "No detector pack installed" : $"Anime Expeditions, Expeditions {pack.Version}";
-        DetectorDetail.Text = pack is null
-            ? "Reinstall the application to restore the bundled detector pack."
-            : $"{pack.States.Count} UI states · {pack.Files.Count} compiled references · built {pack.BuiltAt.LocalDateTime:g}";
     }
 
     private static void OpenFolder(string path)

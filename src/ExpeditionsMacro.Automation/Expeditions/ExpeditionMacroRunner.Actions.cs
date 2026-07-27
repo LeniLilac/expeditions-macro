@@ -26,32 +26,65 @@ public sealed partial class ExpeditionMacroRunner
         ImageFrame? clientImage,
         CancellationToken cancellationToken)
     {
-        DateTimeOffset deadline =
-            DateTimeOffset.UtcNow + TimeSpan.FromSeconds(3);
-        StableNavigationActionTracker<string> tracker = new();
-        ImageFrame? current = clientImage;
-        while (DateTimeOffset.UtcNow < deadline)
+        (int X, int Y) action =
+            await WaitForStableActionAsync(
+                state,
+                clientImage,
+                () => CaptureClient(window, detector),
+                detector.ActionFor,
+                static () => DateTimeOffset.UtcNow,
+                static (duration, token) =>
+                    Task.Delay(duration, token),
+                cancellationToken).ConfigureAwait(false);
+        Focus(window);
+        await _automation.ClickClientAsync(
+            window,
+            action.X,
+            action.Y,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    internal static async Task<(int X, int Y)>
+        WaitForStableActionAsync(
+        string state,
+        ImageFrame? initialFrame,
+        Func<ImageFrame> capture,
+        Func<string, ImageFrame?, (int X, int Y)> locate,
+        Func<DateTimeOffset> utcNow,
+        Func<TimeSpan, CancellationToken, Task> delay,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(state);
+        ArgumentNullException.ThrowIfNull(capture);
+        ArgumentNullException.ThrowIfNull(locate);
+        ArgumentNullException.ThrowIfNull(utcNow);
+        ArgumentNullException.ThrowIfNull(delay);
+
+        StableNavigationActionTracker<string> tracker =
+            new();
+        ObservationWaitBudget budget = new(
+            TimeSpan.FromSeconds(3),
+            minimumObservations: 2,
+            utcNow);
+        ImageFrame? current = initialFrame;
+        while (budget.ShouldObserve(
+                   tracker.HasPendingCandidate))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            current ??= CaptureClient(window, detector);
+            current ??= capture();
             (int X, int Y) action =
-                detector.ActionFor(state, current);
+                locate(state, current);
             (int X, int Y)? stable =
                 tracker.Update(state, action);
+            budget.MarkObserved();
             if (stable is not null)
             {
-                Focus(window);
-                await _automation.ClickClientAsync(
-                    window,
-                    stable.Value.X,
-                    stable.Value.Y,
-                    cancellationToken).ConfigureAwait(false);
-                return;
+                return stable.Value;
             }
 
             current = null;
-            await Task.Delay(
-                150,
+            await delay(
+                TimeSpan.FromMilliseconds(150),
                 cancellationToken).ConfigureAwait(false);
         }
 

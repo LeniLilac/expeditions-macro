@@ -58,7 +58,7 @@ public static class RequiredGameSettings
         new(RequiredGameSetting.ShowDamageIndicators, false),
         new(RequiredGameSetting.StrictPhantomPlacement, true),
         new(RequiredGameSetting.PrioritizePhantomPlacement, true),
-        new(RequiredGameSetting.AutoUpgradePlacedUnits, true),
+        new(RequiredGameSetting.AutoUpgradePlacedUnits, false),
         new(RequiredGameSetting.AutoAbilitiesOnPlacement, true),
         new(RequiredGameSetting.DisplayUpdateLogOnLogin, false),
         new(RequiredGameSetting.AutoSprint, true),

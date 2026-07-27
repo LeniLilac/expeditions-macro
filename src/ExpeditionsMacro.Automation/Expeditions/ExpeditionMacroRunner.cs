@@ -16,22 +16,13 @@ namespace ExpeditionsMacro.Automation.Expeditions;
 
 public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
 {
-    private static readonly TimeSpan ExtractionTransitionTimeout = TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan ConfirmationDismissalTimeout = TimeSpan.FromSeconds(5);
-    private static readonly TimeSpan GameModeHandoffTimeout = TimeSpan.FromSeconds(90);
-
-    private static readonly HashSet<string> RecoveryStates = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "afk", "disconnect", "lobby", "play", "map_select", "map_preview",
-        "post_match_party",
-    };
-
     private readonly IRobloxAutomation _automation;
     private readonly CameraAlignmentEngine _camera;
     private readonly FastNoAlignPreparationSession _fastNoAlign;
     private readonly PlacementService _placements;
     private readonly TeamSelectionService _teams;
     private readonly IDiscordNotifier _discord;
+    private readonly ManualInputRouteService? _manualInputs;
 
     public ExpeditionMacroRunner(
         IRobloxAutomation automation,
@@ -39,7 +30,8 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
         PlacementService placements,
         TeamSelectionService teams,
         IDiscordNotifier discord,
-        FastNoAlignPreparationSession? fastNoAlign = null)
+        FastNoAlignPreparationSession? fastNoAlign = null,
+        ManualInputRouteService? manualInputs = null)
     {
         _automation = automation;
         _camera = camera;
@@ -49,6 +41,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
         _placements = placements;
         _teams = teams;
         _discord = discord;
+        _manualInputs = manualInputs;
     }
 
     public string GameId => "anime-expeditions";
@@ -87,6 +80,12 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
         cameraModel?.Manifest.Validate();
         placementModel.Validate();
         ValidateCompatibility(preset, cameraModel, placementModel, detector.Manifest);
+        ManualInputRecording? manualRecording =
+            await ManualInputMatchPlayback.ResolveAsync(
+                    _manualInputs,
+                    placementModel,
+                    cancellationToken)
+                .ConfigureAwait(false);
         ValidateTeamKey(preset.TeamSlot > 0, unitMenuKey);
         RobloxWindow window = _automation.FindWindow() ??
             throw new RobloxSessionUnavailableException(
@@ -182,50 +181,32 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                         return;
                     }
 
-                    IReadOnlyList<PlacementStep> beforeStart =
-                        PlacementExecutionPlan.BeforeStart(
-                            preset.CameraPreparationMode,
-                            placementModel);
-                    if (beforeStart.Count > 0)
+                    ExpeditionMatchStart? started =
+                        await BeginConfiguredMatchAsync(
+                                window,
+                                 preset,
+                                 placementModel,
+                                 manualRecording,
+                                 detector,
+                                progress,
+                                stopAfterCurrentRunUtc,
+                                Report,
+                                Write,
+                                cancelPlacementKey,
+                                cancellationToken)
+                            .ConfigureAwait(false);
+                    if (started is null)
                     {
-                        Report(
-                            "Placement",
-                            0,
-                            "Placing the recorded prestart units.");
-                        await PlaceStepsAsync(
-                            window,
-                            placementModel,
-                            beforeStart,
-                            preset,
-                            Write,
-                            cancelPlacementKey,
-                            cancellationToken).ConfigureAwait(false);
-                        Write(
-                            $"Preplace pass sent {beforeStart.Count} placement(s).");
-                    }
-                    await ThrowIfRecoveryAsync(window, detector, preset, cancellationToken).ConfigureAwait(false);
-                    if (ExpeditionRunPolicy.StopDeadlineReached(DateTimeOffset.UtcNow, stopAfterCurrentRunUtc))
-                    {
-                        Write("Challenge reset reached during Expedition preparation. Returning before starting the node.", MacroEventLevel.Success);
                         return;
                     }
-
-                    Report("Starting node", 0, "Starting the Expedition node.");
-                    Stopwatch matchRuntime = Stopwatch.StartNew();
-                    await ClickActionAsync(window, detector, "start", cancellationToken).ConfigureAwait(false);
-                    await Task.Delay(2600, cancellationToken).ConfigureAwait(false);
-                    IReadOnlyList<PlacementStep> afterStart =
-                        PlacementExecutionPlan.AfterStart(
-                            preset.CameraPreparationMode,
-                            placementModel);
                     RunTerminal terminal = await MonitorUntilRunEndAsync(
                         window,
                         preset,
                         placementModel,
-                        beforeStart,
-                        afterStart,
+                        started.BeforeStart,
+                        started.AfterStart,
                         detector,
-                        matchRuntime,
+                        started.Runtime,
                         value => { bossesSeen = value; PublishSummary(); },
                         Report,
                         Write,
@@ -245,7 +226,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                         victories,
                         defeats,
                         reportTarget,
-                        matchRuntime.Elapsed);
+                        started.Runtime.Elapsed);
                     if (continueScheduledRoute is not null)
                     {
                         bool repeated =
@@ -256,7 +237,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                                 preset,
                                 playMenuKey,
                                 preparation,
-                                matchRuntime.Elapsed,
+                                started.Runtime.Elapsed,
                                 continueScheduledRoute,
                                 Report,
                                 Write,
@@ -477,8 +458,22 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                         candidate => string.Equals(detector.RecoveryState(candidate), "lobby", StringComparison.OrdinalIgnoreCase),
                         candidate => string.Equals(detector.RecoveryState(candidate), "play", StringComparison.OrdinalIgnoreCase),
                         (key, token) => _automation.TapLetterKeyAsync(window, key, token),
-                        async (timeout, token) => string.Equals(
-                            await WaitForRecoveryChangeAsync(window, detector, "lobby", timeout, preset, report, log, token).ConfigureAwait(false),
+                        async (
+                            timeout,
+                            initialOpenObservation,
+                            token) => string.Equals(
+                            await WaitForRecoveryChangeAsync(
+                                window,
+                                detector,
+                                "lobby",
+                                timeout,
+                                preset,
+                                report,
+                                log,
+                                token,
+                                initialOpenObservation
+                                    ? "play"
+                                    : null).ConfigureAwait(false),
                             "play",
                             StringComparison.OrdinalIgnoreCase),
                         attempt => report("Recovery", 0, $"Lobby recognized. Opening Play with {playMenuKey} (attempt {attempt}/{LobbyPlayNavigator.MaximumAttempts}).", state, null),
@@ -627,13 +622,26 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
         ExpeditionPreset preset,
         Action<string, int, string, string?, double?> report,
         Action<string, MacroEventLevel, string?, double?> log,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? initialState = null)
     {
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
-        StableStateTracker<string> tracker = new(ExpeditionRunPolicy.RecoveryStableDetections(preset));
+        int stableDetections =
+            ExpeditionRunPolicy
+                .RecoveryStableDetections(preset);
+        StableStateTracker<string> tracker =
+            new(stableDetections);
+        ObservationWaitBudget budget = new(
+            timeout,
+            stableDetections);
+        if (!string.IsNullOrWhiteSpace(initialState))
+        {
+            _ = tracker.Update(initialState);
+            budget.MarkObserved();
+        }
         bool allowStandaloneContinue = excluded.Equals("map_preview", StringComparison.OrdinalIgnoreCase);
         bool captureErrorReported = false;
-        while (DateTimeOffset.UtcNow < deadline)
+        while (budget.ShouldObserve(
+                   tracker.HasPendingCandidate))
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -655,6 +663,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                     string? stable = tracker.Update(state);
                     if (stable is not null && !stable.Equals(excluded, StringComparison.OrdinalIgnoreCase)) return stable;
                 }
+                budget.MarkObserved();
             }
             catch (Exception error) when (error is not OperationCanceledException)
             {
@@ -663,6 +672,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                     log($"Waiting for Roblox during recovery: {error.Message}", MacroEventLevel.Warning, null, null);
                     captureErrorReported = true;
                 }
+                budget.MarkObserved();
             }
             await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
         }
@@ -960,46 +970,4 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
         }
     }
 
-    private static string Label(string value) => value.Equals("afk", StringComparison.OrdinalIgnoreCase)
-        ? "AFK Chamber"
-        : System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(value.Replace('_', ' '));
-
-    private void Focus(RobloxWindow window)
-    {
-        if (!_automation.Focus(window)) throw new RobloxSessionUnavailableException("Windows could not focus Roblox.");
-    }
-
-    private static char ValidatePlayMenuKey(char value)
-    {
-        char normalized = char.ToUpperInvariant(value);
-        if (!char.IsAsciiLetter(normalized))
-        {
-            throw new InvalidDataException(
-                "Set the Toggle Play Menu key under Settings > Controls so it matches Anime Expeditions' Toggle Play Menu binding.");
-        }
-
-        return normalized;
-    }
-
-    private static void ValidateTeamKey(bool required, char? value)
-    {
-        if (!required) return;
-        if (value is null || !char.IsAsciiLetter(value.Value))
-        {
-            throw new InvalidDataException(
-                "Set the Toggle Unit Inventory key under Settings > Controls so it matches Anime Expeditions' Toggle Unit Inventory binding before using a saved team.");
-        }
-    }
-
-    private sealed record RunTerminal(string State, ImageFrame Frame);
-
-    private sealed class RecoveryNeededException : Exception
-    {
-        public RecoveryNeededException(string state) : base($"Recovery screen recognized: {state}.")
-        {
-            State = state;
-        }
-
-        public string State { get; }
-    }
 }

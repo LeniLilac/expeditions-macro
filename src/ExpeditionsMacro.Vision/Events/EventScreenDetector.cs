@@ -9,6 +9,7 @@ namespace ExpeditionsMacro.Vision.Events;
 public enum EventScreenState
 {
     None,
+    EventCatalog,
     EventHome,
     ActSelector,
     ActDetail,
@@ -29,6 +30,8 @@ public static class EventScreenDetector
 {
     private static readonly ScreenRegion EventHeader =
         new(0, 55, 180, 55);
+    private static readonly ScreenRegion EventCatalogVillainCard =
+        new(10, 155, 170, 58);
     private static readonly ScreenRegion EventHomeAction =
         new(430, 548, 135, 42);
     private static readonly ScreenRegion ActTitle =
@@ -107,6 +110,18 @@ public static class EventScreenDetector
                     571));
         }
 
+        double eventCatalog =
+            EventCatalogScore(image);
+        if (eventCatalog >= 0.72)
+        {
+            return Trace(
+                new EventScreenMatch(
+                    EventScreenState.EventCatalog,
+                    eventCatalog,
+                    94,
+                    183));
+        }
+
         double actSelector = ActSelectorScore(
             image,
             eventChrome);
@@ -118,7 +133,9 @@ public static class EventScreenDetector
                 : new EventScreenMatch(
                     EventScreenState.None,
                     Math.Max(
-                        eventHome,
+                        Math.Max(
+                            eventHome,
+                            eventCatalog),
                         actSelector)));
     }
 
@@ -244,6 +261,45 @@ public static class EventScreenDetector
             1);
     }
 
+    private static double EventCatalogScore(
+        ImageFrame image)
+    {
+        double cyanHeader = ColorFraction(
+            image,
+            EventHeader,
+            IsEventCyan);
+        double villainRed = ColorFraction(
+            image,
+            EventCatalogVillainCard,
+            IsEventRed);
+        double villainDark = ColorFraction(
+            image,
+            EventCatalogVillainCard,
+            IsDark);
+        if (cyanHeader < 0.20 ||
+            villainRed < 0.08 ||
+            villainDark < 0.75)
+        {
+            return 0;
+        }
+        return Math.Clamp(
+            0.72 +
+            0.10 * Ramp(
+                cyanHeader,
+                0.20,
+                0.42) +
+            0.10 * Ramp(
+                villainRed,
+                0.08,
+                0.16) +
+            0.08 * Ramp(
+                villainDark,
+                0.75,
+                0.92),
+            0,
+            1);
+    }
+
     private static double ActSelectorScore(
         ImageFrame image,
         double eventChrome)
@@ -336,6 +392,14 @@ public static class EventScreenDetector
         red >= 95 &&
         red - green >= 38 &&
         red - blue >= 25;
+
+    private static bool IsEventCyan(
+        byte red,
+        byte green,
+        byte blue) =>
+        blue >= 100 &&
+        green >= 70 &&
+        blue - red >= 30;
 
     private static bool IsDark(
         byte red,

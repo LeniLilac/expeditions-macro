@@ -26,17 +26,20 @@ public sealed class PlacementService
     private readonly IPlacementCaptureService _capture;
     private readonly PlacementModelRepository _models;
     private readonly Func<char> _targetingKey;
+    private readonly Func<char> _autoUpgradeKey;
 
     public PlacementService(
         IRobloxAutomation automation,
         IPlacementCaptureService capture,
         PlacementModelRepository models,
-        Func<char>? targetingKey = null)
+        Func<char>? targetingKey = null,
+        Func<char>? autoUpgradeKey = null)
     {
         _automation = automation;
         _capture = capture;
         _models = models;
         _targetingKey = targetingKey ?? (() => 'T');
+        _autoUpgradeKey = autoUpgradeKey ?? (() => 'Y');
     }
 
     public async Task<PlacementModel> RecordAsync(
@@ -137,9 +140,21 @@ public sealed class PlacementService
         if (!char.IsAsciiLetter(targetingKey))
         {
             throw new InvalidDataException(
-                "The Change Unit Targeting key must be one letter from A through Z.");
+                "Scroll down to Controls on the Dashboard and set Change Unit Targeting key to the same A-Z letter assigned in Anime Expeditions.");
         }
         targetingKey = char.ToUpperInvariant(targetingKey);
+        char autoUpgradeKey = default;
+        if (steps.Any(step => step.AutoUpgrade))
+        {
+            autoUpgradeKey = _autoUpgradeKey();
+            if (!char.IsAsciiLetter(autoUpgradeKey))
+            {
+                throw new InvalidDataException(
+                    "Scroll down to Controls on the Dashboard and set Auto Upgrade Unit key to the same A-Z letter assigned in Anime Expeditions.");
+            }
+            autoUpgradeKey =
+                char.ToUpperInvariant(autoUpgradeKey);
+        }
         EnsureFocus(window);
         await EnsureSizeAsync(window, model.ClientWidth, model.ClientHeight, cancellationToken).ConfigureAwait(false);
         for (int index = 0; index < steps.Count; index++)
@@ -206,22 +221,23 @@ public sealed class PlacementService
                         cancellationToken).ConfigureAwait(false);
                 }
             }
-            if (index + 1 < steps.Count)
-            {
-                await _automation.ParkCursorAsync(
-                    window,
-                    cancellationToken).ConfigureAwait(false);
-            }
-            else
+            if (step.AutoUpgrade)
             {
                 status?.Invoke(
-                    "Placement batch complete: closing the final selected-unit panel and parking the cursor.");
-                await DismissFinalSelectedUnitPanelAsync(
+                    $"Step {index + 1}/{steps.Count}: enabling Auto Upgrade for the selected unit.");
+                EnsureFocus(window);
+                await _automation.TapLetterKeyAsync(
                     window,
-                    model.ClientWidth,
-                    model.ClientHeight,
+                    autoUpgradeKey,
                     cancellationToken).ConfigureAwait(false);
             }
+            status?.Invoke(
+                $"Step {index + 1}/{steps.Count}: closing the selected-unit panel before the next action.");
+            await DismissSelectedUnitPanelAsync(
+                window,
+                model.ClientWidth,
+                model.ClientHeight,
+                cancellationToken).ConfigureAwait(false);
             stepSent?.Invoke(index + 1, steps.Count, step);
             int delay = useDefaultInterval ? defaultIntervalMilliseconds : step.DelayAfterMilliseconds;
             status?.Invoke($"Step {index + 1}/{steps.Count}: waiting {delay} ms after click.");
@@ -323,7 +339,7 @@ public sealed class PlacementService
         return false;
     }
 
-    private async Task DismissFinalSelectedUnitPanelAsync(
+    private async Task DismissSelectedUnitPanelAsync(
         RobloxWindow window,
         int clientWidth,
         int clientHeight,
@@ -371,7 +387,7 @@ public sealed class PlacementService
         }
 
         throw new RobloxUiUnavailableException(
-            "The final selected-unit panel remained open after " +
+            "The selected-unit panel remained open after " +
             $"{SelectionDismissAttempts} clicks at the safe idle point.");
     }
 

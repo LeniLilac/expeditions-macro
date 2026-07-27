@@ -17,6 +17,7 @@ public partial class MacroPage
         SelectionChangedEventArgs e)
     {
         if (TaskPresetCombo is null) return;
+        SyncTaskKindButtons();
         RefreshVisiblePresets();
         UpdateTaskTargetEditor();
     }
@@ -66,16 +67,29 @@ public partial class MacroPage
             {
                 TaskRows.Add(row);
             }
-            TaskEditorStatusText.Text =
+            LoopEditor.SetTasks(TaskRows);
+            MacroPlanLoopBlockNode? destination =
+                SelectedTaskDestination();
+            if (!LoopEditor.TryPlaceTask(
+                    row,
+                    destination,
+                    out string placementError))
+            {
+                throw new InvalidOperationException(
+                    placementError);
+            }
+            ReindexRows();
+            ShowPlanBlocksStatus(
                 existingIndex >= 0
                     ? "Task updated. Save the plan to persist it."
-                    : "Task added. Save the plan to persist it.";
-            ReindexRows();
+                    : destination is null
+                        ? "Task added to the plan. Save the plan to persist it."
+                        : $"Task added to {destination.BlockLabel}. Save the plan to persist it.");
             ResetTaskEditor();
         }
         catch (Exception error)
         {
-            TaskEditorStatusText.Text = error.Message;
+            ShowTaskEditorError(error.Message);
         }
     }
 
@@ -130,8 +144,6 @@ public partial class MacroPage
             Kind = kind,
             Name = name,
             Priority = 1,
-            Enabled =
-                TaskEnabledCheck.IsChecked == true,
             PlacementTarget = route?.Target,
             TargetVictories =
                 runtimeTarget ? 1 : target,
@@ -162,10 +174,12 @@ public partial class MacroPage
         if (FastTaskWorkflow &&
             !row.Definition.UsesPlacementSetup)
         {
-            TaskEditorStatusText.Text =
-                "This is a legacy preset task. Remove it and add a Fast no align route to replace it.";
+            ShowPlanBlocksStatus(
+                "This is a legacy preset task. Remove it and add a Fast no align route to replace it.");
             return;
         }
+        PopulateTaskDestinations(
+            LoopEditor.ParentLoopFor(row));
         _editingTaskId = row.Definition.Id;
         TaskKindCombo.SelectedItem =
             TaskKindCombo.Items
@@ -189,8 +203,6 @@ public partial class MacroPage
                         value.Id ==
                             row.Definition.PresetId);
         }
-        TaskEnabledCheck.IsChecked =
-            row.Definition.Enabled;
         TaskTargetText.Text =
             row.Definition.CompleteOnRuntimeDefeat
                 ? row.Definition
@@ -201,12 +213,11 @@ public partial class MacroPage
                     .TargetVictories
                     .ToString(
                         CultureInfo.InvariantCulture);
-        AddTaskButton.Content = "Update block";
-        CancelTaskEditButton.Visibility =
-            Visibility.Visible;
-        TaskEditorStatusText.Text =
-            "Editing this block. Changing its route or target resets its saved progress.";
+        TaskEditorTitleText.Text = "Edit task";
+        AddTaskButton.Content = "Save changes";
+        HideTaskEditorError();
         UpdateTaskTargetEditor();
+        ShowTaskEditor();
     }
 
     private void ApplyPlacementSetupTask(
@@ -288,7 +299,7 @@ public partial class MacroPage
                     route.Target.Matches(
                         selected.Target)) ??
             _visibleRoutes.FirstOrDefault();
-        TaskEditorStatusText.Text = string.Empty;
+        HideTaskEditorError();
     }
 
     private void UpdateTaskTargetEditor()
@@ -320,6 +331,8 @@ public partial class MacroPage
             new GridLength(
                 1,
                 GridUnitType.Star);
+        TaskTargetColumn.Width =
+            new GridLength(132);
         TaskPresetCombo.Visibility =
             Visibility.Visible;
         TaskRouteCombo.Visibility =
@@ -338,6 +351,8 @@ public partial class MacroPage
             : runtime
                 ? "Runtime, min"
                 : "Victories";
+        TaskTargetLabel.Visibility =
+            Visibility.Visible;
         TaskTargetText.IsEnabled =
             !challenge &&
             !_services.Coordinator.IsBusy;
@@ -398,6 +413,12 @@ public partial class MacroPage
                 : new GridLength(
                     1,
                     GridUnitType.Star);
+        TaskTargetColumn.Width =
+            challenge
+                ? new GridLength(
+                    1,
+                    GridUnitType.Star)
+                : new GridLength(132);
         TaskPresetCombo.Visibility =
             Visibility.Collapsed;
         TaskRouteCombo.Visibility =
@@ -427,6 +448,10 @@ public partial class MacroPage
             : runtime
                 ? "Runtime, min"
                 : "Victories";
+        TaskTargetLabel.Visibility =
+            challenge
+                ? Visibility.Collapsed
+                : Visibility.Visible;
         TaskTargetText.IsEnabled =
             !challenge &&
             !_services.Coordinator.IsBusy;

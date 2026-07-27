@@ -7,8 +7,11 @@ namespace ExpeditionsMacro.App.Pages;
 internal enum MacroPlanSnapshotState
 {
     Empty,
+    EmptyLoop,
     TasksOnly,
     NestedLoops,
+    TaskPopup,
+    LoopSettingsPopup,
 }
 
 public partial class MacroPage
@@ -25,6 +28,23 @@ public partial class MacroPage
                 expectedTasks: 0);
             EmptyTasksText.Visibility =
                 Visibility.Visible;
+            ApplyTotals();
+            return;
+        }
+        if (state == MacroPlanSnapshotState.EmptyLoop)
+        {
+            LoopEditor.AddLoopBlock();
+            if (LoopEditor.RootBlocks is not
+                [MacroPlanLoopBlockNode
+                {
+                    Children.Count: 0,
+                }])
+            {
+                throw new InvalidOperationException(
+                    "A user-added empty loop did not remain as one editable loop block.");
+            }
+            EmptyTasksText.Visibility =
+                Visibility.Collapsed;
             ApplyTotals();
             return;
         }
@@ -100,6 +120,18 @@ public partial class MacroPage
         EmptyTasksText.Visibility =
             Visibility.Collapsed;
         ApplyTotals();
+        if (state == MacroPlanSnapshotState.TaskPopup)
+        {
+            OpenTaskEditor(
+                LoopEditor.LoopBlocks[1]);
+        }
+        else if (state ==
+                 MacroPlanSnapshotState
+                     .LoopSettingsPopup)
+        {
+            LoopEditor.OpenLoopSettingsForSnapshot(
+                LoopEditor.LoopBlocks[1]);
+        }
     }
 
     private void VerifyLoopFreeSnapshotStructure(

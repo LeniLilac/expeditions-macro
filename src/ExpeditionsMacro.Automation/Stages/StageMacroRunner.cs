@@ -17,14 +17,13 @@ namespace ExpeditionsMacro.Automation.Stages;
 
 public sealed partial class StageMacroRunner
 {
-    private static readonly TimeSpan NavigationTimeout = TimeSpan.FromSeconds(12);
-    private static readonly TimeSpan RecoveryTimeout = TimeSpan.FromSeconds(90);
     private readonly IRobloxAutomation _automation;
     private readonly CameraAlignmentEngine _camera;
     private readonly FastNoAlignPreparationSession _fastNoAlign;
     private readonly PlacementService _placements;
     private readonly TeamSelectionService _teams;
     private readonly IDiscordNotifier _discord;
+    private readonly ManualInputRouteService? _manualInputs;
 
     public StageMacroRunner(
         IRobloxAutomation automation,
@@ -32,7 +31,8 @@ public sealed partial class StageMacroRunner
         PlacementService placements,
         TeamSelectionService teams,
         IDiscordNotifier discord,
-        FastNoAlignPreparationSession? fastNoAlign = null)
+        FastNoAlignPreparationSession? fastNoAlign = null,
+        ManualInputRouteService? manualInputs = null)
     {
         _automation = automation;
         _camera = camera;
@@ -42,6 +42,7 @@ public sealed partial class StageMacroRunner
         _placements = placements;
         _teams = teams;
         _discord = discord;
+        _manualInputs = manualInputs;
     }
 
     private async Task<StageRunResult> RunAsync(
@@ -77,22 +78,22 @@ public sealed partial class StageMacroRunner
         CameraPreparationMode cameraMode =
             story?.CameraPreparationMode ??
             raid!.CameraPreparationMode;
-        models.Camera?.Manifest.Validate();
-        models.PrestartPlacement?.Validate();
-        models.DelayedPlacement?.Validate();
-        ValidateCompatibility(
-            mode,
-            story,
-            raid,
-            cameraMode,
-            models,
-            detector.Manifest);
+        ManualInputRecording? manualRecording =
+            await ValidateAndResolveManualRecordingAsync(
+                    mode,
+                    story,
+                    raid,
+                    cameraMode,
+                    models,
+                    detector.Manifest,
+                    cancellationToken)
+                .ConfigureAwait(false);
         if (!char.IsAsciiLetter(playMenuKey)) throw new InvalidDataException(AppSettings.PlayMenuKeySetupInstructions);
 
         int teamSlot = story?.TeamSlot ?? raid!.TeamSlot;
         if (teamSlot > 0 && unitMenuKey is null)
         {
-            throw new InvalidDataException("Set the Toggle Unit Inventory key under Settings > Controls before using a preset that changes teams.");
+            throw new InvalidDataException("Scroll down to Controls on the Dashboard, then set Toggle Unit Inventory key to match Anime Expeditions before using a preset that changes teams.");
         }
 
         int retries = story?.DefeatRetries ?? raid!.DefeatRetries;
@@ -173,33 +174,21 @@ public sealed partial class StageMacroRunner
                     Write,
                     cancellationToken).ConfigureAwait(false);
 
-                IReadOnlyList<PlacementStep> beforeStart =
-                    PlacementExecutionPlan.BeforeStart(
-                        cameraMode,
-                        models.PrestartPlacement);
-                if (beforeStart.Count > 0 &&
-                    models.PrestartPlacement is not null)
-                {
-                    Report("Placement", 45, "Placing before-start units.");
-                    await PlayPlacementAsync(
-                        window,
-                        models.PrestartPlacement,
-                        beforeStart,
-                        story,
-                        raid,
-                        cancelPlacementKey,
-                        cancellationToken).ConfigureAwait(false);
-                }
-
-                ImageFrame prestart = CaptureClient(window, detector);
-                StageScreenMatch prestartMatch = StageScreenDetector.Detect(prestart);
-                if (prestartMatch.State != StageScreenState.Prestart || prestartMatch.ActionX is null || prestartMatch.ActionY is null)
-                {
-                    throw new RobloxUiUnavailableException($"The {Label(mode)} Start Game button disappeared before it could be clicked.");
-                }
-                Stopwatch matchRuntime = Stopwatch.StartNew();
-                await ClickAsync(window, prestartMatch.ActionX.Value, prestartMatch.ActionY.Value, cancellationToken).ConfigureAwait(false);
-                await Task.Delay(1800, cancellationToken).ConfigureAwait(false);
+                (Stopwatch matchRuntime, bool manualPlayback) =
+                    await BeginConfiguredMatchAsync(
+                            window,
+                            mode,
+                            models,
+                            cameraMode,
+                            story,
+                            raid,
+                            detector,
+                            manualRecording,
+                            progress,
+                            Report,
+                            cancelPlacementKey,
+                            cancellationToken)
+                        .ConfigureAwait(false);
 
                 TerminalObservation terminal =
                     await RunConfiguredMatchAsync(
@@ -212,6 +201,7 @@ public sealed partial class StageMacroRunner
                         matchRuntime,
                         stableDetections,
                         cancelPlacementKey,
+                        manualPlayback,
                         cancellationToken).ConfigureAwait(false);
                 StageRunOutcome outcome = terminal.State == StageScreenState.Victory ? StageRunOutcome.Victory : StageRunOutcome.Defeat;
                 matchCompleted = true;

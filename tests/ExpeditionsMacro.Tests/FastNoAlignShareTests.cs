@@ -140,6 +140,12 @@ public sealed class FastNoAlignShareTests
                         bundle.PlacementSetups)
                         .Steps)
                     .TargetingPriority);
+            Assert.False(
+                Assert.Single(
+                    Assert.Single(
+                        bundle.PlacementSetups)
+                        .Steps)
+                    .AutoUpgrade);
 
             FastNoAlignShareService importer =
                 Service(destinationRoot);
@@ -179,6 +185,9 @@ public sealed class FastNoAlignShareTests
                 UnitTargetingPriority.Strongest,
                 Assert.Single(importedSetup.Steps)
                     .TargetingPriority);
+            Assert.False(
+                Assert.Single(importedSetup.Steps)
+                    .AutoUpgrade);
             Assert.Equal(
                 PlacementSetupCatalog.IdFor(target),
                 importedSetup.Id);
@@ -190,6 +199,96 @@ public sealed class FastNoAlignShareTests
             TestPaths.DeleteTemporaryDirectory(
                 destinationRoot);
         }
+    }
+
+    [Fact]
+    public async Task Export_RejectsDeviceLocalManualRecording()
+    {
+        string root =
+            TestPaths.NewTemporaryDirectory();
+        try
+        {
+            PlacementTarget target = new()
+            {
+                Mode =
+                    PlacementTargetMode.Expedition,
+                MapNumber = 2,
+            };
+            PlacementModel setup =
+                Setup(target, team: 1) with
+                {
+                    ManualInputRecordingId =
+                        "local-recording",
+                };
+            MacroPlan plan = Plan(
+                new MacroTaskDefinition
+                {
+                    Id = "expedition-task",
+                    Kind =
+                        MacroTaskKind.Expedition,
+                    Name = "Flower Forest",
+                    PlacementTarget = target,
+                });
+            await new PlacementModelRepository(
+                    new AppPaths(root))
+                .SaveAsync(setup);
+
+            InvalidOperationException error =
+                await Assert.ThrowsAsync<
+                    InvalidOperationException>(
+                    () => Service(root)
+                        .ExportAsync(plan));
+
+            Assert.Contains(
+                "device-local",
+                error.Message,
+                StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(
+                root);
+        }
+    }
+
+    [Fact]
+    public void Bundle_RejectsDeviceLocalManualRecording()
+    {
+        PlacementTarget target = new()
+        {
+            Mode =
+                PlacementTargetMode.Expedition,
+            MapNumber = 2,
+        };
+        FastNoAlignShareBundle bundle = new()
+        {
+            Plan = Plan(
+                new MacroTaskDefinition
+                {
+                    Id = "expedition-task",
+                    Kind =
+                        MacroTaskKind.Expedition,
+                    Name = "Flower Forest",
+                    PlacementTarget = target,
+                }),
+            PlacementSetups =
+            [
+                Setup(target, team: 1) with
+                {
+                    ManualInputRecordingId =
+                        "injected-recording",
+                },
+            ],
+        };
+
+        InvalidDataException error =
+            Assert.Throws<InvalidDataException>(
+                bundle.Validate);
+
+        Assert.Contains(
+            "device-local",
+            error.Message,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -380,7 +479,7 @@ public sealed class FastNoAlignShareTests
     }
 
     [Fact]
-    public void Bundle_RejectsLegacyTasks()
+    public void Schema1Bundle_RejectsReferencedPresets()
     {
         MacroPlan legacy = Plan(
             new MacroTaskDefinition
@@ -392,6 +491,9 @@ public sealed class FastNoAlignShareTests
             });
         FastNoAlignShareBundle bundle = new()
         {
+            SchemaVersion =
+                FastNoAlignShareBundle
+                    .LegacySchemaVersion,
             Plan = legacy,
             PlacementSetups = [],
         };
@@ -400,9 +502,9 @@ public sealed class FastNoAlignShareTests
             Assert.Throws<InvalidDataException>(
                 bundle.Validate);
         Assert.Contains(
-            "Legacy preset",
+            "schema 1",
             error.Message,
-            StringComparison.Ordinal);
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -451,7 +553,11 @@ public sealed class FastNoAlignShareTests
         AppPaths paths = new(root);
         return new FastNoAlignShareService(
             new MacroPlanRepository(paths),
-            new PlacementModelRepository(paths));
+            new PlacementModelRepository(paths),
+            new PresetRepository(paths),
+            new ChallengePresetRepository(paths),
+            new StoryPresetRepository(paths),
+            new RaidPresetRepository(paths));
     }
 
     private static MacroPlan Plan(
@@ -490,6 +596,7 @@ public sealed class FastNoAlignShareTests
                     Phase = PlacementPhase.BeforeStart,
                     TargetingPriority =
                         UnitTargetingPriority.Strongest,
+                    AutoUpgrade = false,
                 },
             ],
             CreatedAt = DateTimeOffset.UtcNow,

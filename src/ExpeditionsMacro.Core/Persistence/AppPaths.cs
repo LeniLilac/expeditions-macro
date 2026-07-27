@@ -15,6 +15,7 @@ public sealed class AppPaths
         StoryPresets = Path.Combine(Root, "story-presets");
         RaidPresets = Path.Combine(Root, "raid-presets");
         MacroPlans = Path.Combine(Root, "macro-plans");
+        ManualRecordings = Path.Combine(Root, "manual-recordings");
         DetectorPacks = Path.Combine(Root, "detector-packs");
         Diagnostics = Path.Combine(Root, "diagnostics");
         Logs = Path.Combine(Root, "logs");
@@ -39,6 +40,8 @@ public sealed class AppPaths
 
     public string MacroPlans { get; }
 
+    public string ManualRecordings { get; }
+
     public string DetectorPacks { get; }
 
     public string Diagnostics { get; }
@@ -58,6 +61,7 @@ public sealed class AppPaths
         Directory.CreateDirectory(StoryPresets);
         Directory.CreateDirectory(RaidPresets);
         Directory.CreateDirectory(MacroPlans);
+        Directory.CreateDirectory(ManualRecordings);
         Directory.CreateDirectory(DetectorPacks);
         Directory.CreateDirectory(Diagnostics);
         Directory.CreateDirectory(Logs);

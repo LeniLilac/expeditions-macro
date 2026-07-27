@@ -7,8 +7,11 @@ public partial class MacroPage
 {
     private void CancelTaskEdit_Click(
         object sender,
-        RoutedEventArgs e) =>
+        RoutedEventArgs e)
+    {
         ResetTaskEditor();
+        OpenTaskEditorButton.Focus();
+    }
 
     private void RemoveTask(MacroTaskRow row)
     {
@@ -18,17 +21,17 @@ public partial class MacroPage
         {
             ResetTaskEditor();
         }
-        TaskEditorStatusText.Text =
-            "Task removed. Save the plan to persist the change.";
+        ShowPlanBlocksStatus(
+            "Task removed. Save the plan to persist the change.");
     }
 
     private void ResetTaskEditor()
     {
         _editingTaskId = null;
-        AddTaskButton.Content = "Add block";
-        CancelTaskEditButton.Visibility =
+        TaskEditorOverlay.Visibility =
             Visibility.Collapsed;
-        TaskEnabledCheck.IsChecked = true;
+        TaskEditorTitleText.Text = "Add task";
+        AddTaskButton.Content = "Add task";
         TaskTargetText.Text = "1";
         TaskDefeatRetriesText.Text = "0";
         TaskTraitCheck.IsChecked = true;
@@ -38,7 +41,18 @@ public partial class MacroPage
         TaskBossNodesText.Text = "1";
         TaskHardModeCheck.IsChecked = false;
         TaskDifficultyCombo.SelectedIndex = 0;
+        HideTaskEditorError();
         UpdateTaskTargetEditor();
+    }
+
+    private void ShowPlanBlocksStatus(
+        string message)
+    {
+        PlanBlocksStatusText.Text = message;
+        PlanBlocksStatusText.Visibility =
+            string.IsNullOrWhiteSpace(message)
+                ? Visibility.Collapsed
+                : Visibility.Visible;
     }
 
     private void ReindexRows()
@@ -64,7 +78,7 @@ public partial class MacroPage
         }
         LoopEditor.SetTasks(TaskRows);
         EmptyTasksText.Visibility =
-            TaskRows.Count == 0
+            LoopEditor.RootBlocks.Count == 0
                 ? Visibility.Visible
                 : Visibility.Collapsed;
     }

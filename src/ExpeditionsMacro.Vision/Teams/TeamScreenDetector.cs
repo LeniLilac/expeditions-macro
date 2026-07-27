@@ -234,7 +234,11 @@ public static class TeamScreenDetector
             region => ColorFraction(image, region, IsGreenButton) >=
                 MinimumVisibleLoadButtonFraction);
         if (dark < 0.80 || loadRows < 2) return 0;
-        return Math.Clamp(0.45 * Ramp(dark, 0.80, 0.96) + 0.55 * (loadRows / 3d), 0, 1);
+        return Math.Clamp(
+            0.45 * Ramp(dark, 0.80, 0.96) +
+            0.55 * Math.Min(1, loadRows / 2d),
+            0,
+            1);
     }
 
     private static double DarkFraction(ImageFrame image, ScreenRegion region) => ColorFraction(image, region, (red, green, blue) => red + green + blue <= 210);

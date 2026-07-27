@@ -7,6 +7,11 @@ namespace ExpeditionsMacro.Automation.Expeditions;
 
 public sealed partial class ExpeditionMacroRunner
 {
+    private static readonly TimeSpan ExtractionTransitionTimeout =
+        TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan ConfirmationDismissalTimeout =
+        TimeSpan.FromSeconds(5);
+
     private async Task ExtractAtCheckpointAsync(
         RobloxWindow window,
         IDetectorPack detector,

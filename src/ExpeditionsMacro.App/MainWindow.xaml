@@ -21,14 +21,25 @@
         <Border Grid.Row="0" Background="{DynamicResource SidebarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" MouseRightButtonUp="TitleBar_RightClick">
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="216" />
+                    <ColumnDefinition x:Name="TitleNavigationColumn"
+                                      Width="216" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0" Margin="14,0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Image Width="23" Height="23" Margin="0,0,9,0" Source="Resources/app-preview.png" />
-                    <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="Expeditions Macro" />
-                </StackPanel>
+                <Grid Grid.Column="0">
+                    <StackPanel x:Name="BrandContent"
+                                Margin="14,0"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <Image Width="23"
+                               Height="23"
+                               Margin="0,0,9,0"
+                               Source="Resources/app-preview.png" />
+                        <TextBlock VerticalAlignment="Center"
+                                   FontWeight="SemiBold"
+                                   Text="Expeditions Macro" />
+                    </StackPanel>
+                </Grid>
                 <TextBlock x:Name="TitleContext" Grid.Column="1" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" Text="Dashboard" />
                 <StackPanel Grid.Column="2" Orientation="Horizontal" WindowChrome.IsHitTestVisibleInChrome="True">
                     <Button Style="{StaticResource IconButton}" Width="44" Height="41" BorderThickness="0" Background="Transparent" icons:Lucide.Icon="Minus" ToolTip="Minimize" Click="Minimize_Click" />
@@ -40,18 +51,47 @@
 
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="216" />
+                <ColumnDefinition x:Name="NavigationColumn"
+                                  Width="216" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <Border Grid.Column="0" Background="{DynamicResource SidebarBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,1,0">
+            <Border x:Name="NavigationRail"
+                    Grid.Column="0"
+                    Background="{DynamicResource SidebarBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="0,0,1,0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    <TextBlock Margin="18,18,18,7" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource FaintBrush}" Text="WORKSPACE" />
-                    <StackPanel Grid.Row="1">
+                    <Grid x:Name="WorkspaceHeaderRow"
+                          Height="34"
+                          Margin="10,10,10,7">
+                        <TextBlock x:Name="WorkspaceHeader"
+                                   Margin="8,0,44,0"
+                                   VerticalAlignment="Center"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource FaintBrush}"
+                                   Text="WORKSPACE" />
+                        <Button x:Name="NavigationRailToggleButton"
+                                Width="32"
+                                MinWidth="32"
+                                Height="32"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Style="{StaticResource IconButton}"
+                                icons:Lucide.Icon="Menu"
+                                ToolTip="Collapse navigation"
+                                AutomationProperties.Name="Collapse navigation"
+                                Click="NavigationRailToggle_Click" />
+                    </Grid>
+                    <ScrollViewer Grid.Row="1"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
                         <RadioButton x:Name="DashboardNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" IsChecked="True" Tag="Dashboard" icons:Lucide.Icon="LayoutDashboard" Content="Dashboard" Checked="Navigation_Checked" />
                         <RadioButton x:Name="MacroPlanNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Macro Plan" icons:Lucide.Icon="Blocks" Content="Macro Plan" Checked="Navigation_Checked" />
                         <TextBlock x:Name="PresetsHeader"
@@ -64,19 +104,47 @@
                         <RadioButton x:Name="ChallengesNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Challenges" icons:Lucide.Icon="Swords" Content="Challenges" Checked="Navigation_Checked" />
                         <RadioButton x:Name="StoryNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Story" icons:Lucide.Icon="BookOpen" Content="Story" Checked="Navigation_Checked" />
                         <RadioButton x:Name="RaidNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Raid" icons:Lucide.Icon="Shield" Content="Raid" Checked="Navigation_Checked" />
-                        <TextBlock Margin="18,18,18,7" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource FaintBrush}" Text="TOOLS" />
+                        <TextBlock x:Name="ToolsHeader"
+                                   Margin="18,18,18,7"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource FaintBrush}"
+                                   Text="TOOLS" />
                         <RadioButton x:Name="CameraNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Camera Models" icons:Lucide.Icon="Camera" Content="Camera Models" Checked="Navigation_Checked" />
                         <RadioButton x:Name="PlacementNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Placement Setup" icons:Lucide.Icon="MapPin" Content="Placement Setup" Checked="Navigation_Checked" />
+                        <RadioButton x:Name="RecordingsNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Recordings" icons:Lucide.Icon="CircleDot" Content="Recordings" Visibility="Collapsed" Checked="Navigation_Checked" />
                         <RadioButton x:Name="DebugNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Debug" icons:Lucide.Icon="Bug" Content="Debug" Visibility="Collapsed" Checked="Navigation_Checked" />
                         <RadioButton x:Name="SettingsNav" GroupName="Navigation" Style="{StaticResource NavigationItem}" Tag="Settings" icons:Lucide.Icon="Settings" Content="Settings" Checked="Navigation_Checked" />
                     </StackPanel>
+                    </ScrollViewer>
                     <StackPanel Grid.Row="2">
-                        <Button Margin="12,0,12,8" Height="36" MinWidth="0" icons:Lucide.Icon="CircleHelp" Content="Setup guide" ToolTip="Open the setup guide in your browser" Click="SetupGuide_Click" />
-                        <Button Margin="12,0,12,8" Height="36" MinWidth="0" icons:Lucide.Icon="MessagesSquare" Content="Join Discord" ToolTip="Open the Expeditions Macro community invite" Click="JoinDiscord_Click" />
-                        <Border Margin="12,0,12,6" Padding="10" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="5">
-                            <Grid>
+                        <Button x:Name="SetupGuideButton"
+                                Margin="12,0,12,8"
+                                Height="36"
+                                MinWidth="0"
+                                icons:Lucide.Icon="CircleHelp"
+                                Content="Setup guide"
+                                ToolTip="Open the setup guide in your browser"
+                                Click="SetupGuide_Click" />
+                        <Button x:Name="JoinDiscordButton"
+                                Margin="12,0,12,8"
+                                Height="36"
+                                MinWidth="0"
+                                icons:Lucide.Icon="MessagesSquare"
+                                Content="Join Discord"
+                                ToolTip="Open the Expeditions Macro community invite"
+                                Click="JoinDiscord_Click" />
+                        <Border x:Name="OperationStatusBorder"
+                                Margin="12,0,12,6"
+                                Padding="10"
+                                Background="{DynamicResource SurfaceBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="5">
+                            <Grid x:Name="OperationStatusContent">
                                 <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                                <StackPanel Orientation="Horizontal">
+                                <StackPanel x:Name="OperationSummary"
+                                            Orientation="Horizontal">
                                     <Ellipse x:Name="OperationDot" Width="7" Height="7" Margin="0,0,8,0" VerticalAlignment="Center" Fill="{DynamicResource FaintBrush}" />
                                     <TextBlock x:Name="OperationLabel" MaxWidth="155" TextTrimming="CharacterEllipsis" FontSize="12" Text="Ready" />
                                 </StackPanel>

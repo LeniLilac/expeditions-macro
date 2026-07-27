@@ -103,15 +103,26 @@ public sealed partial class ChallengeMacroRunner
         ChallengeScreenState desired,
         TimeSpan timeout,
         Action<string, int, string, string?, double?> report,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool initialDesiredObservation = false)
     {
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
         StableStateTracker<ChallengeScreenState> stateTracker =
             new(preset.StableDetections);
         StableNavigationActionTracker<ChallengeScreenState>
             actionTracker =
                 new(Math.Max(2, preset.StableDetections));
-        while (DateTimeOffset.UtcNow < deadline)
+        ObservationWaitBudget budget = new(
+            timeout,
+            preset.StableDetections);
+        if (initialDesiredObservation &&
+            !RequiresStableChallengeAction(desired))
+        {
+            _ = stateTracker.Update(desired);
+            budget.MarkObserved();
+        }
+        while (budget.ShouldObserve(
+                   stateTracker.HasPendingCandidate ||
+                   actionTracker.HasPendingCandidate))
         {
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = CaptureClient(window, detector);
@@ -144,6 +155,7 @@ public sealed partial class ChallengeMacroRunner
                     match.State.ToString(),
                     match.Confidence);
             }
+            budget.MarkObserved();
             await Task.Delay(
                 preset.PollMilliseconds,
                 cancellationToken).ConfigureAwait(false);

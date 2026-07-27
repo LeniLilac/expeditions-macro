@@ -1,4 +1,3 @@
-using System.IO.Compression;
 using System.Security.Cryptography;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
@@ -45,53 +44,17 @@ public sealed class DetectorPackRepository : IDetectorPackRepository
         return new CompiledDetectorPack(directory, manifest);
     }
 
-    public async Task InstallAsync(Stream package, CancellationToken cancellationToken = default)
+    private async Task InstallBundledDirectoryAsync(
+        string sourceDirectory,
+        DetectorPackManifest manifest,
+        CancellationToken cancellationToken)
     {
-        _paths.EnsureCreated();
-        string extraction = Path.Combine(_paths.DetectorPacks, $".install.{Guid.NewGuid():N}");
-        Directory.CreateDirectory(extraction);
-        try
-        {
-            using ZipArchive archive = new(package, ZipArchiveMode.Read, leaveOpen: true);
-            foreach (ZipArchiveEntry entry in archive.Entries)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                string destination = SafeArchivePath(extraction, entry.FullName);
-                if (entry.FullName.EndsWith('/') || entry.FullName.EndsWith('\\'))
-                {
-                    Directory.CreateDirectory(destination);
-                    continue;
-                }
-                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-                await using Stream source = entry.Open();
-                await using FileStream target = new(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-                await source.CopyToAsync(target, cancellationToken).ConfigureAwait(false);
-            }
-            string manifestPath = Directory.EnumerateFiles(extraction, "manifest.json", SearchOption.AllDirectories).Single();
-            string contentRoot = Path.GetDirectoryName(manifestPath)!;
-            DetectorPackManifest manifest = await JsonFileStore.ReadAsync<DetectorPackManifest>(manifestPath, cancellationToken).ConfigureAwait(false)
-                ?? throw new InvalidDataException("Detector package has no manifest.");
-            manifest.Validate();
-            await ValidateFilesAsync(contentRoot, manifest, cancellationToken).ConfigureAwait(false);
-            InstallDirectory(contentRoot, manifest.PackId);
-        }
-        finally
-        {
-            if (Directory.Exists(extraction)) Directory.Delete(extraction, recursive: true);
-        }
-    }
-
-    public async Task InstallDirectoryAsync(string sourceDirectory, CancellationToken cancellationToken = default)
-    {
-        DetectorPackManifest manifest = await JsonFileStore.ReadAsync<DetectorPackManifest>(Path.Combine(sourceDirectory, "manifest.json"), cancellationToken).ConfigureAwait(false)
-            ?? throw new InvalidDataException("Detector pack has no manifest.");
-        manifest.Validate();
         await ValidateFilesAsync(sourceDirectory, manifest, cancellationToken).ConfigureAwait(false);
         string staging = Path.Combine(_paths.DetectorPacks, $".copy.{Guid.NewGuid():N}");
         CopyDirectory(sourceDirectory, staging);
         try
         {
-            InstallDirectory(staging, manifest.PackId);
+            ReplaceCurrentDirectory(staging, manifest.PackId);
         }
         finally
         {
@@ -102,15 +65,18 @@ public sealed class DetectorPackRepository : IDetectorPackRepository
     public async Task<bool> EnsureBundledAsync(string sourceDirectory, CancellationToken cancellationToken = default)
     {
         DetectorPackManifest bundled;
-        Version bundledVersion;
         try
         {
             bundled = await JsonFileStore.ReadAsync<DetectorPackManifest>(Path.Combine(sourceDirectory, "manifest.json"), cancellationToken).ConfigureAwait(false)
                 ?? throw new InvalidDataException("Bundled detector pack has no manifest.");
             bundled.Validate();
-            bundledVersion = ParseVersion(bundled);
+            await ValidateFilesAsync(sourceDirectory, bundled, cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception error) when (error is InvalidDataException or System.Text.Json.JsonException)
+        catch (Exception error) when (
+            error is IOException or
+                UnauthorizedAccessException or
+                InvalidDataException or
+                System.Text.Json.JsonException)
         {
             throw BundledPackDamaged(error);
         }
@@ -124,12 +90,13 @@ public sealed class DetectorPackRepository : IDetectorPackRepository
             try
             {
                 await ValidateFilesAsync(currentDirectory, current, cancellationToken).ConfigureAwait(false);
-                int comparison = ParseVersion(current).CompareTo(bundledVersion);
-                if (comparison > 0) return false;
                 string currentManifestPath = Path.Combine(currentDirectory, "manifest.json");
-                if (comparison == 0 &&
-                    await HasSameManifestAsync(currentManifestPath, Path.Combine(sourceDirectory, "manifest.json"), cancellationToken).ConfigureAwait(false))
+                if (await HasSameManifestAsync(
+                    currentManifestPath,
+                    Path.Combine(sourceDirectory, "manifest.json"),
+                    cancellationToken).ConfigureAwait(false))
                 {
+                    RemoveLegacyPrevious(current.PackId);
                     return false;
                 }
             }
@@ -142,51 +109,67 @@ public sealed class DetectorPackRepository : IDetectorPackRepository
 
         try
         {
-            await InstallDirectoryAsync(sourceDirectory, cancellationToken).ConfigureAwait(false);
+            await InstallBundledDirectoryAsync(
+                sourceDirectory,
+                bundled,
+                cancellationToken).ConfigureAwait(false);
         }
-        catch (Exception error) when (error is InvalidDataException or System.Text.Json.JsonException)
+        catch (Exception error) when (
+            error is IOException or
+                UnauthorizedAccessException or
+                InvalidDataException or
+                System.Text.Json.JsonException)
         {
             throw BundledPackDamaged(error);
         }
         return true;
     }
 
-    public Task RollbackAsync(string packId, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        string root = Path.Combine(_paths.DetectorPacks, ValidateId(packId));
-        string current = Path.Combine(root, "current");
-        string previous = Path.Combine(root, "previous");
-        if (!Directory.Exists(previous)) throw new InvalidOperationException("No previous detector pack is available.");
-        string swap = Path.Combine(root, $".swap.{Guid.NewGuid():N}");
-        if (Directory.Exists(current)) Directory.Move(current, swap);
-        Directory.Move(previous, current);
-        if (Directory.Exists(swap)) Directory.Move(swap, previous);
-        return Task.CompletedTask;
-    }
-
-    private void InstallDirectory(string source, string packId)
+    private void ReplaceCurrentDirectory(
+        string source,
+        string packId)
     {
         string root = Path.Combine(_paths.DetectorPacks, ValidateId(packId));
         string current = Path.Combine(root, "current");
         string previous = Path.Combine(root, "previous");
         string incoming = Path.Combine(root, $".incoming.{Guid.NewGuid():N}");
+        string displaced = Path.Combine(root, $".replaced.{Guid.NewGuid():N}");
         Directory.CreateDirectory(root);
         CopyDirectory(source, incoming);
         try
         {
             if (Directory.Exists(previous)) Directory.Delete(previous, recursive: true);
-            if (Directory.Exists(current)) Directory.Move(current, previous);
+            if (Directory.Exists(current)) Directory.Move(current, displaced);
             Directory.Move(incoming, current);
+            if (Directory.Exists(displaced)) Directory.Delete(displaced, recursive: true);
         }
         catch
         {
-            if (!Directory.Exists(current) && Directory.Exists(previous)) Directory.Move(previous, current);
+            if (!Directory.Exists(current) && Directory.Exists(displaced))
+            {
+                Directory.Move(displaced, current);
+            }
             throw;
         }
         finally
         {
             if (Directory.Exists(incoming)) Directory.Delete(incoming, recursive: true);
+            if (Directory.Exists(displaced) && Directory.Exists(current))
+            {
+                Directory.Delete(displaced, recursive: true);
+            }
+        }
+    }
+
+    private void RemoveLegacyPrevious(string packId)
+    {
+        string previous = Path.Combine(
+            _paths.DetectorPacks,
+            ValidateId(packId),
+            "previous");
+        if (Directory.Exists(previous))
+        {
+            Directory.Delete(previous, recursive: true);
         }
     }
 
@@ -211,11 +194,6 @@ public sealed class DetectorPackRepository : IDetectorPackRepository
         byte[] rightHash = await SHA256.HashDataAsync(right, cancellationToken).ConfigureAwait(false);
         return CryptographicOperations.FixedTimeEquals(leftHash, rightHash);
     }
-
-    private static Version ParseVersion(DetectorPackManifest manifest) =>
-        Version.TryParse(manifest.Version, out Version? version)
-            ? version
-            : throw new InvalidDataException($"Detector pack '{manifest.PackId}' has an invalid version.");
 
     private static InvalidDataException BundledPackDamaged(Exception innerException) =>
         new(
