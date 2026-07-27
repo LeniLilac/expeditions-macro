@@ -38,11 +38,13 @@ public partial class MacroPage : UserControl, IAppPage
     private string? _editingTaskId;
     private bool _loading;
     private bool _macroOwned;
+    private bool _syncingTaskKindButtons;
     private bool _testingWebhook;
     public MacroPage(AppServices services)
     {
         _services = services;
         InitializeComponent();
+        InitializeTaskDialog();
         InitializeDashboard();
         DataContext = this;
         LoopEditor.SetTasks(TaskRows);
@@ -52,6 +54,9 @@ public partial class MacroPage : UserControl, IAppPage
             (_, args) => BeginTaskEdit(args.Task);
         LoopEditor.RemoveTaskRequested +=
             (_, args) => RemoveTask(args.Task);
+        LoopEditor.AddTaskRequested +=
+            (_, args) =>
+                OpenTaskEditor(args.Loop);
         PlanCombo.ItemsSource = _plans;
         TaskKindCombo.ItemsSource = Enum.GetValues<MacroTaskKind>()
             .Where(kind =>
@@ -158,6 +163,12 @@ public partial class MacroPage : UserControl, IAppPage
     private void CoordinatorStateChanged()
     {
         bool busy = _services.Coordinator.IsBusy;
+        if (busy &&
+            TaskEditorOverlay.Visibility ==
+                Visibility.Visible)
+        {
+            ResetTaskEditor();
+        }
         StartButton.IsEnabled = !busy;
         StopButton.IsEnabled = busy;
         PlanCombo.IsEnabled = !busy;
@@ -174,10 +185,12 @@ public partial class MacroPage : UserControl, IAppPage
         TaskExtractCheck.IsEnabled = !busy;
         TaskBossNodesText.IsEnabled = !busy;
         TaskHardModeCheck.IsEnabled = !busy;
-        TaskEnabledCheck.IsEnabled = !busy;
         AddTaskButton.IsEnabled = !busy;
         CancelTaskEditButton.IsEnabled = !busy;
+        OpenTaskEditorButton.IsEnabled = !busy;
         ResetProgressButton.IsEnabled = !busy;
+        AddLoopBlockButton.IsEnabled = !busy;
+        TaskEditorOverlay.IsEnabled = !busy;
         LoopEditor.SetInteractionEnabled(!busy);
         WebhookPassword.IsEnabled = !busy;
         WebhookVisible.IsEnabled = !busy;
@@ -204,6 +217,16 @@ public partial class MacroPage : UserControl, IAppPage
             AppendLog("Macro plan stopped.");
         }
     }
+
+    private void AddLoopBlock_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        LoopEditor.AddLoopBlock();
+
+    private void OpenTaskEditor_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        OpenTaskEditor(destination: null);
 
     private void UpdateHotkeyText()
     {

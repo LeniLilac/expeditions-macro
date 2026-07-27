@@ -152,7 +152,6 @@ public sealed class MacroScheduler
         MacroPlanLoopPolicy
             .ActiveTasks(plan, now)
             .Select((task, index) => new { Task = task, Index = index, Progress = plan.ProgressFor(task.Id) })
-            .Where(value => value.Task.Enabled)
             .Where(value => value.Task.IsRecurring || !value.Progress.Completed)
             .Where(value => value.Progress.NextEligibleAtUtc is null || value.Progress.NextEligibleAtUtc <= now)
             .OrderBy(value => value.Task.Priority)
@@ -242,7 +241,9 @@ public sealed class MacroScheduler
     private static DateTimeOffset? NextWake(MacroPlan plan, DateTimeOffset now) =>
         MacroPlanLoopPolicy
             .ActiveTasks(plan, now)
-            .Where(task => task.Enabled && (task.IsRecurring || !plan.ProgressFor(task.Id).Completed))
+            .Where(task =>
+                task.IsRecurring ||
+                !plan.ProgressFor(task.Id).Completed)
             .Select(task => plan.ProgressFor(task.Id).NextEligibleAtUtc)
             .Where(value => value > now)
             .OrderBy(value => value)

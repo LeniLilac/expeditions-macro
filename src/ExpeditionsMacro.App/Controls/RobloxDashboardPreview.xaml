@@ -6,7 +6,7 @@
              Unloaded="Preview_Unloaded">
     <Border Width="810"
             Height="613"
-            HorizontalAlignment="Center"
+            HorizontalAlignment="Left"
             Background="#050506"
             BorderBrush="{DynamicResource BorderBrush}"
             BorderThickness="1"

@@ -23,19 +23,22 @@ public sealed partial class EventMacroRunner
     private readonly TeamSelectionService _teams;
     private readonly IDiscordNotifier _discord;
     private readonly MatchLobbyNavigator _lobby;
+    private readonly ManualInputRouteService? _manualInputs;
 
     public EventMacroRunner(
         IRobloxAutomation automation,
         PlacementService placements,
         TeamSelectionService teams,
         IDiscordNotifier discord,
-        FastNoAlignPreparationSession fastNoAlign)
+        FastNoAlignPreparationSession fastNoAlign,
+        ManualInputRouteService? manualInputs = null)
     {
         _automation = automation;
         _placements = placements;
         _teams = teams;
         _discord = discord;
         _fastNoAlign = fastNoAlign;
+        _manualInputs = manualInputs;
         _lobby = new MatchLobbyNavigator(automation);
     }
 
@@ -76,8 +79,14 @@ public sealed partial class EventMacroRunner
             unitMenuKey is null)
         {
             throw new InvalidDataException(
-                "Set the Unit menu key under Settings > Controls before using an Event route that changes teams.");
+                "Scroll down to Controls on the Dashboard, then set Toggle Unit Inventory key to match Anime Expeditions before using an Event route that changes teams.");
         }
+        ManualInputRecording? manualRecording =
+            await ManualInputMatchPlayback.ResolveAsync(
+                    _manualInputs,
+                    placement,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
         RobloxWindow window =
             _automation.FindWindow() ??
@@ -158,11 +167,11 @@ public sealed partial class EventMacroRunner
                 progress,
                 cancellationToken).ConfigureAwait(false);
 
-            IReadOnlyList<PlacementStep> beforeStart =
-                PlacementExecutionPlan.BeforeStart(
+            PlacementMatchExecutionPlan execution =
+                PlacementExecutionPlan.ForMatch(
                     CameraPreparationMode.FastNoAlign,
                     placement);
-            if (beforeStart.Count > 0)
+            if (execution.BeforeStart.Count > 0)
             {
                 Report(
                     "Placement",
@@ -172,7 +181,7 @@ public sealed partial class EventMacroRunner
                     window,
                     preset,
                     placement,
-                    beforeStart,
+                    execution.BeforeStart,
                     cancelPlacementKey,
                     cancellationToken).ConfigureAwait(false);
             }
@@ -189,15 +198,37 @@ public sealed partial class EventMacroRunner
                     "The Event Start Game button disappeared before it could be clicked.");
             }
 
-            Stopwatch matchRuntime = Stopwatch.StartNew();
-            await ClickAsync(
-                window,
-                startX,
-                startY,
-                cancellationToken).ConfigureAwait(false);
-            await Task.Delay(
-                1800,
-                cancellationToken).ConfigureAwait(false);
+            Stopwatch matchRuntime;
+            if (execution.ManualPlayback)
+            {
+                if (_manualInputs is null ||
+                    manualRecording is null)
+                {
+                    throw new InvalidOperationException(
+                        "Manual input playback is unavailable.");
+                }
+                matchRuntime =
+                    await ManualInputMatchPlayback.PlayAsync(
+                        _manualInputs,
+                        window,
+                        manualRecording,
+                        progress,
+                        matchStarting: null,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            else
+            {
+                matchRuntime = Stopwatch.StartNew();
+                await ClickAsync(
+                    window,
+                    startX,
+                    startY,
+                    cancellationToken).ConfigureAwait(false);
+                await Task.Delay(
+                    1800,
+                    cancellationToken).ConfigureAwait(false);
+            }
             EventTerminalObservation terminal =
                 await RunMatchAsync(
                     window,
@@ -206,6 +237,7 @@ public sealed partial class EventMacroRunner
                     detector,
                     matchRuntime,
                     cancelPlacementKey,
+                    execution.ManualPlayback,
                     cancellationToken).ConfigureAwait(false);
             StageRunOutcome outcome =
                 terminal.State ==
@@ -317,6 +349,17 @@ public sealed partial class EventMacroRunner
     }
 
     private static string RouteLabel(
-        EventPreset preset) =>
-        $"Villain Invasion - Act {(int)preset.Act}";
+        EventPreset preset)
+    {
+        if (preset.Act != EventAct.Act1)
+        {
+            return $"Villain Invasion - Act {(int)preset.Act}";
+        }
+
+        string angle =
+            preset.SpawnRoute == EventSpawnRoute.Angle2
+                ? "Angle 2"
+                : "Angle 1";
+        return $"Villain Invasion - Act 1 - {angle}";
+    }
 }

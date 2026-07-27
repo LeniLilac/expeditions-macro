@@ -14,10 +14,10 @@ internal sealed record DeepDebugSanitizedSettings(
     bool IncludeLogsInDiagnosticArchives,
     bool DeepDebugEnabled,
     bool DebugModeEnabled,
+    bool ManualInputRecordingEnabled,
+    bool AutoCheckUiScaleOnStart,
     bool AutoCheckGameSettingsOnStart,
     bool FastNoAlignEnabled,
-    bool CheckDetectorUpdates,
-    DateTimeOffset? LastDetectorUpdateCheck,
     bool MinimizeDuringAutomation,
     bool RestartRobloxWithPrivateServer,
     bool RestartRobloxAtMacroStart,
@@ -30,7 +30,8 @@ internal sealed record DeepDebugSanitizedSettings(
     string CancelPlacementKey,
     string ChangeUnitTargetingKey,
     string UpgradeUnitKey,
-    string ToggleAutoUpgradeUnitKey,
+    string AutoUpgradeUnitKey,
+    string ToggleAutoUpgradePlacedUnitsKey,
     ResourceRefuelDebugSettings ResourceRefuelDebug)
 {
     public static DeepDebugSanitizedSettings From(
@@ -46,10 +47,10 @@ internal sealed record DeepDebugSanitizedSettings(
         settings.IncludeLogsInDiagnosticArchives,
         settings.DeepDebugEnabled,
         settings.DebugModeEnabled,
+        settings.ManualInputRecordingEnabled,
+        settings.AutoCheckUiScaleOnStart,
         settings.AutoCheckGameSettingsOnStart,
         settings.FastNoAlignEnabled,
-        settings.CheckDetectorUpdates,
-        settings.LastDetectorUpdateCheck,
         settings.MinimizeDuringAutomation,
         settings.RestartRobloxWithPrivateServer,
         settings.RestartRobloxAtMacroStart,
@@ -63,6 +64,7 @@ internal sealed record DeepDebugSanitizedSettings(
         settings.CancelPlacementKey,
         settings.ChangeUnitTargetingKey,
         settings.UpgradeUnitKey,
-        settings.ToggleAutoUpgradeUnitKey,
+        settings.AutoUpgradeUnitKey,
+        settings.ToggleAutoUpgradePlacedUnitsKey,
         settings.ResourceRefuelDebug);
 }

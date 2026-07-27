@@ -9,6 +9,9 @@ namespace ExpeditionsMacro.Automation.Expeditions;
 
 public sealed partial class ExpeditionMacroRunner
 {
+    private static readonly TimeSpan GameModeHandoffTimeout =
+        TimeSpan.FromSeconds(90);
+
     internal enum GameModeHandoffCommand
     {
         Complete,

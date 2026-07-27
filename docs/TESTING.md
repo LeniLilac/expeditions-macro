@@ -19,11 +19,11 @@ Start with focused tests while iterating, then expand according to risk. Do not 
 
 - Pure documentation or policy text: repository policy check and `git diff --check`.
 - Core models/persistence: focused unit tests plus the full non-golden suite.
-- Input, capture, coordinator, or cancellation: focused Windows/workflow tests and the full non-golden suite.
-- UI/XAML: relevant view-model/page tests, a Release build, and `scripts/Render-UiSnapshots.ps1 -Configuration Release`; inspect both themes.
+- Input, capture, coordinator, or cancellation: focused Windows/workflow tests and the full non-golden suite. Manual-input changes must cover malformed schemas, every supported event type, both wheel directions, ignored hotkey transitions, initial pointer state, pre/post-send drift, focus/geometry loss, cancellation, and held-input cleanup.
+- UI/XAML: relevant view-model/page tests, a Release build, and `scripts/Render-UiSnapshots.ps1 -Configuration Release`; inspect all 72 expected snapshots in both themes, including empty/nested loop plans, the loop-settings and add-task popups, ready/armed/running Recordings states, the bounded Dashboard run log in wide and compact layouts, the compact stacked Dashboard at the 960 by 640 minimum window, Placement Setup recording settings, the controls plus scrolled placement-step rail at the minimum window, and the collapsed app-navigation/Placement-catalog rails.
 - Detector regions, matching, thresholds, ordering, preprocessing, or action placement: focused detector tests and the complete cross-state golden corpus.
 - Dataset changes: privacy review every image, update counts/docs, then run the complete golden corpus.
-- Release packaging: `scripts/Build-Release.ps1` and `scripts/Verify-Release.ps1` in addition to the above.
+- Release packaging: `scripts/Build-Release.ps1` and `scripts/Verify-Release.ps1` in addition to the above. Verification must enforce the root-apphost plus nested-dependency layout, require every hash-verified detector payload declared by the bundled manifest, extract under a temporary path containing spaces, launch the root executable from an unrelated working directory, and require a successful packaged UI snapshot run.
 
 ## Useful targeted commands
 
@@ -44,5 +44,7 @@ The golden corpus is intentionally slower and is sharded in GitHub Actions. Loca
 - Every detector fix requires a representative privacy-reviewed 808 by 611 fixture plus positive and relevant negative coverage.
 - Startup settings work must cover the Lobby gate, the opening-animation negative, UI Scale 0.80/1.00/1.20, device-dependent rendered-scale feedback, all required pages, both Units scrollbar boundaries, physical accessibility-navigation scan codes, and unknown-control safe stops.
 - Runtime-recovery changes must prove typed restart-candidate classification, diagnostics before restart, stable Lobby recovery, unchanged incomplete-task progress, operation-scoped startup preflight, and circuit-breaker exhaustion. Do not make generic `InvalidOperationException` recoverable.
-- Fast share-code tests must round-trip the plan, exact route overrides or resolved category fallbacks, Teams, placement phases, and delays while proving task progress, camera models, app settings, and secrets are absent.
+- Fast share-code tests must round-trip the plan and loops, referenced Fast no-align presets, exact route overrides or resolved category fallbacks, unit slots and coordinates, Teams, placement phases and delays, targeting, per-step Auto Upgrade, default timing, route identity, and impossibility thresholds while proving task progress, manual recordings, camera models, app settings, and secrets are absent.
+- Macro-plan persistence tests must prove a legacy task with `"enabled": false` loads as active and that normalized plan/share JSON omits the retired field.
+- A plan whose resolved Placement Setup references a manual input recording must fail share export clearly. Tests must reject raw recording payloads and recording references in decoded bundles and prove no local recording can be silently collected or imported.
 - When manual user input is paired with passive capture, label the input as user reported rather than claiming it came from the event log.

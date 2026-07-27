@@ -16,8 +16,9 @@ These 808 by 611 Roblox-client captures are embedded in the WPF app as the place
 | `expedition-flower-forest.png` | 20 | Expedition, Flower Forest |
 | `expedition-rose-kingdom.png` | 33 | Expedition, Rose Kingdom |
 | `event-villain-invasion-act-1.png` | 28 | Event, Villain Invasion Act 1 |
+| `event-villain-invasion-act-1-angle-2.png` | 13 | Event, Villain Invasion Act 1 Angle 2 |
 | `event-villain-invasion-act-2.png` | 34 | Event, Villain Invasion Act 2 |
 | `event-villain-invasion-act-3.png` | 43 | Event, Villain Invasion Act 3 |
 | `event-villain-invasion-act-4.png` | 8 | Event, Villain Invasion Act 4 |
 
-Privacy review: every image contains only the canonical Roblox client. No desktop chrome, chat, account name, notification, webhook, private-server link, or local path is visible.
+Privacy review: every image contains only the canonical Roblox client. No desktop chrome, chat, account name, notification, webhook, private-server link, local path, or in-world player label is visible.

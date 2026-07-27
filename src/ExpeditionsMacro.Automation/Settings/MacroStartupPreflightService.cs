@@ -2,16 +2,12 @@ using ExpeditionsMacro.Automation.Camera;
 using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
-using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Runtime;
-using ExpeditionsMacro.Vision.Refuel;
 using ExpeditionsMacro.Vision.Settings;
-using ExpeditionsMacro.Vision.Stages;
-using ExpeditionsMacro.Vision.Teams;
 
 namespace ExpeditionsMacro.Automation.Settings;
 
-public sealed class MacroStartupPreflightService
+public sealed partial class MacroStartupPreflightService
 {
     private const int StableFrames = 3;
     private static readonly TimeSpan PollInterval =
@@ -132,9 +128,9 @@ public sealed class MacroStartupPreflightService
                 window,
                 canonicalScale: false,
                 cancellationToken).ConfigureAwait(false);
-        if (Math.Abs(panel.UiScale - 1) >
-            GameSettingsScreenDetector
-                .CanonicalScaleTolerance)
+        if (!GameSettingsScreenDetector
+                .IsCanonicalUiScale(
+                    panel.UiScale))
         {
             await CloseSettingsPanelAsync(
                 window,
@@ -173,7 +169,8 @@ public sealed class MacroStartupPreflightService
 
     public async Task<GameSettingsNormalizationResult> RunAsync(
         IDetectorPack detector,
-        bool normalizeSettings,
+        bool normalizeUiScale,
+        bool normalizeGameSettings,
         IProgress<MacroProgress>? progress,
         Action<MacroEvent>? log,
         CancellationToken cancellationToken)
@@ -181,12 +178,13 @@ public sealed class MacroStartupPreflightService
         ArgumentNullException.ThrowIfNull(detector);
         RobloxWindow window =
             await AcquireWindowAsync(
-                normalizeSettings
-                    ? "Checking Anime Expeditions UI Scale before lobby verification."
-                    : "Waiting for a stable lobby before macro startup.",
+                StartupPreparationMessage.Progress(
+                    normalizeUiScale,
+                    normalizeGameSettings),
                 progress,
                 cancellationToken).ConfigureAwait(false);
-        if (!normalizeSettings)
+        if (!normalizeUiScale &&
+            !normalizeGameSettings)
         {
             await WaitForLobbyAsync(
                 window,
@@ -194,63 +192,84 @@ public sealed class MacroStartupPreflightService
                 TimeSpan.FromSeconds(12),
                 cancellationToken).ConfigureAwait(false);
             Report(
-                "Lobby verified. Automatic game-settings check is disabled.",
+                "Lobby verified. UI Scale and required game-settings checks are disabled; no Settings input was sent.",
                 progress,
                 log,
                 MacroEventLevel.Information);
-            return new GameSettingsNormalizationResult(0, false);
+            return new GameSettingsNormalizationResult(
+                0,
+                false);
         }
 
         await _prepareCamera(
             window,
             cancellationToken).ConfigureAwait(false);
-        Report(
-            "Checking Anime Expeditions UI Scale before lobby verification.",
-            progress,
-            log,
-            MacroEventLevel.Information);
-        bool scaleChanged =
-            await _uiScale.NormalizeAsync(
-            window,
-            cancellationToken).ConfigureAwait(false);
+        bool scaleChanged = false;
+        if (normalizeUiScale)
+        {
+            Report(
+                "Checking Anime Expeditions UI Scale before lobby verification.",
+                progress,
+                log,
+                MacroEventLevel.Information);
+            scaleChanged =
+                await _uiScale.NormalizeAsync(
+                    window,
+                    cancellationToken).ConfigureAwait(false);
+        }
+
         await WaitForLobbyAsync(
             window,
             detector,
             TimeSpan.FromSeconds(12),
             cancellationToken).ConfigureAwait(false);
 
-        Report(
-            "Lobby verified. Checking Anime Expeditions settings.",
-            progress,
-            log,
-            MacroEventLevel.Information);
-        await OpenSettingsPanelAsync(
-            window,
-            cancellationToken).ConfigureAwait(false);
-        await WaitForPanelAsync(
-            window,
-            canonicalScale: true,
-            cancellationToken).ConfigureAwait(false);
-        int changes = await _normalizer.NormalizeAsync(
-            window,
-            message => Report(
-                message,
+        int changes = 0;
+        if (normalizeGameSettings)
+        {
+            Report(
+                "Lobby verified. Checking required Anime Expeditions settings.",
                 progress,
                 log,
-                MacroEventLevel.Information),
-            cancellationToken).ConfigureAwait(false);
-        await CloseSettingsPanelAsync(
-            window,
-            cancellationToken).ConfigureAwait(false);
-        await WaitForLobbyAsync(
-            window,
-            detector,
-            TimeSpan.FromSeconds(7),
-            cancellationToken).ConfigureAwait(false);
+                MacroEventLevel.Information);
+            GameSettingsPanelMatch panel =
+                await OpenSettingsPanelAsync(
+                window,
+                cancellationToken).ConfigureAwait(false);
+            if (!GameSettingsScreenDetector
+                    .IsCanonicalUiScale(
+                        panel.UiScale))
+            {
+                await CloseSettingsPanelAsync(
+                    window,
+                    cancellationToken).ConfigureAwait(false);
+                throw new InvalidOperationException(
+                    "Required game settings cannot be checked at the current UI Scale. Enable Check and fix UI Scale at macro start, or set the in-game value to 1.00.");
+            }
+            changes = await _normalizer.NormalizeAsync(
+                window,
+                message => Report(
+                    message,
+                    progress,
+                    log,
+                    MacroEventLevel.Information),
+                cancellationToken).ConfigureAwait(false);
+            await CloseSettingsPanelAsync(
+                window,
+                cancellationToken).ConfigureAwait(false);
+            await WaitForLobbyAsync(
+                window,
+                detector,
+                TimeSpan.FromSeconds(7),
+                cancellationToken).ConfigureAwait(false);
+        }
+
         Report(
-            changes == 0 && !scaleChanged
-                ? "Anime Expeditions settings already match the required profile."
-                : $"Anime Expeditions settings ready: {changes} toggle(s) corrected{(scaleChanged ? " and rendered UI Scale calibrated" : string.Empty)}.",
+            StartupPreparationMessage.Result(
+                normalizeUiScale,
+                normalizeGameSettings,
+                changes,
+                scaleChanged),
             progress,
             log,
             MacroEventLevel.Success);
@@ -350,9 +369,9 @@ public sealed class MacroStartupPreflightService
                 last.Visible &&
                 last.Settled &&
                 (!canonicalScale ||
-                 Math.Abs(last.UiScale - 1) <=
                  GameSettingsScreenDetector
-                     .CanonicalScaleTolerance);
+                     .IsCanonicalUiScale(
+                         last.UiScale));
             stable = expected ? stable + 1 : 0;
             if (stable >= 2) return last;
             await _delay(
@@ -392,58 +411,6 @@ public sealed class MacroStartupPreflightService
 
         throw new RobloxUiUnavailableException(
             "Anime Expeditions Settings did not finish closing.");
-    }
-
-    private async Task WaitForLobbyAsync(
-        RobloxWindow window,
-        IDetectorPack detector,
-        TimeSpan timeout,
-        CancellationToken cancellationToken)
-    {
-        DateTimeOffset deadline =
-            _utcNow() + timeout;
-        int stable = 0;
-        while (_utcNow() < deadline)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            ValidateWindow(window);
-            ImageFrame frame =
-                _automation.CaptureClient(window);
-            stable = IsCleanLobby(detector, frame)
-                ? stable + 1
-                : 0;
-            if (stable >= StableFrames) return;
-            await _delay(
-                PollInterval,
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        throw new RobloxUiUnavailableException(
-            "Start the macro from the fully loaded Anime Expeditions lobby with Play, Areas, Units, and Settings closed.");
-    }
-
-    private static bool IsCleanLobby(
-        IDetectorPack detector,
-        ImageFrame frame)
-    {
-        if (!string.Equals(
-                detector.RecoveryState(frame),
-                "lobby",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        GameSettingsPanelMatch settings =
-            GameSettingsScreenDetector.DetectPanel(frame);
-        return !settings.Visible &&
-            settings.CloseX == 0 &&
-            StageScreenDetector.Detect(frame).State ==
-                StageScreenState.None &&
-            TeamScreenDetector.Detect(frame).State ==
-                TeamScreenState.None &&
-            AreasScreenDetector.Detect(frame).State ==
-                AreasScreenState.None;
     }
 
     private void ValidateWindow(RobloxWindow window)

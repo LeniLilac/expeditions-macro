@@ -20,12 +20,15 @@ public sealed partial class EventMacroRunner
         IDetectorPack detector,
         Stopwatch matchRuntime,
         char cancelPlacementKey,
+        bool manualPlayback,
         CancellationToken cancellationToken)
     {
         IReadOnlyList<PlacementStep> afterStart =
-            PlacementExecutionPlan.AfterStart(
-                CameraPreparationMode.FastNoAlign,
-                placement);
+            manualPlayback
+                ? []
+                : PlacementExecutionPlan.AfterStart(
+                    CameraPreparationMode.FastNoAlign,
+                    placement);
         int nextStep = 0;
         StableStateTracker<string> terminal =
             new(Math.Max(2, preset.StableDetections));
@@ -80,7 +83,10 @@ public sealed partial class EventMacroRunner
 
             MatchRuntimePolicy.ThrowIfExceeded(
                 matchRuntime.Elapsed,
-                MatchRuntimePolicy.EventLimit(preset),
+                MatchRuntimePolicy.ForPlacement(
+                    placement,
+                    MatchRuntimePolicy.EventLimit(
+                        preset)),
                 "Event match");
             await keepAlive.TryPulseAsync(
                 (key, token) =>

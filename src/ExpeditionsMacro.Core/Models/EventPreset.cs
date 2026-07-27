@@ -13,6 +13,12 @@ public enum EventAct
     Act4 = 4,
 }
 
+public enum EventSpawnRoute
+{
+    Angle1,
+    Angle2,
+}
+
 public sealed record EventPreset
 {
     public required string Id { get; init; }
@@ -23,6 +29,9 @@ public sealed record EventPreset
         EventModeId.VillainInvasion;
 
     public required EventAct Act { get; init; }
+
+    public EventSpawnRoute SpawnRoute { get; init; } =
+        EventSpawnRoute.Angle1;
 
     public required string PlacementModelId { get; init; }
 
@@ -54,10 +63,17 @@ public sealed record EventPreset
                 "Event setup identity is incomplete.");
         }
         if (!Enum.IsDefined(Mode) ||
-            !Enum.IsDefined(Act))
+            !Enum.IsDefined(Act) ||
+            !Enum.IsDefined(SpawnRoute))
         {
             throw new InvalidDataException(
-                "The Event mode or act is invalid.");
+                "The Event mode, act, or spawn route is invalid.");
+        }
+        if (Act != EventAct.Act1 &&
+            SpawnRoute != EventSpawnRoute.Angle1)
+        {
+            throw new InvalidDataException(
+                "Only Villain Invasion Act 1 supports alternate spawn routes.");
         }
         if (TeamSlot is < 0 or > 8 ||
             DefeatRetries is < 0 or > 20)

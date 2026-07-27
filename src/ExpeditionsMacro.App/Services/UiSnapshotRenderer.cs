@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using ExpeditionsMacro.App.Controls;
 using ExpeditionsMacro.App.Pages;
 using ExpeditionsMacro.Core.Models;
 
@@ -15,26 +16,46 @@ internal static class UiSnapshotRenderer
         string File,
         bool ShowPageEnd,
         bool ShowDebugUtilities,
-        MacroPlanSnapshotState MacroPlanState)[] Pages =
+        MacroPlanSnapshotState MacroPlanState,
+        ManualRecordingsSnapshotState
+            RecordingsState)[] Pages =
     [
-        ("Dashboard", "dashboard", false, false, MacroPlanSnapshotState.Empty),
-        ("Dashboard", "dashboard-controls", true, false, MacroPlanSnapshotState.Empty),
-        ("Macro Plan", "macro-plan-empty", false, false, MacroPlanSnapshotState.Empty),
-        ("Macro Plan", "macro-plan-tasks-only", false, false, MacroPlanSnapshotState.TasksOnly),
-        ("Macro Plan", "macro-plan", false, false, MacroPlanSnapshotState.NestedLoops),
-        ("Macro Plan", "macro-plan-share", true, false, MacroPlanSnapshotState.NestedLoops),
-        ("Expeditions", "expeditions", false, false, MacroPlanSnapshotState.Empty),
-        ("Challenges", "challenges", false, false, MacroPlanSnapshotState.Empty),
-        ("Challenges", "challenges-status", true, false, MacroPlanSnapshotState.Empty),
-        ("Story", "story", false, false, MacroPlanSnapshotState.Empty),
-        ("Raid", "raid", false, false, MacroPlanSnapshotState.Empty),
-        ("Camera Models", "camera-models", false, false, MacroPlanSnapshotState.Empty),
-        ("Placement Setup", "placement-setup", false, false, MacroPlanSnapshotState.Empty),
-        ("Debug", "debug", false, false, MacroPlanSnapshotState.Empty),
-        ("Debug", "debug-refuel", true, false, MacroPlanSnapshotState.Empty),
-        ("Debug", "debug-utilities", false, true, MacroPlanSnapshotState.Empty),
-        ("Settings", "settings", false, false, MacroPlanSnapshotState.Empty),
-        ("Settings", "settings-debug", true, false, MacroPlanSnapshotState.Empty),
+        ("Dashboard", "dashboard", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Dashboard", "dashboard-run-log", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Dashboard", "dashboard-controls", true, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Dashboard", "dashboard-navigation-collapsed", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Dashboard", "dashboard-small-navigation-collapsed", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Dashboard", "dashboard-run-log-small-navigation-collapsed", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Macro Plan", "macro-plan-empty", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Macro Plan", "macro-plan-empty-loop", false, false, MacroPlanSnapshotState.EmptyLoop, ManualRecordingsSnapshotState.Ready),
+        ("Macro Plan", "macro-plan-tasks-only", false, false, MacroPlanSnapshotState.TasksOnly, ManualRecordingsSnapshotState.Ready),
+        ("Macro Plan", "macro-plan", false, false, MacroPlanSnapshotState.NestedLoops, ManualRecordingsSnapshotState.Ready),
+        ("Macro Plan", "macro-plan-loop-settings", false, false, MacroPlanSnapshotState.LoopSettingsPopup, ManualRecordingsSnapshotState.Ready),
+        ("Macro Plan", "macro-plan-add-task", false, false, MacroPlanSnapshotState.TaskPopup, ManualRecordingsSnapshotState.Ready),
+        ("Macro Plan", "macro-plan-share", true, false, MacroPlanSnapshotState.NestedLoops, ManualRecordingsSnapshotState.Ready),
+        ("Expeditions", "expeditions", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Challenges", "challenges", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Challenges", "challenges-status", true, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Story", "story", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Raid", "raid", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Camera Models", "camera-models", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Placement Setup", "placement-setup", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Placement Setup", "placement-setup-recording", true, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Placement Setup", "placement-setup-small-controls", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Placement Setup", "placement-setup-small-steps", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Placement Setup", "placement-setup-recording-small-controls", true, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Placement Setup", "placement-setup-catalog-collapsed", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Placement Setup", "placement-setup-both-rails-collapsed", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Recordings", "recordings", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Recordings", "recordings-armed-recording", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.ArmedRecording),
+        ("Recordings", "recordings-running-recording", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.RunningRecording),
+        ("Recordings", "recordings-armed-playback", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.ArmedPlayback),
+        ("Recordings", "recordings-running-playback", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.RunningPlayback),
+        ("Debug", "debug", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Debug", "debug-refuel", true, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Debug", "debug-utilities", false, true, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Settings", "settings", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Settings", "settings-debug", true, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
     ];
 
     public static async Task RenderAsync(AppServices services, string outputDirectory)
@@ -75,14 +96,20 @@ internal static class UiSnapshotRenderer
                     string file,
                     bool showPageEnd,
                     bool showDebugUtilities,
-                    MacroPlanSnapshotState macroPlanState) in Pages)
+                    MacroPlanSnapshotState macroPlanState,
+                    ManualRecordingsSnapshotState
+                        recordingsState) in Pages)
                 {
+                    SetSnapshotRailState(
+                        window,
+                        file);
                     await window.SelectPageForSnapshotAsync(
                         key,
                         showPageEnd,
                         showDebugUtilities,
-                        macroPlanState);
-                    Size size = SnapshotSize(key);
+                        macroPlanState,
+                        recordingsState);
+                    Size size = SnapshotSize(key, file);
                     await File.WriteAllTextAsync(
                         progressPath,
                         $"Rendering {file} ({theme.ToString().ToLowerInvariant()}) at {size.Width:0}x{size.Height:0}.");
@@ -93,6 +120,12 @@ internal static class UiSnapshotRenderer
                     root.Measure(size);
                     root.Arrange(new Rect(size));
                     root.UpdateLayout();
+                    PrepareCompactPlacementSnapshot(
+                        root,
+                        file);
+                    PrepareDashboardSnapshot(
+                        root,
+                        file);
                     RenderTargetBitmap bitmap = new(
                         (int)size.Width,
                         (int)size.Height,
@@ -100,6 +133,16 @@ internal static class UiSnapshotRenderer
                         96,
                         PixelFormats.Pbgra32);
                     bitmap.Render(root);
+                    if (macroPlanState ==
+                            MacroPlanSnapshotState
+                                .LoopSettingsPopup)
+                    {
+                        bitmap =
+                            RenderLoopSettingsPopup(
+                                root,
+                                bitmap,
+                                size);
+                    }
                     EnsureVisiblePixels(bitmap, file, theme);
                     PngBitmapEncoder encoder = new();
                     encoder.Frames.Add(BitmapFrame.Create(bitmap));
@@ -118,9 +161,38 @@ internal static class UiSnapshotRenderer
         }
     }
 
-    private static Size SnapshotSize(string key)
+    private static Size SnapshotSize(
+        string key,
+        string file)
     {
         Size standard = new(1200, 780);
+        if (string.Equals(
+                file,
+                "dashboard",
+                StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(
+                file,
+                "dashboard-run-log",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            if (string.Equals(
+                    Environment.GetEnvironmentVariable("CI"),
+                    "true",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return standard;
+            }
+            return new Size(1660, 1040);
+        }
+        if (file.Contains(
+                "-small",
+                StringComparison.OrdinalIgnoreCase) ||
+            file.Contains(
+                "-collapsed",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return new Size(960, 640);
+        }
         if (string.Equals(
                 key,
                 "Macro Plan",
@@ -149,6 +221,177 @@ internal static class UiSnapshotRenderer
                workArea.Height >= wide.Height
             ? wide
             : standard;
+    }
+
+    private static void SetSnapshotRailState(
+        MainWindow window,
+        string file)
+    {
+        window.SetNavigationRailCollapsedForSnapshot(
+            file.Contains(
+                "navigation-collapsed",
+                StringComparison.OrdinalIgnoreCase) ||
+            file.Contains(
+                "both-rails-collapsed",
+                StringComparison.OrdinalIgnoreCase));
+        window.SetPlacementCatalogCollapsedForSnapshot(
+            file.Contains(
+                "catalog-collapsed",
+                StringComparison.OrdinalIgnoreCase) ||
+            file.Contains(
+                "both-rails-collapsed",
+                StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static void PrepareCompactPlacementSnapshot(
+        FrameworkElement root,
+        string file)
+    {
+        if (!file.Contains(
+                "placement-setup",
+                StringComparison.OrdinalIgnoreCase) ||
+            !(file.Contains(
+                  "-small",
+                  StringComparison.OrdinalIgnoreCase) ||
+              file.Contains(
+                  "-collapsed",
+                  StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        PlacementFastEditorView? editor =
+            FindVisualChild<PlacementFastEditorView>(
+                root);
+        if (editor is null)
+        {
+            throw new InvalidOperationException(
+                "The compact Placement Setup snapshot did not contain its editor.");
+        }
+        if (file.Contains(
+                "recording",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            editor.ClearSnapshotSettings();
+        }
+        editor.SetCompactSnapshotViewport(
+            file.Contains(
+                "steps",
+                StringComparison.OrdinalIgnoreCase));
+        root.UpdateLayout();
+    }
+
+    private static void PrepareDashboardSnapshot(
+        FrameworkElement root,
+        string file)
+    {
+        bool showCurrentRun = file.Contains(
+            "dashboard-small",
+            StringComparison.OrdinalIgnoreCase);
+        bool showLongRunLog = file.Contains(
+            "dashboard-run-log",
+            StringComparison.OrdinalIgnoreCase);
+        if (!showCurrentRun &&
+            !showLongRunLog)
+        {
+            return;
+        }
+
+        MacroPage? page =
+            FindVisualChild<MacroPage>(root);
+        if (page is null)
+        {
+            throw new InvalidOperationException(
+                "The Dashboard snapshot did not contain its page.");
+        }
+        if (showLongRunLog)
+        {
+            page.ShowBoundedRunLogForSnapshot();
+        }
+        if (showCurrentRun)
+        {
+            page.ShowCurrentRunForSnapshot();
+        }
+        root.UpdateLayout();
+    }
+
+    private static RenderTargetBitmap
+        RenderLoopSettingsPopup(
+        FrameworkElement root,
+        RenderTargetBitmap pageBitmap,
+        Size pageSize)
+    {
+        MacroPlanLoopEditor? editor =
+            FindVisualChild<
+                MacroPlanLoopEditor>(root);
+        if (editor is null ||
+            !editor.TryGetLoopSettingsSnapshotVisual(
+                root,
+                out FrameworkElement popup,
+                out Point origin))
+        {
+            throw new InvalidOperationException(
+                "The loop settings popup was not open for its UI snapshot.");
+        }
+        Size popupSize = new(
+            popup.ActualWidth,
+            popup.ActualHeight);
+        popup.Measure(popupSize);
+        popup.Arrange(new Rect(popupSize));
+        popup.UpdateLayout();
+        RenderTargetBitmap popupBitmap = new(
+            (int)Math.Ceiling(popupSize.Width),
+            (int)Math.Ceiling(popupSize.Height),
+            96,
+            96,
+            PixelFormats.Pbgra32);
+        popupBitmap.Render(popup);
+
+        DrawingVisual composite = new();
+        using (DrawingContext drawing =
+               composite.RenderOpen())
+        {
+            drawing.DrawImage(
+                pageBitmap,
+                new Rect(pageSize));
+            drawing.DrawImage(
+                popupBitmap,
+                new Rect(origin, popupSize));
+        }
+        RenderTargetBitmap result = new(
+            (int)pageSize.Width,
+            (int)pageSize.Height,
+            96,
+            96,
+            PixelFormats.Pbgra32);
+        result.Render(composite);
+        return result;
+    }
+
+    private static T? FindVisualChild<T>(
+        DependencyObject parent)
+        where T : DependencyObject
+    {
+        for (int index = 0;
+             index < VisualTreeHelper.GetChildrenCount(
+                 parent);
+             index++)
+        {
+            DependencyObject child =
+                VisualTreeHelper.GetChild(
+                    parent,
+                    index);
+            if (child is T match)
+            {
+                return match;
+            }
+            T? nested = FindVisualChild<T>(child);
+            if (nested is not null)
+            {
+                return nested;
+            }
+        }
+        return null;
     }
 
     private static void VerifyBundledFont(MainWindow window)

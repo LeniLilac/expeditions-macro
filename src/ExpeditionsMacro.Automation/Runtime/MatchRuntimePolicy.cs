@@ -49,6 +49,17 @@ internal static class MatchRuntimePolicy
                 15d * preset.BossesBeforeExtract);
     }
 
+    public static TimeSpan? ForPlacement(
+        PlacementModel placement,
+        TimeSpan? routeDefault)
+    {
+        ArgumentNullException.ThrowIfNull(placement);
+        return placement.ImpossibilityThresholdMinutes > 0
+            ? TimeSpan.FromMinutes(
+                placement.ImpossibilityThresholdMinutes)
+            : routeDefault;
+    }
+
     public static void ThrowIfExceeded(
         TimeSpan elapsed,
         TimeSpan? limit,

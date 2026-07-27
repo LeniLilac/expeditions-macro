@@ -11,6 +11,10 @@ public sealed class StableStateTracker<T> where T : notnull
         _required = Math.Max(1, required);
     }
 
+    public bool HasPendingCandidate =>
+        _count > 0 &&
+        _count < _required;
+
     public T? Update(T? state)
     {
         if (state is null)

@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using ExpeditionsMacro.App.Services;
 using ExpeditionsMacro.Core.Abstractions;
@@ -19,6 +20,15 @@ public partial class RobloxDashboardPreview :
     private bool _dashboardActive = true;
     private bool _ownerVisible = true;
     private bool _nativeDockingEnabled = true;
+    private bool _releaseForClose;
+    private int _ownedDialogSuspendDepth;
+    private Window? _owner;
+
+    private enum PreviewReleaseDisposition
+    {
+        Restore,
+        MinimizeRetained,
+    }
 
     public RobloxDashboardPreview()
     {
@@ -32,6 +42,7 @@ public partial class RobloxDashboardPreview :
 
     public bool RequiresVisibleOwner =>
         _nativeDockingEnabled &&
+        !_releaseForClose &&
         _pinned &&
         _dashboardActive;
 
@@ -59,7 +70,7 @@ public partial class RobloxDashboardPreview :
         _dashboardActive = active;
         if (!active)
         {
-            return TryDetach(out error);
+            return TryAutoDetach(out error);
         }
 
         error = string.Empty;
@@ -74,7 +85,7 @@ public partial class RobloxDashboardPreview :
         _ownerVisible = visible;
         if (!visible)
         {
-            return TryDetach(out error);
+            return TryAutoDetach(out error);
         }
 
         error = string.Empty;
@@ -105,10 +116,42 @@ public partial class RobloxDashboardPreview :
     }
 
     public bool TryDetach(out string error)
+        => TryRelease(
+            PreviewReleaseDisposition.Restore,
+            out error);
+
+    private bool TryAutoDetach(out string error)
+        => TryRelease(
+            PreviewReleaseDisposition
+                .MinimizeRetained,
+            out error);
+
+    public bool TryPrepareForClose(
+        out string error)
+    {
+        _releaseForClose = true;
+        if (TryDetach(out error))
+        {
+            return true;
+        }
+
+        _releaseForClose = false;
+        RefreshPin();
+        return false;
+    }
+
+    private bool TryRelease(
+        PreviewReleaseDisposition disposition,
+        out string error)
     {
         bool detached =
-            _pin.TryUnpin(
-                out error);
+            disposition ==
+                PreviewReleaseDisposition
+                    .MinimizeRetained
+                ? _pin.TryUnpinAndMinimize(
+                    out error)
+                : _pin.TryUnpin(
+                    out error);
         if (!detached)
         {
             PreviewStatusText.Text = error;
@@ -123,10 +166,53 @@ public partial class RobloxDashboardPreview :
     public void RefreshNow() =>
         RefreshPin();
 
+    public bool TrySuspendForOwnedDialog(
+        out string error)
+    {
+        if (_ownedDialogSuspendDepth > 0)
+        {
+            _ownedDialogSuspendDepth++;
+            error = string.Empty;
+            return true;
+        }
+
+        if (!_pin.TrySuspend(out error))
+        {
+            return false;
+        }
+
+        _ownedDialogSuspendDepth = 1;
+        ShowPlaceholder(
+            "Roblox pinning pauses while a macro message is open.");
+        return true;
+    }
+
+    public void ResumeAfterOwnedDialog()
+    {
+        if (_ownedDialogSuspendDepth <= 0)
+        {
+            return;
+        }
+
+        _ownedDialogSuspendDepth--;
+        if (_ownedDialogSuspendDepth == 0)
+        {
+            RefreshPin();
+        }
+    }
+
     private void Preview_Loaded(
         object sender,
         RoutedEventArgs e)
     {
+        _owner = Window.GetWindow(this);
+        if (_owner is not null)
+        {
+            _owner.Activated +=
+                Owner_ActivationChanged;
+            _owner.Deactivated +=
+                Owner_ActivationChanged;
+        }
         _refreshTimer.Start();
         RefreshPin();
     }
@@ -136,12 +222,33 @@ public partial class RobloxDashboardPreview :
         RoutedEventArgs e)
     {
         _refreshTimer.Stop();
-        _ = TryDetach(out _);
+        if (_owner is not null)
+        {
+            _owner.Activated -=
+                Owner_ActivationChanged;
+            _owner.Deactivated -=
+                Owner_ActivationChanged;
+            _owner = null;
+        }
+        _ = _releaseForClose
+            ? TryDetach(out _)
+            : TryAutoDetach(out _);
+    }
+
+    private void Owner_ActivationChanged(
+        object? sender,
+        EventArgs e)
+    {
+        _ = Dispatcher.BeginInvoke(
+            DispatcherPriority.Input,
+            new Action(RefreshPin));
     }
 
     private void RefreshPin()
     {
         if (!_nativeDockingEnabled ||
+            _releaseForClose ||
+            _ownedDialogSuspendDepth > 0 ||
             !_pinned ||
             !_dashboardActive ||
             !_ownerVisible ||
@@ -154,6 +261,7 @@ public partial class RobloxDashboardPreview :
         try
         {
             Window? owner =
+                _owner ??
                 Window.GetWindow(this);
             if (owner is null ||
                 owner.WindowState ==
@@ -162,14 +270,31 @@ public partial class RobloxDashboardPreview :
                     owner,
                     out WindowBounds target))
             {
-                if (!_pin.TryUnpin(
+                if (!_pin.TryUnpinAndMinimize(
                     out string detachError))
                 {
                     ShowPlaceholder(detachError);
                     return;
                 }
                 ShowPlaceholder(
-                    "Keep the Roblox live view fully visible to pin it.");
+                    "Roblox was minimized because the live view is not fully visible.");
+                return;
+            }
+
+            nint ownerHandle =
+                new WindowInteropHelper(owner)
+                    .Handle;
+            if (!_pin.IsForegroundSession(
+                    ownerHandle))
+            {
+                if (!_pin.TrySuspend(
+                    out string detachError))
+                {
+                    ShowPlaceholder(detachError);
+                    return;
+                }
+                ShowPlaceholder(
+                    "Roblox pinning pauses while another app is in front.");
                 return;
             }
 

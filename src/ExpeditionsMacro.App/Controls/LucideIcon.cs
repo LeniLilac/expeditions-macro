@@ -32,6 +32,7 @@ public enum LucideIconKind
     LayoutDashboard,
     LogOut,
     MapPin,
+    Menu,
     MessagesSquare,
     Minus,
     MousePointerClick,
@@ -204,6 +205,10 @@ public sealed class LucideIcon : Control
             Path("M15 12H3"),
             Path("M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4")),
         [LucideIconKind.MapPin] = Group(Path("M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"), Circle(12, 10, 3)),
+        [LucideIconKind.Menu] = Group(
+            Path("M4 6h16"),
+            Path("M4 12h16"),
+            Path("M4 18h16")),
         [LucideIconKind.MessagesSquare] = Group(Path("M16 10a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 14.286V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"), Path("M20 9a2 2 0 0 1 2 2v10.286a.71.71 0 0 1-1.212.502l-2.202-2.202A2 2 0 0 0 17.172 19H10a2 2 0 0 1-2-2v-1")),
         [LucideIconKind.Minus] = Path("M5 12h14"),
         [LucideIconKind.MousePointerClick] = Group(Path("M14 4.1 12 6"), Path("m5.1 8-2.9-.8"), Path("m6 12-1.9 2"), Path("M7.2 2.2 8 5.1"), Path("M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z")),

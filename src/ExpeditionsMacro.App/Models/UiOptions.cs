@@ -25,9 +25,7 @@ public sealed class MacroTaskRow
         : Definition.CompleteOnRuntimeDefeat
             ? $"{Definition.TargetRuntimeMinutes / 60d:0.#} h, then defeat"
             : $"{Definition.TargetVictories} victories";
-    public string Status => !Definition.Enabled
-        ? "Disabled"
-        : Progress.Completed
+    public string Status => Progress.Completed
         ? "Complete"
         : Definition.IsRecurring && Progress.NextEligibleAtUtc is DateTimeOffset next
             ? $"Available {next.LocalDateTime:t}"

@@ -79,12 +79,18 @@ public static class PlacementScreenshotCatalog
                     _ => throw UnknownTarget(),
                 },
             PlacementTargetMode.Event =>
-                target.ActNumber switch
+                (target.ActNumber, target.SpawnRoute) switch
                 {
-                    1 => "event-villain-invasion-act-1.png",
-                    2 => "event-villain-invasion-act-2.png",
-                    3 => "event-villain-invasion-act-3.png",
-                    4 => "event-villain-invasion-act-4.png",
+                    (1, EventSpawnRoute.Angle1) =>
+                        "event-villain-invasion-act-1.png",
+                    (1, EventSpawnRoute.Angle2) =>
+                        "event-villain-invasion-act-1-angle-2.png",
+                    (2, EventSpawnRoute.Angle1) =>
+                        "event-villain-invasion-act-2.png",
+                    (3, EventSpawnRoute.Angle1) =>
+                        "event-villain-invasion-act-3.png",
+                    (4, EventSpawnRoute.Angle1) =>
+                        "event-villain-invasion-act-4.png",
                     _ => throw UnknownTarget(),
                 },
             _ => throw UnknownTarget(),

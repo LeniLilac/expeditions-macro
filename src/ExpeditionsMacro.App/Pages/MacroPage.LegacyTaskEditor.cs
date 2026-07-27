@@ -33,8 +33,6 @@ public partial class MacroPage
             PresetId = preset.Id,
             Name = preset.Name,
             Priority = 1,
-            Enabled =
-                TaskEnabledCheck.IsChecked == true,
             TargetVictories =
                 runtimeTarget ? 1 : target,
             TargetRuntimeMinutes =
@@ -123,9 +121,14 @@ public partial class MacroPage
                 value =>
                     value.Id == selected?.Id) ??
             _visiblePresets.FirstOrDefault();
-        TaskEditorStatusText.Text =
-            _visiblePresets.Count == 0
-                ? $"Create a {Label(kind)} preset before adding this task."
-                : string.Empty;
+        if (_visiblePresets.Count == 0)
+        {
+            ShowTaskEditorError(
+                $"Create a {Label(kind)} preset before adding this task.");
+        }
+        else
+        {
+            HideTaskEditorError();
+        }
     }
 }

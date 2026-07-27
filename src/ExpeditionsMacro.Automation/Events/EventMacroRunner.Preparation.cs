@@ -61,7 +61,7 @@ public sealed partial class EventMacroRunner
             {
                 await RunSpawnMovementAsync(
                     window,
-                    preset.Act,
+                    preset,
                     cancellationToken).ConfigureAwait(false);
             }
         }
@@ -73,29 +73,11 @@ public sealed partial class EventMacroRunner
 
     private async Task RunSpawnMovementAsync(
         RobloxWindow window,
-        EventAct act,
+        EventPreset preset,
         CancellationToken cancellationToken)
     {
-        (char Key, int Milliseconds)[] route =
-            act switch
-            {
-                EventAct.Act1 =>
-                [
-                    ('W', 750),
-                    ('D', 750),
-                    ('W', 750),
-                ],
-                EventAct.Act2 =>
-                [
-                    ('A', 75),
-                    ('W', 2000),
-                ],
-                EventAct.Act3 => [],
-                EventAct.Act4 => [],
-                _ => throw new ArgumentOutOfRangeException(
-                    nameof(act)),
-            };
-        foreach ((char key, int duration) in route)
+        foreach ((char key, int duration) in
+                 SpawnMovementFor(preset))
         {
             Focus(window);
             await _automation.HoldLetterKeyAsync(
@@ -107,6 +89,16 @@ public sealed partial class EventMacroRunner
                 120,
                 cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    internal static IReadOnlyList<(
+        char Key,
+        int Milliseconds)> SpawnMovementFor(
+        EventPreset preset)
+    {
+        ArgumentNullException.ThrowIfNull(preset);
+        return PlacementRoutePositioningService.StepsFor(
+            PlacementTarget.ForEvent(preset));
     }
 
     private Task PlayPlacementAsync(

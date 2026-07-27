@@ -16,6 +16,8 @@ public sealed record PlacementStep
 
     public UnitTargetingPriority TargetingPriority { get; init; }
 
+    public bool AutoUpgrade { get; init; } = true;
+
     public void Validate(int clientWidth, int clientHeight)
     {
         if (UnitKey is < 0 or > 9) throw new InvalidDataException("Unit key must be 0 through 9.");
@@ -41,6 +43,7 @@ public sealed record PlacementCapture(
 public sealed record PlacementModel
 {
     public const int CurrentSchemaVersion = 1;
+    public const int MaximumImpossibilityThresholdMinutes = 180;
 
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
 
@@ -68,6 +71,10 @@ public sealed record PlacementModel
         PlacementAuthoringRules
             .DefaultAfterStartDelayMilliseconds;
 
+    public string? ManualInputRecordingId { get; init; }
+
+    public int ImpossibilityThresholdMinutes { get; init; }
+
     public required DateTimeOffset CreatedAt { get; init; }
 
     public DateTimeOffset UpdatedAt { get; init; } = DateTimeOffset.UtcNow;
@@ -77,7 +84,15 @@ public sealed record PlacementModel
         if (SchemaVersion != CurrentSchemaVersion) throw new InvalidDataException("Unsupported placement model format.");
         if (string.IsNullOrWhiteSpace(Id) || string.IsNullOrWhiteSpace(Name)) throw new InvalidDataException("Placement model identity is missing.");
         if (ClientWidth <= 0 || ClientHeight <= 0) throw new InvalidDataException("Placement model client size is invalid.");
-        if (Steps.Count == 0) throw new InvalidDataException("Placement model has no steps.");
+        bool usesManualRecording =
+            !string.IsNullOrWhiteSpace(
+                ManualInputRecordingId);
+        if (Steps.Count == 0 &&
+            !usesManualRecording)
+        {
+            throw new InvalidDataException(
+                "Placement model has no steps or manual recording.");
+        }
         if (!Enum.IsDefined(CameraPreparationMode)) throw new InvalidDataException("Placement model camera preparation is invalid.");
         if (TeamSlot is < 0 or > 8) throw new InvalidDataException("Team must be Don't change or Team 1 through 8.");
         if (PlacementIntervalMilliseconds < 0)
@@ -89,6 +104,32 @@ public sealed record PlacementModel
         {
             throw new InvalidDataException(
                 "Default After Start delay cannot be negative.");
+        }
+        if (ImpossibilityThresholdMinutes is < 0 or
+            > MaximumImpossibilityThresholdMinutes)
+        {
+            throw new InvalidDataException(
+                $"Impossibility threshold must be 0 through {MaximumImpossibilityThresholdMinutes} minutes.");
+        }
+        if (usesManualRecording)
+        {
+            if (CameraPreparationMode !=
+                CameraPreparationMode.FastNoAlign)
+            {
+                throw new InvalidDataException(
+                    "Manual recordings require a Fast no align placement setup.");
+            }
+            try
+            {
+                ManualInputRecording.ValidateId(
+                    ManualInputRecordingId!);
+            }
+            catch (ArgumentException error)
+            {
+                throw new InvalidDataException(
+                    "Manual recording id is invalid.",
+                    error);
+            }
         }
         if (CameraPreparationMode == CameraPreparationMode.FastNoAlign)
         {

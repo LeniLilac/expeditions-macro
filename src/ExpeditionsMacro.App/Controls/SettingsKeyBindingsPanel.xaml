@@ -131,19 +131,36 @@
 
         <Grid Margin="0,14,0,0">
             <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
-                <TextBlock Style="{StaticResource FieldLabel}" Text="Toggle Auto Upgrade Unit key" />
-                <TextBlock x:Name="AutoUpgradeStatusText"
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Auto Upgrade Unit key" />
+                <TextBlock x:Name="AutoUpgradeUnitStatusText"
                            Margin="0,5,0,0"
                            Style="{StaticResource Caption}"
                            TextWrapping="Wrap"
                            Text="Required before a macro can start." />
             </StackPanel>
-            <Button x:Name="AutoUpgradeButton"
+            <Button x:Name="AutoUpgradeUnitButton"
                     Width="160"
                     HorizontalAlignment="Right"
                     controls:Lucide.Icon="Keyboard"
                     Content="Set key"
-                    Click="AutoUpgradeButton_Click" />
+                    Click="AutoUpgradeUnitButton_Click" />
+        </Grid>
+
+        <Grid Margin="0,14,0,0">
+            <StackPanel Margin="0,0,180,0" VerticalAlignment="Center">
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Toggle Auto Upgrade Placed Units key" />
+                <TextBlock x:Name="ToggleAutoUpgradePlacedUnitsStatusText"
+                           Margin="0,5,0,0"
+                           Style="{StaticResource Caption}"
+                           TextWrapping="Wrap"
+                           Text="Required before a macro can start." />
+            </StackPanel>
+            <Button x:Name="ToggleAutoUpgradePlacedUnitsButton"
+                    Width="160"
+                    HorizontalAlignment="Right"
+                    controls:Lucide.Icon="Keyboard"
+                    Content="Set key"
+                    Click="ToggleAutoUpgradePlacedUnitsButton_Click" />
         </Grid>
 
         <Grid Margin="0,14,0,0">

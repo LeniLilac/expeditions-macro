@@ -7,7 +7,7 @@ This guide holds the detailed engineering conventions intentionally kept out of 
 - `src/ExpeditionsMacro.Core`: immutable geometry, imaging, models, persistence, and workflow contracts. It must not depend on WPF, Win32, or OpenCV.
 - `src/ExpeditionsMacro.Windows`: Win32 discovery/sizing, Windows Graphics Capture, HDR-to-SDR conversion, global hotkeys, DPAPI, and Roblox-compatible input.
 - `src/ExpeditionsMacro.Vision`: normalization, matching, specialized detectors, detector packs, node hues, and hotbar checks.
-- `src/ExpeditionsMacro.Automation`: camera and placement workflows, mode runners, scheduling, recovery, diagnostics, Discord, and updates.
+- `src/ExpeditionsMacro.Automation`: camera and placement workflows, mode runners, scheduling, recovery, diagnostics, and Discord.
 - `src/ExpeditionsMacro.App`: WPF shell, pages, themes, dialogs, and exclusive operation coordination.
 - `tools/ExpeditionsMacro.DatasetBuilder`: compiles reviewed captures into detector packs.
 - `tools/ExpeditionsMacro.DeepDebugViewer`: local viewer for deep-debug archives.

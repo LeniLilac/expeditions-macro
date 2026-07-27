@@ -40,11 +40,6 @@ public partial class MacroPage
         try
         {
             plan = await SavePlanInternalAsync();
-            if (!plan.Tasks.Any(task => task.Enabled))
-            {
-                throw new InvalidOperationException(
-                    "Enable at least one task before starting the plan.");
-            }
             playMenuKey =
                 AppSettings.ParsePlayMenuKey(
                     _services.Settings.PlayMenuKey,

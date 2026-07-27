@@ -24,7 +24,11 @@ internal sealed class TestFrames
     public ImageFrame UnitsTop { get; } =
         Load("UnitsTop.png");
     public ImageFrame UnitsBottom { get; } =
-        Load("UnitsBottom.png");
+        LoadWithToggle(
+            "UnitsBottom.png",
+            centerX: 436,
+            centerY: 351,
+            enabled: false);
     public ImageFrame Miscellaneous { get; } =
         Load("MiscellaneousPageCurrent.png");
 
@@ -33,11 +37,42 @@ internal sealed class TestFrames
             Path.Combine(
                 TestPaths.SettingsDatasets,
                 name));
+
+    private static ImageFrame LoadWithToggle(
+        string name,
+        int centerX,
+        int centerY,
+        bool enabled)
+    {
+        ImageFrame source = Load(name);
+        byte[] pixels = source.Pixels.ToArray();
+        (byte Red, byte Green, byte Blue) color =
+            enabled
+                ? ((byte)30, (byte)170, (byte)25)
+                : ((byte)190, (byte)30, (byte)30);
+        for (int y = centerY - 8; y <= centerY + 8; y++)
+        {
+            for (int x = centerX - 8; x <= centerX + 8; x++)
+            {
+                int pixel = (y * source.Width + x) * 3;
+                pixels[pixel] = color.Red;
+                pixels[pixel + 1] = color.Green;
+                pixels[pixel + 2] = color.Blue;
+            }
+        }
+        return new ImageFrame(
+            source.Width,
+            source.Height,
+            source.Format,
+            pixels,
+            takeOwnership: true);
+    }
 }
 
 internal sealed class LobbyDetector(
     ImageFrame lobby,
-    bool alwaysLobby = false) : IDetectorPack
+    bool alwaysLobby = false,
+    Action? observationCompleted = null) : IDetectorPack
 {
     public DetectorPackManifest Manifest => null!;
 
@@ -50,11 +85,14 @@ internal sealed class LobbyDetector(
         null;
 
     public string? RecoveryState(
-        ImageFrame clientImage) =>
-        alwaysLobby ||
-        ReferenceEquals(clientImage, lobby)
-            ? "lobby"
-            : null;
+        ImageFrame clientImage)
+    {
+        observationCompleted?.Invoke();
+        return alwaysLobby ||
+            ReferenceEquals(clientImage, lobby)
+                ? "lobby"
+                : null;
+    }
 
     public string? CurrentNodeType(
         ImageFrame clientImage) =>

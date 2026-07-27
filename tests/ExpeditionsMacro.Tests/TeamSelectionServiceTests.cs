@@ -416,6 +416,7 @@ public sealed class TeamSelectionServiceTests
 
         private static string LoadConfirmFixture(int teamSlot) => teamSlot switch
         {
+            4 => "TeamLoadConfirm_Team4_TwoRows_01.png",
             7 => "TeamLoadConfirm_Bottom_Team7_01.png",
             8 => "TeamLoadConfirm_Bottom_Team8_01.png",
             _ => "TeamLoadConfirm_01.png",

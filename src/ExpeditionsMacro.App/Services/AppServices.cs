@@ -14,7 +14,6 @@ using ExpeditionsMacro.Automation.Scheduling;
 using ExpeditionsMacro.Automation.Settings;
 using ExpeditionsMacro.Automation.Stages;
 using ExpeditionsMacro.Automation.Teams;
-using ExpeditionsMacro.Automation.Updates;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
@@ -43,6 +42,8 @@ public sealed class AppServices : IDisposable
         Log = new FileLogger(Paths.Logs);
         SettingsStore = new AppSettingsStore(Paths);
         PlacementModels = new PlacementModelRepository(Paths);
+        ManualRecordings =
+            new ManualInputRecordingRepository(Paths);
         Presets = new PresetRepository(Paths);
         ChallengePresets = new ChallengePresetRepository(Paths);
         StoryPresets = new StoryPresetRepository(Paths);
@@ -50,7 +51,11 @@ public sealed class AppServices : IDisposable
         MacroPlans = new MacroPlanRepository(Paths);
         FastNoAlignShare = new FastNoAlignShareService(
             MacroPlans,
-            PlacementModels);
+            PlacementModels,
+            Presets,
+            ChallengePresets,
+            StoryPresets,
+            RaidPresets);
         PresetDeletion = new PresetDeletionService(Presets, ChallengePresets, StoryPresets, RaidPresets, MacroPlans);
         CameraModels = new CameraModelRepository(Paths);
         CameraShortcuts = new CameraSpawnShortcutRepository(Paths);
@@ -121,7 +126,33 @@ public sealed class AppServices : IDisposable
             PlacementModels,
             () => AppSettings
                 .ParseRequiredUnitActionKeys(Settings)
-                .ChangeTargeting);
+                .ChangeTargeting,
+            () => AppSettings
+                .ParseRequiredUnitActionKeys(Settings)
+                .AutoUpgrade);
+        ManualRecorder =
+            new WindowsManualInputRecorder(Automation);
+        WindowsManualInputPlayback manualPlayback =
+            new(Automation);
+        manualPlayback.SummaryObserved += summary =>
+            DeepDebug.RecordEvent(
+                "manual_input",
+                "playback_summary",
+                new
+                {
+                    summary.RecordingId,
+                    summary.SentEvents,
+                    summary.TotalEvents,
+                    summary.MaximumDriftMicroseconds,
+                    summary.Succeeded,
+                });
+        ManualPlayback = manualPlayback;
+        ManualRoutes = new ManualInputRouteService(
+            ManualRecordings,
+            ManualPlayback);
+        RoutePositioning =
+            new PlacementRoutePositioningService(
+                Automation);
         CameraPose = new CameraPosePreparationService(
             Automation,
             () => AppSettings.ParseShiftLockKey(
@@ -167,7 +198,8 @@ public sealed class AppServices : IDisposable
             Placement,
             Teams,
             _discord,
-            FastNoAlign);
+            FastNoAlign,
+            ManualRoutes);
         Scheduler = new MacroScheduler(MacroPlans);
         RecoveringScheduler = new RecoveringMacroScheduler(
             Scheduler,
@@ -179,21 +211,23 @@ public sealed class AppServices : IDisposable
             Placement,
             Teams,
             _discord,
-            FastNoAlign);
+            FastNoAlign,
+            ManualRoutes);
         Expeditions = new ExpeditionMacroRunner(
             Automation,
             Camera,
             Placement,
             Teams,
             _discord,
-            FastNoAlign);
+            FastNoAlign,
+            ManualRoutes);
         Events = new EventMacroRunner(
             Automation,
             Placement,
             Teams,
             _discord,
-            FastNoAlign);
-        DetectorUpdates = new DetectorPackUpdateService(DetectorPacks);
+            FastNoAlign,
+            ManualRoutes);
         Hotkey.Pressed += (_, _) =>
         {
             DeepDebug.RecordEvent("input", "global_hotkey_pressed", new { Hotkey = Hotkey.DisplayName, CoordinatorState = Coordinator.State });
@@ -206,6 +240,7 @@ public sealed class AppServices : IDisposable
     public FileLogger Log { get; }
     public AppSettingsStore SettingsStore { get; }
     public PlacementModelRepository PlacementModels { get; }
+    public ManualInputRecordingRepository ManualRecordings { get; }
     public PresetRepository Presets { get; }
     public ChallengePresetRepository ChallengePresets { get; }
     public StoryPresetRepository StoryPresets { get; }
@@ -226,6 +261,10 @@ public sealed class AppServices : IDisposable
     public DiagnosticCaptureService DiagnosticCapture { get; }
     public IPlacementCaptureService PlacementCapture { get; }
     public PlacementService Placement { get; }
+    public IManualInputRecorder ManualRecorder { get; }
+    public IManualInputPlayback ManualPlayback { get; }
+    public ManualInputRouteService ManualRoutes { get; }
+    public PlacementRoutePositioningService RoutePositioning { get; }
     public CameraPosePreparationService CameraPose { get; }
     public FastNoAlignPreparationSession FastNoAlign { get; }
     public CameraAlignmentEngine Camera { get; }
@@ -240,7 +279,6 @@ public sealed class AppServices : IDisposable
     public ChallengeMacroRunner Challenges { get; }
     public ExpeditionMacroRunner Expeditions { get; }
     public EventMacroRunner Events { get; }
-    public DetectorPackUpdateService DetectorUpdates { get; }
     public AppSettings Settings { get; private set; } = new();
 
     public event EventHandler? SettingsChanged;
@@ -342,7 +380,6 @@ public sealed class AppServices : IDisposable
         if (Automation is IDisposable automation) automation.Dispose();
         Log.Info("Application closing.");
         Hotkey.Dispose();
-        DetectorUpdates.Dispose();
         _discord.Dispose();
     }
 
@@ -357,7 +394,7 @@ public sealed class AppServices : IDisposable
         string source = Path.Combine(AppContext.BaseDirectory, "Resources", "DetectorPacks", AnimeExpeditionsDetectorSpec.PackId, AnimeExpeditionsDetectorSpec.BundledPackVersion);
         if (await DetectorPacks.EnsureBundledAsync(source))
         {
-            Log.Info("Installed or repaired the bundled detector pack.");
+            Log.Info("Refreshed the bundled detector references.");
         }
     }
 

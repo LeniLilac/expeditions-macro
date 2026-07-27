@@ -1,4 +1,3 @@
-using System.IO.Compression;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
 using ExpeditionsMacro.Vision.Packs;
@@ -8,47 +7,50 @@ namespace ExpeditionsMacro.Tests;
 public sealed class DetectorPackRepositoryTests
 {
     [Fact]
-    public async Task InstallAndRollback_RetainThePreviousValidatedPack()
+    public async Task EnsureBundled_InstallsValidatedReleaseCopy()
     {
         string root = TestPaths.NewTemporaryDirectory();
-        string modified = TestPaths.NewTemporaryDirectory();
         try
         {
-            DetectorPackRepository repository = new(new AppPaths(root));
-            await repository.InstallDirectoryAsync(TestPaths.DetectorPack);
-            CopyDirectory(TestPaths.DetectorPack, modified);
-            string manifestPath = Path.Combine(modified, "manifest.json");
-            DetectorPackManifest manifest = (await JsonFileStore.ReadAsync<DetectorPackManifest>(manifestPath))!;
-            await JsonFileStore.WriteAtomicAsync(manifestPath, manifest with { Version = "1.0.3" });
+            DetectorPackRepository repository =
+                new(new AppPaths(root));
 
-            await repository.InstallDirectoryAsync(modified);
-            Assert.Equal("1.0.3", Assert.Single(await repository.ListAsync()).Version);
+            Assert.True(
+                await repository.EnsureBundledAsync(
+                    TestPaths.DetectorPack));
 
-            await repository.RollbackAsync(AnimeExpeditionsDetectorSpec.PackId);
-
-            Assert.Equal("1.0.2", Assert.Single(await repository.ListAsync()).Version);
-            Assert.NotNull(await repository.LoadAsync(AnimeExpeditionsDetectorSpec.PackId));
+            DetectorPackManifest installed =
+                Assert.Single(await repository.ListAsync());
+            Assert.Equal("1.0.2", installed.Version);
+            Assert.True(
+                (await repository.LoadAsync(
+                    AnimeExpeditionsDetectorSpec.PackId))!
+                .SupportsChallengeMaps);
         }
         finally
         {
             TestPaths.DeleteTemporaryDirectory(root);
-            TestPaths.DeleteTemporaryDirectory(modified);
         }
     }
 
     [Fact]
-    public async Task EnsureBundled_ReplacesAnOlderInstalledPack()
+    public async Task EnsureBundled_ReplacesAnOlderCachedCopy()
     {
         string root = TestPaths.NewTemporaryDirectory();
         try
         {
-            DetectorPackRepository repository = new(new AppPaths(root));
-            await repository.InstallDirectoryAsync(TestPaths.LegacyDetectorPack);
+            AppPaths paths = new(root);
+            SeedCurrent(paths, TestPaths.LegacyDetectorPack);
+            DetectorPackRepository repository = new(paths);
 
-            Assert.True(await repository.EnsureBundledAsync(TestPaths.DetectorPack));
+            Assert.True(
+                await repository.EnsureBundledAsync(
+                    TestPaths.DetectorPack));
 
-            Assert.Equal("1.0.2", Assert.Single(await repository.ListAsync()).Version);
-            Assert.True((await repository.LoadAsync(AnimeExpeditionsDetectorSpec.PackId))!.SupportsChallengeMaps);
+            Assert.Equal(
+                "1.0.2",
+                Assert.Single(await repository.ListAsync())
+                    .Version);
         }
         finally
         {
@@ -63,16 +65,25 @@ public sealed class DetectorPackRepositoryTests
         string stale = TestPaths.NewTemporaryDirectory();
         try
         {
-            await CopyWithVersionAsync(TestPaths.LegacyDetectorPack, stale, "1.0.2");
-            DetectorPackRepository repository = new(new AppPaths(root));
-            await repository.InstallDirectoryAsync(stale);
+            await CopyWithVersionAsync(
+                TestPaths.LegacyDetectorPack,
+                stale,
+                "1.0.2");
+            AppPaths paths = new(root);
+            SeedCurrent(paths, stale);
+            DetectorPackRepository repository = new(paths);
 
-            Assert.True(await repository.EnsureBundledAsync(TestPaths.DetectorPack));
+            Assert.True(
+                await repository.EnsureBundledAsync(
+                    TestPaths.DetectorPack));
 
-            DetectorPackManifest installed = Assert.Single(await repository.ListAsync());
-            Assert.Equal("1.0.2", installed.Version);
+            DetectorPackManifest installed =
+                Assert.Single(await repository.ListAsync());
             Assert.Equal(34, installed.Files.Count);
-            Assert.True((await repository.LoadAsync(AnimeExpeditionsDetectorSpec.PackId))!.SupportsChallengeMaps);
+            Assert.True(
+                (await repository.LoadAsync(
+                    AnimeExpeditionsDetectorSpec.PackId))!
+                .SupportsChallengeMaps);
         }
         finally
         {
@@ -89,17 +100,29 @@ public sealed class DetectorPackRepositoryTests
         try
         {
             CopyDirectory(TestPaths.DetectorPack, stale);
-            string manifestPath = Path.Combine(stale, "manifest.json");
-            DetectorPackManifest manifest = (await JsonFileStore.ReadAsync<DetectorPackManifest>(manifestPath))!;
-            await JsonFileStore.WriteAtomicAsync(manifestPath, manifest with { MinimumAppVersion = "99.0.0" });
-            DetectorPackRepository repository = new(new AppPaths(root));
-            await repository.InstallDirectoryAsync(stale);
+            string manifestPath =
+                Path.Combine(stale, "manifest.json");
+            DetectorPackManifest manifest =
+                (await JsonFileStore.ReadAsync<
+                    DetectorPackManifest>(manifestPath))!;
+            await JsonFileStore.WriteAtomicAsync(
+                manifestPath,
+                manifest with
+                {
+                    MinimumAppVersion = "99.0.0",
+                });
+            AppPaths paths = new(root);
+            SeedCurrent(paths, stale);
+            DetectorPackRepository repository = new(paths);
 
-            Assert.True(await repository.EnsureBundledAsync(TestPaths.DetectorPack));
+            Assert.True(
+                await repository.EnsureBundledAsync(
+                    TestPaths.DetectorPack));
 
-            DetectorPackManifest installed = Assert.Single(await repository.ListAsync());
-            Assert.Equal("0.1.0", installed.MinimumAppVersion);
-            Assert.True((await repository.LoadAsync(AnimeExpeditionsDetectorSpec.PackId))!.SupportsChallengeMaps);
+            Assert.Equal(
+                "0.1.0",
+                Assert.Single(await repository.ListAsync())
+                    .MinimumAppVersion);
         }
         finally
         {
@@ -109,20 +132,32 @@ public sealed class DetectorPackRepositoryTests
     }
 
     [Fact]
-    public async Task EnsureBundled_PreservesANewerInstalledPack()
+    public async Task EnsureBundled_ReplacesANewerCachedCopy()
     {
         string root = TestPaths.NewTemporaryDirectory();
         string newer = TestPaths.NewTemporaryDirectory();
         try
         {
-            await CopyWithVersionAsync(TestPaths.LegacyDetectorPack, newer, "1.0.3");
-            DetectorPackRepository repository = new(new AppPaths(root));
-            await repository.InstallDirectoryAsync(newer);
+            await CopyWithVersionAsync(
+                TestPaths.LegacyDetectorPack,
+                newer,
+                "1.0.3");
+            AppPaths paths = new(root);
+            SeedCurrent(paths, newer);
+            DetectorPackRepository repository = new(paths);
 
-            Assert.False(await repository.EnsureBundledAsync(TestPaths.DetectorPack));
+            Assert.True(
+                await repository.EnsureBundledAsync(
+                    TestPaths.DetectorPack));
 
-            Assert.Equal("1.0.3", Assert.Single(await repository.ListAsync()).Version);
-            Assert.False((await repository.LoadAsync(AnimeExpeditionsDetectorSpec.PackId))!.SupportsChallengeMaps);
+            Assert.Equal(
+                "1.0.2",
+                Assert.Single(await repository.ListAsync())
+                    .Version);
+            Assert.True(
+                (await repository.LoadAsync(
+                    AnimeExpeditionsDetectorSpec.PackId))!
+                .SupportsChallengeMaps);
         }
         finally
         {
@@ -132,55 +167,97 @@ public sealed class DetectorPackRepositoryTests
     }
 
     [Fact]
-    public async Task EnsureBundled_ReplacesACorruptedNewerInstalledPack()
+    public async Task EnsureBundled_RepairsACorruptedCachedCopy()
     {
         string root = TestPaths.NewTemporaryDirectory();
-        string newer = TestPaths.NewTemporaryDirectory();
         try
         {
-            await CopyWithVersionAsync(TestPaths.DetectorPack, newer, "1.0.3");
             AppPaths paths = new(root);
+            SeedCurrent(paths, TestPaths.DetectorPack);
+            File.Delete(
+                Path.Combine(
+                    CurrentDirectory(paths),
+                    "challenge-maps",
+                    "fairy-king-forest.png"));
             DetectorPackRepository repository = new(paths);
-            await repository.InstallDirectoryAsync(newer);
-            File.Delete(Path.Combine(
+
+            Assert.True(
+                await repository.EnsureBundledAsync(
+                    TestPaths.DetectorPack));
+
+            Assert.True(
+                (await repository.LoadAsync(
+                    AnimeExpeditionsDetectorSpec.PackId))!
+                .SupportsChallengeMaps);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task EnsureBundled_RemovesRetiredRollbackCopy()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            AppPaths paths = new(root);
+            SeedCurrent(paths, TestPaths.DetectorPack);
+            string previous = Path.Combine(
                 paths.DetectorPacks,
                 AnimeExpeditionsDetectorSpec.PackId,
-                "current",
-                "challenge-maps",
-                "fairy-king-forest.png"));
+                "previous");
+            CopyDirectory(
+                TestPaths.LegacyDetectorPack,
+                previous);
+            DetectorPackRepository repository = new(paths);
 
-            Assert.True(await repository.EnsureBundledAsync(TestPaths.DetectorPack));
+            Assert.False(
+                await repository.EnsureBundledAsync(
+                    TestPaths.DetectorPack));
 
-            Assert.Equal("1.0.2", Assert.Single(await repository.ListAsync()).Version);
-            Assert.True((await repository.LoadAsync(AnimeExpeditionsDetectorSpec.PackId))!.SupportsChallengeMaps);
+            Assert.False(Directory.Exists(previous));
         }
         finally
         {
             TestPaths.DeleteTemporaryDirectory(root);
-            TestPaths.DeleteTemporaryDirectory(newer);
         }
     }
 
     [Fact]
-    public async Task EnsureBundled_ExplainsWhenTheBundledCopyIsDamaged()
+    public async Task EnsureBundled_ExplainsWhenReleaseCopyIsDamaged()
     {
         string root = TestPaths.NewTemporaryDirectory();
         string damaged = TestPaths.NewTemporaryDirectory();
         try
         {
             CopyDirectory(TestPaths.DetectorPack, damaged);
-            File.Delete(Path.Combine(
-                damaged,
-                "challenge-maps",
-                "fairy-king-forest.png"));
-            DetectorPackRepository repository = new(new AppPaths(root));
+            File.Delete(
+                Path.Combine(
+                    damaged,
+                    "challenge-maps",
+                    "fairy-king-forest.png"));
+            DetectorPackRepository repository =
+                new(new AppPaths(root));
 
-            InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(
-                () => repository.EnsureBundledAsync(damaged));
+            InvalidDataException error =
+                await Assert.ThrowsAsync<InvalidDataException>(
+                    () => repository.EnsureBundledAsync(
+                        damaged));
 
-            Assert.Contains("bundled with this copy", error.Message, StringComparison.Ordinal);
-            Assert.Contains("new empty folder", error.Message, StringComparison.Ordinal);
-            Assert.Contains("fairy-king-forest.png", error.InnerException!.Message, StringComparison.Ordinal);
+            Assert.Contains(
+                "bundled with this copy",
+                error.Message,
+                StringComparison.Ordinal);
+            Assert.Contains(
+                "new empty folder",
+                error.Message,
+                StringComparison.Ordinal);
+            Assert.Contains(
+                "fairy-king-forest.png",
+                error.InnerException!.Message,
+                StringComparison.Ordinal);
             Assert.Empty(await repository.ListAsync());
         }
         finally
@@ -191,18 +268,24 @@ public sealed class DetectorPackRepositoryTests
     }
 
     [Fact]
-    public async Task InstallDirectory_RejectsAChangedCompiledReference()
+    public async Task EnsureBundled_RejectsChangedCompiledReference()
     {
         string root = TestPaths.NewTemporaryDirectory();
         string corrupt = TestPaths.NewTemporaryDirectory();
         try
         {
             CopyDirectory(TestPaths.DetectorPack, corrupt);
-            string file = Directory.EnumerateFiles(Path.Combine(corrupt, "states"), "*.png", SearchOption.AllDirectories).First();
+            string file = Directory.EnumerateFiles(
+                    Path.Combine(corrupt, "states"),
+                    "*.png",
+                    SearchOption.AllDirectories)
+                .First();
             await File.AppendAllBytesAsync(file, [1, 2, 3]);
-            DetectorPackRepository repository = new(new AppPaths(root));
+            DetectorPackRepository repository =
+                new(new AppPaths(root));
 
-            await Assert.ThrowsAsync<InvalidDataException>(() => repository.InstallDirectoryAsync(corrupt));
+            await Assert.ThrowsAsync<InvalidDataException>(
+                () => repository.EnsureBundledAsync(corrupt));
             Assert.Empty(await repository.ListAsync());
         }
         finally
@@ -212,50 +295,60 @@ public sealed class DetectorPackRepositoryTests
         }
     }
 
-    [Fact]
-    public async Task ZipInstall_RejectsPathTraversal()
-    {
-        string root = TestPaths.NewTemporaryDirectory();
-        try
-        {
-            await using MemoryStream package = new();
-            using (ZipArchive archive = new(package, ZipArchiveMode.Create, leaveOpen: true))
-            {
-                ZipArchiveEntry entry = archive.CreateEntry("../outside.txt");
-                await using StreamWriter writer = new(entry.Open());
-                await writer.WriteAsync("unsafe");
-            }
-            package.Position = 0;
-            DetectorPackRepository repository = new(new AppPaths(root));
+    private static void SeedCurrent(
+        AppPaths paths,
+        string source) =>
+        CopyDirectory(source, CurrentDirectory(paths));
 
-            await Assert.ThrowsAsync<InvalidDataException>(() => repository.InstallAsync(package));
-            Assert.False(File.Exists(Path.Combine(root, "outside.txt")));
-        }
-        finally
-        {
-            TestPaths.DeleteTemporaryDirectory(root);
-        }
-    }
+    private static string CurrentDirectory(AppPaths paths) =>
+        Path.Combine(
+            paths.DetectorPacks,
+            AnimeExpeditionsDetectorSpec.PackId,
+            "current");
 
-    private static void CopyDirectory(string source, string destination)
+    private static void CopyDirectory(
+        string source,
+        string destination)
     {
-        foreach (string directory in Directory.EnumerateDirectories(source, "*", SearchOption.AllDirectories))
+        foreach (string directory in
+            Directory.EnumerateDirectories(
+                source,
+                "*",
+                SearchOption.AllDirectories))
         {
-            Directory.CreateDirectory(Path.Combine(destination, Path.GetRelativePath(source, directory)));
+            Directory.CreateDirectory(
+                Path.Combine(
+                    destination,
+                    Path.GetRelativePath(source, directory)));
         }
-        foreach (string file in Directory.EnumerateFiles(source, "*", SearchOption.AllDirectories))
+        foreach (string file in
+            Directory.EnumerateFiles(
+                source,
+                "*",
+                SearchOption.AllDirectories))
         {
-            string target = Path.Combine(destination, Path.GetRelativePath(source, file));
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            string target = Path.Combine(
+                destination,
+                Path.GetRelativePath(source, file));
+            Directory.CreateDirectory(
+                Path.GetDirectoryName(target)!);
             File.Copy(file, target, overwrite: true);
         }
     }
 
-    private static async Task CopyWithVersionAsync(string source, string destination, string version)
+    private static async Task CopyWithVersionAsync(
+        string source,
+        string destination,
+        string version)
     {
         CopyDirectory(source, destination);
-        string manifestPath = Path.Combine(destination, "manifest.json");
-        DetectorPackManifest manifest = (await JsonFileStore.ReadAsync<DetectorPackManifest>(manifestPath))!;
-        await JsonFileStore.WriteAtomicAsync(manifestPath, manifest with { Version = version });
+        string manifestPath =
+            Path.Combine(destination, "manifest.json");
+        DetectorPackManifest manifest =
+            (await JsonFileStore.ReadAsync<
+                DetectorPackManifest>(manifestPath))!;
+        await JsonFileStore.WriteAtomicAsync(
+            manifestPath,
+            manifest with { Version = version });
     }
 }

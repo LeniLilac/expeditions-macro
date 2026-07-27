@@ -10,6 +10,28 @@ namespace ExpeditionsMacro.Tests;
 public sealed class GameSettingsScreenDetectorTests
 {
     [Theory]
+    [InlineData(0.98)]
+    [InlineData(1.00)]
+    [InlineData(1.02)]
+    public void CanonicalUiScale_AcceptsInclusiveTwoPercentRange(
+        double uiScale) =>
+        Assert.True(
+            GameSettingsScreenDetector
+                .IsCanonicalUiScale(uiScale));
+
+    [Theory]
+    [InlineData(0.979999)]
+    [InlineData(1.020001)]
+    [InlineData(double.NaN)]
+    [InlineData(double.NegativeInfinity)]
+    [InlineData(double.PositiveInfinity)]
+    public void CanonicalUiScale_RejectsValuesOutsideRange(
+        double uiScale) =>
+        Assert.False(
+            GameSettingsScreenDetector
+                .IsCanonicalUiScale(uiScale));
+
+    [Theory]
     [InlineData("SettingsScale080.png", 0.78, 0.82)]
     [InlineData("SettingsScale100.png", 0.98, 1.02)]
     [InlineData("SettingsScale120.png", 1.17, 1.22)]
@@ -143,15 +165,40 @@ public sealed class GameSettingsScreenDetectorTests
                 GameSettingsScreenDetector.DetectToggle(
                     fixture.Frame,
                     required.Setting);
+            bool fixtureEnabled =
+                required.Setting ==
+                    RequiredGameSetting.AutoUpgradePlacedUnits ||
+                required.Enabled;
 
             Assert.True(
                 match.State ==
-                (required.Enabled
+                (fixtureEnabled
                     ? GameSettingToggleState.Enabled
                     : GameSettingToggleState.Disabled),
                 $"{required.Setting} was {match.State} at {match.Confidence:P0}.");
             Assert.InRange(match.Confidence, 0.72, 1);
         }
+    }
+
+    [Fact]
+    public void AutoUpgradePlacedUnits_IsDetectedAsWrongAndRequiredOff()
+    {
+        GameSettingToggleMatch match =
+            GameSettingsScreenDetector.DetectToggle(
+                Load("UnitsBottom.png"),
+                RequiredGameSetting.AutoUpgradePlacedUnits);
+        RequiredGameSettingState requirement =
+            Assert.Single(
+                RequiredGameSettings.Profile,
+                entry =>
+                    entry.Setting ==
+                    RequiredGameSetting.AutoUpgradePlacedUnits);
+
+        Assert.Equal(
+            GameSettingToggleState.Enabled,
+            match.State);
+        Assert.False(requirement.Enabled);
+        Assert.InRange(match.Confidence, 0.72, 1);
     }
 
     [Fact]

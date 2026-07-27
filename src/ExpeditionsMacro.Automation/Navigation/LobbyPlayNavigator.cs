@@ -8,7 +8,7 @@ public sealed class PlayMenuBindingException : InvalidOperationException
         : base(
             $"The Play interface did not open with {key}.\n\n" +
             $"Open Anime Expeditions Settings > Keybinds, set Toggle Play Menu to {key}, and try again. " +
-            "The Toggle Play Menu key under Expeditions Macro Settings > Controls must use the same letter.")
+            "Then scroll down to Controls on the Expeditions Macro Dashboard and set Toggle Play Menu key to the same letter.")
     {
         Key = key;
     }
@@ -26,7 +26,11 @@ internal static class LobbyPlayNavigator
         Func<ImageFrame, bool> isLobby,
         Func<ImageFrame, bool> isOpen,
         Func<char, CancellationToken, Task> pressKey,
-        Func<TimeSpan, CancellationToken, Task<bool>> waitForOpen,
+        Func<
+            TimeSpan,
+            bool,
+            CancellationToken,
+            Task<bool>> waitForOpen,
         Action<int>? keyAttemptStarted,
         Action<int>? keyAttemptMissed,
         CancellationToken cancellationToken)
@@ -48,6 +52,7 @@ internal static class LobbyPlayNavigator
             {
                 if (await waitForOpen(
                         TimeSpan.FromSeconds(3),
+                        true,
                         cancellationToken).ConfigureAwait(false))
                 {
                     return;
@@ -57,18 +62,31 @@ internal static class LobbyPlayNavigator
 
             if (!isLobby(current))
             {
-                if (await waitForOpen(TimeSpan.FromSeconds(3), cancellationToken).ConfigureAwait(false)) return;
+                if (await waitForOpen(
+                        TimeSpan.FromSeconds(3),
+                        false,
+                        cancellationToken).ConfigureAwait(false))
+                {
+                    return;
+                }
                 continue;
             }
 
             keyAttemptStarted?.Invoke(attempt);
             await pressKey(key, cancellationToken).ConfigureAwait(false);
-            if (await waitForOpen(TimeSpan.FromSeconds(3), cancellationToken).ConfigureAwait(false)) return;
+            if (await waitForOpen(
+                    TimeSpan.FromSeconds(3),
+                    false,
+                    cancellationToken).ConfigureAwait(false))
+            {
+                return;
+            }
 
             current = capture();
             if (isOpen(current) &&
                 await waitForOpen(
                     TimeSpan.FromSeconds(3),
+                    true,
                     cancellationToken).ConfigureAwait(false))
             {
                 return;

@@ -4,6 +4,46 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.31] - 2026-07-27
+
+### Added
+
+- Added opt-in manual input recordings for advanced Fast no-align routes. Recordings capture physical keyboard, mouse movement, clicks, and wheel input, replay against absolute microsecond timestamps with a hard 10-millisecond drift limit, and can be armed for playback with the global macro hotkey.
+- Extended Fast share codes with referenced Fast no-align legacy presets and their complete ordinary placement dependencies while keeping manual recordings device-local and excluded.
+- Added Event Villain Invasion Act 1 Angle 2 with its separate deterministic approach, placement setup, route identity, and Lobby handoff boundary.
+- Fixed Event entry for accounts whose Events page initially selects an Event other than Villain Invasion.
+- Added a per-placement Auto Upgrade choice, a separate Auto Upgrade Unit binding, and a renamed Toggle Auto Upgrade Placed Units binding.
+- Added vision-based Misc settings and UI Scale input navigation. Startup UI Scale and required game-settings preparation now have independent controls; scale is measured only from the open Settings panel.
+
+### Changed
+
+- Existing settings are migrated once to schema v3 to enable startup private-server restart, failed-recovery private-server restart, startup UI Scale correction, and required game-settings correction. Schema v2's combined preparation choice seeds both independent checks, and subsequent user changes remain authoritative; new installs begin enabled at schema v3.
+- Reworked Macro Plan authoring around popup task and loop settings editors, direct insertion into loops, compact nested block surfaces, accessible challenge-type tiles, and one centered insertion indicator per sibling boundary.
+- Removed the unused task Enabled state. Legacy disabled tasks load as active and the retired field is omitted when plans are saved or shared.
+- Moved the bounded Run log into the unused lower portion of Current run and kept the pinned Roblox view left-aligned.
+- Manual-recording routes now show only Team and Recording controls; ordinary placement steps remain preserved but hidden until recording mode is disabled.
+- Same-route repeats retain the prepared camera and selected Team until a Lobby, rejoin, recovery, process, or route boundary invalidates them.
+- Detector references now ship only as validated application content inside the portable ZIP and installer. The separate detector-pack download, Settings card, update checks, rollback surface, and update preferences were removed.
+- Portable ZIPs now expose `ExpeditionsMacro.exe` at the extraction root while keeping runtime dependencies in the adjacent `ExpeditionsMacro` directory.
+
+### Fixed
+
+- Keybinding setup and validation errors now direct users to scroll down to Controls on the Dashboard while preserving the required matching Anime Expeditions binding.
+- Pinned Roblox now suspends for foreign foreground applications and app-owned dialogs, preventing it from floating over other programs or hiding macro errors, then resumes only after Dashboard regains foreground.
+- Automatic Dashboard unpinning now minimizes Roblox when the live view is scrolled away, another page opens, or the utility is minimized; manual unpin and application shutdown still restore Roblox without minimizing it.
+- Maximized custom-chrome windows now honor the selected monitor's taskbar work area and minimum tracking size.
+- Placement playback closes and verifies the selected-unit panel after every unit, preventing the panel from obstructing the next placement coordinate.
+- Slow devices no longer discard valid Play, Continue, or Lobby observations merely because one detector pass consumed the old wall-clock stability window.
+- Expedition map selection tolerates the observed vertical lighting displacement without lowering its confidence gates.
+- When the UI Scale check is enabled, startup measures the open Settings panel directly and corrects values outside the inclusive 0.98–1.02 rendered range through vision-guided clicks. Disabling that check skips scale measurement instead of estimating it from the Lobby.
+- Manual Recordings keeps its themed list surface while recording or playback is armed/running, and Dashboard pinning no longer re-covers modal errors.
+- Team 4 loading now accepts its field-observed confirmation layout with exactly two visible underlying Load Team rows while retaining the existing modal and action gates.
+
+### Tests
+
+- Revalidated all 1,056 application and detector tests, all 5 Deep Debug Viewer tests, repository policy, and 72 dark/light UI snapshots.
+
+
 ## [1.3.0-beta.30] - 2026-07-26
 
 ### Added
@@ -927,7 +967,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.28...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.31...HEAD
+[1.3.0-beta.31]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.30...v1.3.0-beta.31
 [1.3.0-beta.30]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.28...v1.3.0-beta.30
 [1.3.0-beta.28]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.27...v1.3.0-beta.28
 [1.3.0-beta.27]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.26...v1.3.0-beta.27

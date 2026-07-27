@@ -332,7 +332,6 @@ internal static class MacroPlanLoopPolicy
         IReadOnlyList<MacroTaskDefinition> tasks,
         DateTimeOffset now) =>
         tasks
-            .Where(task => task.Enabled)
             .All(task =>
             {
                 MacroTaskProgress progress =

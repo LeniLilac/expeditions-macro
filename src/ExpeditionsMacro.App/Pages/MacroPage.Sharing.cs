@@ -17,11 +17,14 @@ public partial class MacroPage
             string code =
                 await _services.FastNoAlignShare
                     .ExportAsync(plan);
+            FastNoAlignShareBundle bundle =
+                _services.FastNoAlignShare.Read(code);
+            int presetCount = PresetCount(bundle);
             ShareCodeText.Text = code;
             ShareCodeText.SelectAll();
             ShareCodeText.Focus();
             SharePlanStatusText.Text =
-                $"Exported {plan.Tasks.Count} task{Plural(plan.Tasks.Count)} without run history or account settings.";
+                $"Exported {plan.Tasks.Count} task{Plural(plan.Tasks.Count)}, {presetCount} referenced preset{Plural(presetCount)}, and {bundle.PlacementSetups.Count} placement setup{Plural(bundle.PlacementSetups.Count)} without run history, manual recordings, or account settings.";
         }
         catch (Exception error)
         {
@@ -61,9 +64,10 @@ public partial class MacroPage
             FastNoAlignShareBundle bundle =
                 _services.FastNoAlignShare.Read(
                     ShareCodeText.Text);
+            int presetCount = PresetCount(bundle);
             MessageBoxResult answer = MessageBox.Show(
                 Window.GetWindow(this),
-                $"Import '{bundle.Plan.Name}' with {bundle.Plan.Tasks.Count} task{Plural(bundle.Plan.Tasks.Count)} and {bundle.PlacementSetups.Count} placement setup{Plural(bundle.PlacementSetups.Count)}?\n\nAny local setup for the same routes and any plan with the same name will be replaced.",
+                $"Import '{bundle.Plan.Name}' with {bundle.Plan.Tasks.Count} task{Plural(bundle.Plan.Tasks.Count)}, {presetCount} referenced preset{Plural(presetCount)}, and {bundle.PlacementSetups.Count} placement setup{Plural(bundle.PlacementSetups.Count)}?\n\nA local plan, preset, or placement setup with the same identity will be replaced. Manual recordings and unrelated app settings are not included.",
                 "Import Fast no align plan",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning);
@@ -99,4 +103,11 @@ public partial class MacroPage
 
     private static string Plural(int count) =>
         count == 1 ? string.Empty : "s";
+
+    private static int PresetCount(
+        FastNoAlignShareBundle bundle) =>
+        bundle.ExpeditionPresets.Count +
+        bundle.ChallengePresets.Count +
+        bundle.StoryPresets.Count +
+        bundle.RaidPresets.Count;
 }

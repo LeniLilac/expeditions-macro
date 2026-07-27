@@ -1,5 +1,6 @@
 using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Abstractions;
+using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Settings;
 
@@ -9,8 +10,10 @@ internal sealed class UiScaleNormalizer
 {
     private static readonly TimeSpan PollInterval =
         TimeSpan.FromMilliseconds(160);
-    private static readonly TimeSpan SettledHoldDelay =
-        TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan NavigationTimeout =
+        TimeSpan.FromSeconds(7);
+    private static readonly TimeSpan InputFocusSettleDelay =
+        TimeSpan.FromMilliseconds(2500);
     private const int MaximumFeedbackAttempts = 5;
     private const double StableMeasurementTolerance = 0.005;
 
@@ -40,7 +43,6 @@ internal sealed class UiScaleNormalizer
         RobloxWindow window,
         CancellationToken cancellationToken)
     {
-        bool changed = false;
         await _navigation.RunEnabledAsync(
             window,
             async token =>
@@ -53,102 +55,62 @@ internal sealed class UiScaleNormalizer
                     window,
                     RobloxKeyboardKey.Enter,
                     token).ConfigureAwait(false);
-                GameSettingsPanelMatch initial =
-                    await WaitForSettledPanelAsync(
-                    window,
-                    token).ConfigureAwait(false);
-                changed =
-                    Math.Abs(
-                        initial.UiScale -
-                        UiScaleFeedbackPolicy
-                            .TargetRenderedScale) >
-                    GameSettingsScreenDetector
-                        .CanonicalScaleTolerance;
-                if (!changed) return;
-
-                await _delay(
-                    SettledHoldDelay,
-                    token).ConfigureAwait(false);
-                await _navigation.TapAsync(
-                    window,
-                    RobloxKeyboardKey.LeftArrow,
-                    token).ConfigureAwait(false);
-
-                for (int index = 0; index < 7; index++)
-                {
-                    await _navigation.TapAsync(
-                    window,
-                    RobloxKeyboardKey.DownArrow,
-                        token).ConfigureAwait(false);
-                }
-                await _navigation.TapAsync(
-                window,
-                RobloxKeyboardKey.Enter,
-                    token).ConfigureAwait(false);
-                await WaitForSettledPanelAsync(
-                    window,
-                        token).ConfigureAwait(false);
-                await _delay(
-                    SettledHoldDelay,
-                        token).ConfigureAwait(false);
-                await _navigation.TapAsync(
-                window,
-                RobloxKeyboardKey.RightArrow,
-                    token).ConfigureAwait(false);
-                await _navigation.TapAsync(
-                window,
-                RobloxKeyboardKey.DownArrow,
-                    token).ConfigureAwait(false);
-                await _navigation.TapAsync(
-                window,
-                RobloxKeyboardKey.DownArrow,
-                    token).ConfigureAwait(false);
-                await _navigation.TapAsync(
-                window,
-                RobloxKeyboardKey.LeftArrow,
-                    token).ConfigureAwait(false);
-                double candidate =
-                    UiScaleFeedbackPolicy.TargetRenderedScale;
-                GameSettingsPanelMatch observed = default;
-                for (int attempt = 1;
-                     attempt <= MaximumFeedbackAttempts;
-                     attempt++)
-                {
-                    await EnterScaleValueAsync(
-                        window,
-                        candidate,
-                            token).ConfigureAwait(false);
-                    observed = await WaitForSettledScaleAsync(
-                        window,
-                            token).ConfigureAwait(false);
-                    if (Math.Abs(
-                            observed.UiScale -
-                            UiScaleFeedbackPolicy
-                                .TargetRenderedScale) <=
-                        GameSettingsScreenDetector
-                            .CanonicalScaleTolerance)
-                    {
-                        break;
-                    }
-
-                    double corrected =
-                        UiScaleFeedbackPolicy.Correct(
-                            candidate,
-                            observed.UiScale);
-                    if (corrected == candidate)
-                    {
-                        throw new InvalidOperationException(
-                            $"Anime Expeditions cannot reach the canonical rendered UI size on this device. Numeric UI Scale {candidate:0.00} renders as {observed.UiScale:0.00}, and the supported range is {UiScaleFeedbackPolicy.MinimumValue:0.00} to {UiScaleFeedbackPolicy.MaximumValue:0.00}.");
-                    }
-                    candidate = corrected;
-                    if (attempt == MaximumFeedbackAttempts)
-                    {
-                        throw new InvalidOperationException(
-                            $"Anime Expeditions UI Scale did not converge after {MaximumFeedbackAttempts} feedback adjustments. The last numeric value {candidate:0.00} followed a rendered measurement of {observed.UiScale:0.00}.");
-                    }
-                }
             },
             cancellationToken).ConfigureAwait(false);
+        GameSettingsPanelMatch initial =
+            await WaitForSettledPanelAsync(
+                window,
+                cancellationToken).ConfigureAwait(false);
+        bool changed =
+            !GameSettingsScreenDetector
+                .IsCanonicalUiScale(
+                    initial.UiScale);
+        if (changed)
+        {
+            await SelectMiscellaneousAsync(
+                window,
+                cancellationToken).ConfigureAwait(false);
+            double candidate =
+                UiScaleFeedbackPolicy.TargetRenderedScale;
+            GameSettingsPanelMatch observed = default;
+            for (int attempt = 1;
+                 attempt <= MaximumFeedbackAttempts;
+                 attempt++)
+            {
+                await SelectUiScaleInputAsync(
+                    window,
+                    cancellationToken).ConfigureAwait(false);
+                await EnterScaleValueAsync(
+                    window,
+                    candidate,
+                    cancellationToken).ConfigureAwait(false);
+                observed = await WaitForSettledScaleAsync(
+                    window,
+                    cancellationToken).ConfigureAwait(false);
+                if (GameSettingsScreenDetector
+                        .IsCanonicalUiScale(
+                            observed.UiScale))
+                {
+                    break;
+                }
+
+                double corrected =
+                    UiScaleFeedbackPolicy.Correct(
+                        candidate,
+                        observed.UiScale);
+                if (corrected == candidate)
+                {
+                    throw new InvalidOperationException(
+                        $"Anime Expeditions cannot reach the canonical rendered UI size on this device. Numeric UI Scale {candidate:0.00} renders as {observed.UiScale:0.00}, and the supported range is {UiScaleFeedbackPolicy.MinimumValue:0.00} to {UiScaleFeedbackPolicy.MaximumValue:0.00}.");
+                }
+                candidate = corrected;
+                if (attempt == MaximumFeedbackAttempts)
+                {
+                    throw new InvalidOperationException(
+                        $"Anime Expeditions UI Scale did not converge after {MaximumFeedbackAttempts} feedback adjustments. The last numeric value {candidate:0.00} followed a rendered measurement of {observed.UiScale:0.00}.");
+                }
+            }
+        }
 
         await _navigation.RunEnabledAsync(
             window,
@@ -165,6 +127,166 @@ internal sealed class UiScaleNormalizer
             },
             cancellationToken).ConfigureAwait(false);
         return changed;
+    }
+
+    private async Task SelectMiscellaneousAsync(
+        RobloxWindow window,
+        CancellationToken cancellationToken)
+    {
+        if (GameSettingsNavigationDetector
+                .DetectSelectedPage(Capture(window)).Page ==
+            GameSettingsPage.Miscellaneous)
+        {
+            return;
+        }
+
+        for (int attempt = 1; attempt <= 2; attempt++)
+        {
+            (int X, int Y) action =
+                await WaitForStablePageActionAsync(
+                    window,
+                    cancellationToken).ConfigureAwait(false);
+            await _automation.ClickClientAsync(
+                window,
+                action.X,
+                action.Y,
+                cancellationToken).ConfigureAwait(false);
+            if (await WaitForSelectedPageAsync(
+                    window,
+                    cancellationToken).ConfigureAwait(false))
+            {
+                return;
+            }
+        }
+
+        throw new RobloxUiUnavailableException(
+            "Anime Expeditions did not open the Misc settings page. No UI Scale value was entered.");
+    }
+
+    private async Task<(int X, int Y)>
+        WaitForStablePageActionAsync(
+        RobloxWindow window,
+        CancellationToken cancellationToken)
+    {
+        StableNavigationActionTracker<GameSettingsPage>
+            tracker = new();
+        ObservationWaitBudget budget = new(
+            NavigationTimeout,
+            minimumObservations: 2,
+            _utcNow);
+        while (budget.ShouldObserve(
+                   tracker.HasPendingCandidate))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            GameSettingsNavigationActionMatch match =
+                GameSettingsNavigationDetector.DetectPageAction(
+                    Capture(window),
+                    GameSettingsPage.Miscellaneous);
+            (int X, int Y)? stable = tracker.Update(
+                match.Available
+                    ? GameSettingsPage.Miscellaneous
+                    : GameSettingsPage.None,
+                match.Available
+                    ? (match.ActionX, match.ActionY)
+                    : null);
+            if (stable is { } action)
+            {
+                return action;
+            }
+            budget.MarkObserved();
+            await _delay(
+                PollInterval,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        throw new RobloxUiUnavailableException(
+            "Anime Expeditions did not expose a stable Misc settings action. No UI Scale value was entered.");
+    }
+
+    private async Task<bool> WaitForSelectedPageAsync(
+        RobloxWindow window,
+        CancellationToken cancellationToken)
+    {
+        ObservationWaitBudget budget = new(
+            NavigationTimeout,
+            minimumObservations: 2,
+            _utcNow);
+        int stable = 0;
+        while (budget.ShouldObserve(
+                   confirmationPending: stable == 1))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            bool selected =
+                GameSettingsNavigationDetector
+                    .DetectSelectedPage(
+                        Capture(window)).Page ==
+                GameSettingsPage.Miscellaneous;
+            stable = selected ? stable + 1 : 0;
+            if (stable >= 2)
+            {
+                return true;
+            }
+            budget.MarkObserved();
+            await _delay(
+                PollInterval,
+                cancellationToken).ConfigureAwait(false);
+        }
+        return false;
+    }
+
+    private async Task SelectUiScaleInputAsync(
+        RobloxWindow window,
+        CancellationToken cancellationToken)
+    {
+        (int X, int Y) action =
+            await WaitForStableScaleInputAsync(
+                window,
+                cancellationToken).ConfigureAwait(false);
+        await _automation.ClickClientAsync(
+            window,
+            action.X,
+            action.Y,
+            cancellationToken).ConfigureAwait(false);
+        await _delay(
+            InputFocusSettleDelay,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<(int X, int Y)>
+        WaitForStableScaleInputAsync(
+        RobloxWindow window,
+        CancellationToken cancellationToken)
+    {
+        StableNavigationActionTracker<string> tracker =
+            new();
+        ObservationWaitBudget budget = new(
+            NavigationTimeout,
+            minimumObservations: 2,
+            _utcNow);
+        while (budget.ShouldObserve(
+                   tracker.HasPendingCandidate))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            GameSettingsUiScaleInputMatch match =
+                GameSettingsNavigationDetector
+                    .DetectUiScaleInput(Capture(window));
+            (int X, int Y)? stable = tracker.Update(
+                match.Available ? "ui_scale" : null,
+                match.Available
+                    ? (match.ActionX, match.ActionY)
+                    : null);
+            if (stable is { } action)
+            {
+                return action;
+            }
+            budget.MarkObserved();
+            await _delay(
+                PollInterval,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        throw new RobloxUiUnavailableException(
+            "Anime Expeditions did not expose a stable UI Scale input.");
     }
 
     private async Task<GameSettingsPanelMatch>
@@ -201,10 +323,6 @@ internal sealed class UiScaleNormalizer
         double value,
         CancellationToken cancellationToken)
     {
-        await _navigation.TapAsync(
-            window,
-            RobloxKeyboardKey.Enter,
-            cancellationToken).ConfigureAwait(false);
         for (int index = 0; index < 8; index++)
         {
             await _navigation.TapAsync(
@@ -224,6 +342,12 @@ internal sealed class UiScaleNormalizer
             window,
             RobloxKeyboardKey.Enter,
             cancellationToken).ConfigureAwait(false);
+    }
+
+    private ImageFrame Capture(RobloxWindow window)
+    {
+        ValidateWindow(window);
+        return _automation.CaptureClient(window);
     }
 
     private async Task<GameSettingsPanelMatch>

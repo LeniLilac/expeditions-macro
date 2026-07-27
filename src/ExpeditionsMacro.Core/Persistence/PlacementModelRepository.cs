@@ -40,6 +40,24 @@ public sealed class PlacementModelRepository
         return model;
     }
 
+    public async Task<IReadOnlyList<PlacementModel>>
+        ListReferencingManualRecordingAsync(
+            string recordingId,
+            CancellationToken cancellationToken = default)
+    {
+        ManualInputRecording.ValidateId(recordingId);
+        IReadOnlyList<PlacementModel> models =
+            await ListAsync(cancellationToken)
+                .ConfigureAwait(false);
+        return models
+            .Where(model =>
+                string.Equals(
+                    model.ManualInputRecordingId,
+                    recordingId,
+                    StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+    }
+
     public async Task SaveAsync(PlacementModel model, CancellationToken cancellationToken = default)
     {
         model.Validate();

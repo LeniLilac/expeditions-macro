@@ -12,6 +12,9 @@ internal static class ExpeditionSelectorDetector
         new(7, 239, 151, 68),
     ];
 
+    private static readonly int[] MapCardVerticalOffsets =
+        Enumerable.Range(-6, 13).ToArray();
+
     private static readonly ScreenRegion DifficultyColor =
         new(218, 430, 74, 37);
 
@@ -31,17 +34,46 @@ internal static class ExpeditionSelectorDetector
             return null;
         }
 
-        (int Pixels, int Map)[] ranked =
-            MapCards
-                .Select((region, index) =>
-                    (CountCyanPerimeter(image, region),
-                     Map: index + 1))
-                .OrderByDescending(value => value.Item1)
-                .ToArray();
-        return ranked[0].Pixels >= 100 &&
-            ranked[0].Pixels - ranked[1].Pixels >= 70
-                ? ranked[0].Map
-                : null;
+        // GB-031: the current selector can shift the complete map-card rail a
+        // few pixels vertically while its lighting changes. Keep one shared
+        // offset across all cards so mutable map artwork cannot independently
+        // move each candidate into the perimeter test.
+        (int Gap, int Pixels, int Map)? best = null;
+        foreach (int verticalOffset in MapCardVerticalOffsets)
+        {
+            (int Pixels, int Map)[] ranked =
+                MapCards
+                    .Select((region, index) =>
+                        (CountCyanPerimeter(
+                             image,
+                             region.Translate(
+                                 0,
+                                 verticalOffset)),
+                         Map: index + 1))
+                    .OrderByDescending(value => value.Item1)
+                    .ToArray();
+            int gap =
+                ranked[0].Pixels -
+                ranked[1].Pixels;
+            if (ranked[0].Pixels < 100 ||
+                gap < 70)
+            {
+                continue;
+            }
+
+            if (best is null ||
+                gap > best.Value.Gap ||
+                gap == best.Value.Gap &&
+                ranked[0].Pixels >
+                best.Value.Pixels)
+            {
+                best = (
+                    gap,
+                    ranked[0].Pixels,
+                    ranked[0].Map);
+            }
+        }
+        return best?.Map;
     }
 
     public static int? SelectedDifficulty(

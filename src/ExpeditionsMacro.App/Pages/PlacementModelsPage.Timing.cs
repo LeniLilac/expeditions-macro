@@ -27,7 +27,12 @@ public partial class PlacementModelsPage
         EventArgs e) =>
         FastEditorPanel.SetTimingSettings(
             _fastPlacementIntervalMilliseconds,
-            _fastDefaultAfterStartDelayMilliseconds);
+            _fastDefaultAfterStartDelayMilliseconds,
+            _fastImpossibilityThresholdMinutes,
+            _services.Settings
+                .ManualInputRecordingEnabled,
+            _fastManualRecordingId,
+            _manualRecordingChoices);
 
     private void FastTimingSettingsApplied(
         object? sender,
@@ -61,6 +66,28 @@ public partial class PlacementModelsPage
             return;
         }
 
+        if (!int.TryParse(
+                e.ImpossibilityThresholdText,
+                NumberStyles.Integer,
+                CultureInfo.CurrentCulture,
+                out int impossibilityThreshold) ||
+            impossibilityThreshold is < 0 or
+            > PlacementModel
+                .MaximumImpossibilityThresholdMinutes)
+        {
+            FastEditorPanel.ShowTimingError(
+                $"Enter an impossibility threshold from 0 to {PlacementModel.MaximumImpossibilityThresholdMinutes} minutes.");
+            return;
+        }
+        if (e.UseManualRecording &&
+            string.IsNullOrWhiteSpace(
+                e.ManualRecordingId))
+        {
+            FastEditorPanel.ShowTimingError(
+                "Create a manual recording before enabling playback.");
+            return;
+        }
+
         int previousDefault =
             _fastDefaultAfterStartDelayMilliseconds;
         int afterStartMilliseconds =
@@ -83,8 +110,15 @@ public partial class PlacementModelsPage
         _fastPlacementIntervalMilliseconds = interval;
         _fastDefaultAfterStartDelayMilliseconds =
             afterStartMilliseconds;
+        _fastImpossibilityThresholdMinutes =
+            impossibilityThreshold;
+        _fastManualRecordingId =
+            e.UseManualRecording
+                ? e.ManualRecordingId
+                : null;
+        UpdateFastManualRecordingEditor();
         FastEditorPanel.CloseTimingSettings();
         FastStatusText.Text =
-            "Placement timing updated. Save setup to keep it.";
+            "Placement settings updated. Save setup to keep them.";
     }
 }

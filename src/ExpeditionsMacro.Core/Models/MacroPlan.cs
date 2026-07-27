@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace ExpeditionsMacro.Core.Models;
 
 public enum MacroTaskKind
@@ -16,7 +18,19 @@ public sealed record MacroTaskDefinition
     public string PresetId { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
     public int Priority { get; init; } = 1;
-    public bool Enabled { get; init; } = true;
+
+    // Public beta plans could disable a task. Keep accepting that JSON field,
+    // but discard it so every loaded task is active and future saves omit it.
+    [JsonPropertyName("enabled")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? LegacyEnabled
+    {
+        get => null;
+        init
+        {
+        }
+    }
+
     public int TargetVictories { get; init; } = 1;
     public int TargetRuntimeMinutes { get; init; } = 180;
     public bool CompleteOnRuntimeDefeat { get; init; }

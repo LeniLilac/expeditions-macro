@@ -19,14 +19,14 @@ Releases are built from committed source on an annotated semantic-version tag. N
 7. Run `scripts/Build-Release.ps1 -Version <version>` and `scripts/Verify-Release.ps1`.
 8. Audit the publish set for datasets, secrets, local paths, logs, personal models, and generated files.
 
-The portable ZIP must contain exactly one top-level `ExpeditionsMacro` directory, with `ExpeditionsMacro.exe` directly inside it. Do not place loose application or runtime files at the archive root: extraction tools that do not create a folder automatically would scatter them into the user's selected directory.
+The portable ZIP root must contain only `ExpeditionsMacro.exe` and one `ExpeditionsMacro` dependency directory. The root executable is an SDK-generated apphost bound to `ExpeditionsMacro/ExpeditionsMacro.dll`; the dependency directory must not contain a second executable. Users must extract the complete archive into its own folder and keep the executable beside that directory. The installer continues to consume the ordinary flat publish directory and must not use this portable-only indirection. Both forms must contain the bundled detector manifest and every hash-verified payload declared by it; there is no separate detector download asset.
 
 ## Publish and verify
 
 1. Commit and push the release-ready source before tagging.
 2. Create the signed or annotated version tag used by the release workflow.
 3. Confirm CI and the tag-triggered Release workflow pass for the exact commit. Both stable and silent workflows rerun the shared release preflight before building.
-4. Confirm the GitHub Release contains the installer, portable ZIP, detector pack, checksums, and dependency inventory.
+4. Confirm the GitHub Release contains the installer, portable ZIP, checksums, and dependency inventory, and that package verification passed for the detector data embedded in the application.
 5. Confirm the Discord release announcement only when the requested workflow is not a silent release.
 
 Local test ZIPs may be built with a prerelease version without publishing, but they must still pass repository policy, package checksum verification, and a packaged-app smoke test before delivery.

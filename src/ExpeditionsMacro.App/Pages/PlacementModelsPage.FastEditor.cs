@@ -5,6 +5,7 @@ using System.Windows.Input;
 using ExpeditionsMacro.App.Models;
 using ExpeditionsMacro.App.Services;
 using ExpeditionsMacro.Automation.Diagnostics;
+using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
 
@@ -203,6 +204,11 @@ public partial class PlacementModelsPage
                 PlacementScreenshotCatalog.Load(target);
             PlacementCanvas.IsEnabled =
                 !_services.Coordinator.IsBusy;
+            FastPositionButton.Visibility =
+                PlacementRoutePositioningService
+                    .IsAvailable(target)
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
             FastDetailText.Text =
                 $"{TargetLabel(target)} · B before Start · A after Start";
         }
@@ -210,6 +216,8 @@ public partial class PlacementModelsPage
         {
             PlacementScreenshot.Source = null;
             PlacementCanvas.IsEnabled = false;
+            FastPositionButton.Visibility =
+                Visibility.Collapsed;
             FastDetailText.Text = error.Message;
         }
     }
@@ -463,9 +471,18 @@ public partial class PlacementModelsPage
             PlacementTargetMode.Raid =>
                 $"Raid · Spirit City · Act {target.ActNumber}",
             PlacementTargetMode.Event =>
-                $"Event · Villain Invasion · Act {target.ActNumber}",
+                target.ActNumber ==
+                    (int)EventAct.Act1
+                    ? $"Event · Villain Invasion · Act 1 · {SpawnRouteLabel(target.SpawnRoute)}"
+                    : $"Event · Villain Invasion · Act {target.ActNumber}",
             _ => target.Mode.ToString(),
         };
+
+    private static string SpawnRouteLabel(
+        EventSpawnRoute route) =>
+        route == EventSpawnRoute.Angle2
+            ? "Angle 2"
+            : "Angle 1";
 
     private static string PhaseLabel(
         PlacementPhase phase) =>

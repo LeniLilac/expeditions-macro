@@ -15,6 +15,8 @@ internal static partial class NativeMethods
     internal const int SwpNoActivate = 0x0010;
     internal const int SwpFrameChanged = 0x0020;
     internal const int SwpShowWindow = 0x0040;
+    internal const int SwShowNoActivate = 4;
+    internal const int SwShowMinNoActive = 7;
     internal const int SwRestore = 9;
     internal const int SwShow = 5;
     internal const uint MonitorDefaultToNearest = 0x00000002;
@@ -51,6 +53,7 @@ internal static partial class NativeMethods
     internal const uint DibRgbColors = 0;
     internal const uint CryptprotectUiForbidden = 0x1;
     internal const uint DwmwaExtendedFrameBounds = 9;
+    internal const int WmGetMinMaxInfo = 0x0024;
 
     internal delegate bool EnumWindowsProc(nint window, nint parameter);
     internal delegate nint HookProc(int code, nuint wParam, nint lParam);
@@ -90,6 +93,16 @@ internal static partial class NativeMethods
         internal Rect Monitor;
         internal Rect Work;
         internal uint Flags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct MinMaxInfo
+    {
+        internal Point Reserved;
+        internal Point MaxSize;
+        internal Point MaxPosition;
+        internal Point MinTrackSize;
+        internal Point MaxTrackSize;
     }
 
     [StructLayout(LayoutKind.Sequential)]

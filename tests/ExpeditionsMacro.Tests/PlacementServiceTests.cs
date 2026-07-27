@@ -90,6 +90,7 @@ public sealed class PlacementServiceTests
                     "letter:T",
                     "letter:T",
                     "letter:T",
+                    "letter:Y",
                     "park",
                     "click:783,586",
                     "park",
@@ -273,8 +274,53 @@ public sealed class PlacementServiceTests
         }
     }
 
+    [Theory]
+    [InlineData(true, 1)]
+    [InlineData(false, 0)]
+    public async Task Playback_AppliesConfiguredAutoUpgrade(
+        bool autoUpgrade,
+        int expectedTaps)
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            FakeAutomation automation = new();
+            PlacementService service = new(
+                automation,
+                new FakeCaptureService(automation),
+                new PlacementModelRepository(
+                    new AppPaths(root)),
+                () => 'T',
+                () => 'Y');
+
+            await service.PlayAsync(
+                ModelWithSteps(
+                    new PlacementStep
+                    {
+                        UnitKey = 1,
+                        X = 320,
+                        Y = 280,
+                        DelayAfterMilliseconds = 0,
+                        AutoUpgrade = autoUpgrade,
+                    }),
+                useDefaultInterval: true,
+                defaultIntervalMilliseconds: 0,
+                keyHoldMilliseconds: 0,
+                afterKeyMilliseconds: 0);
+
+            Assert.Equal(
+                expectedTaps,
+                automation.InputActions.Count(
+                    action => action == "letter:Y"));
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
     [Fact]
-    public async Task Playback_ParksBetweenSequencesAndDismissesFinalSelection()
+    public async Task Playback_DismissesSelectionAfterEveryPlacedUnit()
     {
         string root = TestPaths.NewTemporaryDirectory();
         try
@@ -310,12 +356,17 @@ public sealed class PlacementServiceTests
                 afterKeyMilliseconds: 0);
 
             Assert.Equal(
-                3,
+                4,
                 automation.InputActions.Count(
                     action => action == "park"));
+            Assert.Equal(
+                2,
+                automation.InputActions.Count(
+                    action =>
+                        action == "click:783,586"));
             int park =
                 automation.InputActions.IndexOf(
-                "park");
+                    "park");
             Assert.True(
                 park >
                 automation.InputActions.IndexOf(
@@ -324,10 +375,13 @@ public sealed class PlacementServiceTests
                 park <
                 automation.InputActions.IndexOf(
                     "move:290,280->340,280:200"));
-            Assert.Single(
-                automation.InputActions,
-                action =>
-                    action == "click:783,586");
+            int firstDismiss =
+                automation.InputActions.IndexOf(
+                    "click:783,586");
+            Assert.True(
+                firstDismiss <
+                automation.InputActions.IndexOf(
+                    "move:290,280->340,280:200"));
         }
         finally
         {
@@ -613,6 +667,8 @@ public sealed class PlacementServiceTests
         {
             InputActions.Add($"click-retain:{x},{y}");
             ClickTimes.Add(DateTimeOffset.UtcNow);
+            _idleClickCount = 0;
+            _panelDismissed = false;
             return Task.CompletedTask;
         }
 

@@ -207,12 +207,24 @@ public partial class SettingsKeyBindingsPanel
 
     private void UpdateAutoUpgradeDisplay() =>
         UpdateRequiredUnitActionDisplay(
-            BindingTarget.AutoUpgrade,
-            Services.Settings.ToggleAutoUpgradeUnitKey,
-            "Toggle Auto Upgrade Unit",
-            AutoUpgradeButton,
-            AutoUpgradeStatusText,
+            BindingTarget.AutoUpgradeUnit,
+            Services.Settings.AutoUpgradeUnitKey,
+            "Auto Upgrade Unit",
+            AutoUpgradeUnitButton,
+            AutoUpgradeUnitStatusText,
             value => AutoUpgradeDiagnostic = value);
+
+    private void UpdateToggleAutoUpgradePlacedUnitsDisplay() =>
+        UpdateRequiredUnitActionDisplay(
+            BindingTarget.ToggleAutoUpgradePlacedUnits,
+            Services.Settings
+                .ToggleAutoUpgradePlacedUnitsKey,
+            "Toggle Auto Upgrade Placed Units",
+            ToggleAutoUpgradePlacedUnitsButton,
+            ToggleAutoUpgradePlacedUnitsStatusText,
+            value =>
+                ToggleAutoUpgradePlacedUnitsDiagnostic =
+                    value);
 
     private void UpdateRequiredUnitActionDisplay(
         BindingTarget target,
@@ -229,7 +241,7 @@ public partial class SettingsKeyBindingsPanel
                 !char.IsAsciiLetter(candidate[0]))
             {
                 throw new InvalidDataException(
-                    $"Set the {bindingName} key under Settings > Controls.");
+                    $"Scroll down to Controls on the Dashboard and set the {bindingName} key.");
             }
             AppSettings.ValidateControlKeySet(
                 Services.Settings,

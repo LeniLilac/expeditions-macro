@@ -4,12 +4,12 @@
              xmlns:icons="clr-namespace:ExpeditionsMacro.App.Controls">
     <Grid>
         <ScrollViewer x:Name="DashboardScroll"
-                      VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Auto">
-            <Grid MinWidth="1148"
+                       VerticalScrollBarVisibility="Auto"
+                       HorizontalScrollBarVisibility="Disabled"
+                       SizeChanged="DashboardScroll_SizeChanged">
+            <Grid x:Name="DashboardContentGrid"
                   Margin="34,27,40,30">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -26,13 +26,27 @@
                     </StackPanel>
                 </Grid>
 
-                <Grid Grid.Row="1">
+                <Grid x:Name="DashboardOverviewGrid"
+                      Grid.Row="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition x:Name="DashboardOverviewRowGap"
+                                       Height="0" />
+                        <RowDefinition x:Name="DashboardCurrentRunRow"
+                                       Height="0" />
+                    </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="16" />
-                        <ColumnDefinition Width="274" />
+                        <ColumnDefinition x:Name="DashboardLiveViewColumn"
+                                          Width="Auto" />
+                        <ColumnDefinition x:Name="DashboardOverviewColumnGap"
+                                          Width="16" />
+                        <ColumnDefinition x:Name="DashboardCurrentRunColumn"
+                                          Width="*"
+                                          MinWidth="274" />
                     </Grid.ColumnDefinitions>
-                    <Border Style="{StaticResource FormCard}">
+                    <Border x:Name="RobloxLiveViewCard"
+                            HorizontalAlignment="Left"
+                            Style="{StaticResource FormCard}">
                         <Grid>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -53,9 +67,12 @@
                                                           ToolTip="The interactive Roblox window is pinned here while Dashboard is visible." />
                         </Grid>
                     </Border>
-                    <Border Grid.Column="2" Style="{StaticResource FormCard}">
+                    <Border x:Name="CurrentRunCard"
+                            Grid.Column="2"
+                            Style="{StaticResource FormCard}">
                         <Grid>
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
@@ -84,28 +101,61 @@
                                     </StackPanel>
                                 </Grid>
                             </StackPanel>
-                            <ProgressBar x:Name="MacroProgress" Grid.Row="3" Margin="0,20,0,0" Minimum="0" Maximum="100" />
+                            <Grid Grid.Row="3" Margin="0,22,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Style="{StaticResource FieldLabel}"
+                                           Text="Run log" />
+                                <Border x:Name="RunLogViewport"
+                                        Grid.Row="1"
+                                        Height="220"
+                                        Margin="0,8,0,0"
+                                        VerticalAlignment="Top"
+                                        Background="{DynamicResource SurfaceBrush}"
+                                        BorderBrush="{DynamicResource BorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="4">
+                                    <TextBox x:Name="LogText"
+                                             IsReadOnly="True"
+                                             AcceptsReturn="True"
+                                             AutomationProperties.Name="Macro run log"
+                                             VerticalScrollBarVisibility="Auto"
+                                             HorizontalScrollBarVisibility="Disabled"
+                                             TextWrapping="Wrap"
+                                             BorderThickness="0"
+                                             FontSize="11" />
+                                </Border>
+                            </Grid>
+                            <ProgressBar x:Name="MacroProgress"
+                                         Grid.Row="4"
+                                         Visibility="Collapsed"
+                                         Minimum="0"
+                                         Maximum="100" />
                         </Grid>
                     </Border>
                 </Grid>
 
                 <Border Grid.Row="2" Margin="0,14,0,0" Style="{StaticResource FormCard}">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource SectionTitle}" Text="Run log" />
-                        <Border MinHeight="150" Margin="0,14,0,0" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
-                            <TextBox x:Name="LogText" IsReadOnly="True" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" BorderThickness="0" FontSize="11" />
-                        </Border>
-                    </StackPanel>
-                </Border>
-
-                <Border Grid.Row="3" Margin="0,14,0,0" Style="{StaticResource FormCard}">
-                    <Grid>
+                    <Grid x:Name="DashboardDiscordGrid">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition x:Name="DashboardDiscordRowGap"
+                                           Height="0" />
+                            <RowDefinition x:Name="DashboardFailureAlertRow"
+                                           Height="0" />
+                        </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="1" />
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition x:Name="DashboardWebhookColumn"
+                                              Width="*" />
+                            <ColumnDefinition x:Name="DashboardDiscordColumnDivider"
+                                              Width="1" />
+                            <ColumnDefinition x:Name="DashboardFailureAlertColumn"
+                                              Width="*" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Margin="0,0,24,0">
+                        <StackPanel x:Name="DashboardWebhookPanel"
+                                    Margin="0,0,24,0">
                             <TextBlock Style="{StaticResource SectionTitle}" Text="Discord notifications" />
                             <TextBlock Margin="0,18,0,0" Style="{StaticResource FieldLabel}" Text="Webhook link" />
                             <Border Margin="0,7,0,0" Style="{StaticResource InputGroup}">
@@ -123,8 +173,12 @@
                             </Border>
                             <TextBlock x:Name="WebhookStatusText" Margin="0,8,0,0" Style="{StaticResource Caption}" />
                         </StackPanel>
-                        <Border Grid.Column="1" Background="{DynamicResource BorderBrush}" />
-                        <StackPanel Grid.Column="2" Margin="24,0,0,0">
+                        <Border x:Name="DashboardDiscordDivider"
+                                Grid.Column="1"
+                                Background="{DynamicResource BorderBrush}" />
+                        <StackPanel x:Name="DashboardFailureAlertPanel"
+                                    Grid.Column="2"
+                                    Margin="24,0,0,0">
                             <TextBlock Style="{StaticResource SectionTitle}" Text="Failure alert ping" />
                             <TextBlock Margin="0,18,0,0" Style="{StaticResource FieldLabel}" Text="Discord user ID" />
                             <TextBox x:Name="DiscordUserIdText" Margin="0,7,0,0" />
@@ -132,7 +186,7 @@
                     </Grid>
                 </Border>
 
-                <Border Grid.Row="4" Margin="0,14,0,0" Style="{StaticResource FormCard}">
+                <Border Grid.Row="3" Margin="0,14,0,0" Style="{StaticResource FormCard}">
                     <StackPanel>
                         <TextBlock Style="{StaticResource SectionTitle}" Text="Roblox reconnect" />
                         <CheckBox x:Name="RestartRobloxAtStartCheck" Margin="0,14,0,0" Content="Restart Roblox through this private server when a Macro plan starts" />
@@ -155,7 +209,7 @@
                     </StackPanel>
                 </Border>
 
-                <Border Grid.Row="5" Margin="0,14,0,0" Style="{StaticResource FormCard}">
+                <Border Grid.Row="4" Margin="0,14,0,0" Style="{StaticResource FormCard}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="220" />
@@ -164,15 +218,23 @@
                         <StackPanel>
                             <TextBlock Style="{StaticResource SectionTitle}" Text="Macro preparation" />
                         </StackPanel>
-                        <CheckBox x:Name="DashboardAutoGameSettingsCheck"
-                                  Grid.Column="1"
-                                  Content="Check and fix game settings at macro start"
-                                  Checked="DashboardAutoGameSettingsCheck_Changed"
-                                  Unchecked="DashboardAutoGameSettingsCheck_Changed" />
+                        <StackPanel Grid.Column="1">
+                            <CheckBox x:Name="DashboardAutoUiScaleCheck"
+                                      Content="Check and fix UI Scale at macro start"
+                                      ToolTip="When enabled, the macro directly measures the in-game UI Scale from Settings and corrects it when needed."
+                                      Checked="DashboardAutoUiScaleCheck_Changed"
+                                      Unchecked="DashboardAutoUiScaleCheck_Changed" />
+                            <CheckBox x:Name="DashboardAutoGameSettingsCheck"
+                                      Margin="0,12,0,0"
+                                      Content="Check and fix required game settings at macro start"
+                                      ToolTip="When enabled, the macro verifies and corrects the required Gameplay, Graphics, Units, and Misc settings."
+                                      Checked="DashboardAutoGameSettingsCheck_Changed"
+                                      Unchecked="DashboardAutoGameSettingsCheck_Changed" />
+                        </StackPanel>
                     </Grid>
                 </Border>
 
-                <Border Grid.Row="6" Margin="0,14,0,0" Style="{StaticResource FormCard}">
+                <Border Grid.Row="5" Margin="0,14,0,0" Style="{StaticResource FormCard}">
                     <icons:SettingsKeyBindingsPanel x:Name="DashboardKeyBindingsPanel" />
                 </Border>
             </Grid>
@@ -213,112 +275,48 @@
                 <Border Grid.Row="2" Margin="0,14,0,0" Style="{StaticResource FormCard}">
                     <StackPanel>
                         <Grid>
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource SectionTitle}" Text="Plan blocks" />
-                                <TextBlock Margin="0,5,0,0" Style="{StaticResource Caption}" Text="Priority runs from top to bottom. A live match is never interrupted." />
+                            <TextBlock VerticalAlignment="Center"
+                                       Style="{StaticResource SectionTitle}"
+                                       Text="Plan blocks" />
+                            <StackPanel HorizontalAlignment="Right"
+                                        Orientation="Horizontal">
+                                <Button x:Name="ResetProgressButton"
+                                        Height="34"
+                                        icons:Lucide.Icon="RotateCcw"
+                                        Content="Reset progress"
+                                        Click="ResetProgress_Click" />
+                                <Button x:Name="OpenTaskEditorButton"
+                                        Height="34"
+                                        Margin="8,0,0,0"
+                                        Style="{StaticResource PrimaryButton}"
+                                        icons:Lucide.Icon="Plus"
+                                        Content="Add task"
+                                        Click="OpenTaskEditor_Click" />
+                                <Button x:Name="AddLoopBlockButton"
+                                        Height="34"
+                                        Margin="8,0,0,0"
+                                        icons:Lucide.Icon="Plus"
+                                        Content="Add loop"
+                                        Click="AddLoopBlock_Click" />
                             </StackPanel>
-                            <Button x:Name="ResetProgressButton" HorizontalAlignment="Right" Height="34" icons:Lucide.Icon="RotateCcw" Content="Reset progress" Click="ResetProgress_Click" />
                         </Grid>
 
-                        <Border Margin="0,16,0,0" Padding="13" Background="{DynamicResource RaisedBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="7">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="32" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Border Width="28" Height="28" Background="{DynamicResource AccentBrush}" CornerRadius="14">
-                                    <icons:LucideIcon Width="15" Height="15" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource OnAccentBrush}" Icon="Play" />
-                                </Border>
-                                <StackPanel Grid.Column="1" Margin="10,0,0,0">
-                                    <TextBlock FontWeight="SemiBold" Text="When the plan starts" />
-                                    <TextBlock Margin="0,2,0,0" Style="{StaticResource Caption}" Text="Run the first eligible block, then re-evaluate priority after each match." />
-                                </StackPanel>
-                            </Grid>
-                        </Border>
-                        <Border Width="2" Height="10" Margin="27,0,0,0" HorizontalAlignment="Left" Background="{DynamicResource AccentBrush}" />
-
-                        <icons:MacroPlanLoopEditor x:Name="LoopEditor" />
+                        <icons:MacroPlanLoopEditor x:Name="LoopEditor"
+                                                   Margin="0,8,0,0" />
 
                         <ItemsControl x:Name="TaskRowsControl"
                                       Visibility="Collapsed" />
-                        <TextBlock x:Name="EmptyTasksText" Margin="14,10" Style="{StaticResource Caption}" Text="No blocks yet. Build the plan below." />
+                        <TextBlock x:Name="EmptyTasksText"
+                                   Margin="0,8"
+                                   Style="{StaticResource Caption}"
+                                   Text="No blocks yet. Use Add task or Add loop above." />
 
-                        <Border Margin="0,10,0,0" Padding="14" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="7">
-                            <StackPanel>
-                                <TextBlock Style="{StaticResource SectionTitle}" Text="Add a block" />
-                                <Grid Margin="0,14,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="136" />
-                                        <ColumnDefinition x:Name="TaskSelectionGapColumn" Width="16" />
-                                        <ColumnDefinition x:Name="TaskSelectionColumn" Width="*" />
-                                        <ColumnDefinition Width="16" />
-                                        <ColumnDefinition Width="132" />
-                                        <ColumnDefinition Width="16" />
-                                        <ColumnDefinition Width="124" />
-                                        <ColumnDefinition Width="16" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Style="{StaticResource FieldLabel}" Text="Mode" />
-                                        <ComboBox x:Name="TaskKindCombo" Margin="0,7,0,0" DisplayMemberPath="Name" SelectionChanged="TaskKindCombo_SelectionChanged" />
-                                    </StackPanel>
-                                    <StackPanel x:Name="TaskSelectionPanel" Grid.Column="2">
-                                        <TextBlock x:Name="TaskSelectionLabel" Style="{StaticResource FieldLabel}" Text="Preset" />
-                                        <Grid Margin="0,7,0,0">
-                                            <ComboBox x:Name="TaskPresetCombo" DisplayMemberPath="DisplayName" SelectionChanged="TaskPresetCombo_SelectionChanged" />
-                                            <ComboBox x:Name="TaskRouteCombo" DisplayMemberPath="Name" Visibility="Collapsed" SelectionChanged="TaskRouteCombo_SelectionChanged" />
-                                        </Grid>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="4">
-                                        <TextBlock x:Name="TaskTargetLabel" Style="{StaticResource FieldLabel}" Text="Victories" />
-                                        <TextBox x:Name="TaskTargetText" Margin="0,7,0,0" Text="1" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="6">
-                                        <TextBlock Style="{StaticResource FieldLabel}" Text="State" />
-                                        <CheckBox x:Name="TaskEnabledCheck" Margin="0,7,0,0" IsChecked="True" Content="Enabled" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="8" Margin="0,21,0,0" Orientation="Horizontal">
-                                        <Button x:Name="AddTaskButton" Style="{StaticResource PrimaryButton}" icons:Lucide.Icon="Plus" Content="Add block" Click="AddOrUpdateTask_Click" />
-                                        <Button x:Name="CancelTaskEditButton" Height="40" Margin="8,0,0,0" Visibility="Collapsed" icons:Lucide.Icon="X" Content="Cancel" Click="CancelTaskEdit_Click" />
-                                    </StackPanel>
-                                </Grid>
-                                <Border x:Name="FastTaskOptionsPanel" Margin="0,16,0,0" Padding="0,14,0,0" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Visibility="Collapsed">
-                                    <WrapPanel>
-                                        <StackPanel x:Name="TaskDefeatRetriesPanel" Width="124" Margin="0,0,16,0">
-                                            <TextBlock Style="{StaticResource FieldLabel}" Text="Defeat retries" />
-                                            <TextBox x:Name="TaskDefeatRetriesText" Margin="0,7,0,0" Text="0" />
-                                        </StackPanel>
-                                        <StackPanel x:Name="TaskChallengeTypesPanel" Margin="0,0,16,0">
-                                            <TextBlock Style="{StaticResource FieldLabel}" Text="Challenge types" />
-                                            <StackPanel Margin="0,7,0,0" Orientation="Horizontal">
-                                                <CheckBox x:Name="TaskTraitCheck" Margin="0" IsChecked="True" Content="Trait" />
-                                                <CheckBox x:Name="TaskStatCheck" Margin="14,0,0,0" IsChecked="True" Content="Stat" />
-                                                <CheckBox x:Name="TaskSpriteCheck" Margin="14,0,0,0" IsChecked="True" Content="Sprite" />
-                                            </StackPanel>
-                                        </StackPanel>
-                                        <StackPanel x:Name="TaskExpeditionOptionsPanel" Orientation="Horizontal">
-                                            <StackPanel Width="110" Margin="0,0,16,0">
-                                                <TextBlock Style="{StaticResource FieldLabel}" Text="Difficulty" />
-                                                <ComboBox x:Name="TaskDifficultyCombo" Margin="0,7,0,0" />
-                                            </StackPanel>
-                                            <StackPanel Width="174" Margin="0,0,16,0">
-                                                <TextBlock Style="{StaticResource FieldLabel}" Text="Extraction" />
-                                                <CheckBox x:Name="TaskExtractCheck" Margin="0,7,0,0" IsChecked="True" Content="Extract at checkpoint" />
-                                            </StackPanel>
-                                            <StackPanel Width="164">
-                                                <TextBlock Style="{StaticResource FieldLabel}" Text="Boss nodes before extract" />
-                                                <TextBox x:Name="TaskBossNodesText" Margin="0,7,0,0" Text="1" />
-                                            </StackPanel>
-                                        </StackPanel>
-                                        <StackPanel x:Name="TaskStoryOptionsPanel" Width="150">
-                                            <TextBlock Style="{StaticResource FieldLabel}" Text="Story options" />
-                                            <CheckBox x:Name="TaskHardModeCheck" Margin="0,7,0,0" Content="Hard mode" />
-                                        </StackPanel>
-                                    </WrapPanel>
-                                </Border>
-                                <TextBlock x:Name="TaskEditorStatusText" Margin="0,8,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" />
-                            </StackPanel>
-                        </Border>
+                        <TextBlock x:Name="PlanBlocksStatusText"
+                                   Margin="0,7,0,0"
+                                   AutomationProperties.LiveSetting="Polite"
+                                   Style="{StaticResource Caption}"
+                                   TextWrapping="Wrap"
+                                   Visibility="Collapsed" />
                     </StackPanel>
                 </Border>
 
@@ -343,5 +341,17 @@
                 </Border>
             </Grid>
         </ScrollViewer>
+
+        <Grid x:Name="TaskEditorOverlay"
+              Panel.ZIndex="20"
+              Background="#99000000"
+              FocusManager.IsFocusScope="True"
+              KeyboardNavigation.TabNavigation="Cycle"
+              PreviewKeyDown="TaskEditorOverlay_PreviewKeyDown"
+              Visibility="Collapsed">
+            <icons:MacroTaskEditorDialog x:Name="TaskEditorDialog"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center" />
+        </Grid>
     </Grid>
 </UserControl>

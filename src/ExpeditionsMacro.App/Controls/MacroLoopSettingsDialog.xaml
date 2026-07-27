@@ -1,0 +1,94 @@
+<UserControl x:Class="ExpeditionsMacro.App.Controls.MacroLoopSettingsDialog"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:icons="clr-namespace:ExpeditionsMacro.App.Controls"
+             Width="320"
+             FontFamily="{StaticResource UiFont}"
+             Foreground="{DynamicResource TextBrush}"
+             FocusManager.IsFocusScope="True"
+             KeyboardNavigation.TabNavigation="Cycle"
+             PreviewKeyDown="Dialog_PreviewKeyDown">
+    <Border Padding="16"
+            Background="{DynamicResource SurfaceBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="6">
+        <StackPanel>
+            <Grid>
+                <TextBlock x:Name="TitleText"
+                           VerticalAlignment="Center"
+                           Style="{StaticResource SectionTitle}"
+                           Text="Loop settings" />
+                <Button Width="30"
+                        MinWidth="30"
+                        Height="30"
+                        HorizontalAlignment="Right"
+                        Padding="0"
+                        Style="{StaticResource IconButton}"
+                        icons:Lucide.Icon="X"
+                        AutomationProperties.Name="Close loop settings"
+                        ToolTip="Close"
+                        Click="Cancel_Click" />
+            </Grid>
+
+            <Grid Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Style="{StaticResource FieldLabel}"
+                               Text="Forever" />
+                    <TextBlock Margin="0,3,16,0"
+                               Style="{StaticResource Caption}"
+                               Text="Repeat until the plan is stopped."
+                               TextWrapping="Wrap" />
+                </StackPanel>
+                <CheckBox x:Name="ForeverCheck"
+                          Grid.Column="1"
+                          VerticalAlignment="Center"
+                          AutomationProperties.Name="Repeat forever"
+                          Checked="ForeverCheck_Changed"
+                          Unchecked="ForeverCheck_Changed" />
+            </Grid>
+
+            <Border Margin="0,14,0,0"
+                    Padding="0,14,0,0"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="0,1,0,0">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource FieldLabel}"
+                               Text="Repeat count" />
+                    <TextBox x:Name="RepeatCountText"
+                             Margin="0,7,0,0"
+                             AutomationProperties.Name="Loop repeat count"
+                             MaxLength="6" />
+                    <TextBlock Margin="0,5,0,0"
+                               Style="{StaticResource Caption}"
+                               Text="Enter a value from 1 to 100000."
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <TextBlock x:Name="ErrorText"
+                       Margin="0,10,0,0"
+                       AutomationProperties.LiveSetting="Polite"
+                       Foreground="{DynamicResource ErrorBrush}"
+                       TextWrapping="Wrap"
+                       Visibility="Collapsed" />
+
+            <StackPanel Margin="0,16,0,0"
+                        HorizontalAlignment="Right"
+                        Orientation="Horizontal">
+                <Button Height="36"
+                        Content="Cancel"
+                        Click="Cancel_Click" />
+                <Button Height="36"
+                        Margin="8,0,0,0"
+                        Style="{StaticResource PrimaryButton}"
+                        Content="Apply"
+                        Click="Apply_Click" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

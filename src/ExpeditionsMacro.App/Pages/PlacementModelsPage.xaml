@@ -90,20 +90,29 @@
     </UserControl.Resources>
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="320" />
+            <ColumnDefinition x:Name="CatalogColumn"
+                              Width="320" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
-        <Border Grid.Column="0"
+        <Border x:Name="CatalogRail"
+                Grid.Column="0"
                 Background="{DynamicResource SidebarBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="0,0,1,0">
-            <Grid Margin="12,18,12,14">
+            <Grid x:Name="CatalogLayout"
+                  Margin="12,18,12,14">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <Grid Margin="6,0,6,10">
+                <Grid x:Name="CatalogHeader"
+                      Margin="6,0,6,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
                     <TextBlock x:Name="ModelsHeaderText"
                                VerticalAlignment="Center"
                                FontSize="12"
@@ -111,14 +120,27 @@
                                Foreground="{DynamicResource MutedBrush}"
                                Text="PLACEMENT MODELS" />
                     <Button x:Name="NewModelButton"
+                            Grid.Column="1"
                             HorizontalAlignment="Right"
                             Style="{StaticResource IconButton}"
                             Width="32"
                             MinWidth="32"
                             Height="32"
+                            Margin="0,0,6,0"
                             icons:Lucide.Icon="Plus"
                             ToolTip="New model"
                             Click="NewModel_Click" />
+                    <Button x:Name="CatalogRailToggleButton"
+                            Grid.Column="2"
+                            Width="32"
+                            MinWidth="32"
+                            Height="32"
+                            HorizontalAlignment="Right"
+                            Style="{StaticResource IconButton}"
+                            icons:Lucide.Icon="Menu"
+                            ToolTip="Collapse placement routes"
+                            AutomationProperties.Name="Collapse placement routes"
+                            Click="CatalogRailToggle_Click" />
                 </Grid>
                 <ListBox x:Name="ModelsList"
                          Grid.Row="1"
@@ -261,6 +283,9 @@
                         <DataGridTextColumn Header="Client Y"
                                             Width="120"
                                             Binding="{Binding Y, UpdateSourceTrigger=PropertyChanged}" />
+                        <DataGridCheckBoxColumn Header="Auto Upgrade"
+                                                Width="120"
+                                                Binding="{Binding AutoUpgrade, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         <DataGridTextColumn Header="Delay after click, ms"
                                             Width="*"
                                             Binding="{Binding DelayAfterMilliseconds, UpdateSourceTrigger=PropertyChanged}" />

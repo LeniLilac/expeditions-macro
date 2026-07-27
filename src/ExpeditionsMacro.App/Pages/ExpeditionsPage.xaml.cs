@@ -344,7 +344,8 @@ public partial class ExpeditionsPage : UserControl, IAppPage
         {
             await Dispatcher.InvokeAsync(() =>
             {
-                PhaseText.Text = "Toggle Play Menu key setup is required.";
+                PhaseText.Text =
+                    "Toggle Play Menu key is required. Scroll down to Controls on the Dashboard.";
                 AppendLog($"ERROR: {error.Message}");
             });
             throw;

@@ -183,12 +183,12 @@ public sealed class ResourceRefuelService
         if (!char.IsAsciiLetter(request.AreasMenuKey))
         {
             throw new InvalidDataException(
-                "The Areas menu binding must be a letter.");
+                "Scroll down to Controls on the Dashboard and set Toggle Areas Menu key to the same A-Z letter assigned in Anime Expeditions.");
         }
         if (!char.IsAsciiLetter(request.PlayMenuKey))
         {
             throw new InvalidDataException(
-                "The Play menu binding must be a letter.");
+                "Scroll down to Controls on the Dashboard and set Toggle Play Menu key to the same A-Z letter assigned in Anime Expeditions.");
         }
         if (request.Start ==
                 ResourceRefuelStart.RestartPrivateServer &&

@@ -14,8 +14,7 @@
 ## Assets
 
 - `ExpeditionsMacro-<version>-win-x64-setup.exe` - Windows installer.
-- `ExpeditionsMacro-<version>-win-x64.zip` - portable self-contained build.
-- `anime-expeditions-expeditions-<pack-version>.zip` - detector pack.
+- `ExpeditionsMacro-<version>-win-x64.zip` - portable self-contained build with bundled detector data.
 - `dependencies.json` - resolved dependency inventory.
 - `SHA256SUMS.txt` - SHA-256 checksums for every release asset.
 

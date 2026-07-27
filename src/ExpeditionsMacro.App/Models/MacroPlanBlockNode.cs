@@ -19,6 +19,8 @@ public abstract class MacroPlanBlockNode :
     public string EditorId { get; } =
         Guid.NewGuid().ToString("N");
 
+    public virtual bool IsLoop => false;
+
     public int Depth
     {
         get => _depth;
@@ -97,16 +99,31 @@ public sealed class MacroPlanLoopBlockNode :
     MacroPlanBlockNode
 {
     private string _amountText = "2";
-    private string _blockLabel = "Repeat block";
+    private string _blockLabel = "Loop";
     private bool _forever;
     private string _membershipText =
-        "Empty loop · drag tasks or loop blocks here";
+        "No blocks yet";
     private string _statusText = string.Empty;
 
     public event EventHandler? ValueChanged;
 
+    public MacroPlanLoopBlockNode()
+    {
+        Children.CollectionChanged +=
+            (_, _) => OnPropertyChanged(
+                nameof(EmptyDropVisibility));
+    }
+
     public ObservableCollection<MacroPlanBlockNode>
-        Children { get; } = [];
+        Children
+    { get; } = [];
+
+    public override bool IsLoop => true;
+
+    public Visibility EmptyDropVisibility =>
+        Children.Count == 0
+            ? Visibility.Visible
+            : Visibility.Collapsed;
 
     public string AmountText
     {

@@ -39,6 +39,7 @@ public partial class PlacementModelsPage : UserControl, IAppPage
     {
         _services = services;
         InitializeComponent();
+        InitializeCatalogRail();
         WireFastEditorEvents();
         ModelsList.ItemsSource = _models;
         FastSetupList.ItemsSource = _setupNodes;
@@ -78,6 +79,7 @@ public partial class PlacementModelsPage : UserControl, IAppPage
     {
         UpdateHotkeyText();
         ApplyWorkflowMode();
+        await RefreshManualRecordingChoicesAsync();
         await RefreshModelsAsync(_selectedModel?.Id);
     }
 
@@ -140,6 +142,10 @@ public partial class PlacementModelsPage : UserControl, IAppPage
             model.PlacementIntervalMilliseconds;
         _fastDefaultAfterStartDelayMilliseconds =
             model.DefaultAfterStartDelayMilliseconds;
+        _fastImpossibilityThresholdMinutes =
+            model.ImpossibilityThresholdMinutes;
+        _fastManualRecordingId =
+            model.ManualInputRecordingId;
         _steps.Clear();
         foreach (PlacementStep step in
                  PlacementAuthoringRules
@@ -162,6 +168,7 @@ public partial class PlacementModelsPage : UserControl, IAppPage
                         .First(choice =>
                             choice.Value ==
                             model.TeamSlot);
+                UpdateFastManualRecordingEditor();
                 FastStatusText.Text = string.Empty;
                 FastDetailText.Text =
                     $"{model.Steps.Count} placements · Fast no align";
@@ -203,6 +210,7 @@ public partial class PlacementModelsPage : UserControl, IAppPage
         if (FastWorkflow)
         {
             ResetFastTimingDefaults();
+            ResetFastRecordingSettings();
             FastBeforeStartButton.IsChecked = true;
             FastUnit1Button.IsChecked = true;
             if (_selectedSetupTarget is not null)
@@ -346,101 +354,6 @@ public partial class PlacementModelsPage : UserControl, IAppPage
         UpdateBusyState();
     }
 
-    private async void Test_Click(
-        object sender,
-        RoutedEventArgs e)
-    {
-        PlacementModel model;
-        char cancelPlacementKey;
-        try
-        {
-            model = BuildModel();
-            await _services.PlacementModels.SaveAsync(model);
-            _selectedModel = model;
-            cancelPlacementKey =
-                AppSettings.ParseCancelPlacementKey(
-                    _services.Settings.CancelPlacementKey,
-                    _services.Settings
-                        .MacroHotkeyVirtualKey,
-                    _services.Settings.PlayMenuKey,
-                    _services.Settings.UnitMenuKey,
-                    _services.Settings.AreasMenuKey,
-                    _services.Settings
-                        .ShiftLockVirtualKey);
-        }
-        catch (Exception error)
-        {
-            SetStatus(error.Message);
-            return;
-        }
-
-        int delay = ReadPlaybackDelay();
-        bool fast = FastWorkflow;
-        bool overrideTiming =
-            fast ||
-            PlaybackOverrideCheck.IsChecked == true;
-        _services.Coordinator.Arm(
-            "Placement playback",
-            async token =>
-            {
-                if (fast)
-                {
-                    await _services.CameraPose
-                        .PrepareWithoutYawAsync(
-                            progress: new Progress<MacroProgress>(
-                                value => Dispatcher.BeginInvoke(
-                                    () => FastStatusText.Text =
-                                        value.Message)),
-                            cancellationToken: token);
-                }
-                await _services.Placement.PlayAsync(
-                    model,
-                    overrideTiming,
-                    delay,
-                    cancelPlacementKey:
-                        cancelPlacementKey,
-                    stepSent: (index, total, step) =>
-                    {
-                        _services.DeepDebug.RecordEvent(
-                            "placement",
-                            "playback_step",
-                            new
-                            {
-                                Index = index,
-                                Total = total,
-                                Step = step,
-                            });
-                        Dispatcher.BeginInvoke(() =>
-                            SetOperationProgress(
-                                100d * index / total));
-                    },
-                    status: message =>
-                    {
-                        _services.DeepDebug.RecordEvent(
-                            "placement",
-                            "playback_status",
-                            new { Message = message });
-                        Dispatcher.BeginInvoke(() =>
-                            SetStatus(message));
-                    },
-                    cancellationToken: token);
-            },
-            new DeepDebugOperationContext
-            {
-                PlacementModelIds = [model.Id],
-                OperationSettings = new
-                {
-                    Model = model.Id,
-                    UseDefaultInterval = overrideTiming,
-                    DefaultDelayMilliseconds = delay,
-                    FastNoAlign = fast,
-                },
-            });
-        SetStatus(
-            $"Playback armed. Focus Roblox and press {_services.Hotkey.DisplayName} to begin.");
-        UpdateBusyState();
-    }
-
     private void Stop_Click(
         object sender,
         RoutedEventArgs e) =>
@@ -465,35 +378,4 @@ public partial class PlacementModelsPage : UserControl, IAppPage
         else OperationProgress.Value = value;
     }
 
-    private void UpdateBusyState()
-    {
-        bool busy = _services.Coordinator.IsBusy;
-        SaveButton.IsEnabled = !busy;
-        RecordButton.IsEnabled = !busy;
-        TestButton.IsEnabled = !busy;
-        StopButton.IsEnabled = busy;
-        FastSaveButton.IsEnabled = !busy;
-        FastPrepareButton.IsEnabled = !busy;
-        FastTestButton.IsEnabled = !busy;
-        FastStopButton.IsEnabled = busy;
-        TargetModeCombo.IsEnabled = !busy;
-        TargetMapCombo.IsEnabled = !busy;
-        TargetVariantCombo.IsEnabled = !busy;
-        FastTeamCombo.IsEnabled = !busy;
-        FastUnit1Button.IsEnabled = !busy;
-        FastUnit2Button.IsEnabled = !busy;
-        FastUnit3Button.IsEnabled = !busy;
-        FastUnit4Button.IsEnabled = !busy;
-        FastUnit5Button.IsEnabled = !busy;
-        FastUnit6Button.IsEnabled = !busy;
-        FastBeforeStartButton.IsEnabled = !busy;
-        FastAfterStartButton.IsEnabled = !busy;
-        PlacementCanvas.IsEnabled = !busy;
-        FastEditorPanel.SetStepsInteractionEnabled(!busy);
-        FastTimingButton.IsEnabled = !busy;
-        if (busy)
-        {
-            FastEditorPanel.CloseTimingSettings();
-        }
-    }
 }

@@ -11,6 +11,9 @@ public partial class PlacementModelsPage
     private ComboBox FastTeamCombo =>
         FastEditorPanel.FastTeamCombo;
 
+    private ComboBox FastManualRecordingCombo =>
+        FastEditorPanel.FastManualRecordingCombo;
+
     private ComboBox TargetModeCombo =>
         FastEditorPanel.TargetModeCombo;
 
@@ -80,6 +83,9 @@ public partial class PlacementModelsPage
     private Button FastPrepareButton =>
         FastEditorPanel.FastPrepareButton;
 
+    private Button FastPositionButton =>
+        FastEditorPanel.FastPositionButton;
+
     private Button FastTestButton =>
         FastEditorPanel.FastTestButton;
 
@@ -93,6 +99,8 @@ public partial class PlacementModelsPage
     {
         FastEditorPanel.SaveRequested += Save_Click;
         FastEditorPanel.PrepareRequested += FastPrepare_Click;
+        FastEditorPanel.PositionRequested +=
+            FastPosition_Click;
         FastEditorPanel.TestRequested += Test_Click;
         FastEditorPanel.StopRequested += Stop_Click;
         FastEditorPanel.RemoveStepRequested += RemoveRow_Click;
@@ -104,6 +112,8 @@ public partial class PlacementModelsPage
             FastTimingSettingsOpening;
         FastEditorPanel.TimingSettingsApplied +=
             FastTimingSettingsApplied;
+        FastEditorPanel.ManualRecordingChanged +=
+            FastManualRecording_SelectionChanged;
         FastEditorPanel.UnitChanged +=
             FastUnitButton_Checked;
         FastEditorPanel.PhaseChanged +=

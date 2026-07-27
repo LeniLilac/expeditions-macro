@@ -36,12 +36,10 @@ public sealed record MacroPlanLoopDefinition
         if (!tasks
                 .Skip(start)
                 .Take(stop - start + 1)
-                .Any(task =>
-                    task.Enabled &&
-                    !task.IsRecurring))
+                .Any(task => !task.IsRecurring))
         {
             throw new InvalidDataException(
-                "A loop must contain at least one enabled finite task.");
+                "A loop must contain at least one finite task.");
         }
     }
 

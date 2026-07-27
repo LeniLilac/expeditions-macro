@@ -82,7 +82,7 @@ internal static class MacroPlanStructureMove
             return false;
         }
         if (dragged is MacroPlanLoopBlockNode
-                { Forever: true } &&
+            { Forever: true } &&
             parent is not null)
         {
             error =
@@ -201,7 +201,7 @@ internal static class MacroPlanStructureMove
     {
         if (root &&
             dragged is MacroPlanLoopBlockNode
-                { Forever: true })
+            { Forever: true })
         {
             destination.Add(dragged);
             return;
@@ -244,7 +244,7 @@ internal static class MacroPlanStructureMove
         return true;
     }
 
-    private static bool TryFindOwner(
+    public static bool TryFindOwner(
         ObservableCollection<MacroPlanBlockNode> nodes,
         MacroPlanBlockNode target,
         out ObservableCollection<MacroPlanBlockNode> owner,

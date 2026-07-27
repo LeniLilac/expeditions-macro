@@ -29,12 +29,38 @@ public sealed partial class EventMacroRunner
             EventScreenDetector.LobbyEventAction.X,
             EventScreenDetector.LobbyEventAction.Y,
             cancellationToken).ConfigureAwait(false);
-        EventScreenMatch home = await WaitForStateAsync(
-            window,
-            EventScreenState.EventHome,
-            NavigationTimeout,
-            detector,
-            cancellationToken).ConfigureAwait(false);
+        EventScreenMatch entry =
+            await WaitForEventEntryAsync(
+                window,
+                NavigationTimeout,
+                detector,
+                cancellationToken).ConfigureAwait(false);
+        EventScreenMatch home;
+        if (entry.State ==
+            EventScreenState.EventCatalog)
+        {
+            if (entry.ActionX is not int eventX ||
+                entry.ActionY is not int eventY)
+            {
+                throw new RobloxUiUnavailableException(
+                    "The Villain Invasion Event card could not be located.");
+            }
+            await ClickAsync(
+                window,
+                eventX,
+                eventY,
+                cancellationToken).ConfigureAwait(false);
+            home = await WaitForStateAsync(
+                window,
+                EventScreenState.EventHome,
+                NavigationTimeout,
+                detector,
+                cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            home = entry;
+        }
         await ClickAsync(
             window,
             home.ActionX ??
@@ -280,6 +306,57 @@ public sealed partial class EventMacroRunner
         }
 
         return null;
+    }
+
+    private async Task<EventScreenMatch>
+        WaitForEventEntryAsync(
+        RobloxWindow window,
+        TimeSpan timeout,
+        IDetectorPack detector,
+        CancellationToken cancellationToken)
+    {
+        DateTimeOffset deadline =
+            DateTimeOffset.UtcNow + timeout;
+        StableNavigationActionTracker<
+            EventScreenState> tracker =
+                new(required: 2);
+        EventScreenMatch last = default;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            cancellationToken
+                .ThrowIfCancellationRequested();
+            last = EventScreenDetector.Detect(
+                CaptureClient(window, detector));
+            bool isEntry =
+                last.State is
+                    EventScreenState.EventCatalog or
+                    EventScreenState.EventHome;
+            (int X, int Y)? action =
+                isEntry &&
+                last.ActionX is int actionX &&
+                last.ActionY is int actionY
+                    ? (actionX, actionY)
+                    : null;
+            (int X, int Y)? stable =
+                tracker.Update(
+                    isEntry
+                        ? last.State
+                        : EventScreenState.None,
+                    action);
+            if (stable is not null)
+            {
+                return last with
+                {
+                    ActionX = stable.Value.X,
+                    ActionY = stable.Value.Y,
+                };
+            }
+            await Task.Delay(
+                180,
+                cancellationToken).ConfigureAwait(false);
+        }
+        throw new TimeoutException(
+            $"Event navigation did not reach Villain Invasion. Last state: {last.State} ({last.Confidence:P0}).");
     }
 
     private async Task<EventScreenMatch>

@@ -32,7 +32,7 @@ public static class DetectorPackCapabilities
     {
         ArgumentNullException.ThrowIfNull(manifest);
         return $"Detector pack '{manifest.PackId}' version {manifest.Version} does not include the Challenge map references. " +
-            "Update the detector pack in Settings or reinstall Expeditions Macro before running Challenge automation.";
+            "Reinstall or update Expeditions Macro from a complete release package before running Challenge automation.";
     }
 
     private static string Resolve(string directory, string relative) =>

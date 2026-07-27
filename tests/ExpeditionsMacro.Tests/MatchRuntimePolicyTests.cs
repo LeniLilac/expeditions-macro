@@ -96,6 +96,44 @@ public sealed class MatchRuntimePolicyTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void PlacementOverrideReplacesRouteDefault()
+    {
+        PlacementModel placement = new()
+        {
+            Id = "placement",
+            Name = "Placement",
+            ClientWidth = 808,
+            ClientHeight = 611,
+            Steps =
+            [
+                new PlacementStep
+                {
+                    UnitKey = 1,
+                    X = 100,
+                    Y = 100,
+                    DelayAfterMilliseconds = 0,
+                },
+            ],
+            ImpossibilityThresholdMinutes = 37,
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+
+        Assert.Equal(
+            TimeSpan.FromMinutes(37),
+            MatchRuntimePolicy.ForPlacement(
+                placement,
+                TimeSpan.FromMinutes(12)));
+        Assert.Null(
+            MatchRuntimePolicy.ForPlacement(
+                placement with
+                {
+                    ImpossibilityThresholdMinutes =
+                        0,
+                },
+                routeDefault: null));
+    }
+
     private static StoryPreset Story() => new()
     {
         Id = "story",

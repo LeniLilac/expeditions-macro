@@ -27,6 +27,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
     private readonly PlacementService _placements;
     private readonly TeamSelectionService _teams;
     private readonly IDiscordNotifier _discord;
+    private readonly ManualInputRouteService? _manualInputs;
 
     public ChallengeMacroRunner(
         IRobloxAutomation automation,
@@ -34,7 +35,8 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         PlacementService placements,
         TeamSelectionService teams,
         IDiscordNotifier discord,
-        FastNoAlignPreparationSession? fastNoAlign = null)
+        FastNoAlignPreparationSession? fastNoAlign = null,
+        ManualInputRouteService? manualInputs = null)
     {
         _automation = automation;
         _camera = camera;
@@ -44,6 +46,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         _placements = placements;
         _teams = teams;
         _discord = discord;
+        _manualInputs = manualInputs;
     }
 
     public string GameId => "anime-expeditions";
@@ -78,6 +81,14 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
             throw new InvalidDataException(DetectorPackCapabilities.ChallengeMapsUnavailableMessage(detector.Manifest));
         }
         ValidateRuntimeModels(preset, mapModels, detector.Manifest);
+        IReadOnlyDictionary<
+            ChallengeMapId,
+            ManualInputRecording> manualRecordings =
+            await ResolveManualRecordingsAsync(
+                    preset,
+                    mapModels,
+                    cancellationToken)
+                .ConfigureAwait(false);
         ValidateTeamKey(preset.Maps.Any(profile => profile.TeamSlot > 0), unitMenuKey);
         RobloxWindow window = _automation.FindWindow() ??
             throw new RobloxSessionUnavailableException(
@@ -198,6 +209,8 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
                             type,
                             map,
                             models,
+                            manualRecordings.GetValueOrDefault(
+                                map),
                             detector,
                             reporter,
                             playMenuKey,
@@ -363,6 +376,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         ChallengeType type,
         ChallengeMapId map,
         ChallengeMapRuntimeModels models,
+        ManualInputRecording? manualRecording,
         IDetectorPack detector,
         DiscordRunReporter reporter,
         char playMenuKey,
@@ -414,82 +428,42 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
                 report,
                 log,
                 cancellationToken).ConfigureAwait(false);
-            ChallengePlacementPartition? prestartPlacements = null;
-            IReadOnlyList<PlacementStep> configuredBeforeStart =
-                PlacementExecutionPlan.BeforeStart(
-                    preset.CameraPreparationMode,
-                    models.PrestartPlacement);
-            IReadOnlyList<PlacementStep> configuredAfterStart =
-                PlacementExecutionPlan.AfterStart(
-                    preset.CameraPreparationMode,
-                    models.PrestartPlacement,
-                    models.DelayedPlacement);
-            if (models.PrestartPlacement is not null &&
-                configuredBeforeStart.Count > 0)
-            {
-                ScreenRegion dialogOcclusion = ChallengeScreenDetector.PrestartOcclusion(prestart)
-                    ?? throw new RobloxUiUnavailableException("The Challenge Start Game dialog could not be measured before placement.");
-                prestartPlacements = ChallengeRunPolicy.PartitionPrestartPlacements(
-                    configuredBeforeStart,
-                    dialogOcclusion);
-                report("Placement", 45, "Placing units outside the Start Game dialog.", null, null);
-                if (prestartPlacements.BeforeStart.Count > 0)
-                {
-                    await PlaceAsync(
+            (Stopwatch matchRuntime,
+                IReadOnlyList<PlacementStep>
+                    configuredAfterStart) =
+                await BeginConfiguredMatchAsync(
                         window,
                         preset,
-                        models.PrestartPlacement,
-                        prestartPlacements.BeforeStart,
+                        models,
+                        manualRecording,
+                        prestart,
+                        detector,
+                        () =>
+                        {
+                            if (attemptNotified)
+                            {
+                                return;
+                            }
+                            reporter.Queue(
+                                "attempt",
+                                $"Starting the {Label(type)} Challenge on {Label(map)}.",
+                                prestart,
+                                runtime.Elapsed,
+                                priorVictories,
+                                priorDefeats,
+                                new DiscordRunTarget(
+                                    (int)map,
+                                    0,
+                                    ChallengeRoute(
+                                        type,
+                                        map)));
+                            attemptNotified = true;
+                        },
+                        report,
                         log,
                         cancelPlacementKey,
-                        cancellationToken).ConfigureAwait(false);
-                }
-                if (prestartPlacements.AfterStart.Count > 0)
-                {
-                    log(
-                        $"Deferred {prestartPlacements.AfterStart.Count} before-start placement(s) hidden by the Start Game dialog.",
-                        MacroEventLevel.Information,
-                        null,
-                        null);
-                }
-            }
-
-            (int X, int Y)? start = await LocateActionAfterParkingAsync(
-                token => _automation.ParkCursorAsync(window, token),
-                () => CaptureClient(window, detector),
-                frame => ChallengeScreenDetector.ActionFor(ChallengeScreenState.Prestart, frame),
-                retryMilliseconds: 100,
-                maximumAttempts: 3,
-                cancellationToken).ConfigureAwait(false);
-            if (start is null) throw new RobloxUiUnavailableException("The Challenge Start Game button disappeared before it could be clicked.");
-            Stopwatch matchRuntime = Stopwatch.StartNew();
-            await ClickAsync(window, start.Value.X, start.Value.Y, cancellationToken).ConfigureAwait(false);
-            if (!attemptNotified)
-            {
-                reporter.Queue(
-                    "attempt",
-                    $"Starting the {Label(type)} Challenge on {Label(map)}.",
-                    prestart,
-                    runtime.Elapsed,
-                    priorVictories,
-                    priorDefeats,
-                    new DiscordRunTarget((int)map, 0, ChallengeRoute(type, map)));
-                attemptNotified = true;
-            }
-            if (prestartPlacements is { AfterStart.Count: > 0 } && models.PrestartPlacement is not null)
-            {
-                await Task.Delay(550, cancellationToken).ConfigureAwait(false);
-                report("Placement", 50, $"Placing {prestartPlacements.AfterStart.Count} unit(s) that were covered by the Start Game dialog.", null, null);
-                await PlaceAsync(
-                    window,
-                    preset,
-                    models.PrestartPlacement,
-                    prestartPlacements.AfterStart,
-                    log,
-                    cancelPlacementKey,
-                    cancellationToken).ConfigureAwait(false);
-            }
-            await Task.Delay(2200, cancellationToken).ConfigureAwait(false);
+                        cancellationToken)
+                    .ConfigureAwait(false);
             MatchTerminal terminal = await MonitorMatchAsync(
                 window,
                 preset,
@@ -766,28 +740,6 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         : $"{Math.Max(0, (int)remaining.TotalMinutes)}m {Math.Max(0, remaining.Seconds):00}s";
 
     private static string ChallengeRoute(ChallengeType type, ChallengeMapId map) => $"{Label(type)} · {Label(map)}";
-
-    private static char ValidatePlayMenuKey(char value)
-    {
-        char normalized = char.ToUpperInvariant(value);
-        if (!char.IsAsciiLetter(normalized))
-        {
-            throw new InvalidDataException(
-                "Set the Toggle Play Menu key under Settings > Controls so it matches Anime Expeditions' Toggle Play Menu binding.");
-        }
-
-        return normalized;
-    }
-
-    private static void ValidateTeamKey(bool required, char? value)
-    {
-        if (!required) return;
-        if (value is null || !char.IsAsciiLetter(value.Value))
-        {
-            throw new InvalidDataException(
-                "Set the Toggle Unit Inventory key under Settings > Controls so it matches Anime Expeditions' Toggle Unit Inventory binding before using a saved team.");
-        }
-    }
 
     private static string Label(ChallengeMapId map) => map switch
     {
