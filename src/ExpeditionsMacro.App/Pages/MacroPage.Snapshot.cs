@@ -11,6 +11,9 @@ internal enum MacroPlanSnapshotState
     TasksOnly,
     NestedLoops,
     TaskPopup,
+    StoryActTaskPopup,
+    StoryMasteryTaskPopup,
+    StoryInfiniteTaskPopup,
     LoopSettingsPopup,
 }
 
@@ -125,12 +128,65 @@ public partial class MacroPage
             OpenTaskEditor(
                 LoopEditor.LoopBlocks[1]);
         }
+        else if (state is
+                 MacroPlanSnapshotState
+                     .StoryActTaskPopup or
+                 MacroPlanSnapshotState
+                     .StoryMasteryTaskPopup or
+                 MacroPlanSnapshotState
+                     .StoryInfiniteTaskPopup)
+        {
+            StoryRunKind runKind = state switch
+            {
+                MacroPlanSnapshotState
+                    .StoryActTaskPopup =>
+                    StoryRunKind.Act,
+                MacroPlanSnapshotState
+                    .StoryMasteryTaskPopup =>
+                    StoryRunKind.Mastery,
+                _ => StoryRunKind.Infinite,
+            };
+            OpenStoryTaskEditorForSnapshot(
+                runKind);
+        }
         else if (state ==
                  MacroPlanSnapshotState
                      .LoopSettingsPopup)
         {
             LoopEditor.OpenLoopSettingsForSnapshot(
                 LoopEditor.LoopBlocks[1]);
+        }
+    }
+
+    private void OpenStoryTaskEditorForSnapshot(
+        StoryRunKind runKind)
+    {
+        OpenTaskEditor(
+            LoopEditor.LoopBlocks[1]);
+        TaskKindCombo.SelectedItem =
+            TaskKindCombo.Items
+                .Cast<NamedChoice<MacroTaskKind>>()
+                .First(choice =>
+                    choice.Value ==
+                    MacroTaskKind.Story);
+        RefreshVisibleRoutes();
+        TaskRouteCombo.SelectedItem =
+            _visibleRoutes.First(route =>
+                route.Target.MapNumber == 1 &&
+                route.Target.StoryRunKind ==
+                    runKind &&
+                (runKind != StoryRunKind.Act ||
+                 route.Target.ActNumber == 1));
+        UpdateTaskTargetEditor();
+
+        bool hardModeVisible =
+            TaskStoryOptionsPanel.Visibility ==
+            Visibility.Visible;
+        if (hardModeVisible !=
+            (runKind == StoryRunKind.Act))
+        {
+            throw new InvalidOperationException(
+                "Story Hard mode visibility does not match the selected run type.");
         }
     }
 

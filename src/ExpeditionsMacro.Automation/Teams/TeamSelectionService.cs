@@ -1,3 +1,4 @@
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Runtime;
@@ -9,13 +10,34 @@ public sealed class TeamSelectionService
 {
     private const int LoadClickAttempts = 2;
     private const int StableLayoutDetections = 2;
+    private const int TopAlignmentDragAttempts = 3;
+    private const int TeamAlignmentDragAttempts = 5;
     private static readonly TimeSpan TopAlignmentTimeout =
         TimeSpan.FromSeconds(10);
     private static readonly TimeSpan TeamAlignmentTimeout =
         TimeSpan.FromSeconds(15);
     private readonly IRobloxAutomation _automation;
+    private readonly Func<DateTimeOffset> _utcNow;
+    private readonly Func<TimeSpan, CancellationToken, Task> _delay;
 
-    public TeamSelectionService(IRobloxAutomation automation) => _automation = automation;
+    public TeamSelectionService(IRobloxAutomation automation)
+        : this(
+            automation,
+            static () => DateTimeOffset.UtcNow,
+            static (duration, token) =>
+                Task.Delay(duration, token))
+    {
+    }
+
+    internal TeamSelectionService(
+        IRobloxAutomation automation,
+        Func<DateTimeOffset> utcNow,
+        Func<TimeSpan, CancellationToken, Task> delay)
+    {
+        _automation = automation;
+        _utcNow = utcNow;
+        _delay = delay;
+    }
 
     public async Task SelectAsync(
         RobloxWindow window,
@@ -125,17 +147,15 @@ public sealed class TeamSelectionService
                 window,
                 TimeSpan.FromSeconds(4),
                 cancellationToken).ConfigureAwait(false);
-        DateTimeOffset deadline =
-            DateTimeOffset.UtcNow +
-            TopAlignmentTimeout;
-        while (!TeamScreenDetector.IsScrollbarAtTop(
-                   thumb))
+        ObservationWaitBudget budget = new(
+            TopAlignmentTimeout,
+            TopAlignmentDragAttempts,
+            _utcNow);
+        int dragAttempts = 0;
+        while (!TeamScreenDetector.IsScrollbarAtTop(thumb) &&
+               dragAttempts < TopAlignmentDragAttempts &&
+               budget.ShouldObserve())
         {
-            if (DateTimeOffset.UtcNow >= deadline)
-            {
-                throw new RobloxUiUnavailableException(
-                    $"The Unit Team scrollbar could not be normalized to its stable top position. Last center: {thumb.CenterY}.");
-            }
             EnsureFocus(window);
             await _automation.DragClientAsync(
                 window,
@@ -145,12 +165,18 @@ public sealed class TeamSelectionService
                 TeamScreenDetector
                     .TopScrollbarDragLimitY,
                 cancellationToken).ConfigureAwait(false);
+            dragAttempts++;
             thumb = await WaitForStableTeamListAsync(
                 window,
-                Remaining(
-                    deadline,
-                    TimeSpan.FromSeconds(3)),
+                TimeSpan.FromSeconds(3),
                 cancellationToken).ConfigureAwait(false);
+            budget.MarkObserved();
+        }
+
+        if (!TeamScreenDetector.IsScrollbarAtTop(thumb))
+        {
+            throw new RobloxUiUnavailableException(
+                $"The Unit Team scrollbar could not be normalized to its stable top position after {dragAttempts} bounded drag attempts. Last center: {thumb.CenterY}.");
         }
         return thumb;
     }
@@ -160,11 +186,18 @@ public sealed class TeamSelectionService
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
         TeamScrollbarThumb? candidate = null;
         TeamScrollbarThumb? last = null;
         int consecutive = 0;
-        while (DateTimeOffset.UtcNow < deadline)
+        ObservationWaitBudget budget = new(
+            timeout,
+            StableLayoutDetections,
+            _utcNow);
+        while (budget.ShouldObserve(
+                   confirmationPending:
+                       consecutive > 0 &&
+                       consecutive <
+                           StableLayoutDetections))
         {
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame image = CaptureClient(window);
@@ -194,7 +227,10 @@ public sealed class TeamSelectionService
             {
                 return thumb!.Value;
             }
-            await Task.Delay(150, cancellationToken).ConfigureAwait(false);
+            budget.MarkObserved();
+            await _delay(
+                TimeSpan.FromMilliseconds(150),
+                cancellationToken).ConfigureAwait(false);
         }
 
         throw new RobloxUiUnavailableException(
@@ -209,10 +245,13 @@ public sealed class TeamSelectionService
         int targetCenterY,
         CancellationToken cancellationToken)
     {
-        DateTimeOffset deadline =
-            DateTimeOffset.UtcNow +
-            TeamAlignmentTimeout;
-        while (DateTimeOffset.UtcNow < deadline)
+        ObservationWaitBudget budget = new(
+            TeamAlignmentTimeout,
+            TeamAlignmentDragAttempts,
+            _utcNow);
+        int dragAttempts = 0;
+        while (dragAttempts < TeamAlignmentDragAttempts &&
+               budget.ShouldObserve())
         {
             ImageFrame image = CaptureClient(window);
             TeamScreenMatch state = TeamScreenDetector.Detect(image);
@@ -244,35 +283,20 @@ public sealed class TeamSelectionService
                 thumb.X,
                 dragEndY,
                 cancellationToken).ConfigureAwait(false);
+            dragAttempts++;
 
             action = await WaitForAlignedLoadActionAsync(
                 window,
                 teamSlot,
                 targetCenterY,
-                Remaining(
-                    deadline,
-                    TimeSpan.FromSeconds(3)),
+                TimeSpan.FromSeconds(3),
                 cancellationToken).ConfigureAwait(false);
             if (action is not null) return action.Value;
+            budget.MarkObserved();
         }
 
         throw new RobloxUiUnavailableException(
-            $"Team {teamSlot} could not be aligned to a fully visible Load Team button.");
-    }
-
-    private static TimeSpan Remaining(
-        DateTimeOffset deadline,
-        TimeSpan maximum)
-    {
-        TimeSpan remaining =
-            deadline - DateTimeOffset.UtcNow;
-        if (remaining <= TimeSpan.Zero)
-        {
-            return TimeSpan.FromMilliseconds(1);
-        }
-        return remaining < maximum
-            ? remaining
-            : maximum;
+            $"Team {teamSlot} could not be aligned to a fully visible Load Team button after {dragAttempts} bounded drag attempts.");
     }
 
     private async Task<(int X, int Y)?> WaitForAlignedLoadActionAsync(
@@ -282,10 +306,14 @@ public sealed class TeamSelectionService
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
         (int X, int Y)? candidate = null;
         int consecutive = 0;
-        while (DateTimeOffset.UtcNow < deadline)
+        ObservationWaitBudget budget = new(
+            timeout,
+            minimumObservations: 2,
+            _utcNow);
+        while (budget.ShouldObserve(
+                   confirmationPending: consecutive == 1))
         {
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame image = CaptureClient(window);
@@ -308,7 +336,10 @@ public sealed class TeamSelectionService
                 candidate = null;
                 consecutive = 0;
             }
-            await Task.Delay(150, cancellationToken).ConfigureAwait(false);
+            budget.MarkObserved();
+            await _delay(
+                TimeSpan.FromMilliseconds(150),
+                cancellationToken).ConfigureAwait(false);
         }
         return null;
     }
@@ -319,11 +350,15 @@ public sealed class TeamSelectionService
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
         TeamScreenMatch last = new(TeamScreenState.None, 0);
         TeamScreenState? candidate = null;
         int consecutive = 0;
-        while (DateTimeOffset.UtcNow < deadline)
+        ObservationWaitBudget budget = new(
+            timeout,
+            minimumObservations: 2,
+            _utcNow);
+        while (budget.ShouldObserve(
+                   confirmationPending: consecutive == 1))
         {
             cancellationToken.ThrowIfCancellationRequested();
             last = TeamScreenDetector.Detect(CaptureClient(window));
@@ -342,7 +377,10 @@ public sealed class TeamSelectionService
                 candidate = null;
                 consecutive = 0;
             }
-            await Task.Delay(150, cancellationToken).ConfigureAwait(false);
+            budget.MarkObserved();
+            await _delay(
+                TimeSpan.FromMilliseconds(150),
+                cancellationToken).ConfigureAwait(false);
         }
         throw new TimeoutException($"Timed out waiting for the Unit Team interface. Last state: {last.State} ({last.Confidence:P0}).");
     }

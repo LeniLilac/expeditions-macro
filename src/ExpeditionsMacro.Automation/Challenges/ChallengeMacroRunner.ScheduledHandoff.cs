@@ -31,20 +31,21 @@ public sealed partial class ChallengeMacroRunner
                 report,
                 cancellationToken)
             .ConfigureAwait(false);
-        (int X, int Y)? changeMode =
-            ChallengeScreenDetector.ActionFor(
-                ChallengeScreenState
-                    .PostMatchPreview,
-                party);
-        if (changeMode is null)
-        {
-            throw new RobloxUiUnavailableException(
-                "Change Gamemode could not be located after the match.");
-        }
+        ChallengeScreenMatch changeMode =
+            await RequireStableLiveActionAsync(
+                    window,
+                    preset,
+                    detector,
+                    ChallengeScreenState.PostMatchPreview,
+                    party,
+                    "Change Gamemode could not be located after the match.",
+                    report,
+                    cancellationToken)
+                .ConfigureAwait(false);
         await ClickAsync(
             window,
-            changeMode.Value.X,
-            changeMode.Value.Y,
+            changeMode.ActionX!.Value,
+            changeMode.ActionY!.Value,
             cancellationToken).ConfigureAwait(false);
         ImageFrame modes =
             await WaitForScreenAsync(
@@ -79,6 +80,75 @@ public sealed partial class ChallengeMacroRunner
             TimeSpan.FromSeconds(12),
             report,
             cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task RetryDefeatAsync(
+        RobloxWindow window,
+        ChallengePreset preset,
+        IDetectorPack detector,
+        ImageFrame initialFrame,
+        Action<
+            string,
+            int,
+            string,
+            string?,
+            double?> report,
+        CancellationToken cancellationToken)
+    {
+        ChallengeScreenMatch retry =
+            await RequireStableLiveActionAsync(
+                    window,
+                    preset,
+                    detector,
+                    ChallengeScreenState.Defeat,
+                    initialFrame,
+                    "Repeat Stage could not be located after the Challenge defeat.",
+                    report,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        await ClickAsync(
+            window,
+            retry.ActionX!.Value,
+            retry.ActionY!.Value,
+            cancellationToken).ConfigureAwait(false);
+        await Task.Delay(
+            3500,
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<ChallengeScreenMatch>
+        RequireStableLiveActionAsync(
+        RobloxWindow window,
+        ChallengePreset preset,
+        IDetectorPack detector,
+        ChallengeScreenState desired,
+        ImageFrame initialFrame,
+        string failureMessage,
+        Action<
+            string,
+            int,
+            string,
+            string?,
+            double?> report,
+        CancellationToken cancellationToken)
+    {
+        (ImageFrame Frame, ChallengeScreenMatch Match)? observation =
+            await TryWaitForActionAsync(
+                    window,
+                    preset,
+                    detector,
+                    desired,
+                    TimeSpan.FromSeconds(12),
+                    report,
+                    cancellationToken,
+                    (
+                        initialFrame,
+                        ChallengeScreenDetector
+                            .Detect(initialFrame)))
+                .ConfigureAwait(false);
+        return observation?.Match ??
+            throw new RobloxUiUnavailableException(
+                failureMessage);
     }
 
     private async Task PrepareSchedulerHandoffAsync(

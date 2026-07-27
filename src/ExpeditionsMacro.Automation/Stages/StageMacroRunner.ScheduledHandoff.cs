@@ -1,6 +1,7 @@
 using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Automation.Scheduling;
 using ExpeditionsMacro.Core.Abstractions;
+using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Stages;
@@ -42,10 +43,35 @@ public sealed partial class StageMacroRunner
         switch (continuation)
         {
             case ScheduledTaskContinuation.RepeatStage:
-                (int X, int Y)? repeat =
-                    StageScreenDetector.RepeatStageAction(
-                        terminal.Frame,
-                        terminal.State);
+                StableScreenAction<(
+                    ImageFrame Frame,
+                    StageScreenMatch Match)>? repeat =
+                    await StableScreenActionWaiter.WaitAsync(
+                            terminal.State,
+                            stableDetections,
+                            () =>
+                            {
+                                ImageFrame frame =
+                                    CaptureClient(
+                                        window,
+                                        detector);
+                                return (
+                                    Frame: frame,
+                                    Match: StageScreenDetector
+                                        .DetectMatchState(
+                                            frame));
+                            },
+                            static observation =>
+                                observation.Match.State,
+                            observation =>
+                                StageScreenDetector
+                                    .RepeatStageAction(
+                                        observation.Frame,
+                                        terminal.State),
+                            TimeSpan.FromSeconds(12),
+                            TimeSpan.FromMilliseconds(250),
+                            cancellationToken)
+                        .ConfigureAwait(false);
                 if (repeat is null)
                 {
                     throw new RobloxUiUnavailableException(

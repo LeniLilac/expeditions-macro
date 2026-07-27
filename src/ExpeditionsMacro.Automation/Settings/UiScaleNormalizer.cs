@@ -317,12 +317,15 @@ internal sealed class UiScaleNormalizer
         RobloxWindow window,
         CancellationToken cancellationToken)
     {
-        DateTimeOffset deadline =
-            _utcNow() + TimeSpan.FromSeconds(7);
         int stable = 0;
         GameSettingsPanelMatch last = default;
         double previousScale = double.NaN;
-        while (_utcNow() < deadline)
+        ObservationWaitBudget budget = new(
+            TimeSpan.FromSeconds(7),
+            minimumObservations: 2,
+            _utcNow);
+        while (budget.ShouldObserve(
+                   confirmationPending: stable == 1))
         {
             cancellationToken.ThrowIfCancellationRequested();
             ValidateWindow(window);
@@ -349,6 +352,7 @@ internal sealed class UiScaleNormalizer
                 previousScale = last.UiScale;
             }
             if (stable >= 2) return last;
+            budget.MarkObserved();
             await _delay(
                 PollInterval,
                 cancellationToken).ConfigureAwait(false);

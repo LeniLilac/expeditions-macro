@@ -421,7 +421,7 @@ public sealed record FastNoAlignShareBundle
         if (mode != CameraPreparationMode.FastNoAlign)
         {
             throw new InvalidDataException(
-                $"{label} camera-model presets cannot be shared without their camera models. Switch the preset to Fast no align first.");
+                $"{label} uses the retired Camera Model workflow. Replace it with a current Placement Setup before sharing.");
         }
     }
 

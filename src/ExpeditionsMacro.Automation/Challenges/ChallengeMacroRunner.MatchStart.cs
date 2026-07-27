@@ -11,6 +11,48 @@ namespace ExpeditionsMacro.Automation.Challenges;
 
 public sealed partial class ChallengeMacroRunner
 {
+    private async Task ClickAvailableStageAsync(
+        RobloxWindow window,
+        ChallengePreset preset,
+        IDetectorPack detector,
+        (
+            ImageFrame Frame,
+            ChallengeScreenMatch Match) initialObservation,
+        Action<
+            string,
+            int,
+            string,
+            string?,
+            double?> report,
+        CancellationToken cancellationToken)
+    {
+        (ImageFrame Frame, ChallengeScreenMatch Match)?
+            observation =
+                await TryWaitForActionAsync(
+                        window,
+                        preset,
+                        detector,
+                        ChallengeScreenState
+                            .ChallengeAvailable,
+                        TimeSpan.FromSeconds(5),
+                        report,
+                        cancellationToken,
+                        initialObservation)
+                    .ConfigureAwait(false);
+        if (observation is null)
+        {
+            throw new RobloxUiUnavailableException(
+                "The Challenge Select Stage button disappeared before it could be clicked.");
+        }
+
+        await ClickAsync(
+                window,
+                observation.Value.Match.ActionX!.Value,
+                observation.Value.Match.ActionY!.Value,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     private async Task<(Stopwatch Runtime,
         IReadOnlyList<PlacementStep> AfterStart)>
         BeginConfiguredMatchAsync(
@@ -28,14 +70,12 @@ public sealed partial class ChallengeMacroRunner
     {
         PlacementMatchExecutionPlan execution =
             PlacementExecutionPlan.ForMatch(
-                preset.CameraPreparationMode,
-                models.PrestartPlacement,
-                models.DelayedPlacement);
+                models.Placement);
         ChallengePlacementPartition? partition =
             await PlaceVisiblePrestartAsync(
                     window,
                     preset,
-                    models.PrestartPlacement,
+                    models.Placement,
                     execution.BeforeStart,
                     prestart,
                     report,
@@ -59,7 +99,8 @@ public sealed partial class ChallengeMacroRunner
                             frame),
                     retryMilliseconds: 100,
                     maximumAttempts: 3,
-                    cancellationToken)
+                    cancellationToken,
+                    softTimeout: TimeSpan.FromSeconds(5))
                 .ConfigureAwait(false);
         if (start is null)
         {
@@ -106,7 +147,7 @@ public sealed partial class ChallengeMacroRunner
             .ConfigureAwait(false);
         if (partition is
             { AfterStart.Count: > 0 } &&
-            models.PrestartPlacement is not null)
+            models.Placement is not null)
         {
             await Task.Delay(
                     550,
@@ -121,7 +162,7 @@ public sealed partial class ChallengeMacroRunner
             await PlaceAsync(
                     window,
                     preset,
-                    models.PrestartPlacement,
+                    models.Placement,
                     partition.AfterStart,
                     log,
                     cancelPlacementKey,

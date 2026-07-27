@@ -10,35 +10,23 @@ public partial class MacroPage
         ChallengeMapId,
         ChallengeMapRuntimeModels>>
         LoadChallengeModelsAsync(
-            ChallengePreset preset,
-            CancellationToken cancellationToken)
+        ChallengePreset preset,
+        CancellationToken cancellationToken)
     {
+        CameraPreparationExecutionPolicy.ValidateForExecution(
+            preset.CameraPreparationMode,
+            "The selected Challenge preset");
         Dictionary<ChallengeMapId, ChallengeMapRuntimeModels>
             result = [];
         foreach (ChallengeMapProfile profile in preset.Maps)
         {
-            CameraModel? camera =
-                preset.CameraPreparationMode ==
-                    CameraPreparationMode.CameraModel
-                    ? await _services.CameraModels.LoadAsync(
-                        profile.CameraModelId,
-                        cancellationToken).ConfigureAwait(false)
-                        ?? throw new InvalidOperationException(
-                            $"The {Label(profile.Map)} camera model could not be loaded.")
-                    : null;
-            PlacementModel? prestart =
-                await LoadOptionalPlacementAsync(
+            PlacementModel placement =
+                await LoadRequiredPlacementAsync(
                     profile.PrestartPlacementModelId,
-                    cancellationToken).ConfigureAwait(false);
-            PlacementModel? delayed =
-                await LoadOptionalPlacementAsync(
-                    profile.DelayedPlacementModelId,
                     cancellationToken).ConfigureAwait(false);
             result[profile.Map] =
                 new ChallengeMapRuntimeModels(
-                    camera,
-                    prestart,
-                    delayed);
+                    placement);
         }
         return result;
     }
@@ -46,44 +34,21 @@ public partial class MacroPage
     private async Task<StageRuntimeModels>
         LoadStageModelsAsync(
             CameraPreparationMode cameraMode,
-            string cameraId,
             string prestartId,
-            string delayedId,
             CancellationToken cancellationToken)
     {
-        CameraModel? camera =
-            cameraMode == CameraPreparationMode.CameraModel
-                ? await _services.CameraModels.LoadAsync(
-                    cameraId,
-                    cancellationToken).ConfigureAwait(false)
-                    ?? throw new InvalidOperationException(
-                        "The selected camera model could not be loaded.")
-                : null;
-        PlacementModel? prestart =
-            await LoadOptionalPlacementAsync(
+        CameraPreparationExecutionPolicy.ValidateForExecution(
+            cameraMode,
+            "The selected Stage preset");
+        PlacementModel placement =
+            await LoadRequiredPlacementAsync(
                 prestartId,
                 cancellationToken).ConfigureAwait(false);
-        PlacementModel? delayed =
-            await LoadOptionalPlacementAsync(
-                delayedId,
-                cancellationToken).ConfigureAwait(false);
         return new StageRuntimeModels(
-            camera,
-            prestart,
-            delayed);
+            placement);
     }
 
-    private Task<PlacementModel?>
-        LoadOptionalPlacementAsync(
-            string id,
-            CancellationToken cancellationToken) =>
-        string.IsNullOrWhiteSpace(id)
-            ? Task.FromResult<PlacementModel?>(null)
-            : LoadRequiredPlacementAsync(
-                id,
-                cancellationToken);
-
-    private async Task<PlacementModel?>
+    private async Task<PlacementModel>
         LoadRequiredPlacementAsync(
             string id,
             CancellationToken cancellationToken) =>

@@ -139,7 +139,9 @@ try {
     foreach ($line in [System.IO.File]::ReadLines($eventPath)) {
         if ([string]::IsNullOrWhiteSpace($line)) { continue }
         $event = $line | ConvertFrom-Json
-        if ($event.category -eq 'frame' -and $event.action -eq 'capture_client' -and $event.frame) {
+        if ($event.category -eq 'frame' -and
+            $event.action -in @('capture_client', 'automation_action') -and
+            $event.frame) {
             if ($null -ne $current) { $records.Add($current) }
             $leaf = [System.IO.Path]::GetFileName([string]$event.frame)
             $numberMatch = [regex]::Match($leaf, '(\d+)')

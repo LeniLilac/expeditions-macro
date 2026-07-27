@@ -32,6 +32,8 @@ public static class EventScreenDetector
         new(0, 55, 180, 55);
     private static readonly ScreenRegion ActTitle =
         new(380, 20, 225, 58);
+    private static readonly ScreenRegion ActSubtitle =
+        new(400, 40, 220, 80);
     private static readonly ScreenRegion ActScrollRail =
         new(190, 548, 610, 25);
 
@@ -93,17 +95,15 @@ public static class EventScreenDetector
                     shared.ActionY));
         }
 
-        double eventHome = EventEntryDetector.HomeScore(
+        double actSelector = ActSelectorScore(
             image,
             eventChrome);
-        if (eventHome >= 0.72)
+        if (actSelector >= 0.72)
         {
             return Trace(
                 new EventScreenMatch(
-                    EventScreenState.EventHome,
-                    eventHome,
-                    499,
-                    571));
+                    EventScreenState.ActSelector,
+                    actSelector));
         }
 
         double eventCatalog =
@@ -118,14 +118,18 @@ public static class EventScreenDetector
                     183));
         }
 
-        double actSelector = ActSelectorScore(
-            image,
-            eventChrome);
+        // Decorative Event chrome can finish rendering after both live owned
+        // controls. Do not block navigation once the selected Villain tab and
+        // Event Gamemode action independently agree.
+        double eventHome =
+            EventEntryDetector.HomeScore(image);
         return Trace(
-            actSelector >= 0.72
+            eventHome >= 0.72
                 ? new EventScreenMatch(
-                    EventScreenState.ActSelector,
-                    actSelector)
+                    EventScreenState.EventHome,
+                    eventHome,
+                    499,
+                    571)
                 : new EventScreenMatch(
                     EventScreenState.None,
                     Math.Max(
@@ -250,8 +254,14 @@ public static class EventScreenDetector
                 image,
                 ActScrollRail,
                 IsEventRed);
+        double subtitleWhite =
+            BestHorizontalLineFraction(
+                image,
+                ActSubtitle,
+                IsNeutralWhite);
         if (titleRed < 0.025 ||
-            scrollRed < 0.55)
+            scrollRed < 0.55 ||
+            subtitleWhite < 0.08)
         {
             return 0;
         }
@@ -334,6 +344,14 @@ public static class EventScreenDetector
         byte green,
         byte blue) =>
         red + green + blue <= 175;
+
+    private static bool IsNeutralWhite(
+        byte red,
+        byte green,
+        byte blue) =>
+        Math.Min(red, Math.Min(green, blue)) >= 170 &&
+        Math.Max(red, Math.Max(green, blue)) -
+        Math.Min(red, Math.Min(green, blue)) <= 45;
 
     private static double Ramp(
         double value,

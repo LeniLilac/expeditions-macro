@@ -1,3 +1,4 @@
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Runtime;
 
@@ -30,10 +31,14 @@ internal static class RobloxLobbyReadinessGate
         utcNow ??= static () => DateTimeOffset.UtcNow;
         delay ??= static (duration, token) =>
             Task.Delay(duration, token);
-        DateTimeOffset deadline = utcNow() + timeout;
         StableStateTracker<string> lobbyTracker =
             new(StableLobbyFrames);
-        while (utcNow() < deadline)
+        ObservationWaitBudget budget = new(
+            timeout,
+            StableLobbyFrames,
+            utcNow);
+        while (budget.ShouldObserve(
+                   lobbyTracker.HasPendingCandidate))
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -48,6 +53,7 @@ internal static class RobloxLobbyReadinessGate
                     ? "lobby"
                     : null;
                 if (lobbyTracker.Update(lobby) is not null) return;
+                budget.MarkObserved();
             }
             catch (OperationCanceledException)
                 when (cancellationToken.IsCancellationRequested)

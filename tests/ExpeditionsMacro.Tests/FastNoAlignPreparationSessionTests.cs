@@ -10,7 +10,7 @@ public sealed class FastNoAlignPreparationSessionTests
     [Fact]
     public async Task EnsurePrepared_ReusesPoseUntilLobbyIsObserved()
     {
-        FakeAutomation automation = Automation();
+        CameraPoseTestAutomation automation = Automation();
         FastNoAlignPreparationSession session =
             Session(automation);
         RobloxWindow window =
@@ -48,7 +48,7 @@ public sealed class FastNoAlignPreparationSessionTests
     [Fact]
     public async Task EnsurePrepared_DoesNotReuseAcrossRobloxProcesses()
     {
-        FakeAutomation automation = Automation();
+        CameraPoseTestAutomation automation = Automation();
         FastNoAlignPreparationSession session =
             Session(automation);
 
@@ -68,7 +68,7 @@ public sealed class FastNoAlignPreparationSessionTests
     [Fact]
     public async Task FailedPreparation_IsNeverCached()
     {
-        FakeAutomation automation = new(
+        CameraPoseTestAutomation automation = new(
             VisionScorerTests.Pattern(
                 RobloxClientProfile.Width,
                 RobloxClientProfile.Height))
@@ -92,14 +92,14 @@ public sealed class FastNoAlignPreparationSessionTests
         Assert.False(session.IsPrepared(window));
     }
 
-    private static FakeAutomation Automation() =>
+    private static CameraPoseTestAutomation Automation() =>
         new(
             VisionScorerTests.Pattern(
                 RobloxClientProfile.Width,
                 RobloxClientProfile.Height));
 
     private static FastNoAlignPreparationSession Session(
-        FakeAutomation automation) =>
+        CameraPoseTestAutomation automation) =>
         new(new CameraPosePreparationService(automation));
 
     private static RobloxWindow Window(int processId) =>

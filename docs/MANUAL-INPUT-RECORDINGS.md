@@ -1,10 +1,10 @@
 # Manual input recordings
 
-Manual recordings are an opt-in advanced Fast no-align workflow for
+Manual recordings are an opt-in advanced Fast pose workflow for
 routes where replaying one complete manual input sequence is faster than
 detector-driven placement.
 
-Enable **Manual input recordings** under Settings to expose the
+Turn on **Enable advanced manual recordings** under Settings to expose the
 **Recordings** page and the recording selector under Placement Setup.
 
 ## User workflow
@@ -12,22 +12,23 @@ Enable **Manual input recordings** under Settings to expose the
 1. Load the intended route and stop on its confirmed prestart screen.
 2. If the route normally applies deterministic spawn movement, choose
    **Prepare recording start** in Placement Setup first. This runs the
-   production Fast no-align preparation and that route's movement.
+   production Fast pose preparation and that route's movement.
 3. Open **Recordings**, enter a name, and choose **Arm recording**.
 4. Focus Roblox and press the global macro hotkey. Record the complete
    sequence, including the click on **Start Game**.
 5. Press the macro hotkey again before Victory or Defeat appears.
-6. Select the saved recording in that route's Placement Setup and save.
+6. Select the saved recording in that route's Placement Setup. The
+   assignment saves automatically.
 7. Select the recording and choose **Arm playback**. Focus Roblox, then
    press the global macro hotkey to start the test from the same prestart
    state. Press the hotkey again to stop playback. The Placement Setup
    playback action uses the same armed-hotkey boundary.
 
 At runtime, the mode runner still verifies prestart and performs its
-normal route, team, camera, and deterministic positioning preparation.
+normal route, team, Fast pose, and deterministic positioning preparation.
 It then gives exclusive Roblox input ownership to the selected recording
 instead of clicking Start or running placement steps. Screen detection
-and camera work remain paused throughout playback. When playback ends,
+and pose preparation remain paused throughout playback. When playback ends,
 the runner resumes terminal-state detection, handles Victory or Defeat,
 and uses the normal Repeat Stage or scheduler handoff.
 
@@ -77,8 +78,9 @@ Windows implementations:
 - reject pointer input outside the Roblox client;
 - establish the saved initial pointer through acknowledged motion before
   starting the playback clock;
-- refuse a mouse button or wheel event when the real pointer is not at
-  the recorded client coordinate;
+- require the real pointer to be within one client pixel of the recorded
+  client coordinate before a mouse button or wheel event, without
+  correcting or jumping the pointer at that boundary;
 - track every key and mouse button pressed during playback.
 
 Success, cancellation, focus loss, invalid geometry, timing failure, and
@@ -117,7 +119,7 @@ ID, event count, maximum timing drift, and success state. Share bundles
 never collect recordings, screenshots, app settings, webhooks,
 private-server links, diagnostics, or Windows profile paths.
 
-Turning off Advanced manual recordings hides its authoring surfaces but
+Turning off **Enable advanced manual recordings** hides its authoring surfaces but
 does not erase saved route assignments. A plan cannot start a route that
 references a manual recording until the feature is re-enabled or the
 recording assignment is removed.

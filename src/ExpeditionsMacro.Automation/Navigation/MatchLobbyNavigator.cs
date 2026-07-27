@@ -98,12 +98,16 @@ public sealed class MatchLobbyNavigator
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        DateTimeOffset deadline = _utcNow() + timeout;
         StableNavigationActionTracker<MatchLobbyDoorLayout>
             tracker = new(
                 required: 2,
                 coordinateTolerance: 0);
-        while (_utcNow() < deadline)
+        ObservationWaitBudget budget = new(
+            timeout,
+            minimumObservations: 2,
+            _utcNow);
+        while (budget.ShouldObserve(
+                   tracker.HasPendingCandidate))
         {
             MatchLobbyDoorButtonMatch match =
                 MatchLobbyDoorButtonDetector.Detect(
@@ -116,6 +120,7 @@ public sealed class MatchLobbyNavigator
                     ? (match.ActionX, match.ActionY)
                     : null);
             if (stable is not null) return match;
+            budget.MarkObserved();
             await _delay(
                 PollInterval,
                 cancellationToken).ConfigureAwait(false);
@@ -159,10 +164,14 @@ public sealed class MatchLobbyNavigator
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        DateTimeOffset deadline = _utcNow() + timeout;
         int stable = 0;
         LobbyExitConfirmationMatch last = default;
-        while (_utcNow() < deadline)
+        ObservationWaitBudget budget = new(
+            timeout,
+            minimumObservations: 2,
+            _utcNow);
+        while (budget.ShouldObserve(
+                   confirmationPending: stable == 1))
         {
             last = LobbyExitConfirmationDetector.Detect(
                 await CaptureAsync(
@@ -170,6 +179,7 @@ public sealed class MatchLobbyNavigator
                     cancellationToken).ConfigureAwait(false));
             stable = last.Visible ? stable + 1 : 0;
             if (stable >= 2) return last;
+            budget.MarkObserved();
             await _delay(
                 PollInterval,
                 cancellationToken).ConfigureAwait(false);
@@ -182,9 +192,13 @@ public sealed class MatchLobbyNavigator
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        DateTimeOffset deadline = _utcNow() + timeout;
         int absent = 0;
-        while (_utcNow() < deadline)
+        ObservationWaitBudget budget = new(
+            timeout,
+            minimumObservations: 2,
+            _utcNow);
+        while (budget.ShouldObserve(
+                   confirmationPending: absent == 1))
         {
             LobbyExitConfirmationMatch match =
                 LobbyExitConfirmationDetector.Detect(
@@ -193,6 +207,7 @@ public sealed class MatchLobbyNavigator
                         cancellationToken).ConfigureAwait(false));
             absent = match.Visible ? 0 : absent + 1;
             if (absent >= 2) return true;
+            budget.MarkObserved();
             await _delay(
                 PollInterval,
                 cancellationToken).ConfigureAwait(false);

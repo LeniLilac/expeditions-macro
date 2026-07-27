@@ -38,11 +38,6 @@ public partial class MainWindow : Window
         {
             ["Dashboard"] = _macroPage,
             ["Macro Plan"] = _macroPage,
-            ["Expeditions"] = new ExpeditionsPage(services),
-            ["Challenges"] = new ChallengesPage(services),
-            ["Story"] = new StoryPage(services),
-            ["Raid"] = new RaidPage(services),
-            ["Camera Models"] = new CameraModelsPage(services),
             ["Placement Setup"] = new PlacementModelsPage(services),
             ["Recordings"] = new ManualRecordingsPage(services),
             ["Debug"] = new DebugPage(services),
@@ -112,11 +107,6 @@ public partial class MainWindow : Window
             {
                 "Dashboard" => DashboardNav,
                 "Macro Plan" => MacroPlanNav,
-                "Expeditions" => ExpeditionsNav,
-                "Challenges" => ChallengesNav,
-                "Story" => StoryNav,
-                "Raid" => RaidNav,
-                "Camera Models" => CameraNav,
                 "Placement Setup" => PlacementNav,
                 "Recordings" => RecordingsNav,
                 "Debug" => DebugNav,
@@ -148,11 +138,6 @@ public partial class MainWindow : Window
         {
             "Dashboard" => DashboardNav,
             "Macro Plan" => MacroPlanNav,
-            "Expeditions" => ExpeditionsNav,
-            "Challenges" => ChallengesNav,
-            "Story" => StoryNav,
-            "Raid" => RaidNav,
-            "Camera Models" => CameraNav,
             "Placement Setup" => PlacementNav,
             "Recordings" => RecordingsNav,
             "Debug" => DebugNav,
@@ -171,10 +156,6 @@ public partial class MainWindow : Window
         }
 
         await ShowPageAsync(key);
-        if (_pages[key] is ExpeditionsPage expeditions) expeditions.SetSnapshotFastMode();
-        if (_pages[key] is ChallengesPage challengePresets) challengePresets.SetSnapshotFastMode();
-        if (_pages[key] is StoryPage story) story.SetSnapshotFastMode();
-        if (_pages[key] is RaidPage raid) raid.SetSnapshotFastMode();
         if (_pages[key] is PlacementModelsPage placement)
         {
             placement.SetSnapshotState(
@@ -192,7 +173,6 @@ public partial class MainWindow : Window
                 macroPlanState);
         }
         if (_pages[key] is SettingsPage settings) settings.SetSnapshotScroll(showPageEnd);
-        if (_pages[key] is ChallengesPage challenges) challenges.SetSnapshotScroll(showPageEnd);
         if (_pages[key] is DebugPage debug)
         {
             debug.SetSnapshotState();
@@ -207,7 +187,6 @@ public partial class MainWindow : Window
         // Setup operations complete through a diagnostic wrapper that deliberately
         // does not retain the WPF synchronization context. Exercise that exact
         // boundary in the repeatable UI snapshot check.
-        await Task.Run(() => ((CameraModelsPage)_pages["Camera Models"]).RefreshModelsAsync());
         await Task.Run(() => ((PlacementModelsPage)_pages["Placement Setup"]).RefreshModelsAsync());
     }
 
@@ -365,51 +344,6 @@ public partial class MainWindow : Window
             PlacementNav.IsChecked = true;
         }
 
-        bool cameraVisible =
-            _snapshotMode ||
-            !_services.Settings.FastNoAlignEnabled;
-        CameraNav.Visibility = cameraVisible
-            ? Visibility.Visible
-            : Visibility.Collapsed;
-        if (!cameraVisible &&
-            ReferenceEquals(
-                PageHost.Content,
-                _pages["Camera Models"]))
-        {
-            PlacementNav.IsChecked = true;
-        }
-
-        bool legacyPresetsVisible =
-            _snapshotMode ||
-            !_services.Settings.FastNoAlignEnabled;
-        PresetsHeader.Visibility =
-            legacyPresetsVisible
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-        ExpeditionsNav.Visibility =
-            legacyPresetsVisible
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-        ChallengesNav.Visibility =
-            legacyPresetsVisible
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-        StoryNav.Visibility =
-            legacyPresetsVisible
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-        RaidNav.Visibility =
-            legacyPresetsVisible
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-        if (!legacyPresetsVisible &&
-            PageHost.Content is ExpeditionsPage or
-                ChallengesPage or
-                StoryPage or
-                RaidPage)
-        {
-            DashboardNav.IsChecked = true;
-        }
         SetNavigationRailCollapsed(
             _navigationRailCollapsed);
     }

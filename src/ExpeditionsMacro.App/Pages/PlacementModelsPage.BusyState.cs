@@ -6,10 +6,6 @@ public partial class PlacementModelsPage
     {
         bool busy =
             _services.Coordinator.IsBusy;
-        SaveButton.IsEnabled = !busy;
-        RecordButton.IsEnabled = !busy;
-        TestButton.IsEnabled = !busy;
-        StopButton.IsEnabled = busy;
         FastPrepareButton.IsEnabled = !busy;
         FastPositionButton.IsEnabled = !busy;
         FastTestButton.IsEnabled = !busy;

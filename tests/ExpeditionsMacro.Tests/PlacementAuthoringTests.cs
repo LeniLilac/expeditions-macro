@@ -220,7 +220,7 @@ public sealed class PlacementAuthoringTests
     }
 
     [Fact]
-    public void ExecutionPlan_SplitsFastPhasesAndPreservesLegacyModels()
+    public void ExecutionPlan_SplitsFastPlacementPhases()
     {
         PlacementStep before =
             Step(PlacementPhase.BeforeStart, 1);
@@ -236,36 +236,14 @@ public sealed class PlacementAuthoringTests
             },
             before,
             after);
-        PlacementModel legacyPrimary = Placement(
-            CameraPreparationMode.CameraModel,
-            null,
-            before);
-        PlacementModel legacyDelayed = Placement(
-            CameraPreparationMode.CameraModel,
-            null,
-            after);
-
         Assert.Equal(
             [before],
             PlacementExecutionPlan.BeforeStart(
-                CameraPreparationMode.FastNoAlign,
                 fast));
         Assert.Equal(
             [after],
             PlacementExecutionPlan.AfterStart(
-                CameraPreparationMode.FastNoAlign,
                 fast));
-        Assert.Equal(
-            legacyPrimary.Steps,
-            PlacementExecutionPlan.BeforeStart(
-                CameraPreparationMode.CameraModel,
-                legacyPrimary));
-        Assert.Equal(
-            legacyDelayed.Steps,
-            PlacementExecutionPlan.AfterStart(
-                CameraPreparationMode.CameraModel,
-                legacyPrimary,
-                legacyDelayed));
     }
 
     [Fact]
@@ -323,7 +301,6 @@ public sealed class PlacementAuthoringTests
 
         IReadOnlyList<PlacementStep> schedule =
             PlacementExecutionPlan.AfterStart(
-                CameraPreparationMode.FastNoAlign,
                 model);
 
         Assert.Equal(

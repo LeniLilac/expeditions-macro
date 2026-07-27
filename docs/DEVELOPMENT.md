@@ -7,7 +7,7 @@ This guide holds the detailed engineering conventions intentionally kept out of 
 - `src/ExpeditionsMacro.Core`: immutable geometry, imaging, models, persistence, and workflow contracts. It must not depend on WPF, Win32, or OpenCV.
 - `src/ExpeditionsMacro.Windows`: Win32 discovery/sizing, Windows Graphics Capture, HDR-to-SDR conversion, global hotkeys, DPAPI, and Roblox-compatible input.
 - `src/ExpeditionsMacro.Vision`: normalization, matching, specialized detectors, detector packs, node hues, and hotbar checks.
-- `src/ExpeditionsMacro.Automation`: camera and placement workflows, mode runners, scheduling, recovery, diagnostics, and Discord.
+- `src/ExpeditionsMacro.Automation`: Fast camera-pose preparation, placement workflows, mode runners, scheduling, recovery, diagnostics, and Discord.
 - `src/ExpeditionsMacro.App`: WPF shell, pages, themes, dialogs, and exclusive operation coordination.
 - `tools/ExpeditionsMacro.DatasetBuilder`: compiles reviewed captures into detector packs.
 - `tools/ExpeditionsMacro.DeepDebugViewer`: local viewer for deep-debug archives.
@@ -59,12 +59,15 @@ When a file approaches its budget:
 
 ## Runtime and input conventions
 
-- Store every region, click target, camera region, and placement coordinate relative to the Roblox client.
+- Store every detector region, click target, and placement coordinate relative to the Roblox client.
 - Standardize the client before detector-dependent work and keep it standardized afterward.
 - Pass cancellation tokens through delays, polling, input, capture, downloads, and long processing where supported.
 - Release every held input in `finally` or an equivalent guaranteed cleanup path.
 - Focus and revalidate the window after transitions; rediscover stale handles rather than continuing with stale geometry.
-- Use shared input primitives. Roblox requires acknowledged relative movement before clicks, hardware scan codes for some keys, and relative right-drag motion for fine camera control.
+- Use shared input primitives. Roblox requires acknowledged relative movement before clicks and hardware scan codes for some keys.
+- Camera preparation is Fast-only: clamp zoom and top-down pitch through the shared balanced Shift Lock path, and do not send horizontal yaw input.
+- Treat public-beta camera-model fields as deserialize-only compatibility. They may be loaded and shown with migration guidance, but must be rejected before Roblox discovery or input and must never re-enter new authoring or runtime composition.
+- Make every owned UI wait observation-aware. Seed any already-captured evidence, require fresh state-owned geometry before input, keep the original hard deadline and click/attempt cap, and never let a static action coordinate stand in for live detector proof.
 - Intentional waits over ten minutes follow the keepalive behavior documented in `docs/GAME-BEHAVIOR.md`.
 
 ## Vision and datasets
@@ -72,6 +75,7 @@ When a file approaches its budget:
 - Build detectors from stable structure, using independent geometry, color, edge, and repeated-layout evidence.
 - Do not depend on avatars, player counts, rotating artwork, map names, reward art, hover state, moving units, or session lighting.
 - Tie actions to the same live structure that was detected; translated/scaled detections must translate/scale their action.
+- A detector action is advisory unless the current frame also proves its owning state. Do not authorize input from a manifest/static coordinate fallback.
 - Do not lower a threshold just to pass one screenshot. Identify unstable pixels, replace the signal, and add a negative regression.
 - Preserve state priority so new detectors do not steal disconnect, lobby, reward, terminal, or other earlier states.
 - Store only reviewed 808 by 611 Roblox client PNGs. Exclude desktop chrome, other applications, notifications, chats, account names, tokens, and webhooks.
@@ -82,13 +86,15 @@ When a file approaches its budget:
 - Reuse shared WPF resources and controls. Keep dark and light themes equally usable.
 - Put explanatory copy below headings and above controls; do not squeeze prose beside inputs.
 - Prevent clipping at supported Windows scaling and test long labels, disabled states, and narrow layouts.
-- Show friendly model/preset names rather than record `ToString()` output or schema details.
+- Show friendly route/setup names rather than record `ToString()` output or schema details.
 - Keep capture, image processing, network, polling, and release work off the UI thread.
 - Render and inspect both themes after UI changes.
 
 ## Persistence, networking, and secrets
 
 - User data belongs under `%LocalAppData%\ExpeditionsMacro`, never the installation directory.
+- Macro Plan and Placement Setup persist every committed authoring change automatically. Serialize writes, retain the source identifier and replacement ancestry captured with each edit, drain edits queued during an active save, and flush before plan/setup switches, execution, export, deletion, navigation, or shutdown.
+- Loading and programmatic UI synchronization must not enqueue authoring saves. A stale or failed completion must not overwrite newer status; failed writes remain visibly retryable.
 - Validate downloaded paths, hashes, sizes, versions, and compatibility before installation; retain rollback behavior.
 - Document network behavior in `PRIVACY.md`; do not add telemetry implicitly.
 - Discord messages use Components V2 and explicit `allowed_mentions`.

@@ -114,7 +114,7 @@ public sealed class PlacementServiceTests
     }
 
     [Fact]
-    public async Task Playback_RetriesOnlyClickWhenSelectedPanelIsAbsent()
+    public async Task Playback_DoesNotRetryWhenSelectionAppearsAtBoundary()
     {
         string root = TestPaths.NewTemporaryDirectory();
         try
@@ -158,12 +158,12 @@ public sealed class PlacementServiceTests
                 automation.InputActions.Count(
                     action => action == "key:2"));
             Assert.Equal(
-                2,
+                1,
                 automation.InputActions.Count(
                     action =>
                         action == "click-retain:320,280"));
             Assert.Equal(
-                2,
+                1,
                 automation.InputActions.Count(
                     action =>
                         action ==
@@ -601,6 +601,7 @@ public sealed class PlacementServiceTests
         private int _captureIndex;
         private int _idleClickCount;
         private bool _panelDismissed;
+        private int _dismissedCaptureDelayCount;
 
         public FakeAutomation(
             params ImageFrame[] captures)
@@ -630,6 +631,8 @@ public sealed class PlacementServiceTests
         public List<DateTimeOffset> ClickTimes { get; } = [];
 
         public int IdleClicksBeforeDismissal { get; init; } = 1;
+
+        public int HiddenCaptureDelayAfterDismissal { get; init; }
 
         public Action<char>? LetterTapped
         {
@@ -662,7 +665,11 @@ public sealed class PlacementServiceTests
         {
             if (_panelDismissed)
             {
-                return _dismissedCapture;
+                if (_dismissedCaptureDelayCount++ >=
+                    HiddenCaptureDelayAfterDismissal)
+                {
+                    return _dismissedCapture;
+                }
             }
             ImageFrame frame = _captures[
                 Math.Min(
@@ -740,6 +747,7 @@ public sealed class PlacementServiceTests
             ClickTimes.Add(DateTimeOffset.UtcNow);
             _idleClickCount = 0;
             _panelDismissed = false;
+            _dismissedCaptureDelayCount = 0;
             return Task.CompletedTask;
         }
 
@@ -754,8 +762,6 @@ public sealed class PlacementServiceTests
         public Task ScrollClientAsync(RobloxWindow window, int notches, CancellationToken cancellationToken) => Task.CompletedTask;
 
         public Task DragCameraAsync(RobloxWindow window, int deltaX, int deltaY, int chunkPixels, CancellationToken cancellationToken) => Task.CompletedTask;
-
-        public Task PulseCameraYawAsync(RobloxWindow window, CameraYawDirection direction, int holdMilliseconds, CancellationToken cancellationToken) => Task.CompletedTask;
 
         public Task ZoomOutFullyAsync(RobloxWindow window, int ticks, CancellationToken cancellationToken) => Task.CompletedTask;
 

@@ -24,7 +24,6 @@ public sealed partial class ExpeditionMacroRunner
     {
         PlacementMatchExecutionPlan execution =
             PlacementExecutionPlan.ForMatch(
-                preset.CameraPreparationMode,
                 placement);
         if (execution.BeforeStart.Count > 0)
         {
@@ -82,6 +81,11 @@ public sealed partial class ExpeditionMacroRunner
                     () => CaptureClient(
                         window,
                         detector),
+                    (action, frame) =>
+                        ActionIsOwned(
+                            detector,
+                            action,
+                            frame),
                     detector.ActionFor,
                     static () =>
                         DateTimeOffset.UtcNow,

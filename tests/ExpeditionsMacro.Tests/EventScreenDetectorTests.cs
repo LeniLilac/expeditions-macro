@@ -138,6 +138,46 @@ public sealed class EventScreenDetectorTests
     }
 
     [Fact]
+    public void ShiftedActSelector_PrecedesRetainedEventHomeEvidence()
+    {
+        EventScreenMatch match =
+            EventScreenDetector.Detect(
+                Load("ActSelector_CurrentShifted.png"));
+
+        Assert.Equal(
+            EventScreenState.ActSelector,
+            match.State);
+        Assert.Null(match.ActionX);
+        Assert.Null(match.ActionY);
+    }
+
+    [Fact]
+    public void EventHome_RejectsActCarouselWithoutSelectorHeading()
+    {
+        ImageFrame frame = Load(
+            "ActSelector_CurrentShifted.png")
+            .Clone();
+        FillRegion(
+            frame,
+            x: 380,
+            y: 20,
+            width: 225,
+            height: 100,
+            red: 12,
+            green: 12,
+            blue: 12);
+
+        EventScreenMatch match =
+            EventScreenDetector.Detect(frame);
+
+        Assert.Equal(
+            EventScreenState.None,
+            match.State);
+        Assert.Null(match.ActionX);
+        Assert.Null(match.ActionY);
+    }
+
+    [Fact]
     public void EventCatalog_RejectsWideVillainTab()
     {
         ImageFrame frame = Load(
@@ -177,6 +217,36 @@ public sealed class EventScreenDetectorTests
         Assert.NotEqual(
             EventScreenState.EventHome,
             EventScreenDetector.Detect(frame).State);
+    }
+
+    [Fact]
+    public void EventHome_DoesNotWaitForDecorativeHeader()
+    {
+        ImageFrame frame = Load(
+            "EventHome_BeginnerPathPresent_01.png")
+            .Clone();
+        FillRegion(
+            frame,
+            x: 0,
+            y: 55,
+            width: 180,
+            height: 54,
+            red: 12,
+            green: 12,
+            blue: 12);
+
+        EventScreenMatch match =
+            EventScreenDetector.Detect(frame);
+
+        Assert.Equal(
+            EventScreenState.EventHome,
+            match.State);
+        Assert.Equal(
+            EventScreenDetector.EventGameModeAction.X,
+            match.ActionX);
+        Assert.Equal(
+            EventScreenDetector.EventGameModeAction.Y,
+            match.ActionY);
     }
 
     [Theory]

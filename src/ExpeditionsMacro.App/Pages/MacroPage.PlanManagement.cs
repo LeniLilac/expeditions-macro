@@ -249,11 +249,8 @@ public partial class MacroPage
             (PlanCombo.SelectedItem as MacroPlan)?.Id;
         _plans.Clear();
         foreach (MacroPlan plan in
-                 (await _services.MacroPlans
+                 await _services.MacroPlans
                      .ListAsync())
-                 .Where(plan =>
-                     plan.UsesPlacementSetupWorkflow ==
-                     FastTaskWorkflow))
         {
             _plans.Add(plan);
         }

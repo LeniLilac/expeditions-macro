@@ -6,11 +6,6 @@ public sealed record NamedChoice<T>(T Value, string Name);
 
 public sealed record TeamChoice(int Value, string Name);
 
-public sealed record MacroPresetChoice(MacroTaskKind Kind, string Id, string Name)
-{
-    public string DisplayName => $"{Name} - {Kind}";
-}
-
 public sealed class MacroTaskRow
 {
     public required MacroTaskDefinition Definition { get; init; }

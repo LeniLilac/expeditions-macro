@@ -10,7 +10,6 @@ public partial class PlacementModelsPage
     internal void SetSnapshotState(
         bool showRecordingSettings = false)
     {
-        if (!FastWorkflow) return;
         using IDisposable suspension =
             SuspendPlacementAutoSave();
         _selectedModel = null;
@@ -99,34 +98,4 @@ public partial class PlacementModelsPage
         }
     }
 
-    private void ApplyWorkflowMode()
-    {
-        bool fast = FastWorkflow;
-        ModelsList.ItemsSource =
-            fast ? _setupRows : _models;
-        ApplyCatalogContentVisibility();
-        ModelsHeaderText.Text =
-            fast
-                ? "PLACEMENT SETUP"
-                : "PLACEMENT MODELS";
-        LegacyEditorPanel.Visibility =
-            fast ? Visibility.Collapsed : Visibility.Visible;
-        FastEditorPanel.Visibility =
-            fast ? Visibility.Visible : Visibility.Collapsed;
-        PageHeading.Visibility =
-            fast ? Visibility.Collapsed : Visibility.Visible;
-        if (_selectedModel is not null &&
-            _selectedModel.CameraPreparationMode ==
-                (fast
-                    ? CameraPreparationMode.FastNoAlign
-                    : CameraPreparationMode.CameraModel))
-        {
-            ApplyModel(_selectedModel);
-        }
-        else
-        {
-            ApplyNewModelDefaults();
-        }
-        UpdateBusyState();
-    }
 }

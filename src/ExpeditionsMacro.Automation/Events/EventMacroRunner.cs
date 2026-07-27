@@ -169,7 +169,6 @@ public sealed partial class EventMacroRunner
 
             PlacementMatchExecutionPlan execution =
                 PlacementExecutionPlan.ForMatch(
-                    CameraPreparationMode.FastNoAlign,
                     placement);
             if (execution.BeforeStart.Count > 0)
             {
@@ -186,13 +185,26 @@ public sealed partial class EventMacroRunner
                     cancellationToken).ConfigureAwait(false);
             }
 
-            EventScreenMatch prestart =
-                EventScreenDetector.Detect(
-                    CaptureClient(window, detector));
-            if (prestart.State !=
-                    EventScreenState.Prestart ||
-                prestart.ActionX is not int startX ||
-                prestart.ActionY is not int startY)
+            StableScreenAction<EventScreenMatch>? liveStart =
+                await StableScreenActionWaiter.WaitAsync(
+                        EventScreenState.Prestart,
+                        preset.StableDetections,
+                        () => EventScreenDetector.Detect(
+                            CaptureClient(window, detector)),
+                        static match => match.State,
+                        static match =>
+                            match.ActionX is int x &&
+                            match.ActionY is int y
+                                ? (x, y)
+                                : null,
+                        TimeSpan.FromSeconds(12),
+                        TimeSpan.FromMilliseconds(
+                            Math.Max(
+                                200,
+                                preset.PollMilliseconds)),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            if (liveStart is null)
             {
                 throw new RobloxUiUnavailableException(
                     "The Event Start Game button disappeared before it could be clicked.");
@@ -222,8 +234,8 @@ public sealed partial class EventMacroRunner
                 matchRuntime = Stopwatch.StartNew();
                 await ClickAsync(
                     window,
-                    startX,
-                    startY,
+                    liveStart.Value.X,
+                    liveStart.Value.Y,
                     cancellationToken).ConfigureAwait(false);
                 await Task.Delay(
                     1800,
@@ -288,6 +300,7 @@ public sealed partial class EventMacroRunner
                         preparation,
                         detector,
                         playMenuKey,
+                        preset.StableDetections,
                         outcome,
                         matchRuntime.Elapsed,
                         continueScheduledRoute,

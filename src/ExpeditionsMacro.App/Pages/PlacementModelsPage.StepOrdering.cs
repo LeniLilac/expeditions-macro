@@ -1,3 +1,4 @@
+using System.Windows;
 using ExpeditionsMacro.App.Controls;
 using ExpeditionsMacro.App.Models;
 using ExpeditionsMacro.Core.Models;
@@ -6,6 +7,33 @@ namespace ExpeditionsMacro.App.Pages;
 
 public partial class PlacementModelsPage
 {
+    private void RemoveRow_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        RemoveSelectedPlacementStep();
+
+    private bool RemoveSelectedPlacementStep()
+    {
+        if (ActiveStepsSelector.SelectedItem is
+            PlacementStepRow row)
+        {
+            _steps.Remove(row);
+            return true;
+        }
+
+        return false;
+    }
+
+    private void MoveUp_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        MoveSelected(-1);
+
+    private void MoveDown_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        MoveSelected(1);
+
     private void InsertStepInPhaseOrder(
         PlacementStepRow row)
     {
@@ -48,8 +76,7 @@ public partial class PlacementModelsPage
         {
             return false;
         }
-        if (FastWorkflow &&
-            row.Phase ==
+        if (row.Phase ==
                 PlacementPhase.BeforeStart &&
             PlacementAuthoringRules
                 .IsCoveredByStartDialog(
@@ -105,17 +132,9 @@ public partial class PlacementModelsPage
         }
         UpdateFastPlacementCount();
         ActiveStepsSelector.SelectedItem = row;
-        if (FastWorkflow)
-        {
-            FastStepsList.ScrollIntoView(row);
-            FastStatusText.Text =
-                $"Unit {row.UnitKey} moved to {row.PhaseLabel}.";
-        }
-        else
-        {
-            StatusText.Text =
-                $"Unit {row.UnitKey} moved to {row.PhaseLabel}.";
-        }
+        FastStepsList.ScrollIntoView(row);
+        FastStatusText.Text =
+            $"Unit {row.UnitKey} moved to {row.PhaseLabel}.";
         return true;
     }
 
@@ -172,21 +191,15 @@ public partial class PlacementModelsPage
         }
         if (_steps[target].Phase != row.Phase)
         {
-            if (FastWorkflow)
-            {
-                FastStatusText.Text =
-                    "Before Start steps always stay above After Start steps.";
-            }
+            FastStatusText.Text =
+                "Before Start steps always stay above After Start steps.";
             return;
         }
 
         _steps.Move(current, target);
         ActiveStepsSelector.SelectedItem = row;
-        if (FastWorkflow)
-        {
-            FastStepsList.ScrollIntoView(row);
-            FastStatusText.Text =
-                "Placement order changed.";
-        }
+        FastStepsList.ScrollIntoView(row);
+        FastStatusText.Text =
+            "Placement order changed.";
     }
 }

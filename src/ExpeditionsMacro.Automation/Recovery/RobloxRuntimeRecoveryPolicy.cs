@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using ExpeditionsMacro.Automation.Camera;
 using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Runtime;
 
@@ -17,7 +16,6 @@ public static class RobloxRuntimeRecoveryPolicy
         if (error is OperationCanceledException or PlayMenuBindingException) return false;
         if (error is RobloxSessionUnavailableException or
             RobloxUiUnavailableException or
-            CameraWorldNotRenderedException or
             TimeoutException or
             Win32Exception)
         {

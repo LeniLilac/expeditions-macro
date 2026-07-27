@@ -1,3 +1,4 @@
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Challenges;
@@ -46,7 +47,8 @@ internal static class EventPlayInterfaceCloser
         Func<
             TimeSpan,
             CancellationToken,
-            Task>? delay = null)
+            Task>? delay = null,
+        Func<DateTimeOffset>? utcNow = null)
     {
         ArgumentNullException.ThrowIfNull(observe);
         ArgumentNullException.ThrowIfNull(clickBack);
@@ -57,7 +59,8 @@ internal static class EventPlayInterfaceCloser
             await ObserveStableLayerAsync(
                 observe,
                 delay,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                utcNow).ConfigureAwait(false);
         if (layer == EventPlayInterfaceLayer.Closed)
         {
             return;
@@ -73,7 +76,8 @@ internal static class EventPlayInterfaceCloser
             layer = await ObserveStableLayerAsync(
                 observe,
                 delay,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                utcNow).ConfigureAwait(false);
             if (layer == EventPlayInterfaceLayer.Closed)
             {
                 return;
@@ -88,19 +92,27 @@ internal static class EventPlayInterfaceCloser
         ObserveStableLayerAsync(
         Func<EventPlayInterfaceLayer> observe,
         Func<TimeSpan, CancellationToken, Task> delay,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<DateTimeOffset>? utcNow)
     {
         EventPlayInterfaceLayer? last = null;
         int stable = 0;
-        for (int observation = 0;
-             observation < 30;
-             observation++)
+        int required = 0;
+        ObservationWaitBudget budget = new(
+            TimeSpan.FromSeconds(8),
+            minimumObservations: 3,
+            utcNow);
+        while (budget.ShouldObserve(
+                   confirmationPending:
+                       stable > 0 &&
+                       stable < required))
         {
             cancellationToken.ThrowIfCancellationRequested();
             EventPlayInterfaceLayer current = observe();
+            budget.MarkObserved();
             stable = current == last ? stable + 1 : 1;
             last = current;
-            int required =
+            required =
                 current == EventPlayInterfaceLayer.Closed
                     ? 3
                     : 2;

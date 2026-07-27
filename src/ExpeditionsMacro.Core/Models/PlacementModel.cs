@@ -169,7 +169,7 @@ public sealed record PlacementModel
             throw new InvalidDataException(
                 expectedMode == CameraPreparationMode.FastNoAlign
                     ? "Choose a Fast no align placement model for this preset."
-                    : "Choose a camera-model placement for this preset.");
+                    : "Camera Model placements are retired. Replace this preset with a current Placement Setup.");
         }
         if (expectedMode == CameraPreparationMode.FastNoAlign &&
             (Target is null ||

@@ -27,7 +27,7 @@ public sealed partial class ChallengeMacroRunner
             ManualInputRecording? recording =
                 await ManualInputMatchPlayback.ResolveAsync(
                         _manualInputs,
-                        models.PrestartPlacement,
+                        models.Placement,
                         cancellationToken)
                     .ConfigureAwait(false);
             if (recording is not null)
@@ -43,63 +43,34 @@ public sealed partial class ChallengeMacroRunner
     private async Task PrepareCameraAsync(
         RobloxWindow window,
         ChallengePreset preset,
-        CameraModel? model,
         Action<string, int, string, string?, double?>
             report,
         Action<string, MacroEventLevel, string?, double?>
             log,
         CancellationToken cancellationToken)
     {
-        if (preset.CameraPreparationMode ==
-            CameraPreparationMode.FastNoAlign)
-        {
-            bool prepared =
-                await _fastNoAlign.EnsurePreparedAsync(
-                    window,
-                    preset.ZoomTicks,
-                    preset.PitchDragPixels,
-                    new Progress<MacroProgress>(
-                        value => report(
-                            value.Phase,
-                            value.Percent,
-                            value.Message,
-                            value.DetectedState,
-                            value.Confidence)),
-                    cancellationToken).ConfigureAwait(false);
-            log(
-                prepared
-                    ? "Fast no align prepared zoom and pitch without changing yaw."
-                    : "Fast no align reused the camera pose preserved from the previous match.",
-                MacroEventLevel.Success,
-                prepared
-                    ? "fast_no_align"
-                    : "fast_no_align_reused",
-                null);
-            return;
-        }
-
-        double score =
-            await _camera.PrepareAndAlignAsync(
-                model ??
-                    throw new InvalidDataException(
-                        "Choose a camera model for this Challenge map."),
+        bool prepared =
+            await _fastNoAlign.EnsurePreparedAsync(
                 window,
                 preset.ZoomTicks,
                 preset.PitchDragPixels,
-                progress: new Progress<MacroProgress>(
+                new Progress<MacroProgress>(
                     value => report(
                         value.Phase,
                         value.Percent,
                         value.Message,
                         value.DetectedState,
                         value.Confidence)),
-                cancellationToken: cancellationToken)
-                .ConfigureAwait(false);
+                cancellationToken).ConfigureAwait(false);
         log(
-            $"Camera alignment finished at {score:P0} confidence.",
+            prepared
+                ? "Fast no align prepared zoom and pitch without changing yaw."
+                : "Fast no align reused the camera pose preserved from the previous match.",
             MacroEventLevel.Success,
-            null,
-            score);
+            prepared
+                ? "fast_no_align"
+                : "fast_no_align_reused",
+            null);
     }
 
     private Task PlaceAsync(
@@ -161,21 +132,10 @@ public sealed partial class ChallengeMacroRunner
                 throw new InvalidDataException(
                     $"Models for {Label(profile.Map)} were not loaded.");
             }
-            ValidateCameraModel(
-                preset,
-                profile,
-                models,
-                detector);
             PlacementTarget expectedTarget =
                 PlacementTarget.ForChallenge(profile.Map);
-            foreach (PlacementModel placement in
-                     new[]
-                     {
-                         models.PrestartPlacement,
-                         models.DelayedPlacement,
-                     }
-                     .Where(model => model is not null)
-                     .Cast<PlacementModel>())
+            PlacementModel? placement = models.Placement;
+            if (placement is not null)
             {
                 placement.ValidateCompatibility(
                     preset.CameraPreparationMode,
@@ -189,30 +149,6 @@ public sealed partial class ChallengeMacroRunner
                         $"A {Label(profile.Map)} placement model uses a different Roblox client size.");
                 }
             }
-        }
-    }
-
-    private static void ValidateCameraModel(
-        ChallengePreset preset,
-        ChallengeMapProfile profile,
-        ChallengeMapRuntimeModels models,
-        DetectorPackManifest detector)
-    {
-        if (preset.CameraPreparationMode !=
-            CameraPreparationMode.CameraModel)
-        {
-            return;
-        }
-        CameraModel camera = models.Camera ??
-            throw new InvalidDataException(
-                $"Choose a camera model for {Label(profile.Map)}.");
-        if (camera.Manifest.ClientWidth !=
-                detector.ClientWidth ||
-            camera.Manifest.ClientHeight !=
-                detector.ClientHeight)
-        {
-            throw new InvalidDataException(
-                $"The {Label(profile.Map)} camera model uses a different Roblox client size.");
         }
     }
 

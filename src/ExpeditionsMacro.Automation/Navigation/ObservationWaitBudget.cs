@@ -2,14 +2,17 @@ namespace ExpeditionsMacro.Automation.Navigation;
 
 internal sealed class ObservationWaitBudget
 {
-    private static readonly TimeSpan MinimumHardTimeout =
+    private static readonly TimeSpan MinimumUiLoadWindow =
+        TimeSpan.FromSeconds(12);
+    private static readonly TimeSpan MinimumHardGrace =
         TimeSpan.FromSeconds(30);
-    private static readonly TimeSpan MaximumHardTimeout =
-        TimeSpan.FromSeconds(90);
+    private static readonly TimeSpan MaximumHardGrace =
+        TimeSpan.FromSeconds(60);
 
     private readonly Func<DateTimeOffset> _utcNow;
-    private readonly DateTimeOffset _softDeadline;
-    private readonly DateTimeOffset _hardDeadline;
+    private readonly DateTimeOffset _startedAt;
+    private DateTimeOffset _softDeadline;
+    private DateTimeOffset _hardDeadline;
     private readonly int _minimumObservations;
     private int _observations;
 
@@ -31,14 +34,8 @@ internal sealed class ObservationWaitBudget
 
         _utcNow = utcNow ??
             (() => DateTimeOffset.UtcNow);
-        DateTimeOffset startedAt = _utcNow();
-        _softDeadline = startedAt + softTimeout;
-        TimeSpan hardTimeout = TimeSpan.FromTicks(
-            Math.Clamp(
-                softTimeout.Ticks * 4,
-                MinimumHardTimeout.Ticks,
-                MaximumHardTimeout.Ticks));
-        _hardDeadline = startedAt + hardTimeout;
+        _startedAt = _utcNow();
+        SetDeadlines(softTimeout);
         _minimumObservations = minimumObservations;
     }
 
@@ -54,4 +51,36 @@ internal sealed class ObservationWaitBudget
 
     public void MarkObserved() =>
         _observations++;
+
+    public void ExtendSoftTimeout(TimeSpan softTimeout)
+    {
+        if (softTimeout <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(softTimeout));
+        }
+        if (_startedAt + softTimeout <= _softDeadline)
+        {
+            return;
+        }
+
+        SetDeadlines(softTimeout);
+    }
+
+    private void SetDeadlines(TimeSpan softTimeout)
+    {
+        TimeSpan effectiveSoftTimeout =
+            softTimeout < MinimumUiLoadWindow
+                ? MinimumUiLoadWindow
+                : softTimeout;
+        _softDeadline =
+            _startedAt + effectiveSoftTimeout;
+        double graceMilliseconds = Math.Clamp(
+            effectiveSoftTimeout.TotalMilliseconds * 3,
+            MinimumHardGrace.TotalMilliseconds,
+            MaximumHardGrace.TotalMilliseconds);
+        _hardDeadline =
+            _softDeadline +
+            TimeSpan.FromMilliseconds(graceMilliseconds);
+    }
 }

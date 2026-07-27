@@ -28,11 +28,8 @@ public partial class MacroPage : UserControl, IAppPage
 
     private readonly AppServices _services;
     private readonly ObservableCollection<MacroPlan> _plans = [];
-    private readonly ObservableCollection<MacroPresetChoice> _allPresets = [];
-    private readonly ObservableCollection<MacroPresetChoice> _visiblePresets = [];
     private readonly ObservableCollection<PlacementSetupRoute>
         _visibleRoutes = [];
-    private readonly Dictionary<string, StoryPreset> _storyPresets = new(StringComparer.OrdinalIgnoreCase);
     private readonly DispatcherTimer _runtimeTimer;
     private DateTimeOffset? _runStarted;
     private string? _editingTaskId;
@@ -63,13 +60,10 @@ public partial class MacroPage : UserControl, IAppPage
             (_, args) =>
                 OpenTaskEditor(args.Loop);
         PlanCombo.ItemsSource = _plans;
-        TaskKindCombo.ItemsSource = Enum.GetValues<MacroTaskKind>()
-            .Where(kind =>
-                kind != MacroTaskKind.Event ||
-                _services.Settings.FastNoAlignEnabled)
+        TaskKindCombo.ItemsSource = Enum
+            .GetValues<MacroTaskKind>()
             .Select(kind => new NamedChoice<MacroTaskKind>(kind, Label(kind)))
             .ToArray();
-        TaskPresetCombo.ItemsSource = _visiblePresets;
         TaskRouteCombo.ItemsSource = _visibleRoutes;
         TaskDifficultyCombo.ItemsSource = Enumerable
             .Range(1, 3)
@@ -105,7 +99,6 @@ public partial class MacroPage : UserControl, IAppPage
         _loading = true;
         try
         {
-            await RefreshPresetCatalogAsync();
             await RefreshPlansAsync();
             MacroPlan? selected = _plans.FirstOrDefault(plan => plan.Id == _services.Settings.SelectedMacroPlanId) ?? _plans.FirstOrDefault();
             PlanCombo.SelectedItem = selected;
@@ -119,7 +112,7 @@ public partial class MacroPage : UserControl, IAppPage
             DiscordUserIdText.Text = _services.Settings.DiscordErrorUserId;
             LoadPrivateServerRecoverySettings();
             TaskKindCombo.SelectedIndex = 0;
-            RefreshVisiblePresets();
+            RefreshVisibleRoutes();
             UpdateTaskTargetEditor();
         }
         finally
@@ -192,7 +185,6 @@ public partial class MacroPage : UserControl, IAppPage
         PlanNameText.IsEnabled = !busy;
         TaskRowsControl.IsEnabled = !busy;
         TaskKindCombo.IsEnabled = !busy;
-        TaskPresetCombo.IsEnabled = !busy;
         TaskRouteCombo.IsEnabled = !busy;
         TaskDefeatRetriesText.IsEnabled = !busy;
         TaskTraitCheck.IsEnabled = !busy;
@@ -369,11 +361,6 @@ public partial class MacroPage : UserControl, IAppPage
     private string CurrentWebhook() => ShowWebhookCheck.IsChecked == true ? WebhookVisible.Text.Trim() : WebhookPassword.Password.Trim();
 
     private MacroTaskKind SelectedTaskKind() => (TaskKindCombo.SelectedItem as NamedChoice<MacroTaskKind>)?.Value ?? MacroTaskKind.Challenge;
-
-    private bool IsInfiniteStory(MacroPresetChoice preset) =>
-        preset.Kind == MacroTaskKind.Story &&
-        _storyPresets.TryGetValue(preset.Id, out StoryPreset? story) &&
-        story.RunKind == StoryRunKind.Infinite;
 
     private int IndexOfTask(string? id)
     {

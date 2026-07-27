@@ -120,9 +120,10 @@ internal sealed class ResourceRefuelNavigator
                     window,
                     key,
                     token),
-            (timeout, token) =>
+            (initialFrame, timeout, token) =>
                 _screens.WaitForPlayAsync(
                     window,
+                    initialFrame,
                     timeout,
                     token),
             attemptStarted: null,

@@ -108,15 +108,10 @@
                                     <TextBlock x:Name="TaskSelectionLabel"
                                                Style="{StaticResource Caption}"
                                                Text="Route" />
-                                    <Grid Margin="0,5,0,0">
-                                        <ComboBox x:Name="TaskPresetCombo"
-                                                  AutomationProperties.Name="Task preset"
-                                                  DisplayMemberPath="DisplayName" />
-                                        <ComboBox x:Name="TaskRouteCombo"
-                                                  AutomationProperties.Name="Task route"
-                                                  DisplayMemberPath="Name"
-                                                  Visibility="Collapsed" />
-                                    </Grid>
+                                    <ComboBox x:Name="TaskRouteCombo"
+                                              Margin="0,5,0,0"
+                                              AutomationProperties.Name="Task route"
+                                              DisplayMemberPath="Name" />
                                 </StackPanel>
                                 <StackPanel x:Name="TaskTargetPanel"
                                             Grid.Column="2">

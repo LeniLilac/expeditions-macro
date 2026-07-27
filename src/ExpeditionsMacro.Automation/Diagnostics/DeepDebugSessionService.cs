@@ -419,11 +419,6 @@ public sealed class DeepDebugSessionService
             await _artifacts.ResolveAsync(
                 session.Context,
                 root).ConfigureAwait(false);
-        foreach (string id in session.Context.CameraModelIds)
-        {
-            artifacts.CameraModelIds.Add(
-                DeepDebugArtifactResolver.ValidateId(id));
-        }
         foreach (string id in session.Context.PlacementModelIds)
         {
             artifacts.PlacementModelIds.Add(
@@ -431,25 +426,17 @@ public sealed class DeepDebugSessionService
         }
         if (phase == "start")
         {
-            session.ReferencedCameraModelIds.UnionWith(artifacts.CameraModelIds);
             session.ReferencedPlacementModelIds.UnionWith(artifacts.PlacementModelIds);
             session.ReferencedDetectorPackIds.UnionWith(artifacts.DetectorPackIds);
         }
         else
         {
-            artifacts.CameraModelIds.UnionWith(session.ReferencedCameraModelIds);
             artifacts.PlacementModelIds.UnionWith(session.ReferencedPlacementModelIds);
             artifacts.DetectorPackIds.UnionWith(session.ReferencedDetectorPackIds);
         }
 
         if (!includeModels) return;
         string modelsRoot = Path.Combine(session.StagingDirectory, "models", phase);
-        foreach (string id in artifacts.CameraModelIds)
-        {
-            _archiveText.CopyDirectory(
-                Path.Combine(_paths.CameraModels, id),
-                Path.Combine(modelsRoot, "camera", id));
-        }
         foreach (string id in artifacts.PlacementModelIds)
         {
             _archiveText.CopyDirectory(
@@ -531,7 +518,6 @@ public sealed class DeepDebugSessionService
         public int FrameCount;
         public int EventCount;
         public int InputEventCount;
-        public HashSet<string> ReferencedCameraModelIds { get; } = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<string> ReferencedPlacementModelIds { get; } = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<string> ReferencedDetectorPackIds { get; } = new(StringComparer.OrdinalIgnoreCase);
     }

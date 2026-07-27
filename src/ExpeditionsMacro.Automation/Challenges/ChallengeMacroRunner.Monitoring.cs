@@ -23,7 +23,6 @@ public sealed partial class ChallengeMacroRunner
     private async Task<MatchTerminal> MonitorMatchAsync(
         RobloxWindow window,
         ChallengePreset preset,
-        ChallengeMapProfile profile,
         ChallengeMapRuntimeModels models,
         IReadOnlyList<PlacementStep> fastAfterStartSteps,
         IDetectorPack detector,
@@ -33,12 +32,9 @@ public sealed partial class ChallengeMacroRunner
         char cancelPlacementKey,
         CancellationToken cancellationToken)
     {
-        bool fast = preset.CameraPreparationMode ==
-            CameraPreparationMode.FastNoAlign;
         int nextFastStep = 0;
-        bool delayedPlaced = fast
-            ? fastAfterStartSteps.Count == 0
-            : models.DelayedPlacement is null;
+        bool delayedPlaced =
+            fastAfterStartSteps.Count == 0;
         StableStateTracker<ChallengeScreenState> terminalTracker =
             new(preset.StableDetections);
         StableStateTracker<string> recoveryTracker =
@@ -102,7 +98,6 @@ public sealed partial class ChallengeMacroRunner
             }
             if (candidate == ChallengeScreenState.None &&
                 recovery is null &&
-                fast &&
                 !delayedPlaced &&
                 PlacementExecutionPlan.IsAfterStartDue(
                     fastAfterStartSteps[nextFastStep],
@@ -121,7 +116,7 @@ public sealed partial class ChallengeMacroRunner
                 await PlaceAsync(
                     window,
                     preset,
-                    models.PrestartPlacement!,
+                    models.Placement!,
                     [step],
                     log,
                     cancelPlacementKey,
@@ -131,31 +126,6 @@ public sealed partial class ChallengeMacroRunner
                     nextFastStep >=
                     fastAfterStartSteps.Count;
             }
-            else if (candidate == ChallengeScreenState.None &&
-                recovery is null &&
-                !fast &&
-                !delayedPlaced &&
-                ChallengeRunPolicy.IsDelayedPlacementDue(
-                    profile,
-                    matchRuntime.Elapsed))
-            {
-                report(
-                    "Placement",
-                    65,
-                    $"Running delayed placements after " +
-                    $"{matchRuntime.Elapsed.TotalSeconds:F0} seconds.",
-                    null,
-                    null);
-                await PlaceAsync(
-                    window,
-                    preset,
-                    models.DelayedPlacement!,
-                    log,
-                    cancelPlacementKey,
-                    cancellationToken).ConfigureAwait(false);
-                delayedPlaced = true;
-            }
-
             await keepAlive.TryPulseAsync(
                 (key, token) =>
                     _automation.TapLetterKeyAsync(window, key, token),
@@ -170,8 +140,7 @@ public sealed partial class ChallengeMacroRunner
         ChallengeMapRuntimeModels models)
     {
         PlacementModel? placement =
-            models.PrestartPlacement ??
-            models.DelayedPlacement;
+            models.Placement;
         return placement is null
             ? MatchRuntimePolicy.ChallengeLimit()
             : MatchRuntimePolicy.ForPlacement(

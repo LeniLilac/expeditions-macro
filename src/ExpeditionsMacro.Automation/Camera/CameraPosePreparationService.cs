@@ -4,12 +4,15 @@ using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision;
-using ExpeditionsMacro.Vision.Camera;
 
 namespace ExpeditionsMacro.Automation.Camera;
 
 public sealed class CameraPosePreparationService
 {
+    public const int DefaultZoomTicks = 30;
+    public const int DefaultPitchDragPixels = 1800;
+    public const int DefaultSettleMilliseconds = 200;
+
     private const double PoseClampSimilarity = 0.975;
     private const int MaximumPoseClampProbes = 4;
 
@@ -27,9 +30,9 @@ public sealed class CameraPosePreparationService
 
     public async Task PrepareWithoutYawAsync(
         RobloxWindow? existingWindow = null,
-        int zoomTicks = 30,
-        int pitchDragPixels = 1800,
-        int settleMilliseconds = 200,
+        int zoomTicks = DefaultZoomTicks,
+        int pitchDragPixels = DefaultPitchDragPixels,
+        int settleMilliseconds = DefaultSettleMilliseconds,
         IProgress<MacroProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -58,7 +61,6 @@ public sealed class CameraPosePreparationService
             window,
             zoomTicks,
             settleMilliseconds,
-            regions: null,
             "Fast no align",
             20,
             progress,
@@ -77,7 +79,6 @@ public sealed class CameraPosePreparationService
                 window,
                 pitchDragPixels,
                 settleMilliseconds,
-                regions: null,
                 "Fast no align",
                 75,
                 progress,
@@ -100,8 +101,8 @@ public sealed class CameraPosePreparationService
 
     public async Task PreparePitchOnlyAsync(
         RobloxWindow existingWindow,
-        int pitchDragPixels = 1800,
-        int settleMilliseconds = 200,
+        int pitchDragPixels = DefaultPitchDragPixels,
+        int settleMilliseconds = DefaultSettleMilliseconds,
         IProgress<MacroProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
@@ -130,7 +131,6 @@ public sealed class CameraPosePreparationService
                 existingWindow,
                 pitchDragPixels,
                 settleMilliseconds,
-                regions: null,
                 "Settings preparation",
                 75,
                 progress,
@@ -155,7 +155,6 @@ public sealed class CameraPosePreparationService
         RobloxWindow window,
         int zoomTicks,
         int settleMilliseconds,
-        IReadOnlyList<ScreenRegion>? regions,
         string operation,
         int percent,
         IProgress<MacroProgress>? progress,
@@ -175,7 +174,7 @@ public sealed class CameraPosePreparationService
             Math.Max(75, settleMilliseconds),
             cancellationToken).ConfigureAwait(false);
         ImageFrame previous =
-            CapturePoseThumbnail(window, regions);
+            CapturePoseThumbnail(window);
         double similarity = 0;
         for (int probe = 1;
              probe <= MaximumPoseClampProbes;
@@ -189,8 +188,8 @@ public sealed class CameraPosePreparationService
                 Math.Max(75, settleMilliseconds),
                 cancellationToken).ConfigureAwait(false);
             ImageFrame current =
-                CapturePoseThumbnail(window, regions);
-            similarity = CameraRegisteredScorer.Score(
+                CapturePoseThumbnail(window);
+            similarity = TranslationAwareImageScorer.Score(
                 previous,
                 current,
                 maximumTranslation: 2).Score;
@@ -216,7 +215,6 @@ public sealed class CameraPosePreparationService
         RobloxWindow window,
         int pitchDragPixels,
         int settleMilliseconds,
-        IReadOnlyList<ScreenRegion>? regions,
         string operation,
         int percent,
         IProgress<MacroProgress>? progress,
@@ -245,7 +243,7 @@ public sealed class CameraPosePreparationService
             Math.Max(75, settleMilliseconds),
             cancellationToken).ConfigureAwait(false);
         ImageFrame previous =
-            CapturePoseThumbnail(window, regions);
+            CapturePoseThumbnail(window);
         double similarity = 0;
         for (int probe = 1;
              probe <= MaximumPoseClampProbes;
@@ -261,8 +259,8 @@ public sealed class CameraPosePreparationService
                 Math.Max(75, settleMilliseconds),
                 cancellationToken).ConfigureAwait(false);
             ImageFrame current =
-                CapturePoseThumbnail(window, regions);
-            similarity = CameraRegisteredScorer.Score(
+                CapturePoseThumbnail(window);
+            similarity = TranslationAwareImageScorer.Score(
                 previous,
                 current,
                 maximumTranslation: 2).Score;
@@ -364,18 +362,14 @@ public sealed class CameraPosePreparationService
     }
 
     private ImageFrame CapturePoseThumbnail(
-        RobloxWindow window,
-        IReadOnlyList<ScreenRegion>? regions)
+        RobloxWindow window)
     {
         ImageFrame frame =
             _automation.CaptureClient(window);
-        return regions is null
-            ? VisionScorer.PrepareGray(frame, 160, 101)
-            : VisionScorer.MakeThumbnail(
-                CameraRegionAnalyzer.BuildComposite(
-                    frame,
-                    regions),
-                160);
+        return VisionScorer.PrepareGray(
+            frame,
+            160,
+            101);
     }
 
     private RobloxWindow RequireWindow() =>

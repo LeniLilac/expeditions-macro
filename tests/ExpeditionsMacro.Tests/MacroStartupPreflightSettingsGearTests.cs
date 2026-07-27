@@ -60,6 +60,77 @@ public sealed partial class MacroStartupPreflightServiceTests
     }
 
     [Fact]
+    public async Task HighContrastVoiceLayout_StillOpensAndClosesSettings()
+    {
+        TestFrames frames = new();
+        ImageFrame closed =
+            Brighten(frames.VoiceClosed, amount: 65);
+        ImageFrame selected =
+            MoveSelectedGearToVoiceOffset(
+                frames.Gameplay);
+        PreflightAutomation automation =
+            new(frames, closed)
+            {
+                SettingsOpenFrame = selected,
+            };
+        MacroStartupPreflightService service =
+            CreateService(
+                automation,
+                new TestClock());
+
+        await service.RunUiScaleAsync(
+            new LobbyDetector(frames.Lobby),
+            progress: null,
+            log: null,
+            CancellationToken.None);
+
+        Assert.Equal(
+            2,
+            automation.Clicks.Count(
+                click => click ==
+                    (
+                        RobloxSettingsButtonDetector
+                            .VoiceActionX,
+                        RobloxSettingsButtonDetector
+                            .ActionY)));
+        Assert.Same(closed, automation.CurrentFrame);
+    }
+
+    [Fact]
+    public async Task HighContrastNoVoiceLayout_StillOpensAndClosesSettings()
+    {
+        TestFrames frames = new();
+        ImageFrame closed =
+            Brighten(frames.Lobby, amount: 65);
+        PreflightAutomation automation =
+            new(frames, closed)
+            {
+                SettingsOpenFrame = frames.Gameplay,
+            };
+        MacroStartupPreflightService service =
+            CreateService(
+                automation,
+                new TestClock());
+
+        await service.RunUiScaleAsync(
+            new LobbyDetector(frames.Lobby),
+            progress: null,
+            log: null,
+            CancellationToken.None);
+
+        Assert.Equal(
+            2,
+            automation.Clicks.Count(
+                click => click ==
+                    (
+                        RobloxSettingsButtonDetector
+                            .NoVoiceActionX,
+                        RobloxSettingsButtonDetector
+                            .ActionY)));
+        Assert.Same(closed, automation.CurrentFrame);
+    }
+
+    [Fact]
     public async Task MissingGear_IsAHardCompatibilityFailure()
     {
         TestFrames frames = new();
@@ -200,6 +271,24 @@ public sealed partial class MacroStartupPreflightServiceTests
             }
         }
 
+        return new ImageFrame(
+            source.Width,
+            source.Height,
+            source.Format,
+            pixels,
+            takeOwnership: true);
+    }
+
+    private static ImageFrame Brighten(
+        ImageFrame source,
+        byte amount)
+    {
+        byte[] pixels = source.Pixels
+            .Select(value =>
+                (byte)Math.Min(
+                    byte.MaxValue,
+                    value + amount))
+            .ToArray();
         return new ImageFrame(
             source.Width,
             source.Height,

@@ -23,26 +23,34 @@ public sealed partial class ChallengeMacroRunner
         Action recovered,
         CancellationToken cancellationToken)
     {
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(90);
         StableStateTracker<ChallengeScreenState> navigationTracker =
             new(preset.StableDetections);
-        StableNavigationActionTracker<ChallengeScreenState>
-            actionTracker =
-                new(Math.Max(2, preset.StableDetections));
+        ChallengeNavigationInputGate inputGate =
+            new(preset.StableDetections);
+        ObservationWaitBudget budget = new(
+            TimeSpan.FromSeconds(90),
+            Math.Max(2, preset.StableDetections));
         string? lastRecovery = null;
-        while (DateTimeOffset.UtcNow < deadline)
+        bool navigationTransitionPending = false;
+        while (budget.ShouldObserve(
+                   navigationTracker.HasPendingCandidate ||
+                   inputGate.HasPendingCandidate ||
+                   navigationTransitionPending))
         {
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = CaptureClient(window, detector);
             ChallengeScreenMatch match = ChallengeScreenDetector.Detect(frame);
+            string? recovery = detector.RecoveryState(frame);
+            budget.MarkObserved();
             ChallengeScreenState? stableNavigation =
                 navigationTracker.Update(match.State);
-            (int X, int Y)? stableAction =
-                actionTracker.Update(
-                    IsChallengeNavigationAction(match.State)
-                        ? match.State
-                        : ChallengeScreenState.None,
-                    MatchAction(match));
+            ChallengeNavigationInputAttempt? inputAttempt =
+                inputGate.Observe(
+                    match,
+                    recovery,
+                    detector,
+                    frame,
+                    cancellationToken);
             if (stableNavigation is
                 ChallengeScreenState.ChallengeList or
                 ChallengeScreenState.ChallengeListUnavailable)
@@ -80,27 +88,33 @@ public sealed partial class ChallengeMacroRunner
                     cancellationToken).ConfigureAwait(false);
                 return;
             }
-            if (match.State == ChallengeScreenState.GameModeSelector &&
-                stableNavigation ==
-                    ChallengeScreenState.GameModeSelector)
+            if (inputAttempt?.Owner ==
+                ChallengeNavigationInputOwner.GameModeSelector)
             {
                 report("Navigation", 0, "Opening Challenges from the game-mode selector.", "game_mode_selector", match.Confidence);
-                await ClickAsync(window, match.ActionX!.Value, match.ActionY!.Value, cancellationToken).ConfigureAwait(false);
-                await Task.Delay(850, cancellationToken).ConfigureAwait(false);
-                continue;
-            }
-            if (match.State ==
-                    ChallengeScreenState.PostMatchPreview &&
-                stableAction is not null)
-            {
+                cancellationToken.ThrowIfCancellationRequested();
                 await ClickAsync(
                     window,
-                    stableAction.Value.X,
-                    stableAction.Value.Y,
+                    inputAttempt.Value.X,
+                    inputAttempt.Value.Y,
                     cancellationToken).ConfigureAwait(false);
                 await Task.Delay(850, cancellationToken).ConfigureAwait(false);
                 navigationTracker.Reset();
-                actionTracker.Reset();
+                navigationTransitionPending = true;
+                continue;
+            }
+            if (inputAttempt?.Owner ==
+                ChallengeNavigationInputOwner.PostMatchPreview)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await ClickAsync(
+                    window,
+                    inputAttempt.Value.X,
+                    inputAttempt.Value.Y,
+                    cancellationToken).ConfigureAwait(false);
+                await Task.Delay(850, cancellationToken).ConfigureAwait(false);
+                navigationTracker.Reset();
+                navigationTransitionPending = true;
                 continue;
             }
             if (match.State is ChallengeScreenState.Victory or ChallengeScreenState.Defeat)
@@ -109,7 +123,6 @@ public sealed partial class ChallengeMacroRunner
                 continue;
             }
 
-            string? recovery = detector.RecoveryState(frame);
             if (recovery is "afk" or "disconnect" or "lobby")
             {
                 if (!preset.AutoRecover) throw new InvalidOperationException($"{Label(recovery)} was recognized, but automatic recovery is disabled.");
@@ -147,9 +160,35 @@ public sealed partial class ChallengeMacroRunner
                 }
                 else
                 {
-                    (int x, int y) = detector.ActionFor(recovery, frame);
-                    await ClickAsync(window, x, y, cancellationToken).ConfigureAwait(false);
+                    ChallengeNavigationInputOwner expectedOwner =
+                        recovery == "disconnect"
+                            ? ChallengeNavigationInputOwner
+                                .DisconnectRecovery
+                            : ChallengeNavigationInputOwner
+                                .AfkRecovery;
+                    if (inputAttempt?.Owner != expectedOwner)
+                    {
+                        report(
+                            "Navigation",
+                            0,
+                            $"Confirming the {Label(recovery)} action before recovery input.",
+                            recovery,
+                            null);
+                        await Task.Delay(
+                            preset.PollMilliseconds,
+                            cancellationToken).ConfigureAwait(false);
+                        continue;
+                    }
+
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await ClickAsync(
+                        window,
+                        inputAttempt.Value.X,
+                        inputAttempt.Value.Y,
+                        cancellationToken).ConfigureAwait(false);
                     await Task.Delay(recovery == "disconnect" ? 5000 : 2200, cancellationToken).ConfigureAwait(false);
+                    navigationTracker.Reset();
+                    navigationTransitionPending = true;
                 }
                 continue;
             }
@@ -158,15 +197,42 @@ public sealed partial class ChallengeMacroRunner
                 // The shared Play detector identifies the game-mode selector. The
                 // Expeditions action attached to that detector is intentionally not
                 // used here; Challenge has its own fixed tile.
-                await ClickAsync(window, 480, 205, cancellationToken).ConfigureAwait(false);
+                if (inputAttempt?.Owner !=
+                    ChallengeNavigationInputOwner.GameModeSelector)
+                {
+                    report(
+                        "Navigation",
+                        0,
+                        "Confirming the game-mode selector before opening Challenges.",
+                        recovery,
+                        null);
+                    await Task.Delay(
+                        preset.PollMilliseconds,
+                        cancellationToken).ConfigureAwait(false);
+                    continue;
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                await ClickAsync(
+                    window,
+                    inputAttempt.Value.X,
+                    inputAttempt.Value.Y,
+                    cancellationToken).ConfigureAwait(false);
                 await Task.Delay(900, cancellationToken).ConfigureAwait(false);
+                navigationTracker.Reset();
+                navigationTransitionPending = true;
                 continue;
             }
 
             report("Navigation", 0, "Waiting for a Challenge navigation screen.", null, null);
             await Task.Delay(preset.PollMilliseconds, cancellationToken).ConfigureAwait(false);
         }
-        throw new TimeoutException("Challenge navigation did not reach the selector within 90 seconds.");
+        if (inputGate.ExhaustedError is { } exhausted)
+        {
+            throw exhausted;
+        }
+        throw new TimeoutException(
+            "Challenge navigation did not reach the selector within 90 seconds.");
     }
 
     internal static async Task<ChallengeScreenMatch> ReturnToChallengeSelectorWithVerificationAsync(
@@ -193,10 +259,13 @@ public sealed partial class ChallengeMacroRunner
             attemptStarted?.Invoke(attempt);
             await clickBack(cancellationToken).ConfigureAwait(false);
 
-            DateTimeOffset deadline = DateTimeOffset.UtcNow + verificationTimeout;
             StableStateTracker<ChallengeScreenState> tracker = new(stableDetections);
+            ObservationWaitBudget budget = new(
+                verificationTimeout,
+                stableDetections);
             ChallengeScreenMatch? last = null;
-            while (DateTimeOffset.UtcNow < deadline)
+            while (budget.ShouldObserve(
+                       tracker.HasPendingCandidate))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 last = observe();
@@ -208,6 +277,7 @@ public sealed partial class ChallengeMacroRunner
                 {
                     return last with { State = stable.Value };
                 }
+                budget.MarkObserved();
                 await Task.Delay(pollMilliseconds, cancellationToken).ConfigureAwait(false);
             }
             attemptMissed?.Invoke(attempt, last);
@@ -243,16 +313,21 @@ public sealed partial class ChallengeMacroRunner
         Action<string, int, string, string?, double?> report,
         CancellationToken cancellationToken)
     {
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + timeout;
         StableStateTracker<ChallengeScreenState> tracker = new(preset.StableDetections);
         StableNavigationActionTracker<ChallengeScreenState>
             actionTracker =
                 new(Math.Max(2, preset.StableDetections));
-        while (DateTimeOffset.UtcNow < deadline)
+        ObservationWaitBudget budget = new(
+            timeout,
+            Math.Max(2, preset.StableDetections));
+        while (budget.ShouldObserve(
+                   tracker.HasPendingCandidate ||
+                   actionTracker.HasPendingCandidate))
         {
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = CaptureClient(window, detector);
             ChallengeScreenMatch match = ChallengeScreenDetector.Detect(frame);
+            budget.MarkObserved();
             ChallengeScreenState candidate = match.State is ChallengeScreenState.ChallengeList or ChallengeScreenState.ChallengeListUnavailable
                 ? match.State
                 : ChallengeScreenState.None;
@@ -285,7 +360,7 @@ public sealed partial class ChallengeMacroRunner
         return null;
     }
 
-    private async Task ReturnFromPrestartAfterAlignmentFailureAsync(
+    private async Task ReturnFromPrestartAfterPreparationFailureAsync(
         RobloxWindow window,
         ChallengePreset preset,
         IDetectorPack detector,
@@ -307,19 +382,21 @@ public sealed partial class ChallengeMacroRunner
             log: null,
             report,
             cancellationToken).ConfigureAwait(false);
-        (int X, int Y)? changeMode =
-            ChallengeScreenDetector.ActionFor(
-                ChallengeScreenState.PostMatchPreview,
-                party);
-        if (changeMode is null)
-        {
-            throw new RobloxUiUnavailableException(
-                "Change Gamemode could not be located after leaving the unstarted Challenge.");
-        }
+        ChallengeScreenMatch changeMode =
+            await RequireStableLiveActionAsync(
+                    window,
+                    preset,
+                    detector,
+                    ChallengeScreenState.PostMatchPreview,
+                    party,
+                    "Change Gamemode could not be located after leaving the unstarted Challenge.",
+                    report,
+                    cancellationToken)
+                .ConfigureAwait(false);
         await ClickAsync(
             window,
-            changeMode.Value.X,
-            changeMode.Value.Y,
+            changeMode.ActionX!.Value,
+            changeMode.ActionY!.Value,
             cancellationToken).ConfigureAwait(false);
         ImageFrame modes = await WaitForScreenAsync(
             window,
@@ -365,14 +442,15 @@ public sealed partial class ChallengeMacroRunner
             () => CaptureClient(window, detector),
             (key, token) =>
                 _automation.TapLetterKeyAsync(window, key, token),
-            (timeout, token) => TryWaitForScreenAsync(
+            (initialFrame, timeout, token) => TryWaitForScreenAsync(
                 window,
                 preset,
                 detector,
                 ChallengeScreenState.PostMatchPreview,
                 timeout,
                 report,
-                token),
+                token,
+                initialFrame: initialFrame),
             attempt => report(
                 "Return",
                 85,

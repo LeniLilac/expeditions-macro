@@ -18,10 +18,12 @@ public static class FastNoAlignShareCodec
         FastNoAlignShareBundle bundle)
     {
         ArgumentNullException.ThrowIfNull(bundle);
-        bundle.Validate();
+        FastNoAlignShareBundle normalized =
+            StoryHardModePolicy.Normalize(bundle);
+        normalized.Validate();
         byte[] json =
             JsonSerializer.SerializeToUtf8Bytes(
-                bundle,
+                normalized,
                 CompactJson);
         if (json.Length > MaximumJsonBytes)
         {
@@ -98,8 +100,10 @@ public static class FastNoAlignShareCodec
                 "The Fast no align share code contains invalid data.",
                 error);
         }
-        bundle.Validate();
-        return bundle;
+        FastNoAlignShareBundle normalized =
+            StoryHardModePolicy.Normalize(bundle);
+        normalized.Validate();
+        return normalized;
     }
 
     private static byte[] Decompress(byte[] compressed)

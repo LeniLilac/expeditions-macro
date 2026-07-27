@@ -27,14 +27,22 @@ public sealed partial class EventMacroRunner
             manualPlayback
                 ? []
                 : PlacementExecutionPlan.AfterStart(
-                    CameraPreparationMode.FastNoAlign,
                     placement);
         int nextStep = 0;
+        int terminalDetections =
+            Math.Max(2, preset.StableDetections);
         StableStateTracker<string> terminal =
-            new(Math.Max(2, preset.StableDetections));
+            new(terminalDetections);
         StableStateTracker<string> recovery =
-            new(Math.Max(2, preset.StableDetections));
+            new(terminalDetections);
+        EventTerminalRuntimeGuard runtimeGuard =
+            new(terminalDetections);
         InactivityKeepAlive keepAlive = new();
+        TimeSpan? matchLimit =
+            MatchRuntimePolicy.ForPlacement(
+                placement,
+                MatchRuntimePolicy.EventLimit(
+                    preset));
         while (true)
         {
             cancellationToken
@@ -81,13 +89,15 @@ public sealed partial class EventMacroRunner
                     $"The Event match was interrupted by {EventRunPolicy.RecoveryLabel(stableRecovery)}.");
             }
 
-            MatchRuntimePolicy.ThrowIfExceeded(
-                matchRuntime.Elapsed,
-                MatchRuntimePolicy.ForPlacement(
-                    placement,
-                    MatchRuntimePolicy.EventLimit(
-                        preset)),
-                "Event match");
+            if (runtimeGuard.ShouldEnforceRuntimeLimit(
+                    candidate is not null,
+                    terminal.HasPendingCandidate))
+            {
+                MatchRuntimePolicy.ThrowIfExceeded(
+                    matchRuntime.Elapsed,
+                    matchLimit,
+                    "Event match");
+            }
             await keepAlive.TryPulseAsync(
                 (key, token) =>
                     _automation.TapLetterKeyAsync(

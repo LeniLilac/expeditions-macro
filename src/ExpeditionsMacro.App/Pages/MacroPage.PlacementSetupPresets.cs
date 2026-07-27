@@ -43,9 +43,7 @@ public partial class MacroPage
                 });
             models[map] =
                 new ChallengeMapRuntimeModels(
-                    null,
-                    placement,
-                    null);
+                    placement);
         }
 
         ChallengePreset preset = new()
@@ -139,9 +137,7 @@ public partial class MacroPage
         return (
             preset,
             new StageRuntimeModels(
-                null,
-                placement,
-                null));
+                placement));
     }
 
     private async Task<(
@@ -177,9 +173,7 @@ public partial class MacroPage
         return (
             preset,
             new StageRuntimeModels(
-                null,
-                placement,
-                null));
+                placement));
     }
 
     private async Task<(

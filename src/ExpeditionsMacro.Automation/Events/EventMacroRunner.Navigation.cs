@@ -235,10 +235,11 @@ public sealed partial class EventMacroRunner
                         window,
                         key,
                         token),
-                (timeout, token) =>
+                (initialFrame, timeout, token) =>
                     TryWaitForPostMatchPreviewAsync(
                         window,
                         detector,
+                        initialFrame,
                         timeout,
                         token),
                 attempt => { },
@@ -267,47 +268,6 @@ public sealed partial class EventMacroRunner
             cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<ImageFrame?>
-        TryWaitForPostMatchPreviewAsync(
-        RobloxWindow window,
-        IDetectorPack detector,
-        TimeSpan timeout,
-        CancellationToken cancellationToken)
-    {
-        DateTimeOffset deadline =
-            DateTimeOffset.UtcNow + timeout;
-        StableNavigationActionTracker<
-            ChallengeScreenState> tracker =
-                new(required: 2);
-        while (DateTimeOffset.UtcNow < deadline)
-        {
-            cancellationToken
-                .ThrowIfCancellationRequested();
-            ImageFrame frame =
-                CaptureClient(window, detector);
-            ChallengeScreenMatch match =
-                ChallengeScreenDetector.Detect(frame);
-            (int X, int Y)? action =
-                ChallengeScreenDetector.ActionFor(
-                    ChallengeScreenState.PostMatchPreview,
-                    frame);
-            if (tracker.Update(
-                    match.State ==
-                        ChallengeScreenState.PostMatchPreview
-                        ? match.State
-                        : ChallengeScreenState.None,
-                    action) is not null)
-            {
-                return frame;
-            }
-            await Task.Delay(
-                180,
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        return null;
-    }
-
     private async Task<EventScreenMatch>
         WaitForEventEntryAsync(
         RobloxWindow window,
@@ -315,18 +275,21 @@ public sealed partial class EventMacroRunner
         IDetectorPack detector,
         CancellationToken cancellationToken)
     {
-        DateTimeOffset deadline =
-            DateTimeOffset.UtcNow + timeout;
         StableNavigationActionTracker<
             EventScreenState> tracker =
                 new(required: 2);
+        ObservationWaitBudget budget = new(
+            timeout,
+            minimumObservations: 2);
         EventScreenMatch last = default;
-        while (DateTimeOffset.UtcNow < deadline)
+        while (budget.ShouldObserve(
+                   tracker.HasPendingCandidate))
         {
             cancellationToken
                 .ThrowIfCancellationRequested();
             last = EventScreenDetector.Detect(
                 CaptureClient(window, detector));
+            budget.MarkObserved();
             bool isEntry =
                 last.State is
                     EventScreenState.EventCatalog or
@@ -367,8 +330,6 @@ public sealed partial class EventMacroRunner
         IDetectorPack detector,
         CancellationToken cancellationToken)
     {
-        DateTimeOffset deadline =
-            DateTimeOffset.UtcNow + timeout;
         StableStateTracker<string> tracker =
             new(2);
         StableNavigationActionTracker<string>
@@ -380,12 +341,18 @@ public sealed partial class EventMacroRunner
                 EventScreenState.ActDetail or
                 EventScreenState.PreviewReady or
                 EventScreenState.Prestart;
-        while (DateTimeOffset.UtcNow < deadline)
+        ObservationWaitBudget budget = new(
+            timeout,
+            minimumObservations: 2);
+        while (budget.ShouldObserve(
+                   tracker.HasPendingCandidate ||
+                   actionTracker.HasPendingCandidate))
         {
             cancellationToken
                 .ThrowIfCancellationRequested();
             last = EventScreenDetector.Detect(
                 CaptureClient(window, detector));
+            budget.MarkObserved();
             if (requiresAction)
             {
                 (int X, int Y)? action =
@@ -429,12 +396,14 @@ public sealed partial class EventMacroRunner
         IDetectorPack detector,
         CancellationToken cancellationToken)
     {
-        DateTimeOffset deadline =
-            DateTimeOffset.UtcNow + timeout;
         StableNavigationActionTracker<string>
             tracker = new(required: 2);
+        ObservationWaitBudget budget = new(
+            timeout,
+            minimumObservations: 2);
         EventScreenMatch last = default;
-        while (DateTimeOffset.UtcNow < deadline)
+        while (budget.ShouldObserve(
+                   tracker.HasPendingCandidate))
         {
             cancellationToken
                 .ThrowIfCancellationRequested();
@@ -442,6 +411,7 @@ public sealed partial class EventMacroRunner
                 CaptureClient(window, detector);
             last =
                 EventScreenDetector.Detect(frame);
+            budget.MarkObserved();
             (int X, int Y)? action =
                 last.State ==
                     EventScreenState.ActSelector

@@ -311,8 +311,7 @@ public partial class PlacementModelsPage
         object sender,
         MouseButtonEventArgs e)
     {
-        if (!FastWorkflow ||
-            PlacementScreenshot.Source is null)
+        if (PlacementScreenshot.Source is null)
         {
             return;
         }

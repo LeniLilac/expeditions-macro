@@ -12,8 +12,6 @@ public sealed record DeepDebugOperationContext
 
     public string? RaidPresetId { get; init; }
 
-    public IReadOnlyList<string> CameraModelIds { get; init; } = [];
-
     public IReadOnlyList<string> PlacementModelIds { get; init; } = [];
 
     public object? OperationSettings { get; init; }

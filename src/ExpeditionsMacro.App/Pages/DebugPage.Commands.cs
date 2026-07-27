@@ -1,4 +1,5 @@
 using System.Windows;
+using ExpeditionsMacro.Automation.Camera;
 using ExpeditionsMacro.Automation.Diagnostics;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
@@ -121,7 +122,6 @@ public partial class DebugPage
         object sender,
         RoutedEventArgs e)
     {
-        CameraCalibrationSettings settings = new();
         DeepDebugOperationContext context = new()
         {
             DebugTool = "fast-no-align",
@@ -131,9 +131,15 @@ public partial class DebugPage
                 StartState = "Shift Lock off",
                 EndState = "Zoomed out and top-down",
                 Yaw = "Preserved",
-                settings.ZoomTicks,
-                settings.PitchDragPixels,
-                settings.SettleMilliseconds,
+                ZoomTicks =
+                    CameraPosePreparationService
+                        .DefaultZoomTicks,
+                PitchDragPixels =
+                    CameraPosePreparationService
+                        .DefaultPitchDragPixels,
+                SettleMilliseconds =
+                    CameraPosePreparationService
+                        .DefaultSettleMilliseconds,
             },
         };
         await RunDebugOperationAsync(
@@ -141,9 +147,15 @@ public partial class DebugPage
             "fast-no-align",
             context,
             token => _services.CameraPose.PrepareWithoutYawAsync(
-                zoomTicks: settings.ZoomTicks,
-                pitchDragPixels: settings.PitchDragPixels,
-                settleMilliseconds: settings.SettleMilliseconds,
+                zoomTicks:
+                    CameraPosePreparationService
+                        .DefaultZoomTicks,
+                pitchDragPixels:
+                    CameraPosePreparationService
+                        .DefaultPitchDragPixels,
+                settleMilliseconds:
+                    CameraPosePreparationService
+                        .DefaultSettleMilliseconds,
                 progress: CreateProgressReporter(),
                 cancellationToken: token));
     }

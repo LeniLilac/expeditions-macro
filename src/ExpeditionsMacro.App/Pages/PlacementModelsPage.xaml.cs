@@ -1,28 +1,26 @@
 using System.Collections.ObjectModel;
-using System.Globalization;
-using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using ExpeditionsMacro.App.Models;
 using ExpeditionsMacro.App.Services;
-using ExpeditionsMacro.Automation.Diagnostics;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
-using ExpeditionsMacro.Core.Runtime;
 
 namespace ExpeditionsMacro.App.Pages;
 
-public partial class PlacementModelsPage : UserControl, IAppPage
+public partial class PlacementModelsPage :
+    UserControl,
+    IAppPage
 {
     private readonly AppServices _services;
-    private readonly ObservableCollection<PlacementModel> _models = [];
     private readonly ObservableCollection<PlacementSetupRow>
         _setupRows = [];
     private readonly ObservableCollection<PlacementSetupNode>
         _setupNodes = [];
     private readonly List<PlacementSetupNode>
         _setupRoots = [];
-    private readonly ObservableCollection<PlacementStepRow> _steps = [];
+    private readonly ObservableCollection<PlacementStepRow>
+        _steps = [];
     private PlacementModel? _selectedModel;
     private PlacementTarget? _selectedSetupTarget;
     private int _selectedFastUnit = 1;
@@ -44,9 +42,7 @@ public partial class PlacementModelsPage : UserControl, IAppPage
         InitializeComponent();
         InitializeCatalogRail();
         WireFastEditorEvents();
-        ModelsList.ItemsSource = _models;
         FastSetupList.ItemsSource = _setupNodes;
-        StepsGrid.ItemsSource = _steps;
         FastStepsList.ItemsSource = _steps;
         PlacementMarkers.ItemsSource = _steps;
         InitializeFastEditor();
@@ -61,26 +57,17 @@ public partial class PlacementModelsPage : UserControl, IAppPage
         FastTeamCombo.SelectedIndex = 0;
         InitializePlacementAutoSave();
         _services.Coordinator.StateChanged +=
-            (_, _) => Dispatcher.BeginInvoke(UpdateBusyState);
-        _services.Hotkey.BindingChanged +=
-            (_, _) => Dispatcher.BeginInvoke(UpdateHotkeyText);
-        _services.SettingsChanged +=
             (_, _) => Dispatcher.BeginInvoke(
-                ApplyWorkflowMode);
+                UpdateBusyState);
     }
 
     public Func<Task>? IdleHotkeyAction => null;
 
-    private bool FastWorkflow =>
-        _services.Settings.FastNoAlignEnabled;
-
     private Selector ActiveStepsSelector =>
-        FastWorkflow ? FastStepsList : StepsGrid;
+        FastStepsList;
 
     public async Task OnShownAsync()
     {
-        UpdateHotkeyText();
-        ApplyWorkflowMode();
         await RefreshManualRecordingChoicesAsync();
         await RefreshModelsAsync(_selectedModel?.Id);
     }
@@ -92,35 +79,10 @@ public partial class PlacementModelsPage : UserControl, IAppPage
             await _services.PlacementModels
                 .ListAsync()
                 .ConfigureAwait(false);
-        await Dispatcher.InvokeAsync(() =>
-        {
-            _models.Clear();
-            foreach (PlacementModel model in models)
-            {
-                _models.Add(model);
-            }
-            if (FastWorkflow)
-            {
-                RefreshSetupRows(models, selectedId);
-                return;
-            }
-            if (selectedId is not null)
-            {
-                ModelsList.SelectedItem =
-                    _models.FirstOrDefault(
-                        model => model.Id == selectedId);
-            }
-        });
-    }
-
-    private void ModelsList_SelectionChanged(
-        object sender,
-        SelectionChangedEventArgs e)
-    {
-        if (ModelsList.SelectedItem is PlacementModel model)
-        {
-            ApplyModel(model);
-        }
+        await Dispatcher.InvokeAsync(
+            () => RefreshSetupRows(
+                models,
+                selectedId));
     }
 
     private async void FastSetupList_SelectionChanged(
@@ -128,7 +90,6 @@ public partial class PlacementModelsPage : UserControl, IAppPage
         SelectionChangedEventArgs e)
     {
         if (_changingSetupSelection ||
-            !FastWorkflow ||
             FastSetupList.SelectedItem is not
                 PlacementSetupNode node)
         {
@@ -159,247 +120,63 @@ public partial class PlacementModelsPage : UserControl, IAppPage
         _steps.Clear();
         foreach (PlacementStep step in
                  PlacementAuthoringRules
-                     .OrderForAuthoring(
-                         model.Steps))
+                     .OrderForAuthoring(model.Steps))
         {
-            _steps.Add(PlacementStepRow.FromModel(step));
+            _steps.Add(
+                PlacementStepRow.FromModel(step));
         }
 
-        if (FastWorkflow)
+        if (model.CameraPreparationMode !=
+                CameraPreparationMode.FastNoAlign ||
+            model.Target is null)
         {
-            if (model.CameraPreparationMode ==
-                CameraPreparationMode.FastNoAlign &&
-                model.Target is not null)
-            {
-                ApplyFastTarget(model.Target);
-                FastTeamCombo.SelectedItem =
-                    FastTeamCombo.Items
-                        .Cast<TeamChoice>()
-                        .First(choice =>
-                            choice.Value ==
-                            model.TeamSlot);
-                UpdateFastManualRecordingEditor();
-                FastStatusText.Text = string.Empty;
-                FastDetailText.Text =
-                    $"{model.Steps.Count} placements · Fast no align";
-            }
-            else
-            {
-                ApplyDefaultFastTarget();
-                FastStatusText.Text =
-                    "This is a legacy camera-model placement.";
-                FastDetailText.Text =
-                    "Disable Fast no align in Settings to edit or use it.";
-            }
+            throw new InvalidOperationException(
+                "Legacy camera-model placements are no longer supported. Configure this route in Placement Setup.");
         }
-        else
-        {
-            ModelNameText.Text = model.Name;
-            StatusText.Text = model.CameraPreparationMode ==
-                CameraPreparationMode.CameraModel
-                ? $"Loaded {model.Name}."
-                : "This Fast no align model cannot be used by camera-model presets.";
-            DetailText.Text =
-                $"{model.Steps.Count} placements · Roblox client {model.ClientWidth} × {model.ClientHeight}";
-        }
+
+        ApplyFastTarget(model.Target);
+        FastTeamCombo.SelectedItem =
+            FastTeamCombo.Items
+                .Cast<TeamChoice>()
+                .First(choice =>
+                    choice.Value == model.TeamSlot);
+        UpdateFastManualRecordingEditor();
+        FastStatusText.Text = string.Empty;
+        FastDetailText.Text =
+            $"{model.Steps.Count} placements";
         UpdateFastPlacementCount();
-    }
-
-    private void NewModel_Click(
-        object sender,
-        RoutedEventArgs e)
-    {
-        ModelsList.SelectedItem = null;
-        _selectedModel = null;
-        _steps.Clear();
-        ApplyNewModelDefaults();
     }
 
     private void ApplyNewModelDefaults()
     {
         using IDisposable suspension =
             SuspendPlacementAutoSave();
-        if (FastWorkflow)
+        ResetFastTimingDefaults();
+        ResetFastRecordingSettings();
+        FastBeforeStartButton.IsChecked = true;
+        FastUnit1Button.IsChecked = true;
+        if (_selectedSetupTarget is not null)
         {
-            ResetFastTimingDefaults();
-            ResetFastRecordingSettings();
-            FastBeforeStartButton.IsChecked = true;
-            FastUnit1Button.IsChecked = true;
-            if (_selectedSetupTarget is not null)
-            {
-                ApplyFastTarget(
-                    _selectedSetupTarget);
-            }
-            else
-            {
-                ApplyDefaultFastTarget();
-            }
-            FastTeamCombo.SelectedIndex = 0;
-            FastStatusText.Text = string.Empty;
-            FastDetailText.Text = string.Empty;
+            ApplyFastTarget(_selectedSetupTarget);
         }
         else
         {
-            ModelNameText.Text = "Placement model";
-            StatusText.Text = "Ready to record a new model.";
-            DetailText.Text =
-                $"Click Record placements, focus Roblox, then press {_services.Hotkey.DisplayName}.";
+            ApplyDefaultFastTarget();
         }
+        FastTeamCombo.SelectedIndex = 0;
+        FastStatusText.Text = string.Empty;
+        FastDetailText.Text = string.Empty;
         UpdateFastPlacementCount();
-    }
-
-    private async void Save_Click(
-        object sender,
-        RoutedEventArgs e)
-    {
-        try
-        {
-            PlacementModel model = BuildModel();
-            if (FastWorkflow)
-            {
-                _placementAutoSave.ScheduleSave(model);
-                if (!await FlushPlacementAutoSaveAsync())
-                {
-                    return;
-                }
-            }
-            else
-            {
-                await _services.PlacementModels
-                    .SaveAsync(model);
-            }
-            _selectedModel = model;
-            _selectedSetupTarget = model.Target;
-            await RefreshModelsAsync(model.Id);
-            SetStatus(
-                FastWorkflow
-                    ? "Placement setup saved."
-                    : "Placement model saved.");
-        }
-        catch (Exception error)
-        {
-            SetStatus(error.Message);
-        }
-    }
-
-    private void Record_Click(
-        object sender,
-        RoutedEventArgs e)
-    {
-        if (FastWorkflow) return;
-        string name = ModelNameText.Text.Trim();
-        if (name.Length == 0)
-        {
-            StatusText.Text = "Enter a model name.";
-            return;
-        }
-        if (!TryReadDelay(
-            DefaultDelayText,
-            out int delay))
-        {
-            StatusText.Text =
-                "Default delay must be a non-negative whole number.";
-            return;
-        }
-
-        bool useRecordedTiming =
-            RecordedTimingCheck.IsChecked == true;
-        _steps.Clear();
-        _services.Coordinator.Arm(
-            "Placement recording",
-            async token =>
-            {
-                PlacementModel model =
-                    await _services.Placement.RecordAsync(
-                        name,
-                        delay,
-                        useRecordedTiming,
-                        captured: capture =>
-                        {
-                            _services.DeepDebug.RecordEvent(
-                                "placement",
-                                "capture_recorded",
-                                capture);
-                            Dispatcher.BeginInvoke(() =>
-                            {
-                                _steps.Add(new PlacementStepRow
-                                {
-                                    UnitKey = capture.UnitKey,
-                                    X = capture.X,
-                                    Y = capture.Y,
-                                    DelayAfterMilliseconds = delay,
-                                });
-                                OperationProgress.Value =
-                                    Math.Min(95, _steps.Count * 10);
-                            });
-                        },
-                        status: message =>
-                        {
-                            _services.DeepDebug.RecordEvent(
-                                "placement",
-                                "recording_status",
-                                new { Message = message });
-                            Dispatcher.BeginInvoke(() =>
-                            {
-                                StatusText.Text = message;
-                                if (message.Contains(
-                                    "Recording",
-                                    StringComparison.OrdinalIgnoreCase))
-                                {
-                                    DetailText.Text =
-                                        $"Press {_services.Hotkey.DisplayName} again to finish and save.";
-                                }
-                            });
-                        },
-                        cancellationToken: token);
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    ApplyModel(model);
-                    OperationProgress.Value = 100;
-                });
-                await RefreshModelsAsync(model.Id);
-            },
-            new DeepDebugOperationContext
-            {
-                PlacementModelIds = [ModelId.FromName(name)],
-                OperationSettings = new
-                {
-                    Name = name,
-                    DefaultDelayMilliseconds = delay,
-                    UseRecordedTiming = useRecordedTiming,
-                    CameraPreparationMode =
-                        CameraPreparationMode.CameraModel,
-                },
-                RefreshReferencedModelsAfterOperation = true,
-            });
-        StatusText.Text = "Placement recording armed.";
-        DetailText.Text =
-            $"Focus Roblox and press {_services.Hotkey.DisplayName} to begin. Press it again after the final placement.";
-        UpdateBusyState();
     }
 
     private void Stop_Click(
         object sender,
-        RoutedEventArgs e) =>
+        System.Windows.RoutedEventArgs e) =>
         _services.Coordinator.Cancel();
 
-    private void UpdateHotkeyText()
-    {
-        string hotkey = _services.Hotkey.DisplayName;
-        RecordingDescription.Text =
-            $"Recording starts after {hotkey} and ends when {hotkey} is pressed again.";
-    }
+    private void SetStatus(string message) =>
+        FastStatusText.Text = message;
 
-    private void SetStatus(string message)
-    {
-        if (FastWorkflow) FastStatusText.Text = message;
-        else StatusText.Text = message;
-    }
-
-    private void SetOperationProgress(double value)
-    {
-        if (FastWorkflow) FastOperationProgress.Value = value;
-        else OperationProgress.Value = value;
-    }
-
+    private void SetOperationProgress(double value) =>
+        FastOperationProgress.Value = value;
 }

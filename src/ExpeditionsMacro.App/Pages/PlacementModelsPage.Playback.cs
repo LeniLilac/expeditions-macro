@@ -18,19 +18,11 @@ public partial class PlacementModelsPage
         try
         {
             model = BuildModel();
-            if (FastWorkflow)
+            _placementAutoSave.ScheduleSave(
+                model);
+            if (!await FlushPlacementAutoSaveAsync())
             {
-                _placementAutoSave.ScheduleSave(
-                    model);
-                if (!await FlushPlacementAutoSaveAsync())
-                {
-                    return;
-                }
-            }
-            else
-            {
-                await _services.PlacementModels
-                    .SaveAsync(model);
+                return;
             }
             _selectedModel = model;
             cancelPlacementKey =
@@ -53,17 +45,12 @@ public partial class PlacementModelsPage
             return;
         }
 
-        int delay = ReadPlaybackDelay();
-        bool fast = FastWorkflow;
-        bool overrideTiming =
-            fast ||
-            PlaybackOverrideCheck.IsChecked == true;
+        int delay =
+            _fastPlacementIntervalMilliseconds;
         _services.Coordinator.Arm(
             "Placement playback",
             token => TestPlacementAsync(
                 model,
-                fast,
-                overrideTiming,
                 delay,
                 cancelPlacementKey,
                 token),
@@ -73,11 +60,10 @@ public partial class PlacementModelsPage
                 OperationSettings = new
                 {
                     Model = model.Id,
-                    UseDefaultInterval =
-                        overrideTiming,
+                    UseDefaultInterval = true,
                     DefaultDelayMilliseconds =
                         delay,
-                    FastNoAlign = fast,
+                    FastNoAlign = true,
                     model.ManualInputRecordingId,
                 },
             });
@@ -88,8 +74,6 @@ public partial class PlacementModelsPage
 
     private async Task TestPlacementAsync(
         PlacementModel model,
-        bool fast,
-        bool overrideTiming,
         int delay,
         char cancelPlacementKey,
         CancellationToken token)
@@ -99,14 +83,11 @@ public partial class PlacementModelsPage
                 value => Dispatcher.BeginInvoke(
                     () => FastStatusText.Text =
                         value.Message));
-        if (fast)
-        {
-            await _services.CameraPose
-                .PrepareWithoutYawAsync(
-                    progress: progress,
-                    cancellationToken: token)
-                .ConfigureAwait(false);
-        }
+        await _services.CameraPose
+            .PrepareWithoutYawAsync(
+                progress: progress,
+                cancellationToken: token)
+            .ConfigureAwait(false);
         if (ManualInputRouteService.IsConfigured(
                 model))
         {
@@ -137,7 +118,7 @@ public partial class PlacementModelsPage
 
         await _services.Placement.PlayAsync(
             model,
-            overrideTiming,
+            useDefaultInterval: true,
             delay,
             cancelPlacementKey:
                 cancelPlacementKey,

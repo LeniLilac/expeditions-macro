@@ -6,9 +6,9 @@ Challenge mode automates the three regular Anime Expeditions Challenges that res
 
 - Starts from the lobby, post-match preview, game-mode selector, or Challenge selector.
 - Tries only the enabled Challenge types and skips an entry when **Select Stage** is unavailable.
-- Recognizes the selected map and loads that map's camera model and placement configuration.
+- Recognizes the selected map, prepares its deterministic Fast pose, and loads the matching Placement Setup.
 - Recognizes Roblox's stage-teleport transition and allows up to three minutes for slow server loading; ordinary missing transitions still fail on the shorter navigation deadline.
-- Runs every unobstructed before-start placement, starts the match, immediately runs any rows that were covered by the Start Game dialog, then optionally runs a second placement model after the configured elapsed time.
+- Runs every unobstructed before-start step, starts the match, then immediately runs the same setup's rows that were covered by the Start Game dialog. Later After Start rows keep their individual configured delays.
 - While Victory or Defeat is still visible, presses the configured Anime Expeditions **Toggle Play Menu** key, verifies that navigation opened, and returns through **Change Gamemode**. An ignored key press is retried up to three times. This avoids the small Play control and any hotbar overlap. Defeat retries are configurable and default to zero.
 - Clears per-entry attempts at every global half-hour reset. A no-retry defeat can therefore be attempted again when a new Challenge appears.
 - When scheduled, closes the Challenge selector, verifies the shared game-mode selector, and returns so the Macro scheduler can choose the next highest-priority eligible task.
@@ -20,9 +20,13 @@ The optional Discord webhook reports monitoring start, match attempts, Victory o
 
 The workflow recognizes the game-mode selector, active and unavailable Challenge lists, available and cooldown details, both preview layouts, Start Game, Victory, and Defeat. It uses stable panel geometry, headings, dividers, button shapes, and map thumbnails instead of player names, reward rarity colors, or changing background artwork. After **Select Stage**, the party panel can appear before its green **Start** action becomes live. The runner keeps observing within a bounded wait and requires the Start coordinate to remain stable across the configured confirmations; another action such as **Change Gamemode** cannot satisfy that wait.
 
+UI-state waits are observation-aware. Slow capture or detector passes are allowed enough samples to satisfy the same consecutive-frame proof instead of consuming the whole confirmation window, while a bounded hard deadline still prevents an indefinite wait. Before every click after a transition, the action is revalidated from the live screen that owns it.
+
 Selector rows are clicked through their map artwork, away from reward icons that open item tooltips. Every transition is consumed only from its expected runner state; shared Start Game and Defeat visuals are not sufficient by themselves to begin Challenge automation.
 
-The Start Game dialog occludes part of the map. Before placement begins, the runner measures the live dialog from its detected green action and partitions the model by client-relative click position. Rows outside the dialog remain true preplacements. Covered rows retain their order but run only after the macro deliberately clicks Start, preventing a placement click from activating the button or disappearing into the modal.
+The Start Game dialog occludes part of the map. Before placement begins, the runner measures the live dialog from its detected green action and partitions the Placement Setup by client-relative click position. Rows outside the dialog remain true preplacements. Covered rows retain their order but run only after the macro deliberately clicks Start, preventing a placement click from activating the button or disappearing into the modal.
+
+Challenge task options and Placement Setup edits save automatically. Hard mode is not a Challenge option; it is available only for Story Act tasks.
 
 The **Toggle Play Menu key** is required under **Controls** on the Dashboard. Scroll down, click its button, and press one A-Z letter that matches the in-game **Toggle Play Menu** binding. It must differ from the global macro start/stop hotkey. Challenge recovery also uses this key to open Play from the lobby instead of clicking the left navigation. If Play remains closed after three verified presses, recovery stops and tells the user to correct the in-game binding; it does not click the visible Play button and continue with an unverified control setup.
 

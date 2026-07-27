@@ -246,7 +246,7 @@ public sealed class FastNoAlignPresetShareTests
                         .ExportAsync(plan));
 
             Assert.Contains(
-                "Switch the preset to Fast no align",
+                "Replace it with a current Placement Setup",
                 error.Message,
                 StringComparison.OrdinalIgnoreCase);
         }

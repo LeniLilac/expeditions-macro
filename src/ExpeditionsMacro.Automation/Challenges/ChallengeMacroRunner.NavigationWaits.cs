@@ -9,7 +9,9 @@ namespace ExpeditionsMacro.Automation.Challenges;
 
 public sealed partial class ChallengeMacroRunner
 {
-    private async Task<ChallengeScreenMatch> OpenChallengeTypeAsync(
+    private async Task<(
+        ImageFrame Frame,
+        ChallengeScreenMatch Match)> OpenChallengeTypeAsync(
         RobloxWindow window,
         ChallengePreset preset,
         IDetectorPack detector,
@@ -26,18 +28,22 @@ public sealed partial class ChallengeMacroRunner
                 x,
                 y,
                 cancellationToken).ConfigureAwait(false);
-            DateTimeOffset deadline =
-                DateTimeOffset.UtcNow + TimeSpan.FromSeconds(5);
             StableStateTracker<ChallengeScreenState> stateTracker =
                 new(preset.StableDetections);
             StableNavigationActionTracker<ChallengeScreenState>
                 actionTracker =
                     new(Math.Max(2, preset.StableDetections));
-            while (DateTimeOffset.UtcNow < deadline)
+            ObservationWaitBudget budget = new(
+                TimeSpan.FromSeconds(5),
+                Math.Max(2, preset.StableDetections));
+            while (budget.ShouldObserve(
+                       stateTracker.HasPendingCandidate ||
+                       actionTracker.HasPendingCandidate))
             {
                 ImageFrame frame = CaptureClient(window, detector);
                 ChallengeScreenMatch match =
                     ChallengeScreenDetector.Detect(frame);
+                budget.MarkObserved();
                 ChallengeScreenState candidate =
                     match.State is
                         ChallengeScreenState.ChallengeAvailable or
@@ -72,14 +78,16 @@ public sealed partial class ChallengeMacroRunner
                             : "Challenge is on cooldown.",
                         stable.ToString(),
                         match.Confidence);
-                    return match with
-                    {
-                        State = stable,
-                        ActionX = stableAction?.X ??
-                            match.ActionX,
-                        ActionY = stableAction?.Y ??
-                            match.ActionY,
-                    };
+                    return (
+                        frame,
+                        match with
+                        {
+                            State = stable,
+                            ActionX = stableAction?.X ??
+                                match.ActionX,
+                            ActionY = stableAction?.Y ??
+                                match.ActionY,
+                        });
                 }
                 await Task.Delay(
                     preset.PollMilliseconds,
@@ -104,7 +112,8 @@ public sealed partial class ChallengeMacroRunner
         TimeSpan timeout,
         Action<string, int, string, string?, double?> report,
         CancellationToken cancellationToken,
-        bool initialDesiredObservation = false)
+        bool initialDesiredObservation = false,
+        ImageFrame? initialFrame = null)
     {
         if (RequiresStableChallengeAction(desired))
         {
@@ -116,7 +125,13 @@ public sealed partial class ChallengeMacroRunner
                         desired,
                         timeout,
                         report,
-                        cancellationToken)
+                        cancellationToken,
+                        initialFrame is null
+                            ? null
+                            : (
+                                initialFrame,
+                                ChallengeScreenDetector
+                                    .Detect(initialFrame)))
                     .ConfigureAwait(false);
             return action?.Frame;
         }
@@ -173,7 +188,9 @@ public sealed partial class ChallengeMacroRunner
         ChallengeScreenState desired,
         TimeSpan timeout,
         Action<string, int, string, string?, double?> report,
-        CancellationToken cancellationToken) =>
+        CancellationToken cancellationToken,
+        (ImageFrame Frame, ChallengeScreenMatch Match)?
+            initialObservation = null) =>
         WaitForStableActionAsync(
             desired,
             preset.StableDetections,
@@ -200,7 +217,8 @@ public sealed partial class ChallengeMacroRunner
                         match.Confidence);
                 }
             },
-            cancellationToken);
+            cancellationToken,
+            initialObservation: initialObservation);
 
     private async Task<(ImageFrame Frame, ChallengeScreenMatch Match)>
         WaitForPreviewStartAsync(
@@ -238,7 +256,9 @@ public sealed partial class ChallengeMacroRunner
         Action<ChallengeScreenMatch>? observed,
         CancellationToken cancellationToken,
         Func<DateTimeOffset>? utcNow = null,
-        Func<int, CancellationToken, Task>? delay = null)
+        Func<int, CancellationToken, Task>? delay = null,
+        (ImageFrame Frame, ChallengeScreenMatch Match)?
+            initialObservation = null)
     {
         ArgumentNullException.ThrowIfNull(observe);
         if (stableDetections < 1)
@@ -260,8 +280,36 @@ public sealed partial class ChallengeMacroRunner
         int required = Math.Max(2, stableDetections);
         StableNavigationActionTracker<ChallengeScreenState>
             tracker = new(required);
+        // A first obscured recheck may invalidate the seed; leave enough
+        // completed-observation budget to begin a fresh stable proof.
+        int minimumObservations =
+            required +
+            (initialObservation is null ? 0 : 1);
         ObservationWaitBudget budget =
-            new(timeout, required, utcNow);
+            new(timeout, minimumObservations, utcNow);
+        if (initialObservation is not null)
+        {
+            ChallengeScreenMatch initialMatch =
+                initialObservation.Value.Match;
+            (int X, int Y)? initialAction =
+                initialMatch.State == desired
+                    ? MatchAction(initialMatch)
+                    : null;
+            (int X, int Y)? stableAction =
+                tracker.Update(desired, initialAction);
+            observed?.Invoke(initialMatch);
+            budget.MarkObserved();
+            if (stableAction is not null)
+            {
+                return (
+                    initialObservation.Value.Frame,
+                    initialMatch with
+                    {
+                        ActionX = stableAction.Value.X,
+                        ActionY = stableAction.Value.Y,
+                    });
+            }
+        }
         while (budget.ShouldObserve(
                    tracker.HasPendingCandidate))
         {

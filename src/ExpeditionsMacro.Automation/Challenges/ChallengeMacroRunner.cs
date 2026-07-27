@@ -22,7 +22,6 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
     internal const int SchedulerHandoffMaximumAttempts = 3;
 
     private readonly IRobloxAutomation _automation;
-    private readonly CameraAlignmentEngine _camera;
     private readonly FastNoAlignPreparationSession _fastNoAlign;
     private readonly PlacementService _placements;
     private readonly TeamSelectionService _teams;
@@ -31,7 +30,6 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
 
     public ChallengeMacroRunner(
         IRobloxAutomation automation,
-        CameraAlignmentEngine camera,
         PlacementService placements,
         TeamSelectionService teams,
         IDiscordNotifier discord,
@@ -39,7 +37,6 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         ManualInputRouteService? manualInputs = null)
     {
         _automation = automation;
-        _camera = camera;
         _fastNoAlign = fastNoAlign ??
             new FastNoAlignPreparationSession(
                 new CameraPosePreparationService(automation));
@@ -64,7 +61,6 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         Action<MacroEvent>? log = null,
         Action<ChallengeRunSummary>? summaryChanged = null,
         CancellationToken cancellationToken = default,
-        Func<Exception, CancellationToken, Task>? recoverableFailure = null,
         int? maximumCompletedRuns = null,
         bool returnWhenUnavailable = false,
         char? unitMenuKey = null,
@@ -74,6 +70,8 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
     {
         ArgumentNullException.ThrowIfNull(rotation);
         if (maximumCompletedRuns is < 1) throw new ArgumentOutOfRangeException(nameof(maximumCompletedRuns));
+        preset.Validate();
+        CameraPreparationExecutionPolicy.ValidateForExecution(preset.CameraPreparationMode);
         preset.ValidateReady();
         playMenuKey = ValidatePlayMenuKey(playMenuKey);
         if (!detector.SupportsChallengeMaps)
@@ -178,7 +176,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
                     PublishSummary();
                     Report("Challenge selection", 10, $"Checking {Label(type)} on {Label(map)}.", "challenge_list", null);
 
-                    ChallengeScreenMatch detail = await OpenChallengeTypeAsync(window, preset, detector, type, Report, cancellationToken).ConfigureAwait(false);
+                    (ImageFrame detailFrame, ChallengeScreenMatch detail) = await OpenChallengeTypeAsync(window, preset, detector, type, Report, cancellationToken).ConfigureAwait(false);
                     if (detail.State == ChallengeScreenState.ChallengeCooldown)
                     {
                         cooldownCount++;
@@ -211,6 +209,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
                             models,
                             manualRecordings.GetValueOrDefault(
                                 map),
+                            (detailFrame, detail),
                             detector,
                             reporter,
                             playMenuKey,
@@ -223,67 +222,6 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
                             Write,
                             Report,
                             cancellationToken).ConfigureAwait(false);
-                    }
-                    catch (CameraWorldNotRenderedException world)
-                        when (preset.AutoRecover)
-                    {
-                        recoveries++;
-                        PublishSummary();
-                        string retryDetail =
-                            $"{Label(type)} on {Label(map)} loaded without world geometry. Returning through Play and retrying the same Challenge without placement.";
-                        Write(
-                            retryDetail,
-                            MacroEventLevel.Warning,
-                            "camera_world_missing",
-                            world.BestConfidence);
-                        Report(
-                            "Recovery",
-                            0,
-                            retryDetail,
-                            "camera_world_missing",
-                            world.BestConfidence);
-                        await ReturnFromPrestartAfterAlignmentFailureAsync(
-                            window,
-                            preset,
-                            detector,
-                            playMenuKey,
-                            Report,
-                            cancellationToken).ConfigureAwait(false);
-                        ranChallenge = true;
-                        break;
-                    }
-                    catch (CameraAlignmentException alignment)
-                    {
-                        string skipDetail = $"Skipping {Label(type)} on {Label(map)} for this reset because camera alignment exhausted {alignment.Attempts} attempts (best {alignment.BestConfidence:P0}). No units were placed and the match was not started.";
-                        Write(skipDetail, MacroEventLevel.Warning, "camera_alignment_skipped", alignment.BestConfidence);
-                        Report("Task skipped", 100, skipDetail, "camera_alignment_skipped", alignment.BestConfidence);
-                        if (recoverableFailure is not null)
-                        {
-                            try
-                            {
-                                await recoverableFailure(alignment, cancellationToken).ConfigureAwait(false);
-                            }
-                            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                            {
-                                throw;
-                            }
-                            catch (Exception diagnosticsError)
-                            {
-                                Write($"Recoverable-failure diagnostics could not finish: {diagnosticsError.Message}", MacroEventLevel.Warning, "camera_alignment_skipped", alignment.BestConfidence);
-                            }
-                        }
-                        reporter.Queue(
-                            "skipped",
-                            skipDetail,
-                            TryCaptureClient(window, detector),
-                            runtime.Elapsed,
-                            victories,
-                            defeats,
-                            new DiscordRunTarget((int)map, 0, ChallengeRoute(type, map)));
-                        await ReturnFromPrestartAfterAlignmentFailureAsync(window, preset, detector, playMenuKey, Report, cancellationToken).ConfigureAwait(false);
-                        rotation.MarkAttempted(type);
-                        PublishSummary();
-                        continue;
                     }
                     catch (ChallengeRecoveryException recovery)
                     {
@@ -377,6 +315,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         ChallengeMapId map,
         ChallengeMapRuntimeModels models,
         ManualInputRecording? manualRecording,
+        (ImageFrame Frame, ChallengeScreenMatch Match) availableObservation,
         IDetectorPack detector,
         DiscordRunReporter reporter,
         char playMenuKey,
@@ -394,10 +333,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         int defeats = 0;
         int retry = 0;
         ChallengeMapProfile profile = preset.Maps.Single(value => value.Map == map);
-        ImageFrame available = CaptureClient(window, detector);
-        (int X, int Y)? stage = ChallengeScreenDetector.ActionFor(ChallengeScreenState.ChallengeAvailable, available);
-        if (stage is null) throw new RobloxUiUnavailableException("The Challenge Select Stage button disappeared before it could be clicked.");
-        await ClickAsync(window, stage.Value.X, stage.Value.Y, cancellationToken).ConfigureAwait(false);
+        await ClickAvailableStageAsync(window, preset, detector, availableObservation, report, cancellationToken).ConfigureAwait(false);
         (_, ChallengeScreenMatch preview) = await WaitForPreviewStartAsync(window, preset, detector, report, cancellationToken).ConfigureAwait(false);
         await ClickAsync(window, preview.ActionX!.Value, preview.ActionY!.Value, cancellationToken).ConfigureAwait(false);
         bool attemptNotified = false;
@@ -422,7 +358,6 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
             await PrepareCameraAsync(
                 window,
                 preset,
-                models.Camera,
                 report,
                 log,
                 cancellationToken).ConfigureAwait(false);
@@ -465,7 +400,6 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
             MatchTerminal terminal = await MonitorMatchAsync(
                 window,
                 preset,
-                profile,
                 models,
                 configuredAfterStart,
                 detector,
@@ -515,9 +449,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
                 retry++;
                 retriesChanged(1);
                 report("Retry", 0, $"Retrying after defeat ({retry}/{preset.DefeatRetries}).", "defeat", terminal.Confidence);
-                (int x, int y) = ChallengeScreenDetector.DefeatRetryAction(terminal.Frame);
-                await ClickAsync(window, x, y, cancellationToken).ConfigureAwait(false);
-                await Task.Delay(3500, cancellationToken).ConfigureAwait(false);
+                await RetryDefeatAsync(window, preset, detector, terminal.Frame, report, cancellationToken).ConfigureAwait(false);
                 continue;
             }
 
@@ -536,14 +468,15 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         CancellationToken cancellationToken)
     {
         int retryMilliseconds = Math.Clamp(preset.PollMilliseconds / 2, 180, 350);
-        int maximumAttempts = Math.Max(2, (int)Math.Ceiling(6000d / retryMilliseconds));
         ChallengeMapId? map = await RecognizeMapAfterParkingAsync(
             token => _automation.ParkCursorAsync(window, token),
             () => CaptureClient(window, detector),
             frame => detector.ChallengeMapForType(frame, type),
             retryMilliseconds,
-            maximumAttempts,
-            cancellationToken).ConfigureAwait(false);
+            maximumAttempts: 3,
+            cancellationToken,
+            softTimeout: TimeSpan.FromSeconds(20))
+            .ConfigureAwait(false);
         if (map is not null)
         {
             log($"{Label(type)} map recognized as {Label(map.Value)}.", MacroEventLevel.Success, "challenge_map", null);
@@ -558,7 +491,10 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         Func<ImageFrame, ChallengeMapId?> recognize,
         int retryMilliseconds,
         int maximumAttempts,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TimeSpan? softTimeout = null,
+        Func<DateTimeOffset>? utcNow = null,
+        Func<TimeSpan, CancellationToken, Task>? delay = null)
     {
         ArgumentNullException.ThrowIfNull(parkCursor);
         ArgumentNullException.ThrowIfNull(capture);
@@ -566,17 +502,31 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         if (retryMilliseconds < 0) throw new ArgumentOutOfRangeException(nameof(retryMilliseconds));
         if (maximumAttempts < 1) throw new ArgumentOutOfRangeException(nameof(maximumAttempts));
 
+        delay ??= static (duration, token) =>
+            Task.Delay(duration, token);
+        TimeSpan timeout = softTimeout ??
+            TimeSpan.FromMilliseconds(
+                Math.Max(
+                    1L,
+                    (long)retryMilliseconds *
+                    maximumAttempts));
+        ObservationWaitBudget budget = new(
+            timeout,
+            maximumAttempts,
+            utcNow);
         await parkCursor(cancellationToken).ConfigureAwait(false);
-        await Task.Delay(retryMilliseconds, cancellationToken).ConfigureAwait(false);
-        for (int attempt = 0; attempt < maximumAttempts; attempt++)
+        await delay(
+            TimeSpan.FromMilliseconds(retryMilliseconds),
+            cancellationToken).ConfigureAwait(false);
+        while (budget.ShouldObserve())
         {
             cancellationToken.ThrowIfCancellationRequested();
             ChallengeMapId? map = recognize(capture());
             if (map is not null) return map;
-            if (attempt + 1 < maximumAttempts)
-            {
-                await Task.Delay(retryMilliseconds, cancellationToken).ConfigureAwait(false);
-            }
+            budget.MarkObserved();
+            await delay(
+                TimeSpan.FromMilliseconds(retryMilliseconds),
+                cancellationToken).ConfigureAwait(false);
         }
         return null;
     }
@@ -587,7 +537,10 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         Func<ImageFrame, (int X, int Y)?> locate,
         int retryMilliseconds,
         int maximumAttempts,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TimeSpan? softTimeout = null,
+        Func<DateTimeOffset>? utcNow = null,
+        Func<TimeSpan, CancellationToken, Task>? delay = null)
     {
         ArgumentNullException.ThrowIfNull(parkCursor);
         ArgumentNullException.ThrowIfNull(capture);
@@ -595,16 +548,28 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         if (retryMilliseconds < 0) throw new ArgumentOutOfRangeException(nameof(retryMilliseconds));
         if (maximumAttempts < 1) throw new ArgumentOutOfRangeException(nameof(maximumAttempts));
 
-        for (int attempt = 0; attempt < maximumAttempts; attempt++)
+        delay ??= static (duration, token) =>
+            Task.Delay(duration, token);
+        TimeSpan timeout = softTimeout ??
+            TimeSpan.FromMilliseconds(
+                Math.Max(
+                    1L,
+                    (long)retryMilliseconds *
+                    maximumAttempts));
+        ObservationWaitBudget budget = new(
+            timeout,
+            maximumAttempts,
+            utcNow);
+        for (int attempt = 0; attempt < maximumAttempts && budget.ShouldObserve(); attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             await parkCursor(cancellationToken).ConfigureAwait(false);
             (int X, int Y)? action = locate(capture());
             if (action is not null) return action;
-            if (attempt + 1 < maximumAttempts)
-            {
-                await Task.Delay(retryMilliseconds, cancellationToken).ConfigureAwait(false);
-            }
+            budget.MarkObserved();
+            await delay(
+                TimeSpan.FromMilliseconds(retryMilliseconds),
+                cancellationToken).ConfigureAwait(false);
         }
         return null;
     }
@@ -636,23 +601,29 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         Action<string, int, string, string?, double?> report,
         CancellationToken cancellationToken)
     {
-        DateTimeOffset startedAt = DateTimeOffset.UtcNow;
-        DateTimeOffset deadline = startedAt + InitialPrestartTimeout;
         StableStateTracker<ChallengeScreenState> prestartTracker = new(preset.StableDetections);
         StableStateTracker<string> recoveryTracker = new(preset.StableDetections);
+        ObservationWaitBudget budget = new(
+            InitialPrestartTimeout,
+            preset.StableDetections);
         bool teleportingSeen = false;
         ChallengeScreenState lastObservedState = ChallengeScreenState.None;
-        while (DateTimeOffset.UtcNow < deadline)
+        while (budget.ShouldObserve(
+                   prestartTracker.HasPendingCandidate ||
+                   recoveryTracker.HasPendingCandidate))
         {
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = CaptureClient(window, detector);
             ChallengeScreenMatch match = ChallengeScreenDetector.Detect(frame);
             lastObservedState = match.State;
-            DateTimeOffset extendedDeadline = ExtendPrestartDeadline(startedAt, deadline, match.State);
-            if (extendedDeadline > deadline)
+            budget.MarkObserved();
+            if (!teleportingSeen &&
+                match.State ==
+                    ChallengeScreenState.Teleporting)
             {
-                deadline = extendedDeadline;
                 teleportingSeen = true;
+                budget.ExtendSoftTimeout(
+                    TeleportingPrestartTimeout);
                 report(
                     "Teleporting",
                     0,

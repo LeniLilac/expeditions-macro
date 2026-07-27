@@ -2,6 +2,8 @@ namespace ExpeditionsMacro.Core.Models;
 
 public enum CameraPreparationMode
 {
+    // Retained so public-beta JSON remains readable. Runtime supports
+    // FastNoAlign only.
     CameraModel,
     FastNoAlign,
 }

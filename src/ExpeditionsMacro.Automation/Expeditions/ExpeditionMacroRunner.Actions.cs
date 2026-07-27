@@ -31,6 +31,11 @@ public sealed partial class ExpeditionMacroRunner
                 state,
                 clientImage,
                 () => CaptureClient(window, detector),
+                (action, frame) =>
+                    ActionIsOwned(
+                        detector,
+                        action,
+                        frame),
                 detector.ActionFor,
                 static () => DateTimeOffset.UtcNow,
                 static (duration, token) =>
@@ -49,6 +54,7 @@ public sealed partial class ExpeditionMacroRunner
         string state,
         ImageFrame? initialFrame,
         Func<ImageFrame> capture,
+        Func<string, ImageFrame, bool> isOwned,
         Func<string, ImageFrame?, (int X, int Y)> locate,
         Func<DateTimeOffset> utcNow,
         Func<TimeSpan, CancellationToken, Task> delay,
@@ -56,6 +62,7 @@ public sealed partial class ExpeditionMacroRunner
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(state);
         ArgumentNullException.ThrowIfNull(capture);
+        ArgumentNullException.ThrowIfNull(isOwned);
         ArgumentNullException.ThrowIfNull(locate);
         ArgumentNullException.ThrowIfNull(utcNow);
         ArgumentNullException.ThrowIfNull(delay);
@@ -72,6 +79,16 @@ public sealed partial class ExpeditionMacroRunner
         {
             cancellationToken.ThrowIfCancellationRequested();
             current ??= capture();
+            if (!isOwned(state, current))
+            {
+                tracker.Reset();
+                budget.MarkObserved();
+                current = null;
+                await delay(
+                    TimeSpan.FromMilliseconds(150),
+                    cancellationToken).ConfigureAwait(false);
+                continue;
+            }
             (int X, int Y) action =
                 locate(state, current);
             (int X, int Y)? stable =
@@ -90,5 +107,22 @@ public sealed partial class ExpeditionMacroRunner
 
         throw new RobloxUiUnavailableException(
             $"The {state} action did not settle before it could be clicked.");
+    }
+
+    private static bool ActionIsOwned(
+        IDetectorPack detector,
+        string action,
+        ImageFrame frame)
+    {
+        string ownerState =
+            ExpeditionRunPolicy.ActionOwnerState(action);
+        IReadOnlyDictionary<string, double> scores =
+            detector.ScoreStates(
+                frame,
+                [ownerState]);
+        return ExpeditionRunPolicy.IsStateDetected(
+            detector.Manifest,
+            scores,
+            ownerState);
     }
 }

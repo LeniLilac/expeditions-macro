@@ -1,6 +1,8 @@
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Automation.Scheduling;
 using ExpeditionsMacro.Automation.Stages;
 using ExpeditionsMacro.Core.Abstractions;
+using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Events;
@@ -16,6 +18,7 @@ public sealed partial class EventMacroRunner
         RepeatedRoutePreparationState preparation,
         IDetectorPack detector,
         char playMenuKey,
+        int stableDetections,
         StageRunOutcome outcome,
         TimeSpan runtime,
         Func<
@@ -37,13 +40,40 @@ public sealed partial class EventMacroRunner
         switch (continuation)
         {
             case ScheduledTaskContinuation.RepeatStage:
-                (int X, int Y)? repeatAction =
-                    StageScreenDetector.RepeatStageAction(
-                        terminal.Frame,
-                        terminal.State ==
-                            EventScreenState.Victory
-                            ? StageScreenState.Victory
-                            : StageScreenState.Defeat);
+                StageScreenState terminalStageState =
+                    terminal.State ==
+                        EventScreenState.Victory
+                        ? StageScreenState.Victory
+                        : StageScreenState.Defeat;
+                StableScreenAction<(
+                    ImageFrame Frame,
+                    EventScreenMatch Match)>? repeatAction =
+                    await StableScreenActionWaiter.WaitAsync(
+                            terminal.State,
+                            stableDetections,
+                            () =>
+                            {
+                                ImageFrame frame =
+                                    CaptureClient(
+                                        window,
+                                        detector);
+                                return (
+                                    Frame: frame,
+                                    Match: EventScreenDetector
+                                        .DetectMatchState(
+                                            frame));
+                            },
+                            static observation =>
+                                observation.Match.State,
+                            observation =>
+                                StageScreenDetector
+                                    .RepeatStageAction(
+                                        observation.Frame,
+                                        terminalStageState),
+                            TimeSpan.FromSeconds(12),
+                            TimeSpan.FromMilliseconds(250),
+                            cancellationToken)
+                        .ConfigureAwait(false);
                 if (repeatAction is null)
                 {
                     throw new RobloxUiUnavailableException(

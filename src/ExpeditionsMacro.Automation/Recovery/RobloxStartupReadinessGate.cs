@@ -1,3 +1,4 @@
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Runtime;
 
 namespace ExpeditionsMacro.Automation.Recovery;
@@ -36,9 +37,15 @@ internal static class RobloxStartupReadinessGate
         utcNow ??= static () => DateTimeOffset.UtcNow;
         delay ??= static (duration, token) =>
             Task.Delay(duration, token);
-        DateTimeOffset deadline = utcNow() + timeout;
         int stable = 0;
-        while (utcNow() < deadline)
+        ObservationWaitBudget budget = new(
+            timeout,
+            StableReadyFrames,
+            utcNow);
+        while (budget.ShouldObserve(
+                   confirmationPending:
+                       stable > 0 &&
+                       stable < StableReadyFrames))
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -52,6 +59,7 @@ internal static class RobloxStartupReadinessGate
                 {
                     return;
                 }
+                budget.MarkObserved();
             }
             catch (OperationCanceledException)
                 when (cancellationToken.IsCancellationRequested)
