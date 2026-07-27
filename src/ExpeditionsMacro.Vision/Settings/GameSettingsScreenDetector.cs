@@ -11,8 +11,6 @@ public static class GameSettingsScreenDetector
     public const int ClientHeight = 611;
     public const double MinimumCanonicalUiScale = 0.98;
     public const double MaximumCanonicalUiScale = 1.02;
-    public const int SettingsButtonX = 232;
-    public const int SettingsButtonY = 34;
     public const int UnitsScrollbarTopY = 185;
     public const int UnitsScrollbarBottomY = 452;
 

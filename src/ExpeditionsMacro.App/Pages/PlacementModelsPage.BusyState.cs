@@ -10,7 +10,6 @@ public partial class PlacementModelsPage
         RecordButton.IsEnabled = !busy;
         TestButton.IsEnabled = !busy;
         StopButton.IsEnabled = busy;
-        FastSaveButton.IsEnabled = !busy;
         FastPrepareButton.IsEnabled = !busy;
         FastPositionButton.IsEnabled = !busy;
         FastTestButton.IsEnabled = !busy;

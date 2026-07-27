@@ -18,20 +18,34 @@ public partial class PlacementModelsPage
         try
         {
             model = BuildModel();
-            await _services.PlacementModels
-                .SaveAsync(model);
+            if (FastWorkflow)
+            {
+                _placementAutoSave.ScheduleSave(
+                    model);
+                if (!await FlushPlacementAutoSaveAsync())
+                {
+                    return;
+                }
+            }
+            else
+            {
+                await _services.PlacementModels
+                    .SaveAsync(model);
+            }
             _selectedModel = model;
             cancelPlacementKey =
-                AppSettings.ParseCancelPlacementKey(
-                    _services.Settings
-                        .CancelPlacementKey,
-                    _services.Settings
-                        .MacroHotkeyVirtualKey,
-                    _services.Settings.PlayMenuKey,
-                    _services.Settings.UnitMenuKey,
-                    _services.Settings.AreasMenuKey,
-                    _services.Settings
-                        .ShiftLockVirtualKey);
+                ManualInputRouteService.IsConfigured(model)
+                    ? default
+                    : AppSettings.ParseCancelPlacementKey(
+                        _services.Settings
+                            .CancelPlacementKey,
+                        _services.Settings
+                            .MacroHotkeyVirtualKey,
+                        _services.Settings.PlayMenuKey,
+                        _services.Settings.UnitMenuKey,
+                        _services.Settings.AreasMenuKey,
+                        _services.Settings
+                            .ShiftLockVirtualKey);
         }
         catch (Exception error)
         {

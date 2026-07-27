@@ -398,10 +398,8 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         (int X, int Y)? stage = ChallengeScreenDetector.ActionFor(ChallengeScreenState.ChallengeAvailable, available);
         if (stage is null) throw new RobloxUiUnavailableException("The Challenge Select Stage button disappeared before it could be clicked.");
         await ClickAsync(window, stage.Value.X, stage.Value.Y, cancellationToken).ConfigureAwait(false);
-        ImageFrame preview = await WaitForScreenAsync(window, preset, detector, ChallengeScreenState.PreviewReady, TimeSpan.FromSeconds(15), report, cancellationToken).ConfigureAwait(false);
-        (int X, int Y)? startPreview = ChallengeScreenDetector.ActionFor(ChallengeScreenState.PreviewReady, preview);
-        if (startPreview is null) throw new RobloxUiUnavailableException("The Challenge preview Start button could not be located.");
-        await ClickAsync(window, startPreview.Value.X, startPreview.Value.Y, cancellationToken).ConfigureAwait(false);
+        (_, ChallengeScreenMatch preview) = await WaitForPreviewStartAsync(window, preset, detector, report, cancellationToken).ConfigureAwait(false);
+        await ClickAsync(window, preview.ActionX!.Value, preview.ActionY!.Value, cancellationToken).ConfigureAwait(false);
         bool attemptNotified = false;
         bool teamLoaded = profile.TeamSlot == 0;
         while (true)

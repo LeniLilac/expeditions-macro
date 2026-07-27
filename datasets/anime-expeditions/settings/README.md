@@ -1,16 +1,17 @@
 # Startup game-settings fixtures
 
-These fourteen 808 by 611 Roblox client captures reproduce the startup
+These fifteen 808 by 611 Roblox client captures reproduce the startup
 settings-normalization flow:
 
 - a fully loaded Lobby with Settings closed;
+- the shifted Roblox Settings gear when the top bar includes a voice control;
 - an in-progress Settings opening animation;
 - the settled panel at UI Scale 0.80, 1.00, and 1.20;
 - the Gameplay, Graphics, Units, and two observed Misc page layouts;
 - both the top and bottom Units scrollbar positions.
 
 The fixtures were selected from reviewed local diagnostic archives on
-2026-07-25. Only representative client frames were retained. The source
+2026-07-25 and 2026-07-27. Only representative client frames were retained. The source
 archives, repeated frames, and timestamped review contact sheets are not
 tracked.
 
@@ -27,3 +28,9 @@ uses any coordinate-based page or toggle action.
 from a beta.23 startup failure. The player/title strip above Settings was
 replaced with an opaque rectangle; no settings detector or action region
 intersects that redaction.
+
+`SettingsButtonVoiceClosed.png` retains only the privacy-safe top-bar
+pixels from a field capture and replaces the rest of the canonical client
+frame with opaque black. It preserves the exact opaque gear glyph at
+`(276, 34)` and the variable translucent pill behind it. No player,
+account, chat, desktop, notification, or secret-bearing pixels remain.

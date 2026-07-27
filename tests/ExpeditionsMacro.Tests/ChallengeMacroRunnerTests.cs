@@ -100,6 +100,128 @@ public sealed class ChallengeMacroRunnerTests
     }
 
     [Fact]
+    public async Task PreviewStartWaiter_WaitsForTheExpectedLiveAction()
+    {
+        ImageFrame frame = new(
+            1,
+            1,
+            PixelFormat.Rgb24,
+            new byte[3],
+            takeOwnership: true);
+        Queue<ChallengeScreenMatch> observations = new(
+        [
+            new(
+                ChallengeScreenState.PreviewReady,
+                0.91),
+            new(
+                ChallengeScreenState.PreviewReady,
+                0.92),
+            new(
+                ChallengeScreenState.PostMatchPreview,
+                0.93,
+                668,
+                377),
+            new(
+                ChallengeScreenState.PostMatchPreview,
+                0.93,
+                668,
+                377),
+            new(
+                ChallengeScreenState.PostMatchPreview,
+                0.93,
+                668,
+                377),
+            new(
+                ChallengeScreenState.PreviewReady,
+                0.94,
+                404,
+                384),
+            new(
+                ChallengeScreenState.PreviewReady,
+                0.95,
+                405,
+                384),
+            new(
+                ChallengeScreenState.PreviewReady,
+                0.96,
+                405,
+                385),
+        ]);
+        DateTimeOffset now =
+            new(2026, 7, 27, 18, 5, 37, TimeSpan.Zero);
+        int seen = 0;
+
+        (ImageFrame Frame, ChallengeScreenMatch Match)? result =
+            await ChallengeMacroRunner
+                .WaitForStableActionAsync(
+                    ChallengeScreenState.PreviewReady,
+                    stableDetections: 3,
+                    observe: () =>
+                    {
+                        now += TimeSpan.FromMilliseconds(100);
+                        return (
+                            frame,
+                            observations.Dequeue());
+                    },
+                    timeout: TimeSpan.FromSeconds(2),
+                    pollMilliseconds: 0,
+                    observed: _ => seen++,
+                    CancellationToken.None,
+                    utcNow: () => now,
+                    delay: (_, _) => Task.CompletedTask);
+
+        Assert.NotNull(result);
+        Assert.Same(frame, result.Value.Frame);
+        Assert.Equal(
+            ChallengeScreenState.PreviewReady,
+            result.Value.Match.State);
+        Assert.Equal(405, result.Value.Match.ActionX);
+        Assert.Equal(385, result.Value.Match.ActionY);
+        Assert.Equal(8, seen);
+        Assert.Empty(observations);
+    }
+
+    [Fact]
+    public async Task PreviewStartWaiter_NoLiveActionTimesOutWithoutClickTarget()
+    {
+        ImageFrame frame = new(
+            1,
+            1,
+            PixelFormat.Rgb24,
+            new byte[3],
+            takeOwnership: true);
+        DateTimeOffset now =
+            new(2026, 7, 27, 18, 5, 37, TimeSpan.Zero);
+        int observations = 0;
+
+        (ImageFrame Frame, ChallengeScreenMatch Match)? result =
+            await ChallengeMacroRunner
+                .WaitForStableActionAsync(
+                    ChallengeScreenState.PreviewReady,
+                    stableDetections: 2,
+                    observe: () =>
+                    {
+                        observations++;
+                        now += TimeSpan.FromSeconds(1);
+                        return (
+                            frame,
+                            new ChallengeScreenMatch(
+                                ChallengeScreenState
+                                    .PreviewReady,
+                                0.94));
+                    },
+                    timeout: TimeSpan.FromSeconds(2),
+                    pollMilliseconds: 0,
+                    observed: null,
+                    CancellationToken.None,
+                    utcNow: () => now,
+                    delay: (_, _) => Task.CompletedTask);
+
+        Assert.Null(result);
+        Assert.Equal(2, observations);
+    }
+
+    [Fact]
     public void TeleportingScreen_ExtendsThePrestartDeadlineToThreeMinutes()
     {
         DateTimeOffset startedAt = new(2026, 7, 22, 12, 37, 13, TimeSpan.Zero);

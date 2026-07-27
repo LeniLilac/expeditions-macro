@@ -4,6 +4,35 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.32] - 2026-07-27
+
+### Added
+
+- Added automatic persistence for every committed Macro Plan and Placement Setup edit, including a visible pending/saving/saved/error state and forced flushes before plan switches, playback, sharing, navigation, and shutdown.
+- Added editable Before Start / After Start phase selectors to existing placement steps.
+- Added per-step Auto Upgrade priorities from Off through Priority 6. Playback sends the matching Auto Upgrade Unit key zero through six times after verified placement and targeting.
+- Added compact X actions beside optional Anime Expeditions keybindings so a binding can be explicitly unset without changing Escape's capture-cancel behavior.
+
+### Changed
+
+- Replaced Roblox accessibility navigation with verified visual clicks: Settings uses the opaque gear at either supported top-bar offset, and in-match Lobby return uses the opaque door action before verifying the confirmation and final Lobby.
+- Pinned Roblox now remains attached when focus moves to a non-overlapping window or another monitor. It suspends only for overlapping foreign windows or app-owned dialogs, while page/scroll/minimize auto-detach still minimizes Roblox.
+- Manual-recording Placement Setups remain exclusive: retained ordinary steps stay saved but do not execute while a recording is selected.
+
+### Fixed
+
+- Startup restart can now reach UI Scale correction from a stable noncanonical-scale Lobby before requiring strict post-preflight Lobby confirmation.
+- Challenge navigation waits for the live Preview Start action instead of accepting a retained post-match Change Gamemode action.
+- Event entry recognizes the selected colored tab and selects Villain Invasion when another Event is initially active, while avoiding an extra click when Villain Invasion is already selected.
+- Story and Raid handoff accepts stable shared Play-selector evidence when a locked, dim mode tile prevents specialized Stage classification, avoiding false Toggle Play Menu binding errors and repeated key presses.
+- Autosave drains edits queued during an active write, preserves chained rename ancestry, waits for in-flight placement writes during shutdown, retries failed writes, and prevents stale completion messages.
+- Placement key validation now requires only the bindings used by active ordinary steps; manual recordings and empty phase subsets no longer fail on irrelevant unset placement keys.
+
+### Tests
+
+- Added deterministic autosave lifecycle, placement phase/priority, vision-guided Settings/door, startup-order, pinned-window exposure, Event selection, Challenge Start, and shared Play-selector regressions.
+- Revalidated all 1,135 application and detector tests, all 5 Deep Debug Viewer tests, repository policy, and 72 dark/light UI snapshots.
+
 ## [1.3.0-beta.31] - 2026-07-27
 
 ### Added
@@ -967,7 +996,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.31...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.32...HEAD
+[1.3.0-beta.32]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.31...v1.3.0-beta.32
 [1.3.0-beta.31]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.30...v1.3.0-beta.31
 [1.3.0-beta.30]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.28...v1.3.0-beta.30
 [1.3.0-beta.28]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.27...v1.3.0-beta.28

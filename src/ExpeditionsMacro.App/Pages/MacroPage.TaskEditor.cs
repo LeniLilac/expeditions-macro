@@ -79,13 +79,8 @@ public partial class MacroPage
                     placementError);
             }
             ReindexRows();
-            ShowPlanBlocksStatus(
-                existingIndex >= 0
-                    ? "Task updated. Save the plan to persist it."
-                    : destination is null
-                        ? "Task added to the plan. Save the plan to persist it."
-                        : $"Task added to {destination.BlockLabel}. Save the plan to persist it.");
             ResetTaskEditor();
+            QueuePlanAutoSave();
         }
         catch (Exception error)
         {

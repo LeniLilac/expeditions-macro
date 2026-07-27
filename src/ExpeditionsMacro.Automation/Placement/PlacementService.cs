@@ -20,7 +20,7 @@ public sealed class PlacementService
     private const int SelectionDismissPollMilliseconds = 100;
     private const int SelectionDismissSamples = 4;
     private const int IdleCursorInsetPixels = 24;
-    private const int TargetingTapIntervalMilliseconds = 100;
+    private const int UnitActionTapIntervalMilliseconds = 100;
 
     private readonly IRobloxAutomation _automation;
     private readonly IPlacementCaptureService _capture;
@@ -129,22 +129,34 @@ public sealed class PlacementService
         CancellationToken cancellationToken)
     {
         if (defaultIntervalMilliseconds < 0) throw new ArgumentOutOfRangeException(nameof(defaultIntervalMilliseconds));
+        if (steps.Count == 0)
+        {
+            return;
+        }
         if (!char.IsAsciiLetter(cancelPlacementKey))
         {
-            throw new ArgumentOutOfRangeException(
-                nameof(cancelPlacementKey));
+            throw new InvalidDataException(
+                "Scroll down to Controls on the Dashboard and set Cancel Placement key to the same A-Z letter assigned in Anime Expeditions.");
         }
         cancelPlacementKey =
             char.ToUpperInvariant(cancelPlacementKey);
-        char targetingKey = _targetingKey();
-        if (!char.IsAsciiLetter(targetingKey))
+        char targetingKey = default;
+        if (steps.Any(step =>
+                (int)step.TargetingPriority > 0))
         {
-            throw new InvalidDataException(
-                "Scroll down to Controls on the Dashboard and set Change Unit Targeting key to the same A-Z letter assigned in Anime Expeditions.");
+            targetingKey = _targetingKey();
+            if (!char.IsAsciiLetter(targetingKey))
+            {
+                throw new InvalidDataException(
+                    "Scroll down to Controls on the Dashboard and set Change Unit Targeting key to the same A-Z letter assigned in Anime Expeditions.");
+            }
+            targetingKey =
+                char.ToUpperInvariant(targetingKey);
         }
-        targetingKey = char.ToUpperInvariant(targetingKey);
         char autoUpgradeKey = default;
-        if (steps.Any(step => step.AutoUpgrade))
+        if (steps.Any(step =>
+                step.AutoUpgradePriority !=
+                    UnitAutoUpgradePriority.Off))
         {
             autoUpgradeKey = _autoUpgradeKey();
             if (!char.IsAsciiLetter(autoUpgradeKey))
@@ -217,19 +229,34 @@ public sealed class PlacementService
                 if (tap + 1 < targetingTaps)
                 {
                     await Task.Delay(
-                        TargetingTapIntervalMilliseconds,
+                        UnitActionTapIntervalMilliseconds,
                         cancellationToken).ConfigureAwait(false);
                 }
             }
-            if (step.AutoUpgrade)
+            int autoUpgradeTaps =
+                (int)step.AutoUpgradePriority;
+            if (autoUpgradeTaps > 0)
             {
                 status?.Invoke(
-                    $"Step {index + 1}/{steps.Count}: enabling Auto Upgrade for the selected unit.");
-                EnsureFocus(window);
-                await _automation.TapLetterKeyAsync(
-                    window,
-                    autoUpgradeKey,
-                    cancellationToken).ConfigureAwait(false);
+                    $"Step {index + 1}/{steps.Count}: applying Auto Upgrade {FormatAutoUpgradePriority(step.AutoUpgradePriority)} ({autoUpgradeTaps} key taps).");
+                for (int tap = 0;
+                     tap < autoUpgradeTaps;
+                     tap++)
+                {
+                    EnsureFocus(window);
+                    await _automation.TapLetterKeyAsync(
+                        window,
+                        autoUpgradeKey,
+                        cancellationToken).ConfigureAwait(false);
+                    cancellationToken
+                        .ThrowIfCancellationRequested();
+                    if (tap + 1 < autoUpgradeTaps)
+                    {
+                        await Task.Delay(
+                            UnitActionTapIntervalMilliseconds,
+                            cancellationToken).ConfigureAwait(false);
+                    }
+                }
             }
             status?.Invoke(
                 $"Step {index + 1}/{steps.Count}: closing the selected-unit panel before the next action.");
@@ -277,6 +304,12 @@ public sealed class PlacementService
             keyHoldMilliseconds,
             cancellationToken).ConfigureAwait(false);
     }
+
+    private static string FormatAutoUpgradePriority(
+        UnitAutoUpgradePriority priority) =>
+        priority == UnitAutoUpgradePriority.Off
+            ? "Off"
+            : $"Priority {(int)priority}";
 
     private async Task ClickPlacementAsync(
         RobloxWindow window,

@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using ExpeditionsMacro.Core.Models;
 
 namespace ExpeditionsMacro.App.Models;
@@ -11,11 +12,26 @@ public sealed record PlacementStoryVariant(
     int ActNumber,
     string Label);
 
-public sealed record PlacementSetupRow(
-    PlacementSetupRoute Route,
-    PlacementModel? Model,
-    string? InheritedFrom = null)
+public sealed class PlacementSetupRow(
+    PlacementSetupRoute route,
+    PlacementModel? model,
+    string? inheritedFrom = null) :
+    INotifyPropertyChanged
 {
+    private PlacementModel? _model = model;
+    private string? _inheritedFrom = inheritedFrom;
+
+    public event PropertyChangedEventHandler?
+        PropertyChanged;
+
+    public PlacementSetupRoute Route { get; } =
+        route;
+
+    public PlacementModel? Model => _model;
+
+    public string? InheritedFrom =>
+        _inheritedFrom;
+
     public string Name => Route.Name;
 
     public string Status => Model is not null
@@ -23,6 +39,26 @@ public sealed record PlacementSetupRow(
         : InheritedFrom is not null
             ? $"Uses {InheritedFrom}"
             : "Not configured";
+
+    public void UpdateModel(
+        PlacementModel? model,
+        string? inheritedFrom = null)
+    {
+        _model = model;
+        _inheritedFrom = inheritedFrom;
+        PropertyChanged?.Invoke(
+            this,
+            new PropertyChangedEventArgs(
+                nameof(Model)));
+        PropertyChanged?.Invoke(
+            this,
+            new PropertyChangedEventArgs(
+                nameof(InheritedFrom)));
+        PropertyChanged?.Invoke(
+            this,
+            new PropertyChangedEventArgs(
+                nameof(Status)));
+    }
 }
 
 public sealed class PlacementSetupNode

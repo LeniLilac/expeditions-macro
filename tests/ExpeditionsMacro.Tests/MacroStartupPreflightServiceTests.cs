@@ -97,20 +97,18 @@ public sealed partial class MacroStartupPreflightServiceTests
         Assert.Contains(
             RobloxKeyboardKey.Digit1,
             automation.Keys);
-        Assert.Equal(
-            4,
-            automation.Keys.Count(
-                key =>
-                    key == RobloxKeyboardKey.Backslash));
         Assert.DoesNotContain(
-            automation.Clicks,
-            point =>
-                point ==
-                (
-                    GameSettingsScreenDetector
-                        .SettingsButtonX,
-                    GameSettingsScreenDetector
-                        .SettingsButtonY));
+            RobloxKeyboardKey.Backslash,
+            automation.Keys);
+        Assert.Equal(
+            2,
+            automation.Clicks.Count(
+                point => point ==
+                    (
+                        RobloxSettingsButtonDetector
+                            .NoVoiceActionX,
+                        RobloxSettingsButtonDetector
+                            .ActionY)));
         Assert.Empty(automation.Drags);
         Assert.Equal(1, automation.PitchPreparationCount);
         Assert.Equal(
@@ -152,7 +150,7 @@ public sealed partial class MacroStartupPreflightServiceTests
     }
 
     [Fact]
-    public async Task GameSettingsDebug_PreparesPitchBeforeAccessibility()
+    public async Task GameSettingsDebug_PreparesPitchBeforeSettingsGear()
     {
         TestFrames frames = new();
         PreflightAutomation automation =
@@ -173,6 +171,10 @@ public sealed partial class MacroStartupPreflightServiceTests
         Assert.Equal(
             "pitch",
             automation.ActionSequence[0]);
+        Assert.StartsWith(
+            "click:",
+            automation.ActionSequence[1],
+            StringComparison.Ordinal);
         Assert.Same(frames.Lobby, automation.CurrentFrame);
     }
 
@@ -264,11 +266,9 @@ public sealed partial class MacroStartupPreflightServiceTests
                 CancellationToken.None);
 
         Assert.True(result.UiScaleChanged);
-        Assert.Equal(
-            8,
-            automation.Keys.Count(
-                key =>
-                    key == RobloxKeyboardKey.Backslash));
+        Assert.DoesNotContain(
+            RobloxKeyboardKey.Backslash,
+            automation.Keys);
         Assert.Contains(
             RobloxKeyboardKey.Digit1,
             automation.Keys);
@@ -419,9 +419,6 @@ public sealed partial class MacroStartupPreflightServiceTests
         private string _scaleInput = string.Empty;
         private bool _scaleNormalized;
         private bool _settingsOpen;
-        private bool _accessibilityEnabled;
-        private bool _navigationAtRoot;
-        private bool _navigationAtSettingsButton;
         private readonly ImageFrame _closedFrame;
 
         public PreflightAutomation(
@@ -446,6 +443,8 @@ public sealed partial class MacroStartupPreflightServiceTests
             get;
             init;
         }
+
+        public bool IgnoreSettingsGearClicks { get; init; }
 
         public List<(int X, int Y)> Clicks { get; } = [];
 
@@ -536,11 +535,20 @@ public sealed partial class MacroStartupPreflightServiceTests
             CancellationToken cancellationToken)
         {
             Clicks.Add((x, y));
-            if ((x, y) ==
+            ActionSequence.Add($"click:{x},{y}");
+            RobloxSettingsButtonMatch settingsButton =
+                RobloxSettingsButtonDetector.Detect(
+                    CurrentFrame);
+            if (settingsButton.Available &&
+                (x, y) ==
                 (
-                    GameSettingsScreenDetector.SettingsButtonX,
-                    GameSettingsScreenDetector.SettingsButtonY))
+                    settingsButton.ActionX,
+                    settingsButton.ActionY))
             {
+                if (IgnoreSettingsGearClicks)
+                {
+                    return Task.CompletedTask;
+                }
                 _settingsOpen = !_settingsOpen;
                 CurrentFrame = _settingsOpen
                     ? _scaleNormalized
@@ -675,36 +683,7 @@ public sealed partial class MacroStartupPreflightServiceTests
         {
             ActionSequence.Add($"key:{key}");
             Keys.Add(key);
-            if (key == RobloxKeyboardKey.Backslash)
-            {
-                _accessibilityEnabled =
-                    !_accessibilityEnabled;
-                if (_accessibilityEnabled)
-                {
-                    _navigationAtRoot = true;
-                    _navigationAtSettingsButton = false;
-                }
-            }
-            else if (_accessibilityEnabled &&
-                     _navigationAtRoot &&
-                     key == RobloxKeyboardKey.RightArrow)
-            {
-                _navigationAtRoot = false;
-                _navigationAtSettingsButton = true;
-            }
-            else if (_accessibilityEnabled &&
-                     _navigationAtSettingsButton &&
-                     key == RobloxKeyboardKey.Enter)
-            {
-                _navigationAtSettingsButton = false;
-                _settingsOpen = !_settingsOpen;
-                CurrentFrame = _settingsOpen
-                    ? _scaleNormalized
-                        ? _frames.Gameplay
-                        : SettingsOpenFrame
-                    : _closedFrame;
-            }
-            else if (key == RobloxKeyboardKey.Enter &&
+            if (key == RobloxKeyboardKey.Enter &&
                      _editingScale)
             {
                 AppliedScaleValues.Add(_scaleInput);

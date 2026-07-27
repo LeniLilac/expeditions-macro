@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace ExpeditionsMacro.Core.Models;
 
 public sealed record PlacementStep
@@ -16,7 +18,14 @@ public sealed record PlacementStep
 
     public UnitTargetingPriority TargetingPriority { get; init; }
 
-    public bool AutoUpgrade { get; init; } = true;
+    [JsonPropertyName("auto_upgrade")]
+    [JsonConverter(
+        typeof(UnitAutoUpgradePriorityJsonConverter))]
+    public UnitAutoUpgradePriority AutoUpgradePriority
+    {
+        get;
+        init;
+    } = UnitAutoUpgradePriority.Off;
 
     public void Validate(int clientWidth, int clientHeight)
     {
@@ -29,6 +38,11 @@ public sealed record PlacementStep
         {
             throw new InvalidDataException(
                 "Unit targeting priority is invalid.");
+        }
+        if (!Enum.IsDefined(AutoUpgradePriority))
+        {
+            throw new InvalidDataException(
+                "Auto Upgrade priority is invalid.");
         }
     }
 }

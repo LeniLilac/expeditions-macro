@@ -25,7 +25,7 @@
                            Margin="0,2,0,0"
                            FontSize="11"
                            Foreground="{DynamicResource FaintBrush}"
-                           Text="{Binding Status}"
+                           Text="{Binding Row.Status}"
                            TextTrimming="CharacterEllipsis" />
                 <Button x:Name="DisclosureButton"
                         Grid.Column="1"
@@ -283,9 +283,30 @@
                         <DataGridTextColumn Header="Client Y"
                                             Width="120"
                                             Binding="{Binding Y, UpdateSourceTrigger=PropertyChanged}" />
-                        <DataGridCheckBoxColumn Header="Auto Upgrade"
-                                                Width="120"
-                                                Binding="{Binding AutoUpgrade, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <DataGridTemplateColumn Header="Placement phase"
+                                                Width="150">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <ComboBox AutomationProperties.Name="Placement phase"
+                                              DisplayMemberPath="Label"
+                                              ItemsSource="{x:Static models:PlacementStepRow.Phases}"
+                                              SelectedValue="{Binding Phase, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              SelectedValuePath="Value" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="Auto Upgrade"
+                                                Width="140">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <ComboBox AutomationProperties.Name="Auto upgrade priority"
+                                              DisplayMemberPath="Label"
+                                              ItemsSource="{x:Static models:PlacementStepRow.AutoUpgradePriorities}"
+                                              SelectedValue="{Binding AutoUpgradePriority, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                              SelectedValuePath="Value" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                         <DataGridTextColumn Header="Delay after click, ms"
                                             Width="*"
                                             Binding="{Binding DelayAfterMilliseconds, UpdateSourceTrigger=PropertyChanged}" />

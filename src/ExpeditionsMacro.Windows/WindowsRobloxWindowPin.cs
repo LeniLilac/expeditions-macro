@@ -52,30 +52,21 @@ public sealed class WindowsRobloxWindowPin : IDisposable
         }
     }
 
-    public bool IsForegroundSession(
-        nint owner)
+    public bool IsDashboardExposed(
+        nint owner,
+        nint knownSource)
     {
         lock (_gate)
         {
-            nint foreground =
-                NativeMethods.GetForegroundWindow();
-            if (owner == nint.Zero ||
-                foreground == nint.Zero ||
-                !NativeMethods.IsWindow(owner) ||
-                !NativeMethods.IsWindow(foreground))
-            {
-                return false;
-            }
-
             nint source =
                 _state is { } state &&
                 NativeMethods.IsWindow(state.Source)
                     ? state.Source
-                    : nint.Zero;
-            return IsForegroundWindowAllowed(
+                    : knownSource;
+            return WindowsPinnedWindowExposure
+                .IsDashboardExposed(
                 owner,
-                source,
-                foreground);
+                source);
         }
     }
 
@@ -267,16 +258,6 @@ public sealed class WindowsRobloxWindowPin : IDisposable
                   WsExAppWindow)) |
             WsExTopmost;
     }
-
-    internal static bool IsForegroundWindowAllowed(
-        nint owner,
-        nint source,
-        nint foreground) =>
-        owner != nint.Zero &&
-        foreground != nint.Zero &&
-        (foreground == owner ||
-         (source != nint.Zero &&
-          foreground == source));
 
     private bool TryUnpinCore(
         PinnedWindowReleaseDisposition disposition,

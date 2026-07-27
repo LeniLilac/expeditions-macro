@@ -44,7 +44,7 @@ public partial class ExpeditionsPage
                     _services.Settings
                         .MacroHotkeyVirtualKey);
             cancelPlacementKey =
-                AppSettings.ParseCancelPlacementKey(
+                AppSettings.ParseOptionalCancelPlacementKey(
                     _services.Settings
                         .CancelPlacementKey,
                     _services.Settings
@@ -53,9 +53,7 @@ public partial class ExpeditionsPage
                     _services.Settings.UnitMenuKey,
                     _services.Settings.AreasMenuKey,
                     _services.Settings
-                        .ShiftLockVirtualKey);
-            _ = AppSettings.ParseRequiredUnitActionKeys(
-                _services.Settings);
+                        .ShiftLockVirtualKey) ?? default;
             if (!DiscordWebhookClient
                     .ValidateWebhookUrl(webhook))
             {

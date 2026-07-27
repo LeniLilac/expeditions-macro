@@ -30,10 +30,6 @@ public static class EventScreenDetector
 {
     private static readonly ScreenRegion EventHeader =
         new(0, 55, 180, 55);
-    private static readonly ScreenRegion EventCatalogVillainCard =
-        new(10, 155, 170, 58);
-    private static readonly ScreenRegion EventHomeAction =
-        new(430, 548, 135, 42);
     private static readonly ScreenRegion ActTitle =
         new(380, 20, 225, 58);
     private static readonly ScreenRegion ActScrollRail =
@@ -97,7 +93,7 @@ public static class EventScreenDetector
                     shared.ActionY));
         }
 
-        double eventHome = EventHomeScore(
+        double eventHome = EventEntryDetector.HomeScore(
             image,
             eventChrome);
         if (eventHome >= 0.72)
@@ -111,7 +107,7 @@ public static class EventScreenDetector
         }
 
         double eventCatalog =
-            EventCatalogScore(image);
+            EventEntryDetector.CatalogScore(image);
         if (eventCatalog >= 0.72)
         {
             return Trace(
@@ -240,66 +236,6 @@ public static class EventScreenDetector
             1);
     }
 
-    private static double EventHomeScore(
-        ImageFrame image,
-        double eventChrome)
-    {
-        if (eventChrome == 0) return 0;
-        double actionRed = ColorFraction(
-            image,
-            EventHomeAction,
-            IsEventRed);
-        if (actionRed < 0.55) return 0;
-        return Math.Clamp(
-            0.72 +
-            0.16 * Ramp(
-                actionRed,
-                0.55,
-                0.82) +
-            0.12 * eventChrome,
-            0,
-            1);
-    }
-
-    private static double EventCatalogScore(
-        ImageFrame image)
-    {
-        double cyanHeader = ColorFraction(
-            image,
-            EventHeader,
-            IsEventCyan);
-        double villainRed = ColorFraction(
-            image,
-            EventCatalogVillainCard,
-            IsEventRed);
-        double villainDark = ColorFraction(
-            image,
-            EventCatalogVillainCard,
-            IsDark);
-        if (cyanHeader < 0.20 ||
-            villainRed < 0.08 ||
-            villainDark < 0.75)
-        {
-            return 0;
-        }
-        return Math.Clamp(
-            0.72 +
-            0.10 * Ramp(
-                cyanHeader,
-                0.20,
-                0.42) +
-            0.10 * Ramp(
-                villainRed,
-                0.08,
-                0.16) +
-            0.08 * Ramp(
-                villainDark,
-                0.75,
-                0.92),
-            0,
-            1);
-    }
-
     private static double ActSelectorScore(
         ImageFrame image,
         double eventChrome)
@@ -392,14 +328,6 @@ public static class EventScreenDetector
         red >= 95 &&
         red - green >= 38 &&
         red - blue >= 25;
-
-    private static bool IsEventCyan(
-        byte red,
-        byte green,
-        byte blue) =>
-        blue >= 100 &&
-        green >= 70 &&
-        blue - red >= 30;
 
     private static bool IsDark(
         byte red,

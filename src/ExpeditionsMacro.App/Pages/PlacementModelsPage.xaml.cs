@@ -38,6 +38,9 @@ public partial class PlacementModelsPage : UserControl, IAppPage
     public PlacementModelsPage(AppServices services)
     {
         _services = services;
+        _placementAutoSave =
+            new PlacementModelAutoSaveSession(
+                services.PlacementModels);
         InitializeComponent();
         InitializeCatalogRail();
         WireFastEditorEvents();
@@ -56,8 +59,7 @@ public partial class PlacementModelsPage : UserControl, IAppPage
                     : $"Team {slot}"))
             .ToArray();
         FastTeamCombo.SelectedIndex = 0;
-        _steps.CollectionChanged += (_, _) =>
-            UpdateFastPlacementCount();
+        InitializePlacementAutoSave();
         _services.Coordinator.StateChanged +=
             (_, _) => Dispatcher.BeginInvoke(UpdateBusyState);
         _services.Hotkey.BindingChanged +=
@@ -121,22 +123,30 @@ public partial class PlacementModelsPage : UserControl, IAppPage
         }
     }
 
-    private void FastSetupList_SelectionChanged(
+    private async void FastSetupList_SelectionChanged(
         object sender,
         SelectionChangedEventArgs e)
     {
-        if (!FastWorkflow ||
+        if (_changingSetupSelection ||
+            !FastWorkflow ||
             FastSetupList.SelectedItem is not
                 PlacementSetupNode node)
         {
             return;
         }
 
-        ApplySetup(node.Row);
+        if (!await FlushPlacementAutoSaveAsync())
+        {
+            RestoreActiveSetupSelection();
+            return;
+        }
+        ApplySelectedSetupNode(node);
     }
 
     private void ApplyModel(PlacementModel model)
     {
+        using IDisposable suspension =
+            SuspendPlacementAutoSave();
         _selectedModel = model;
         _fastPlacementIntervalMilliseconds =
             model.PlacementIntervalMilliseconds;
@@ -207,6 +217,8 @@ public partial class PlacementModelsPage : UserControl, IAppPage
 
     private void ApplyNewModelDefaults()
     {
+        using IDisposable suspension =
+            SuspendPlacementAutoSave();
         if (FastWorkflow)
         {
             ResetFastTimingDefaults();
@@ -243,7 +255,19 @@ public partial class PlacementModelsPage : UserControl, IAppPage
         try
         {
             PlacementModel model = BuildModel();
-            await _services.PlacementModels.SaveAsync(model);
+            if (FastWorkflow)
+            {
+                _placementAutoSave.ScheduleSave(model);
+                if (!await FlushPlacementAutoSaveAsync())
+                {
+                    return;
+                }
+            }
+            else
+            {
+                await _services.PlacementModels
+                    .SaveAsync(model);
+            }
             _selectedModel = model;
             _selectedSetupTarget = model.Target;
             await RefreshModelsAsync(model.Id);

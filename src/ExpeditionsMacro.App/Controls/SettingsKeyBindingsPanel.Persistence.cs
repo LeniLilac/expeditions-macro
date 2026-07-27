@@ -111,6 +111,61 @@ public partial class SettingsKeyBindingsPanel
                 ShiftLockVirtualKey = virtualKey,
             });
 
+    private Task ClearBindingAsync(
+        BindingTarget target) =>
+        Services.UpdateSettingsAsync(
+            settings => target switch
+            {
+                BindingTarget.Play =>
+                    settings with
+                    {
+                        PlayMenuKey = string.Empty,
+                    },
+                BindingTarget.Unit =>
+                    settings with
+                    {
+                        UnitMenuKey = string.Empty,
+                    },
+                BindingTarget.Areas =>
+                    settings with
+                    {
+                        AreasMenuKey = string.Empty,
+                    },
+                BindingTarget.CancelPlacement =>
+                    settings with
+                    {
+                        CancelPlacementKey = string.Empty,
+                    },
+                BindingTarget.Targeting =>
+                    settings with
+                    {
+                        ChangeUnitTargetingKey = string.Empty,
+                    },
+                BindingTarget.Upgrade =>
+                    settings with
+                    {
+                        UpgradeUnitKey = string.Empty,
+                    },
+                BindingTarget.AutoUpgradeUnit =>
+                    settings with
+                    {
+                        AutoUpgradeUnitKey = string.Empty,
+                    },
+                BindingTarget.ToggleAutoUpgradePlacedUnits =>
+                    settings with
+                    {
+                        ToggleAutoUpgradePlacedUnitsKey =
+                            string.Empty,
+                    },
+                BindingTarget.ShiftLock =>
+                    settings with
+                    {
+                        ShiftLockVirtualKey = 0,
+                    },
+                _ => throw new ArgumentOutOfRangeException(
+                    nameof(target)),
+            });
+
     private async Task ApplySettingsAsync(
         Func<AppSettings, AppSettings> update)
     {
@@ -149,20 +204,27 @@ public partial class SettingsKeyBindingsPanel
                 settings.UnitMenuKey);
         }
 
-        _ = AppSettings.ParseShiftLockKey(
-            settings.ShiftLockVirtualKey,
-            settings.MacroHotkeyVirtualKey,
-            settings.PlayMenuKey,
-            settings.UnitMenuKey,
-            settings.AreasMenuKey,
-            settings.CancelPlacementKey);
-        _ = AppSettings.ParseCancelPlacementKey(
-            settings.CancelPlacementKey,
-            settings.MacroHotkeyVirtualKey,
-            settings.PlayMenuKey,
-            settings.UnitMenuKey,
-            settings.AreasMenuKey,
-            settings.ShiftLockVirtualKey);
+        if (settings.ShiftLockVirtualKey != 0)
+        {
+            _ = AppSettings.ParseShiftLockKey(
+                settings.ShiftLockVirtualKey,
+                settings.MacroHotkeyVirtualKey,
+                settings.PlayMenuKey,
+                settings.UnitMenuKey,
+                settings.AreasMenuKey,
+                settings.CancelPlacementKey);
+        }
+        if (!string.IsNullOrWhiteSpace(
+                settings.CancelPlacementKey))
+        {
+            _ = AppSettings.ParseCancelPlacementKey(
+                settings.CancelPlacementKey,
+                settings.MacroHotkeyVirtualKey,
+                settings.PlayMenuKey,
+                settings.UnitMenuKey,
+                settings.AreasMenuKey,
+                settings.ShiftLockVirtualKey);
+        }
         AppSettings.ValidateControlKeySet(
             settings,
             requireUnitActionKeys: false);

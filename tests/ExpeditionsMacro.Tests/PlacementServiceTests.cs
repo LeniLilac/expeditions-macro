@@ -90,7 +90,6 @@ public sealed class PlacementServiceTests
                     "letter:T",
                     "letter:T",
                     "letter:T",
-                    "letter:Y",
                     "park",
                     "click:783,586",
                     "park",
@@ -275,10 +274,15 @@ public sealed class PlacementServiceTests
     }
 
     [Theory]
-    [InlineData(true, 1)]
-    [InlineData(false, 0)]
-    public async Task Playback_AppliesConfiguredAutoUpgrade(
-        bool autoUpgrade,
+    [InlineData(UnitAutoUpgradePriority.Off, 0)]
+    [InlineData(UnitAutoUpgradePriority.Priority1, 1)]
+    [InlineData(UnitAutoUpgradePriority.Priority2, 2)]
+    [InlineData(UnitAutoUpgradePriority.Priority3, 3)]
+    [InlineData(UnitAutoUpgradePriority.Priority4, 4)]
+    [InlineData(UnitAutoUpgradePriority.Priority5, 5)]
+    [InlineData(UnitAutoUpgradePriority.Priority6, 6)]
+    public async Task Playback_AppliesConfiguredAutoUpgradePriority(
+        UnitAutoUpgradePriority priority,
         int expectedTaps)
     {
         string root = TestPaths.NewTemporaryDirectory();
@@ -301,7 +305,8 @@ public sealed class PlacementServiceTests
                         X = 320,
                         Y = 280,
                         DelayAfterMilliseconds = 0,
-                        AutoUpgrade = autoUpgrade,
+                        AutoUpgradePriority =
+                            priority,
                     }),
                 useDefaultInterval: true,
                 defaultIntervalMilliseconds: 0,
@@ -312,6 +317,66 @@ public sealed class PlacementServiceTests
                 expectedTaps,
                 automation.InputActions.Count(
                     action => action == "letter:Y"));
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task Playback_CancellationStopsRemainingAutoUpgradePriorityTaps()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            using CancellationTokenSource cancellation =
+                new();
+            FakeAutomation automation = new()
+            {
+                LetterTapped = key =>
+                {
+                    if (key == 'Y')
+                    {
+                        cancellation.Cancel();
+                    }
+                },
+            };
+            PlacementService service = new(
+                automation,
+                new FakeCaptureService(automation),
+                new PlacementModelRepository(
+                    new AppPaths(root)),
+                () => 'T',
+                () => 'Y');
+
+            await Assert.ThrowsAnyAsync<
+                OperationCanceledException>(
+                () => service.PlayAsync(
+                    ModelWithSteps(
+                        new PlacementStep
+                        {
+                            UnitKey = 1,
+                            X = 320,
+                            Y = 280,
+                            DelayAfterMilliseconds = 0,
+                            AutoUpgradePriority =
+                                UnitAutoUpgradePriority
+                                    .Priority6,
+                        }),
+                    useDefaultInterval: true,
+                    defaultIntervalMilliseconds: 0,
+                    keyHoldMilliseconds: 0,
+                    afterKeyMilliseconds: 0,
+                    cancellationToken:
+                        cancellation.Token));
+
+            Assert.Single(
+                automation.InputActions,
+                action => action == "letter:Y");
+            Assert.DoesNotContain(
+                "park",
+                automation.InputActions);
         }
         finally
         {
@@ -509,7 +574,7 @@ public sealed class PlacementServiceTests
             CreatedAt = DateTimeOffset.UtcNow,
         };
 
-    private sealed class FakeCaptureService(FakeAutomation automation) : IPlacementCaptureService
+    internal sealed class FakeCaptureService(FakeAutomation automation) : IPlacementCaptureService
     {
         public (int Width, int Height)? ClientSizeAtCapture { get; private set; }
 
@@ -527,7 +592,7 @@ public sealed class PlacementServiceTests
         }
     }
 
-    private sealed class FakeAutomation : IRobloxAutomation
+    internal sealed class FakeAutomation : IRobloxAutomation
     {
         private readonly RobloxWindow _window = new((nint)42, "Roblox");
         private ClientBounds _client = new(100, 120, 800, 599);
@@ -565,6 +630,12 @@ public sealed class PlacementServiceTests
         public List<DateTimeOffset> ClickTimes { get; } = [];
 
         public int IdleClicksBeforeDismissal { get; init; } = 1;
+
+        public Action<char>? LetterTapped
+        {
+            get;
+            init;
+        }
 
         public RobloxWindow? FindWindow(string titleFragment = "Roblox") => _window;
 
@@ -695,8 +766,13 @@ public sealed class PlacementServiceTests
             char key,
             CancellationToken cancellationToken)
         {
+            cancellationToken
+                .ThrowIfCancellationRequested();
+            char normalized =
+                char.ToUpperInvariant(key);
             InputActions.Add(
-                $"letter:{char.ToUpperInvariant(key)}");
+                $"letter:{normalized}");
+            LetterTapped?.Invoke(normalized);
             return Task.CompletedTask;
         }
 

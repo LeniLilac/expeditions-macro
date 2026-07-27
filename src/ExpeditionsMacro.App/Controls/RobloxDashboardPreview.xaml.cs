@@ -284,8 +284,20 @@ public partial class RobloxDashboardPreview :
             nint ownerHandle =
                 new WindowInteropHelper(owner)
                     .Handle;
-            if (!_pin.IsForegroundSession(
-                    ownerHandle))
+            RobloxWindow? source = null;
+            nint sourceHandle =
+                _pin.SourceHandle;
+            if (sourceHandle == nint.Zero)
+            {
+                source =
+                    _services.Automation.FindWindow();
+                sourceHandle =
+                    source?.Handle ??
+                    nint.Zero;
+            }
+            if (!_pin.IsDashboardExposed(
+                    ownerHandle,
+                    sourceHandle))
             {
                 if (!_pin.TrySuspend(
                     out string detachError))
@@ -294,7 +306,7 @@ public partial class RobloxDashboardPreview :
                     return;
                 }
                 ShowPlaceholder(
-                    "Roblox pinning pauses while another app is in front.");
+                    "Roblox pinning pauses while another window covers the Dashboard.");
                 return;
             }
 
@@ -306,7 +318,7 @@ public partial class RobloxDashboardPreview :
                 return;
             }
 
-            RobloxWindow? source =
+            source ??=
                 _services.Automation.FindWindow();
             if (source is null)
             {

@@ -11,6 +11,8 @@ public partial class PlacementModelsPage
         bool showRecordingSettings = false)
     {
         if (!FastWorkflow) return;
+        using IDisposable suspension =
+            SuspendPlacementAutoSave();
         _selectedModel = null;
         _selectedSetupTarget =
             showRecordingSettings
@@ -37,6 +39,8 @@ public partial class PlacementModelsPage
             X = 390,
             Y = 352,
             Phase = PlacementPhase.BeforeStart,
+            AutoUpgradePriority =
+                UnitAutoUpgradePriority.Priority1,
             DelayAfterMilliseconds =
                 PlacementAuthoringRules
                     .DefaultStepDelayMilliseconds,
@@ -47,6 +51,8 @@ public partial class PlacementModelsPage
             X = 445,
             Y = 394,
             Phase = PlacementPhase.AfterStart,
+            AutoUpgradePriority =
+                UnitAutoUpgradePriority.Priority4,
             DelayAfterStartMilliseconds =
                 PlacementAuthoringRules
                     .DefaultAfterStartDelayMilliseconds,

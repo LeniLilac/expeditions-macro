@@ -94,31 +94,33 @@ public partial class PlacementModelsPage
             (int)Math.Round(
                 afterStartSeconds * 1000,
                 MidpointRounding.AwayFromZero);
-        foreach (PlacementStepRow step in _steps)
+        using (SuspendPlacementAutoSave())
         {
-            step.DelayAfterMilliseconds = interval;
-            if (step.Phase ==
-                    PlacementPhase.AfterStart &&
-                step.DelayAfterStartMilliseconds ==
-                    previousDefault)
+            foreach (PlacementStepRow step in _steps)
             {
-                step.DelayAfterStartMilliseconds =
-                    afterStartMilliseconds;
+                step.DelayAfterMilliseconds = interval;
+                if (step.Phase ==
+                        PlacementPhase.AfterStart &&
+                    step.DelayAfterStartMilliseconds ==
+                        previousDefault)
+                {
+                    step.DelayAfterStartMilliseconds =
+                        afterStartMilliseconds;
+                }
             }
-        }
 
-        _fastPlacementIntervalMilliseconds = interval;
-        _fastDefaultAfterStartDelayMilliseconds =
-            afterStartMilliseconds;
-        _fastImpossibilityThresholdMinutes =
-            impossibilityThreshold;
-        _fastManualRecordingId =
-            e.UseManualRecording
-                ? e.ManualRecordingId
-                : null;
+            _fastPlacementIntervalMilliseconds = interval;
+            _fastDefaultAfterStartDelayMilliseconds =
+                afterStartMilliseconds;
+            _fastImpossibilityThresholdMinutes =
+                impossibilityThreshold;
+            _fastManualRecordingId =
+                e.UseManualRecording
+                    ? e.ManualRecordingId
+                    : null;
+        }
         UpdateFastManualRecordingEditor();
         FastEditorPanel.CloseTimingSettings();
-        FastStatusText.Text =
-            "Placement settings updated. Save setup to keep them.";
+        SchedulePlacementAutoSave();
     }
 }

@@ -325,6 +325,37 @@ public sealed record AppSettings
         return key;
     }
 
+    public static char? ParseOptionalCancelPlacementKey(
+        string? value,
+        int macroHotkeyVirtualKey,
+        string? playMenuKey,
+        string? unitMenuKey,
+        string? areasMenuKey,
+        int shiftLockVirtualKey) =>
+        string.IsNullOrWhiteSpace(value)
+            ? null
+            : ParseCancelPlacementKey(
+                value,
+                macroHotkeyVirtualKey,
+                playMenuKey,
+                unitMenuKey,
+                areasMenuKey,
+                shiftLockVirtualKey);
+
+    public static char ParseChangeUnitTargetingKey(
+        AppSettings settings) =>
+        ParseUnitActionKey(
+            settings,
+            settings.ChangeUnitTargetingKey,
+            "Change Unit Targeting");
+
+    public static char ParseAutoUpgradeUnitKey(
+        AppSettings settings) =>
+        ParseUnitActionKey(
+            settings,
+            settings.AutoUpgradeUnitKey,
+            "Auto Upgrade Unit");
+
     public static UnitActionKeys ParseRequiredUnitActionKeys(
         AppSettings settings)
     {
@@ -345,6 +376,20 @@ public sealed record AppSettings
             ParseRequiredLetter(
                 settings.ToggleAutoUpgradePlacedUnitsKey,
                 "Toggle Auto Upgrade Placed Units"));
+    }
+
+    private static char ParseUnitActionKey(
+        AppSettings settings,
+        string? value,
+        string label)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        ValidateControlKeySet(
+            settings,
+            requireUnitActionKeys: false);
+        return ParseRequiredLetter(
+            value,
+            label);
     }
 
     public static void ValidateControlKeySet(
@@ -372,7 +417,7 @@ public sealed record AppSettings
             bindings,
             "Toggle Cancel Unit Placement",
             settings.CancelPlacementKey,
-            required: true);
+            required: false);
         AddLetter(
             bindings,
             "Change Unit Targeting",
@@ -451,9 +496,3 @@ public sealed record AppSettings
         return char.ToUpperInvariant(candidate[0]);
     }
 }
-
-public readonly record struct UnitActionKeys(
-    char ChangeTargeting,
-    char Upgrade,
-    char AutoUpgrade,
-    char ToggleAutoUpgradePlacedUnits);

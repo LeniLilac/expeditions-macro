@@ -115,18 +115,30 @@
                     </TextBlock>
                     <StackPanel Grid.Row="4">
                         <TextBlock Style="{StaticResource FieldLabel}"
+                                   Text="Placement phase" />
+                        <ComboBox Margin="0,5,0,8"
+                                  AutomationProperties.Name="Placement phase"
+                                  AutomationProperties.HelpText="Choose whether this unit is placed before or after Start."
+                                  DisplayMemberPath="Label"
+                                  ItemsSource="{x:Static models:PlacementStepRow.Phases}"
+                                  SelectedValue="{Binding Phase, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                  SelectedValuePath="Value" />
+                        <TextBlock Style="{StaticResource FieldLabel}"
                                    Text="Targeting priority" />
                         <ComboBox Margin="0,5,0,0"
                                   ItemsSource="{x:Static models:PlacementStepRow.TargetingPriorities}"
                                   SelectedItem="{Binding TargetingPriority, Mode=TwoWay}" />
-                        <Grid Margin="0,8,0,0">
-                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="8" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                            <TextBlock VerticalAlignment="Center" Style="{StaticResource FieldLabel}" Text="Auto upgrade" />
-                            <CheckBox Grid.Column="2" Style="{StaticResource PlacementBinaryChoiceButton}"
-                                      AutomationProperties.Name="Auto upgrade" AutomationProperties.HelpText="Press Space to switch auto upgrade off or on."
-                                      IsChecked="{Binding AutoUpgrade, Mode=TwoWay}"
-                                      ToolTip="Choose whether this unit upgrades automatically."/>
-                        </Grid>
+                        <TextBlock Margin="0,8,0,0"
+                                   Style="{StaticResource FieldLabel}"
+                                   Text="Auto upgrade priority" />
+                        <ComboBox Margin="0,5,0,0"
+                                  AutomationProperties.Name="Auto upgrade priority"
+                                  AutomationProperties.HelpText="Choose how many times Auto Upgrade Unit is pressed after placement."
+                                  DisplayMemberPath="Label"
+                                  ItemsSource="{x:Static models:PlacementStepRow.AutoUpgradePriorities}"
+                                  SelectedValue="{Binding AutoUpgradePriority, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                  SelectedValuePath="Value"
+                                  ToolTip="Choose Off or Priority 1 through Priority 6." />
                     </StackPanel>
                     <StackPanel x:Name="StepAfterStartDelay"
                                 Grid.Row="6">
@@ -163,11 +175,6 @@
                 BorderThickness="1"
                 CornerRadius="5">
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
                 <StackPanel>
                     <TextBlock Style="{StaticResource FieldLabel}"
                                Text="Route" />
@@ -178,13 +185,6 @@
                                TextTrimming="CharacterEllipsis"
                                Text="Expedition · School Grounds" />
                 </StackPanel>
-                <Button x:Name="FastSaveButton"
-                        Grid.Column="2"
-                        Height="40"
-                        VerticalAlignment="Bottom"
-                        icons:Lucide.Icon="Save"
-                        Content="Save setup"
-                        Click="Save_Click" />
                 <Grid Visibility="Collapsed">
                     <ComboBox x:Name="TargetModeCombo"
                               DisplayMemberPath="Label"

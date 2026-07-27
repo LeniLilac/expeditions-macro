@@ -56,7 +56,7 @@ public partial class MacroPage
                         _services.Settings.PlayMenuKey);
             }
             cancelPlacementKey =
-                AppSettings.ParseCancelPlacementKey(
+                AppSettings.ParseOptionalCancelPlacementKey(
                     _services.Settings
                         .CancelPlacementKey,
                     _services.Settings
@@ -65,9 +65,7 @@ public partial class MacroPage
                     _services.Settings.UnitMenuKey,
                     _services.Settings.AreasMenuKey,
                     _services.Settings
-                        .ShiftLockVirtualKey);
-            _ = AppSettings.ParseRequiredUnitActionKeys(
-                _services.Settings);
+                        .ShiftLockVirtualKey) ?? default;
             ValidateDiscord(
                 webhook,
                 discordUserId);

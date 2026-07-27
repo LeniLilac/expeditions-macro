@@ -13,6 +13,8 @@ internal sealed class TestFrames
         Load("LobbyClosed.png");
     public ImageFrame EventThemeLobby { get; } =
         Load("LobbyEventTheme.png");
+    public ImageFrame VoiceClosed { get; } =
+        Load("SettingsButtonVoiceClosed.png");
     public ImageFrame Scale080 { get; } =
         Load("SettingsScale080.png");
     public ImageFrame Scale120 { get; } =
