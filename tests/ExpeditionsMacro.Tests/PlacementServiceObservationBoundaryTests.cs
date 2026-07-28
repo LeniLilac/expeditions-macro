@@ -9,89 +9,65 @@ namespace ExpeditionsMacro.Tests;
 public sealed class PlacementServiceObservationBoundaryTests
 {
     [Fact]
-    public async Task Playback_ConfirmsFinalSelectionSampleWithoutDuplicateClick()
-    {
-        ImageFrame hidden = Load("SelectedUnitPanelHoverNegative_01.png");
-        ImageFrame visible = Load("SelectedUnitPanel_01.png");
-        PlacementServiceTests.FakeAutomation automation = new(
-            Enumerable.Repeat(hidden, 8)
-                .Concat([visible, visible])
-                .ToArray());
-
-        await PlayOneStepAsync(automation);
-
-        Assert.Equal(
-            1,
-            automation.InputActions.Count(
-                action => action == "click-retain:320,280"));
-        Assert.DoesNotContain(
-            automation.InputActions,
-            action => action.StartsWith(
-                "move:",
-                StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public async Task Playback_ConfirmsHiddenPanelAtFinalDismissAttempt()
-    {
-        PlacementServiceTests.FakeAutomation automation = new()
-        {
-            IdleClicksBeforeDismissal = 8,
-            HiddenCaptureDelayAfterDismissal = 3,
-        };
-
-        await PlayOneStepAsync(automation);
-
-        Assert.Equal(
-            8,
-            automation.InputActions.Count(
-                action => action == "click:783,586"));
-        Assert.Equal("park", automation.InputActions[^1]);
-    }
-
-    private static async Task PlayOneStepAsync(
-        PlacementServiceTests.FakeAutomation automation)
+    public async Task Playback_AcceptsPanelAtTimeoutBoundaryWithoutAnotherClick()
     {
         string root = TestPaths.NewTemporaryDirectory();
         try
         {
+            ImageFrame negative = ImageCodec.Load(
+                Path.Combine(
+                    TestPaths.StageDatasets,
+                    "SelectedUnitPanelHoverNegative_01.png"));
+            ImageFrame positive = ImageCodec.Load(
+                Path.Combine(
+                    TestPaths.StageDatasets,
+                    "SelectedUnitPanel_01.png"));
+            PlacementServiceTests.FakeAutomation automation = new(
+                Enumerable.Repeat(negative, 7)
+                    .Concat([positive, positive])
+                    .ToArray());
             PlacementService service = new(
                 automation,
-                new PlacementServiceTests.FakeCaptureService(automation),
-                new PlacementModelRepository(new AppPaths(root)));
+                new PlacementServiceTests.FakeCaptureService(
+                    automation),
+                new PlacementModelRepository(
+                    new AppPaths(root)),
+                () => 'T');
+            PlacementModel model = new()
+            {
+                Id = "boundary",
+                Name = "Boundary",
+                ClientWidth = 808,
+                ClientHeight = 611,
+                Steps =
+                [
+                    new PlacementStep
+                    {
+                        UnitKey = 2,
+                        X = 320,
+                        Y = 280,
+                        DelayAfterMilliseconds = 0,
+                    },
+                ],
+                CreatedAt = DateTimeOffset.UtcNow,
+            };
+
             await service.PlayAsync(
-                new PlacementModel
-                {
-                    Id = "boundary",
-                    Name = "Boundary",
-                    ClientWidth = 808,
-                    ClientHeight = 611,
-                    Steps =
-                    [
-                        new PlacementStep
-                        {
-                            UnitKey = 1,
-                            X = 320,
-                            Y = 280,
-                            DelayAfterMilliseconds = 0,
-                        },
-                    ],
-                    CreatedAt = DateTimeOffset.UtcNow,
-                },
+                model,
                 useDefaultInterval: true,
                 defaultIntervalMilliseconds: 0,
                 keyHoldMilliseconds: 0,
                 afterKeyMilliseconds: 0);
+
+            Assert.Equal(
+                4,
+                automation.InputActions.Count(
+                    action =>
+                        action == "click-retain:320,280"));
         }
         finally
         {
             TestPaths.DeleteTemporaryDirectory(root);
         }
     }
-
-    private static ImageFrame Load(string fileName) =>
-        ImageCodec.Load(
-            Path.Combine(
-                TestPaths.StageDatasets,
-                fileName));
 }

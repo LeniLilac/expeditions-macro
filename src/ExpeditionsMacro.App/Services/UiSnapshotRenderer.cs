@@ -38,6 +38,7 @@ internal static class UiSnapshotRenderer
         ("Macro Plan", "macro-plan-add-story-infinite", false, false, MacroPlanSnapshotState.StoryInfiniteTaskPopup, ManualRecordingsSnapshotState.Ready),
         ("Macro Plan", "macro-plan-share", true, false, MacroPlanSnapshotState.NestedLoops, ManualRecordingsSnapshotState.Ready),
         ("Placement Setup", "placement-setup", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Placement Setup", "placement-setup-timing", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Placement Setup", "placement-setup-recording", true, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Placement Setup", "placement-setup-small-controls", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Placement Setup", "placement-setup-small-steps", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
@@ -257,15 +258,19 @@ internal static class UiSnapshotRenderer
         if (!file.Contains(
                 "placement-setup",
                 StringComparison.OrdinalIgnoreCase) ||
-            !(file.Contains(
-                  "-small",
-                  StringComparison.OrdinalIgnoreCase) ||
-              file.Contains(
-                  "-medium",
-                  StringComparison.OrdinalIgnoreCase) ||
-              file.Contains(
-                  "-collapsed",
-                  StringComparison.OrdinalIgnoreCase)))
+            (!(file.Contains(
+                   "-small",
+                   StringComparison.OrdinalIgnoreCase) ||
+               file.Contains(
+                   "-medium",
+                   StringComparison.OrdinalIgnoreCase) ||
+               file.Contains(
+                   "-collapsed",
+                   StringComparison.OrdinalIgnoreCase)) &&
+             !string.Equals(
+                 file,
+                 "placement-setup-timing",
+                 StringComparison.OrdinalIgnoreCase)))
         {
             return;
         }
@@ -276,7 +281,21 @@ internal static class UiSnapshotRenderer
         if (editor is null)
         {
             throw new InvalidOperationException(
-                "The compact Placement Setup snapshot did not contain its editor.");
+                "The Placement Setup snapshot did not contain its editor.");
+        }
+        if (string.Equals(
+                file,
+                "placement-setup-timing",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            editor.SetSnapshotSettings(
+                placementIntervalMilliseconds: 900,
+                placementAttempts: 4,
+                defaultAfterStartDelayMilliseconds: 30_000,
+                impossibilityThresholdMinutes: 0,
+                recordingMode: false);
+            root.UpdateLayout();
+            return;
         }
         if (file.Contains(
                 "recording",

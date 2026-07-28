@@ -1,5 +1,6 @@
 using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Automation.Recovery;
+using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
 
 namespace ExpeditionsMacro.Tests;
@@ -33,20 +34,33 @@ public sealed class RobloxRuntimeRecoveryPolicyTests
                 new RobloxDisplayScaleException(125)));
         Assert.False(
             RobloxRuntimeRecoveryPolicy.IsRestartCandidate(
+                new ManualInputPlaybackTimingException(
+                    scheduledMicroseconds: 100_000,
+                    actualMicroseconds: 150_001,
+                    ManualInputEventKind.MouseButtonDown,
+                    inputWasSent: true)));
+        Assert.False(
+            RobloxRuntimeRecoveryPolicy.IsRestartCandidate(
                 new InvalidDataException("invalid preset")));
     }
 
     [Fact]
-    public void CircuitBreaker_AllowsThreeRestartsPerTenMinutes()
+    public void CircuitBreaker_AllowsTenRestartsPerTenMinutes()
     {
         RobloxRestartCircuitBreaker circuit = new();
         DateTimeOffset start =
             DateTimeOffset.Parse("2026-07-23T00:00:00Z");
 
-        Assert.True(circuit.TryReserve(start));
-        Assert.True(circuit.TryReserve(start.AddMinutes(1)));
-        Assert.True(circuit.TryReserve(start.AddMinutes(2)));
-        Assert.False(circuit.TryReserve(start.AddMinutes(3)));
+        for (int restart = 0; restart < 10; restart++)
+        {
+            Assert.True(
+                circuit.TryReserve(
+                    start.AddSeconds(
+                        restart)));
+        }
+        Assert.False(
+            circuit.TryReserve(
+                start.AddMinutes(9)));
         Assert.True(circuit.TryReserve(start.AddMinutes(10)));
     }
 }

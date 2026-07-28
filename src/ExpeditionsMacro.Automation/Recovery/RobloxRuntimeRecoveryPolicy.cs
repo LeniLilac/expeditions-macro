@@ -6,14 +6,19 @@ namespace ExpeditionsMacro.Automation.Recovery;
 
 public static class RobloxRuntimeRecoveryPolicy
 {
-    public const int MaximumRestartsPerWindow = 3;
+    public const int MaximumRestartsPerWindow = 10;
 
     public static readonly TimeSpan RestartWindow = TimeSpan.FromMinutes(10);
 
     public static bool IsRestartCandidate(Exception error)
     {
         ArgumentNullException.ThrowIfNull(error);
-        if (error is OperationCanceledException or PlayMenuBindingException) return false;
+        if (error is OperationCanceledException or
+            PlayMenuBindingException or
+            ManualInputPlaybackTimingException)
+        {
+            return false;
+        }
         if (error is RobloxSessionUnavailableException or
             RobloxUiUnavailableException or
             TimeoutException or

@@ -225,6 +225,36 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
                 y,
                 cancellationToken));
 
+    public Task ClickClientBurstRetainingCursorAsync(
+        RobloxWindow window,
+        int x,
+        int y,
+        int clickCount,
+        int durationMilliseconds,
+        CancellationToken cancellationToken) =>
+        TraceAsync(
+            window,
+            "automation",
+            "click_client_burst_retaining_cursor",
+            new
+            {
+                Window = WindowData(window),
+                X = x,
+                Y = y,
+                ClickCount = clickCount,
+                DurationMilliseconds =
+                    durationMilliseconds,
+            },
+            () =>
+                _inner
+                    .ClickClientBurstRetainingCursorAsync(
+                        window,
+                        x,
+                        y,
+                        clickCount,
+                        durationMilliseconds,
+                        cancellationToken));
+
     public Task DragClientAsync(
         RobloxWindow window,
         int startX,

@@ -17,6 +17,8 @@ public partial class PlacementModelsPage
         _fastPlacementIntervalMilliseconds =
             PlacementAuthoringRules
                 .DefaultStepDelayMilliseconds;
+        _fastPlacementAttempts =
+            PlacementModel.DefaultPlacementAttempts;
         _fastDefaultAfterStartDelayMilliseconds =
             PlacementAuthoringRules
                 .DefaultAfterStartDelayMilliseconds;
@@ -27,6 +29,7 @@ public partial class PlacementModelsPage
         EventArgs e) =>
         FastEditorPanel.SetTimingSettings(
             _fastPlacementIntervalMilliseconds,
+            _fastPlacementAttempts,
             _fastDefaultAfterStartDelayMilliseconds,
             _fastImpossibilityThresholdMinutes,
             !string.IsNullOrWhiteSpace(
@@ -65,6 +68,19 @@ public partial class PlacementModelsPage
         }
 
         if (!int.TryParse(
+                e.PlacementAttemptsText,
+                NumberStyles.Integer,
+                CultureInfo.CurrentCulture,
+                out int placementAttempts) ||
+            placementAttempts is < 1 or
+            > PlacementModel.MaximumPlacementAttempts)
+        {
+            FastEditorPanel.ShowTimingError(
+                $"Enter placement attempts from 1 to {PlacementModel.MaximumPlacementAttempts}.");
+            return;
+        }
+
+        if (!int.TryParse(
                 e.ImpossibilityThresholdText,
                 NumberStyles.Integer,
                 CultureInfo.CurrentCulture,
@@ -99,6 +115,8 @@ public partial class PlacementModelsPage
             }
 
             _fastPlacementIntervalMilliseconds = interval;
+            _fastPlacementAttempts =
+                placementAttempts;
             _fastDefaultAfterStartDelayMilliseconds =
                 afterStartMilliseconds;
             _fastImpossibilityThresholdMinutes =

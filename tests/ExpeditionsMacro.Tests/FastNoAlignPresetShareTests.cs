@@ -394,6 +394,9 @@ public sealed class FastNoAlignPresetShareTests
             setup
                 .DefaultAfterStartDelayMilliseconds);
         Assert.Equal(
+            4,
+            setup.PlacementAttempts);
+        Assert.Equal(
             17,
             setup.ImpossibilityThresholdMinutes);
         Assert.Null(setup.ManualInputRecordingId);
@@ -445,6 +448,7 @@ public sealed class FastNoAlignPresetShareTests
             PlacementIntervalMilliseconds = 731,
             DefaultAfterStartDelayMilliseconds =
                 34_567,
+            PlacementAttempts = 4,
             ImpossibilityThresholdMinutes = 17,
             Steps =
             [

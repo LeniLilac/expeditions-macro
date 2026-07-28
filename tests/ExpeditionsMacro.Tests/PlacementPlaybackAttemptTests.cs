@@ -4,7 +4,6 @@ using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
-using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Infrastructure;
 
 namespace ExpeditionsMacro.Tests;
@@ -12,254 +11,240 @@ namespace ExpeditionsMacro.Tests;
 public sealed class PlacementPlaybackAttemptTests
 {
     [Fact]
-    public async Task FirstAttempt_HoldsQuickPlacementTapsUnitClicksAndParksBeforeProof()
+    public async Task InitialBatch_ReusesConsecutiveUnitAndVerifiesOnlyAfterRelease()
     {
-        AttemptAutomation automation = new()
-        {
-            SuccessfulSelectionAttempt = 1,
-        };
+        AttemptAutomation automation = new();
+        List<PlacementStep> sent = [];
 
-        await PlayOneStepAsync(automation, unitKey: 4);
+        await PlayStepsAsync(
+            automation,
+            [
+                Step(1, 300),
+                Step(1, 340),
+                Step(2, 380),
+            ],
+            stepSent: (_, _, step) =>
+                sent.Add(step));
 
-        int firstCapture = automation.Actions.IndexOf("capture");
         Assert.Equal(
             [
+                "letter:Z",
                 $"held:{KeyboardKey.LeftShift}:down",
-                "unit:4",
-                "click-retain:320,280",
-                "park",
-                "capture",
+                "unit:1",
+                "burst:300,280:3:50",
+                "burst:340,280:3:50",
+                "unit:2",
+                "burst:380,280:3:50",
+                $"held:{KeyboardKey.LeftShift}:up",
+                "letter:Z",
             ],
-            automation.Actions.Take(firstCapture + 1));
+            automation.Actions.Take(9));
         Assert.Equal(
             1,
             automation.Actions.Count(
-                action => action == "click-retain:320,280"));
-        Assert.DoesNotContain(
-            automation.Actions,
-            action => action.StartsWith(
-                "move:",
-                StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public async Task MissingFirstProof_RepeatsUnitTapAndDirectClickWithoutMouseApproach()
-    {
-        AttemptAutomation automation = new()
-        {
-            SuccessfulSelectionAttempt = 2,
-        };
-
-        await PlayOneStepAsync(automation, unitKey: 3);
-
-        string[] attemptActions = automation.Actions
-            .Where(action => action != "capture")
-            .Take(8)
-            .ToArray();
+                action => action == "unit:1"));
         Assert.Equal(
-            [
-                $"held:{KeyboardKey.LeftShift}:down",
-                "unit:3",
-                "click-retain:320,280",
-                "park",
-                "unit:3",
-                "click-retain:320,280",
-                "park",
-                $"held:{KeyboardKey.LeftShift}:up",
-            ],
-            attemptActions);
+            1,
+            automation.Actions.Count(
+                action => action == "unit:2"));
+        int batchFinished =
+            automation.Actions.IndexOf(
+                "letter:Z",
+                1);
+        int firstVerification =
+            automation.Actions.IndexOf(
+                "verify:300,280");
+        Assert.True(
+            batchFinished < firstVerification);
+        Assert.Equal(3, sent.Count);
         Assert.DoesNotContain(
             automation.Actions,
             action => action.StartsWith(
                 "move:",
                 StringComparison.Ordinal));
-        AssertSelectionParksPrecedeCapture(
-            automation,
-            expectedSelectionAttempts: 2);
     }
 
     [Fact]
-    public async Task MissingProof_SkipsAfterEightTapClickAttemptsAndPlacesNextStep()
+    public async Task DefaultSingleAttempt_SkipsOnlyUnverifiedRow()
     {
-        AttemptAutomation automation = new()
-        {
-            SuccessfulSelectionAttempt = 9,
-        };
+        AttemptAutomation automation = new();
+        automation.NeverVisibleCoordinates.Add(
+            (320, 280));
         List<string> status = [];
         List<PlacementStep> sent = [];
 
         await PlayStepsAsync(
             automation,
             [
-                new PlacementStep
-                {
-                    UnitKey = 6,
-                    X = 320,
-                    Y = 280,
-                    DelayAfterMilliseconds = 30_000,
-                    TargetingPriority =
-                        UnitTargetingPriority.Strongest,
-                    AutoUpgradePriority =
-                        UnitAutoUpgradePriority.Priority2,
-                },
-                new PlacementStep
-                {
-                    UnitKey = 2,
-                    X = 360,
-                    Y = 280,
-                    DelayAfterMilliseconds = 0,
-                },
+                Step(
+                    6,
+                    320,
+                    UnitTargetingPriority.Strongest,
+                    UnitAutoUpgradePriority.Priority2),
+                Step(2, 360),
             ],
             status.Add,
-            (_, _, step) => sent.Add(step),
-            useDefaultInterval: false);
+            (_, _, step) => sent.Add(step));
 
         Assert.Contains(
             status,
             message => message.Contains(
-                "skipped Unit 6",
+                "after 1 placement attempt(s)",
                 StringComparison.Ordinal));
-        Assert.Equal(
-            8,
-            automation.Actions.Count(
-                action => action == "click-retain:320,280"));
         Assert.Equal(
             1,
             automation.Actions.Count(
-                action => action == "click-retain:360,280"));
+                action =>
+                    action ==
+                    "burst:320,280:3:50"));
         Assert.Equal(
-            8,
+            1,
             automation.Actions.Count(
-                action => action == "unit:6"));
+                action =>
+                    action ==
+                    "burst:360,280:3:50"));
         Assert.DoesNotContain(
-            automation.Actions,
-            action => action.StartsWith(
-                "move:",
-                StringComparison.Ordinal));
-        Assert.DoesNotContain("letter:T", automation.Actions);
-        Assert.DoesNotContain("letter:Y", automation.Actions);
+            "letter:T",
+            automation.Actions);
+        Assert.DoesNotContain(
+            "letter:Y",
+            automation.Actions);
         Assert.Single(sent);
         Assert.Equal(2, sent[0].UnitKey);
-        AssertSelectionParksPrecedeCapture(
-            automation,
-            expectedSelectionAttempts: 9);
     }
 
     [Fact]
-    public async Task CancellationDuringClick_ReleasesMouseAndQuickPlacementKey()
+    public async Task ConfiguredRetries_ReplacesOnlyFailedRow()
     {
-        using CancellationTokenSource cancellation = new();
+        AttemptAutomation automation = new();
+        automation.SuccessfulVerificationAttempt[
+            (320, 280)] = 2;
+
+        await PlayStepsAsync(
+            automation,
+            [Step(4, 320)],
+            placementAttempts: 3);
+
+        Assert.Equal(
+            2,
+            automation.Actions.Count(
+                action =>
+                    action ==
+                    "burst:320,280:3:50"));
+        Assert.Equal(
+            2,
+            automation.Actions.Count(
+                action => action == "unit:4"));
+        Assert.Equal(
+            4,
+            automation.Actions.Count(
+                action => action == "letter:Z"));
+        Assert.Equal(
+            2,
+            automation.Actions.Count(
+                action =>
+                    action == "verify:320,280"));
+    }
+
+    [Fact]
+    public async Task CancellationDuringBurst_ReleasesMouseAndQuickPlacement()
+    {
+        using CancellationTokenSource cancellation =
+            new();
         AttemptAutomation automation = new()
         {
-            CancelOnPlacementClick = 1,
+            CancelOnBurst = 1,
             PlacementCancellation = cancellation,
-            TraceAtomicClickCleanup = true,
         };
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => PlayOneStepAsync(
+        await Assert.ThrowsAnyAsync<
+            OperationCanceledException>(
+            () => PlayStepsAsync(
                 automation,
-                unitKey: 2,
-                cancellation.Token));
+                [Step(2, 320)],
+                cancellationToken:
+                    cancellation.Token));
 
         Assert.Equal(
             [
+                "letter:Z",
                 $"held:{KeyboardKey.LeftShift}:down",
                 "unit:2",
-                "click-retain:320,280",
+                "burst:320,280:3:50",
                 "mouse-down",
                 "mouse-up",
                 $"held:{KeyboardKey.LeftShift}:up",
             ],
             automation.Actions);
-        Assert.DoesNotContain("park", automation.Actions);
-        Assert.DoesNotContain("capture", automation.Actions);
     }
 
     [Fact]
-    public async Task QuickPlacementKeyReleasesBeforeTargetingAndAutoUpgrade()
+    public async Task ProofAndConfiguration_RunAfterQuickPlacementAndCancel()
     {
-        AttemptAutomation automation = new()
-        {
-            SuccessfulSelectionAttempt = 1,
-        };
-        PlacementStep step = new()
-        {
-            UnitKey = 5,
-            X = 320,
-            Y = 280,
-            DelayAfterMilliseconds = 0,
-            TargetingPriority =
-                UnitTargetingPriority.Strongest,
-            AutoUpgradePriority =
-                UnitAutoUpgradePriority.Priority2,
-        };
+        AttemptAutomation automation = new();
 
-        await PlayStepsAsync(
-            automation,
-            [step]);
-
-        int released = automation.Actions.IndexOf(
-            $"held:{KeyboardKey.LeftShift}:up");
-        Assert.True(released >= 0);
-        Assert.True(
-            released <
-            automation.Actions.IndexOf("letter:T"));
-        Assert.True(
-            released <
-            automation.Actions.IndexOf("letter:Y"));
-        Assert.Equal(
-            2,
-            automation.Actions.Count(action =>
-                action == "letter:Y"));
-    }
-
-    private static void AssertSelectionParksPrecedeCapture(
-        AttemptAutomation automation,
-        int expectedSelectionAttempts)
-    {
-        int[] parkIndexes = automation.Actions
-            .Select((action, index) => (action, index))
-            .Where(item => item.action == "park")
-            .Take(expectedSelectionAttempts)
-            .Select(item => item.index)
-            .ToArray();
-        Assert.Equal(
-            expectedSelectionAttempts,
-            parkIndexes.Length);
-        Assert.All(
-            parkIndexes,
-            index => Assert.Equal(
-                "capture",
-                automation.Actions[index + 1]));
-    }
-
-    private static async Task PlayOneStepAsync(
-        AttemptAutomation automation,
-        int unitKey,
-        CancellationToken cancellationToken = default) =>
         await PlayStepsAsync(
             automation,
             [
-                new PlacementStep
-                {
-                    UnitKey = unitKey,
-                    X = 320,
-                    Y = 280,
-                    DelayAfterMilliseconds = 0,
-                },
-            ],
-            cancellationToken: cancellationToken);
+                Step(
+                    5,
+                    320,
+                    UnitTargetingPriority.Strongest,
+                    UnitAutoUpgradePriority.Priority2),
+            ]);
+
+        int heldUp = automation.Actions.IndexOf(
+            $"held:{KeyboardKey.LeftShift}:up");
+        int trailingCancel =
+            automation.Actions.IndexOf(
+                "letter:Z",
+                1);
+        int verification =
+            automation.Actions.IndexOf(
+                "verify:320,280");
+        int targeting =
+            automation.Actions.IndexOf(
+                "letter:T");
+        int autoUpgrade =
+            automation.Actions.IndexOf(
+                "letter:Y");
+        Assert.True(heldUp < trailingCancel);
+        Assert.True(trailingCancel < verification);
+        Assert.True(verification < targeting);
+        Assert.True(targeting < autoUpgrade);
+        Assert.Equal(
+            2,
+            automation.Actions.Count(
+                action => action == "letter:Y"));
+    }
+
+    private static PlacementStep Step(
+        int unit,
+        int x,
+        UnitTargetingPriority targeting =
+            UnitTargetingPriority.First,
+        UnitAutoUpgradePriority autoUpgrade =
+            UnitAutoUpgradePriority.Off) =>
+        new()
+        {
+            UnitKey = unit,
+            X = x,
+            Y = 280,
+            DelayAfterMilliseconds = 0,
+            TargetingPriority = targeting,
+            AutoUpgradePriority = autoUpgrade,
+        };
 
     private static async Task PlayStepsAsync(
         AttemptAutomation automation,
         IReadOnlyList<PlacementStep> steps,
         Action<string>? status = null,
         Action<int, int, PlacementStep>? stepSent = null,
-        bool useDefaultInterval = true,
+        int placementAttempts = 1,
         CancellationToken cancellationToken = default)
     {
-        string root = TestPaths.NewTemporaryDirectory();
+        string root =
+            TestPaths.NewTemporaryDirectory();
         try
         {
             PlacementService service = new(
@@ -274,31 +259,30 @@ public sealed class PlacementPlaybackAttemptTests
                 ClientWidth = 808,
                 ClientHeight = 611,
                 CameraPreparationMode =
-                        CameraPreparationMode.CameraModel,
+                    CameraPreparationMode.CameraModel,
+                PlacementAttempts =
+                    placementAttempts,
                 Steps = steps,
                 CreatedAt = DateTimeOffset.UtcNow,
             };
             model.Validate();
-            RobloxWindow window =
-                automation.FindWindow()!.Value;
             await service.PlayStepsAsync(
-                window,
+                automation.Window,
                 model,
                 steps,
-                useDefaultInterval: useDefaultInterval,
+                useDefaultInterval: true,
                 defaultIntervalMilliseconds: 0,
                 keyHoldMilliseconds: 0,
                 afterKeyMilliseconds: 0,
-                cancelPlacementKey:
-                    AppSettings
-                        .DefaultCancelPlacementKeyChar,
-                stepSent: stepSent,
-                status: status,
-                cancellationToken: cancellationToken);
+                cancelPlacementKey: 'Z',
+                stepSent,
+                status,
+                cancellationToken);
         }
         finally
         {
-            TestPaths.DeleteTemporaryDirectory(root);
+            TestPaths.DeleteTemporaryDirectory(
+                root);
         }
     }
 
@@ -308,7 +292,8 @@ public sealed class PlacementPlaybackAttemptTests
         public Task<(
             int ClientWidth,
             int ClientHeight,
-            IReadOnlyList<PlacementCapture> Captures)> RecordAsync(
+            IReadOnlyList<PlacementCapture> Captures)>
+            RecordAsync(
             RobloxWindow window,
             Action<PlacementCapture>? captured,
             Action<string>? status,
@@ -319,38 +304,42 @@ public sealed class PlacementPlaybackAttemptTests
     private sealed class AttemptAutomation :
         IRobloxAutomation
     {
-        private readonly RobloxWindow _window =
-            new((nint)42, "Roblox");
         private readonly ImageFrame _visible =
             Load("SelectedUnitPanel_01.png");
         private readonly ImageFrame _hidden =
-            Load("SelectedUnitPanelHoverNegative_01.png");
-        private bool _cursorParked;
-        private bool _selectionEvidenceSeen;
-        private bool _dismissed;
-        private int _selectionAttempt;
-        private int _placementClicks;
+            Load(
+                "SelectedUnitPanelHoverNegative_01.png");
+        private (int X, int Y)? _verification;
+        private bool _panelDismissed;
+        private int _burstCount;
+        private readonly Dictionary<(int X, int Y), int>
+            _verificationCounts = [];
+
+        public RobloxWindow Window { get; } =
+            new((nint)42, "Roblox");
 
         public List<string> Actions { get; } = [];
 
-        public int SuccessfulSelectionAttempt { get; init; } = 1;
+        public HashSet<(int X, int Y)>
+            NeverVisibleCoordinates
+        { get; } = [];
 
-        public int CancelOnPlacementClick { get; init; }
+        public Dictionary<(int X, int Y), int>
+            SuccessfulVerificationAttempt
+        { get; } = [];
 
-        public CancellationTokenSource? PlacementCancellation
-        {
-            get;
-            init;
-        }
+        public int CancelOnBurst { get; init; }
 
-        public bool TraceAtomicClickCleanup { get; init; }
+        public CancellationTokenSource?
+            PlacementCancellation
+        { get; init; }
 
         public RobloxWindow? FindWindow(
             string titleFragment = "Roblox") =>
-            _window;
+            Window;
 
         public RobloxWindow? ForegroundWindow() =>
-            _window;
+            Window;
 
         public ClientBounds GetClientBounds(
             RobloxWindow window) =>
@@ -384,17 +373,22 @@ public sealed class PlacementPlaybackAttemptTests
             RobloxWindow window)
         {
             Actions.Add("capture");
-            if (_dismissed)
+            if (_panelDismissed ||
+                _verification is not { } coordinate ||
+                NeverVisibleCoordinates.Contains(
+                    coordinate))
             {
                 return _hidden;
             }
-
-            bool visible =
-                _cursorParked &&
-                _selectionAttempt >=
-                    SuccessfulSelectionAttempt;
-            _selectionEvidenceSeen |= visible;
-            return visible ? _visible : _hidden;
+            int required =
+                SuccessfulVerificationAttempt
+                    .GetValueOrDefault(
+                        coordinate,
+                        1);
+            return _verificationCounts[
+                    coordinate] >= required
+                ? _visible
+                : _hidden;
         }
 
         public Task MoveCursorToClientCenterAsync(
@@ -402,33 +396,13 @@ public sealed class PlacementPlaybackAttemptTests
             CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
-        public Task MoveCursorBetweenClientPointsAsync(
-            RobloxWindow window,
-            int startX,
-            int startY,
-            int endX,
-            int endY,
-            int durationMilliseconds,
-            CancellationToken cancellationToken)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            Actions.Add(
-                $"move:{startX},{startY}->{endX},{endY}:{durationMilliseconds}");
-            _cursorParked = false;
-            return Task.CompletedTask;
-        }
-
         public Task ParkCursorAsync(
             RobloxWindow window,
             CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            cancellationToken
+                .ThrowIfCancellationRequested();
             Actions.Add("park");
-            _cursorParked = true;
-            if (!_selectionEvidenceSeen)
-            {
-                _selectionAttempt++;
-            }
             return Task.CompletedTask;
         }
 
@@ -438,10 +412,10 @@ public sealed class PlacementPlaybackAttemptTests
             int y,
             CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            Actions.Add($"idle-click:{x},{y}");
-            _dismissed = true;
-            _cursorParked = true;
+            cancellationToken
+                .ThrowIfCancellationRequested();
+            Actions.Add($"idle:{x},{y}");
+            _panelDismissed = true;
             return Task.CompletedTask;
         }
 
@@ -451,26 +425,41 @@ public sealed class PlacementPlaybackAttemptTests
             int y,
             CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            _placementClicks++;
-            Actions.Add($"click-retain:{x},{y}");
-            _cursorParked = false;
-            if (TraceAtomicClickCleanup)
+            cancellationToken
+                .ThrowIfCancellationRequested();
+            Actions.Add($"verify:{x},{y}");
+            _verification = (x, y);
+            _panelDismissed = false;
+            _verificationCounts[(x, y)] =
+                _verificationCounts
+                    .GetValueOrDefault((x, y)) +
+                1;
+            return Task.CompletedTask;
+        }
+
+        public Task ClickClientBurstRetainingCursorAsync(
+            RobloxWindow window,
+            int x,
+            int y,
+            int clickCount,
+            int durationMilliseconds,
+            CancellationToken cancellationToken)
+        {
+            cancellationToken
+                .ThrowIfCancellationRequested();
+            _burstCount++;
+            Actions.Add(
+                $"burst:{x},{y}:{clickCount}:{durationMilliseconds}");
+            if (_burstCount == CancelOnBurst)
             {
                 Actions.Add("mouse-down");
-            }
-            try
-            {
-                if (_placementClicks ==
-                    CancelOnPlacementClick)
+                try
                 {
                     PlacementCancellation?.Cancel();
+                    cancellationToken
+                        .ThrowIfCancellationRequested();
                 }
-                cancellationToken.ThrowIfCancellationRequested();
-            }
-            finally
-            {
-                if (TraceAtomicClickCleanup)
+                finally
                 {
                     Actions.Add("mouse-up");
                 }
@@ -518,7 +507,8 @@ public sealed class PlacementPlaybackAttemptTests
             char key,
             CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            cancellationToken
+                .ThrowIfCancellationRequested();
             Actions.Add(
                 $"letter:{char.ToUpperInvariant(key)}");
             return Task.CompletedTask;
@@ -530,7 +520,8 @@ public sealed class PlacementPlaybackAttemptTests
             int holdMilliseconds,
             CancellationToken cancellationToken)
         {
-            cancellationToken.ThrowIfCancellationRequested();
+            cancellationToken
+                .ThrowIfCancellationRequested();
             Actions.Add($"unit:{unitKey}");
             return Task.CompletedTask;
         }
@@ -546,7 +537,8 @@ public sealed class PlacementPlaybackAttemptTests
                 $"held:{virtualKey}:down");
             try
             {
-                return await action(cancellationToken)
+                return await action(
+                        cancellationToken)
                     .ConfigureAwait(false);
             }
             finally

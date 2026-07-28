@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using ExpeditionsMacro.Core.Models;
+using ExpeditionsMacro.Core.Runtime;
 
 namespace ExpeditionsMacro.Windows;
 
@@ -60,8 +61,11 @@ internal sealed class ManualInputPlaybackEngine
                 if (Math.Abs(driftMicroseconds) >
                     MaximumDriftMicroseconds)
                 {
-                    throw new TimeoutException(
-                        "Manual playback could not maintain the required +/- 50 ms timing accuracy.");
+                    throw new ManualInputPlaybackTimingException(
+                        input.OffsetMicroseconds,
+                        actualMicroseconds,
+                        input.Kind,
+                        inputWasSent: false);
                 }
                 sink.Send(input);
                 actualMicroseconds =
@@ -77,8 +81,11 @@ internal sealed class ManualInputPlaybackEngine
                 if (Math.Abs(driftMicroseconds) >
                     MaximumDriftMicroseconds)
                 {
-                    throw new TimeoutException(
-                        "Manual playback could not maintain the required +/- 50 ms timing accuracy.");
+                    throw new ManualInputPlaybackTimingException(
+                        input.OffsetMicroseconds,
+                        actualMicroseconds,
+                        input.Kind,
+                        inputWasSent: true);
                 }
             }
 
@@ -143,7 +150,7 @@ internal sealed class StopwatchManualInputClock :
         }
     }
 
-    public async ValueTask WaitUntilAsync(
+    public ValueTask WaitUntilAsync(
         long deadlineMicroseconds,
         CancellationToken cancellationToken)
     {
@@ -155,24 +162,37 @@ internal sealed class StopwatchManualInputClock :
                 ElapsedMicroseconds;
             if (remaining <= 0)
             {
-                return;
+                return ValueTask.CompletedTask;
             }
             if (remaining > SpinWindowMicroseconds)
             {
                 long delayMicroseconds =
                     remaining -
                     SpinWindowMicroseconds;
-                await Task.Delay(
-                        TimeSpan.FromMilliseconds(
-                            delayMicroseconds / 1_000d),
-                        cancellationToken)
-                    .ConfigureAwait(false);
+                if (cancellationToken.WaitHandle.WaitOne(
+                    TimeSpan.FromMilliseconds(
+                        delayMicroseconds / 1_000d)))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
                 continue;
             }
 
             Thread.SpinWait(128);
         }
     }
+}
+
+internal static class ManualInputPlaybackWorker
+{
+    public static Task RunAsync(
+        Func<Task> playback) =>
+        Task.Factory.StartNew(
+            () => playback().GetAwaiter().GetResult(),
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning |
+                TaskCreationOptions.DenyChildAttach,
+            TaskScheduler.Default);
 }
 
 public readonly record struct ManualInputPlaybackTiming(

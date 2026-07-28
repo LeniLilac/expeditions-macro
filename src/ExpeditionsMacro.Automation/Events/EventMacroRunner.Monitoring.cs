@@ -105,21 +105,25 @@ public sealed partial class EventMacroRunner
                         key,
                         token),
                 cancellationToken).ConfigureAwait(false);
-            if (candidate is null &&
-                recoverable is null &&
-                nextStep < afterStart.Count &&
-                PlacementExecutionPlan.IsAfterStartDue(
-                    afterStart[nextStep],
-                    matchRuntime.Elapsed))
+            IReadOnlyList<PlacementStep> dueSteps =
+                candidate is null &&
+                recoverable is null
+                    ? PlacementExecutionPlan
+                        .DueAfterStartBatch(
+                            afterStart,
+                            nextStep,
+                            matchRuntime.Elapsed)
+                    : [];
+            if (dueSteps.Count > 0)
             {
                 await PlayPlacementAsync(
                     window,
                     preset,
                     placement,
-                    [afterStart[nextStep]],
+                    dueSteps,
                     cancelPlacementKey,
                     cancellationToken).ConfigureAwait(false);
-                nextStep++;
+                nextStep += dueSteps.Count;
             }
             await Task.Delay(
                 Math.Max(

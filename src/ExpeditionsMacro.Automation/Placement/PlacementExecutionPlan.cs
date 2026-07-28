@@ -62,4 +62,43 @@ public static class PlacementExecutionPlan
         step.Phase == PlacementPhase.AfterStart &&
         elapsed >= TimeSpan.FromMilliseconds(
             step.DelayAfterStartMilliseconds);
+
+    public static IReadOnlyList<PlacementStep>
+        DueAfterStartBatch(
+        IReadOnlyList<PlacementStep> orderedSteps,
+        int nextIndex,
+        TimeSpan elapsed)
+    {
+        ArgumentNullException.ThrowIfNull(
+            orderedSteps);
+        if (nextIndex < 0 ||
+            nextIndex > orderedSteps.Count)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(nextIndex));
+        }
+
+        if (nextIndex == orderedSteps.Count ||
+            !IsAfterStartDue(
+                orderedSteps[nextIndex],
+                elapsed))
+        {
+            return [];
+        }
+
+        int dueOffset =
+            orderedSteps[nextIndex]
+                .DelayAfterStartMilliseconds;
+        List<PlacementStep> due = [];
+        for (int index = nextIndex;
+             index < orderedSteps.Count &&
+             orderedSteps[index]
+                 .DelayAfterStartMilliseconds ==
+                 dueOffset;
+             index++)
+        {
+            due.Add(orderedSteps[index]);
+        }
+        return due;
+    }
 }

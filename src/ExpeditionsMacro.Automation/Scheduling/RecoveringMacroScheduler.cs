@@ -99,7 +99,7 @@ public sealed class RecoveringMacroScheduler
                 if (!circuitBreaker.TryReserve(DateTimeOffset.UtcNow))
                 {
                     throw new RobloxSessionUnavailableException(
-                        "Roblox needed more than three restarts within ten minutes. Automatic relaunch stopped to prevent a restart loop.",
+                        "Roblox needed more than ten restarts within ten minutes. Automatic relaunch stopped to prevent a restart loop.",
                         error);
                 }
 
