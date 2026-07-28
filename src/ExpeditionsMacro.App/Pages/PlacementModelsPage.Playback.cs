@@ -18,6 +18,10 @@ public partial class PlacementModelsPage
         try
         {
             model = BuildModel();
+            PlacementControlRequirements
+                .ValidateQuickPlacementForPlayback(
+                    model,
+                    _services.Settings);
             _placementAutoSave.ScheduleSave(
                 model);
             if (!await FlushPlacementAutoSaveAsync())

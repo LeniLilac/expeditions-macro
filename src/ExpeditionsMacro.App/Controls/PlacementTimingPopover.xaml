@@ -54,24 +54,6 @@
                        Text="0 uses the route default. Recovery starts if Victory or Defeat is not seen by this time."
                        TextWrapping="Wrap" />
 
-            <Border x:Name="ManualRecordingPanel"
-                    Margin="0,14,0,0"
-                    Padding="0,13,0,0"
-                    BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="0,1,0,0"
-                    Visibility="Collapsed">
-                <StackPanel>
-                    <CheckBox x:Name="UseManualRecordingCheck"
-                              Content="Use manual recording"
-                              Checked="UseManualRecordingCheck_Changed"
-                              Unchecked="UseManualRecordingCheck_Changed" />
-                    <TextBlock Margin="0,5,0,0"
-                               Style="{StaticResource Caption}"
-                               Text="Choose the recording from the main Placement Setup controls. Playback replaces normal steps and includes clicking Start Game; existing steps are preserved."
-                               TextWrapping="Wrap" />
-                </StackPanel>
-            </Border>
-
             <TextBlock x:Name="TimingErrorText"
                        Margin="0,10,0,0"
                        Foreground="{DynamicResource ErrorBrush}"

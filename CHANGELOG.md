@@ -4,6 +4,33 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.35] - 2026-07-28
+
+### Added
+
+- Placement Setup now exposes **Recording Mode** and **Step Mode** as a route-header selector. Recording Mode uses the saved recording picker while preserving ordinary placement steps for an immediate return to Step Mode.
+- Advanced manual recordings now live under the new **Experimental** Settings section.
+- Expedition Placement Setup now permits one placement per unit slot across Before Start and After Start, and all setup editors reject new points inside the fixed central hotbar/HUD region. Existing invalid rows remain loadable so users can inspect, move, or remove them.
+
+### Changed
+
+- Manual recording playback now allows each event's total elapsed playback time to be up to 50 milliseconds early or late while retaining absolute-timeline scheduling and pre/post-send safety checks.
+- Settings Diagnostics now makes clear that key bindings are read-only there and directs edits to Controls on the Dashboard.
+
+### Fixed
+
+- Manual recording capture now reconstructs mixed keyboard and mouse input from the wrap-safe native Windows hook timeline, persists an explicit action anchor for a one-pixel pointer difference, and rejects larger incomplete pointer paths before saving.
+- Ordinary placement now tries one immediate place/select pair, parks the pointer so a hover card cannot cover selected-unit proof, and falls back to at most three bounded 50-pixel/200-millisecond place/select pairs without repeating unit-key normalization.
+- Added a default-unset **Quick Placement key** under Dashboard > Controls. Step Mode now holds that physical key after normalization and requires two stable cyan Quick Placement frames before coordinate input; one failed proof receives one extra unit-slot tap and one recheck, while a second miss skips the row safely. Recording Mode remains exempt.
+- An ordinary placement that still lacks selected-unit proof after all eight clicks is now logged and skipped so later configured steps continue. The skipped row receives no targeting, Auto Upgrade, or success callback and does not trigger private-server recovery.
+- Villain Invasion Event Home now accepts the field-observed one-pixel Event Gamemode lower border while retaining the selected tab, label, action, carousel, and Act-selector ownership checks.
+- Switching between Recording Mode and Step Mode autosaves only the recording assignment and leaves every ordinary placement step intact.
+- Compact Placement Setup now hands a mouse-wheel gesture from the nested placement-step list to the outer workspace when the inner list reaches its top or bottom boundary, keeping the rest of the page reachable.
+
+### Tests
+
+- Revalidated `1,249` application and detector tests, `5` Deep Debug Viewer tests, repository policy, and all 72 dark/light UI snapshots.
+
 ## [1.3.0-beta.34] - 2026-07-27
 
 ### Fixed
@@ -1026,7 +1053,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.34...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.35...HEAD
+[1.3.0-beta.35]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.34...v1.3.0-beta.35
 [1.3.0-beta.34]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.33...v1.3.0-beta.34
 [1.3.0-beta.33]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.32...v1.3.0-beta.33
 [1.3.0-beta.32]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.31...v1.3.0-beta.32

@@ -176,7 +176,15 @@
                 BorderThickness="1"
                 CornerRadius="5">
             <Grid>
-                <StackPanel>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <StackPanel x:Name="FastRouteIdentityPanel">
                     <TextBlock Style="{StaticResource FieldLabel}"
                                Text="Route" />
                     <TextBlock x:Name="FastRouteNameText"
@@ -186,6 +194,12 @@
                                TextTrimming="CharacterEllipsis"
                                Text="Expedition · School Grounds" />
                 </StackPanel>
+                <icons:PlacementPlaybackModeSelector x:Name="FastPlaybackModeSelector"
+                                                     Grid.Column="1"
+                                                     Margin="24,0,0,0"
+                                                     HorizontalAlignment="Right"
+                                                     VerticalAlignment="Center"
+                                                     Visibility="Collapsed" />
                 <Grid Visibility="Collapsed">
                     <ComboBox x:Name="TargetModeCombo"
                               DisplayMemberPath="Label"
@@ -337,6 +351,7 @@
                              ScrollViewer.CanContentScroll="False"
                              SelectionMode="Single"
                              ItemTemplate="{StaticResource PlacementStepTemplate}"
+                             PreviewMouseWheel="FastStepsList_PreviewMouseWheel"
                              PreviewMouseLeftButtonUp="FastStepsList_PreviewMouseLeftButtonUp"
                              PreviewMouseMove="FastStepsList_PreviewMouseMove"
                              DragOver="FastStepsList_DragOver"
@@ -347,7 +362,7 @@
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                Style="{StaticResource Caption}"
-                               Text="Normal placement steps are preserved and return when manual recording is turned off."
+                               Text="Normal placement steps are preserved and return in Step Mode."
                                TextAlignment="Center"
                                TextWrapping="Wrap"
                                Visibility="Collapsed" />

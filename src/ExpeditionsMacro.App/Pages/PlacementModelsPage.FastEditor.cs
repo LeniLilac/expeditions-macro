@@ -204,11 +204,8 @@ public partial class PlacementModelsPage
                 PlacementScreenshotCatalog.Load(target);
             PlacementCanvas.IsEnabled =
                 !_services.Coordinator.IsBusy;
-            FastPositionButton.Visibility =
-                PlacementRoutePositioningService
-                    .IsAvailable(target)
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
+            UpdateFastPositionButtonVisibility(
+                target);
             FastDetailText.Text =
                 $"{TargetLabel(target)} · B before Start · A after Start";
         }
@@ -221,6 +218,16 @@ public partial class PlacementModelsPage
             FastDetailText.Text = error.Message;
         }
     }
+
+    private void UpdateFastPositionButtonVisibility(
+        PlacementTarget target) =>
+        FastPositionButton.Visibility =
+            !string.IsNullOrWhiteSpace(
+                _fastManualRecordingId) &&
+            PlacementRoutePositioningService
+                .IsAvailable(target)
+                ? Visibility.Visible
+                : Visibility.Collapsed;
 
     private PlacementTarget CurrentFastTarget()
     {
@@ -316,21 +323,23 @@ public partial class PlacementModelsPage
             return;
         }
         Point point = e.GetPosition(PlacementCanvas);
-        int x = Math.Clamp(
-            (int)Math.Round(point.X),
-            0,
-            807);
-        int y = Math.Clamp(
-            (int)Math.Round(point.Y),
-            0,
-            610);
-        if (_selectedFastPhase ==
-                PlacementPhase.BeforeStart &&
-            PlacementAuthoringRules
-                .IsCoveredByStartDialog(x, y))
+        int x = Math.Clamp((int)Math.Round(point.X), 0, 807);
+        int y = Math.Clamp((int)Math.Round(point.Y), 0, 610);
+        string? placementError =
+            PlacementSafetyRules.IsInsideFixedCentralHotbar(x, y)
+                ? "That point is inside the fixed center unit hotbar. Choose a map point outside the bottom hotbar."
+                : CurrentFastTarget().Mode == PlacementTargetMode.Expedition &&
+                    _steps.Any(step =>
+                        step.UnitKey == _selectedFastUnit)
+                    ? $"Expedition setups allow one placement for Unit {_selectedFastUnit} across Before Start and After Start. Remove its existing point before adding another."
+                    : _selectedFastPhase == PlacementPhase.BeforeStart &&
+                        PlacementAuthoringRules
+                            .IsCoveredByStartDialog(x, y)
+                        ? "That point is covered by the Start Game dialog. Move it outside the dialog or choose After Start."
+                        : null;
+        if (placementError is not null)
         {
-            FastStatusText.Text =
-                "That point is covered by the Start Game dialog. Move it outside the dialog or choose After Start.";
+            FastStatusText.Text = placementError;
             e.Handled = true;
             return;
         }

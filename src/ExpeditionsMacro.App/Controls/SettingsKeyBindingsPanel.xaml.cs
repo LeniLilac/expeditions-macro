@@ -27,6 +27,8 @@ public partial class SettingsKeyBindingsPanel : UserControl
 
     public string CancelPlacementDiagnostic { get; private set; } = "Z";
 
+    public string QuickPlacementDiagnostic { get; private set; } = "Not set";
+
     public string TargetingDiagnostic { get; private set; } = "Not set";
 
     public string UpgradeDiagnostic { get; private set; } = "Not set";
@@ -65,6 +67,7 @@ public partial class SettingsKeyBindingsPanel : UserControl
         UpdateUnitDisplay();
         UpdateAreasDisplay();
         UpdateCancelPlacementDisplay();
+        UpdateQuickPlacementDisplay();
         UpdateTargetingDisplay();
         UpdateUpgradeDisplay();
         UpdateAutoUpgradeDisplay();
@@ -97,6 +100,13 @@ public partial class SettingsKeyBindingsPanel : UserControl
         BeginCapture(
             BindingTarget.CancelPlacement,
             CancelPlacementButton);
+
+    private void QuickPlacementButton_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        BeginCapture(
+            BindingTarget.QuickPlacement,
+            QuickPlacementButton);
 
     private void TargetingButton_Click(
         object sender,
@@ -152,14 +162,14 @@ public partial class SettingsKeyBindingsPanel : UserControl
             await ClearBindingAsync(target);
             Refresh();
             StatusFor(target).Text =
-                $"{BindingLabel(target)} is now Not set.";
+                $"{BindingLabel(target)} key is now unset.";
             BindingsChanged?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception error)
         {
             Refresh();
             StatusFor(target).Text =
-                $"Could not unset the key: {error.Message}";
+                $"Could not unset {BindingLabel(target)} key: {error.Message}";
         }
         finally
         {
@@ -190,6 +200,7 @@ public partial class SettingsKeyBindingsPanel : UserControl
             BindingTarget.Unit => "Press the letter assigned to Toggle Unit Inventory. Escape cancels.",
             BindingTarget.Areas => "Press the letter assigned to Toggle Areas Menu. Escape cancels.",
             BindingTarget.CancelPlacement => "Press the letter assigned to Toggle Cancel Unit Placement. Escape cancels.",
+            BindingTarget.QuickPlacement => "Press the physical key assigned to Quick Placement. Escape cancels.",
             BindingTarget.Targeting => "Press the letter assigned to Change Unit Targeting. Escape cancels.",
             BindingTarget.Upgrade => "Press the letter assigned to Upgrade Unit. Escape cancels.",
             BindingTarget.AutoUpgradeUnit => "Press the letter assigned to Auto Upgrade Unit. Escape cancels.",
@@ -234,9 +245,21 @@ public partial class SettingsKeyBindingsPanel : UserControl
             MacroStatusText.Text = "That macro hotkey is not supported. Choose a letter, number, punctuation, numpad, or supported function key.";
             return;
         }
-        else if (target == BindingTarget.ShiftLock && !KeyboardKey.IsSupportedShiftLockKey(virtualKey))
+        else if (target == BindingTarget.ShiftLock &&
+            !KeyboardKey.IsSupportedShiftLockKey(
+                virtualKey))
         {
-            ShiftLockStatusText.Text = "Choose Left/Right Shift, Left/Right Ctrl, or a supported letter, number, symbol, numpad, function, or common control key.";
+            ShiftLockStatusText.Text =
+                "Choose Left/Right Shift, Left/Right Ctrl, or a supported letter, number, symbol, numpad, function, or common control key.";
+            return;
+        }
+        else if (target ==
+                BindingTarget.QuickPlacement &&
+            !KeyboardKey.IsSupportedQuickPlacementKey(
+                virtualKey))
+        {
+            QuickPlacementStatusText.Text =
+                "Choose Left/Right Shift, Left/Right Ctrl, a letter, symbol, numpad key, function key, or common control key. Number-row keys 0-9 are reserved for unit slots.";
             return;
         }
 
@@ -267,6 +290,10 @@ public partial class SettingsKeyBindingsPanel : UserControl
                 case BindingTarget.CancelPlacement:
                     await ApplyCancelPlacementAsync(
                         (char)virtualKey);
+                    break;
+                case BindingTarget.QuickPlacement:
+                    await ApplyQuickPlacementAsync(
+                        virtualKey);
                     break;
                 case BindingTarget.Targeting:
                     await ApplyTargetingAsync(
@@ -333,6 +360,9 @@ public partial class SettingsKeyBindingsPanel : UserControl
         CancelPlacementButton.IsEnabled = enabled &&
             _captureTarget is BindingTarget.None or
                 BindingTarget.CancelPlacement;
+        QuickPlacementButton.IsEnabled = enabled &&
+            _captureTarget is BindingTarget.None or
+                BindingTarget.QuickPlacement;
         TargetingButton.IsEnabled = enabled &&
             _captureTarget is BindingTarget.None or
                 BindingTarget.Targeting;
@@ -354,6 +384,7 @@ public partial class SettingsKeyBindingsPanel : UserControl
         SetClearButtonState(ClearUnitButton, BindingTarget.Unit, clearEnabled);
         SetClearButtonState(ClearAreasButton, BindingTarget.Areas, clearEnabled);
         SetClearButtonState(ClearCancelPlacementButton, BindingTarget.CancelPlacement, clearEnabled);
+        SetClearButtonState(ClearQuickPlacementButton, BindingTarget.QuickPlacement, clearEnabled);
         SetClearButtonState(ClearTargetingButton, BindingTarget.Targeting, clearEnabled);
         SetClearButtonState(ClearUpgradeButton, BindingTarget.Upgrade, clearEnabled);
         SetClearButtonState(ClearAutoUpgradeUnitButton, BindingTarget.AutoUpgradeUnit, clearEnabled);
@@ -388,6 +419,9 @@ public partial class SettingsKeyBindingsPanel : UserControl
             BindingTarget.CancelPlacement =>
                 !string.IsNullOrWhiteSpace(
                     Services.Settings.CancelPlacementKey),
+            BindingTarget.QuickPlacement =>
+                Services.Settings
+                    .QuickPlacementVirtualKey != 0,
             BindingTarget.Targeting =>
                 !string.IsNullOrWhiteSpace(
                     Services.Settings.ChangeUnitTargetingKey),
@@ -414,6 +448,8 @@ public partial class SettingsKeyBindingsPanel : UserControl
             BindingTarget.Areas => "Toggle Areas Menu",
             BindingTarget.CancelPlacement =>
                 "Toggle Cancel Unit Placement",
+            BindingTarget.QuickPlacement =>
+                "Quick Placement",
             BindingTarget.Targeting => "Change Unit Targeting",
             BindingTarget.Upgrade => "Upgrade Unit",
             BindingTarget.AutoUpgradeUnit => "Auto Upgrade Unit",
@@ -432,6 +468,8 @@ public partial class SettingsKeyBindingsPanel : UserControl
         BindingTarget.Areas => AreasStatusText,
         BindingTarget.CancelPlacement =>
             CancelPlacementStatusText,
+        BindingTarget.QuickPlacement =>
+            QuickPlacementStatusText,
         BindingTarget.Targeting => TargetingStatusText,
         BindingTarget.Upgrade => UpgradeStatusText,
         BindingTarget.AutoUpgradeUnit =>
@@ -452,6 +490,7 @@ public partial class SettingsKeyBindingsPanel : UserControl
         Unit,
         Areas,
         CancelPlacement,
+        QuickPlacement,
         Targeting,
         Upgrade,
         AutoUpgradeUnit,

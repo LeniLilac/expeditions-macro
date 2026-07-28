@@ -74,6 +74,14 @@ public partial class SettingsKeyBindingsPanel
                 CancelPlacementKey = key.ToString(),
             });
 
+    private Task ApplyQuickPlacementAsync(
+        int virtualKey) =>
+        ApplySettingsAsync(
+            settings => settings with
+            {
+                QuickPlacementVirtualKey = virtualKey,
+            });
+
     private Task ApplyTargetingAsync(char key) =>
         ApplySettingsAsync(
             settings => settings with
@@ -135,6 +143,11 @@ public partial class SettingsKeyBindingsPanel
                     settings with
                     {
                         CancelPlacementKey = string.Empty,
+                    },
+                BindingTarget.QuickPlacement =>
+                    settings with
+                    {
+                        QuickPlacementVirtualKey = 0,
                     },
                 BindingTarget.Targeting =>
                     settings with
@@ -212,7 +225,8 @@ public partial class SettingsKeyBindingsPanel
                 settings.PlayMenuKey,
                 settings.UnitMenuKey,
                 settings.AreasMenuKey,
-                settings.CancelPlacementKey);
+                settings.CancelPlacementKey,
+                settings.QuickPlacementVirtualKey);
         }
         if (!string.IsNullOrWhiteSpace(
                 settings.CancelPlacementKey))
@@ -225,6 +239,8 @@ public partial class SettingsKeyBindingsPanel
                 settings.AreasMenuKey,
                 settings.ShiftLockVirtualKey);
         }
+        _ = AppSettings.ParseOptionalQuickPlacementKey(
+            settings);
         AppSettings.ValidateControlKeySet(
             settings,
             requireUnitActionKeys: false);

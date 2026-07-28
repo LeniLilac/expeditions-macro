@@ -75,6 +75,7 @@ public sealed class DeepDebugSessionTests
             AutoUpgradeUnitKey = "B",
             ToggleAutoUpgradePlacedUnitsKey = "V",
             ShiftLockVirtualKey = KeyboardKey.RightControl,
+            QuickPlacementVirtualKey = KeyboardKey.LeftShift,
             ResourceRefuelDebug =
                 new ResourceRefuelDebugSettings
                 {
@@ -123,6 +124,12 @@ public sealed class DeepDebugSessionTests
                 StringComparison.OrdinalIgnoreCase));
         using JsonDocument sanitized = JsonDocument.Parse(await ReadEntryAsync(archive, "configuration/start/settings-sanitized.json"));
         Assert.Equal(KeyboardKey.RightControl, sanitized.RootElement.GetProperty("shift_lock_virtual_key").GetInt32());
+        Assert.Equal(
+            KeyboardKey.LeftShift,
+            sanitized.RootElement
+                .GetProperty(
+                    "quick_placement_virtual_key")
+                .GetInt32());
         Assert.Equal(
             "G",
             sanitized.RootElement

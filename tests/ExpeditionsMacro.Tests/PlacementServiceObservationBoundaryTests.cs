@@ -20,9 +20,15 @@ public sealed class PlacementServiceObservationBoundaryTests
 
         await PlayOneStepAsync(automation);
 
-        Assert.Single(
+        Assert.Equal(
+            2,
+            automation.InputActions.Count(
+                action => action == "click-retain:320,280"));
+        Assert.DoesNotContain(
             automation.InputActions,
-            action => action == "click-retain:320,280");
+            action => action.StartsWith(
+                "move:",
+                StringComparison.Ordinal));
     }
 
     [Fact]

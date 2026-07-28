@@ -336,6 +336,37 @@ public sealed class DeepDebugRobloxAutomation : IRobloxAutomation, IDisposable
                 holdMilliseconds,
                 cancellationToken));
 
+    public async Task<TResult> RunWithKeyHeldAsync<TResult>(
+        RobloxWindow window,
+        int virtualKey,
+        Func<CancellationToken, Task<TResult>> action,
+        CancellationToken cancellationToken)
+    {
+        TResult result = default!;
+        await TraceAsync(
+                window,
+                "automation",
+                "run_with_key_held",
+                new
+                {
+                    Window = WindowData(window),
+                    VirtualKey = virtualKey,
+                    Key = KeyboardKey.GetDisplayName(virtualKey),
+                },
+                async () =>
+                {
+                    result =
+                        await _inner.RunWithKeyHeldAsync(
+                                window,
+                                virtualKey,
+                                action,
+                                cancellationToken)
+                            .ConfigureAwait(false);
+                })
+            .ConfigureAwait(false);
+        return result;
+    }
+
     public Task TapUnitKeyAsync(RobloxWindow window, int unitKey, int holdMilliseconds, CancellationToken cancellationToken) =>
         TraceAsync(
             window,

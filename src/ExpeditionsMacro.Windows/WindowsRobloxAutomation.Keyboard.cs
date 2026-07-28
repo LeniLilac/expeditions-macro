@@ -53,6 +53,17 @@ public sealed partial class WindowsRobloxAutomation
             holdMilliseconds,
             cancellationToken);
 
+    public Task<TResult> RunWithKeyHeldAsync<TResult>(
+        RobloxWindow window,
+        int virtualKey,
+        Func<CancellationToken, Task<TResult>> action,
+        CancellationToken cancellationToken) =>
+        _keyboard.RunWithKeyHeldAsync(
+            window,
+            virtualKey,
+            action,
+            cancellationToken);
+
     public Task TapUnitKeyAsync(
         RobloxWindow window,
         int unitKey,

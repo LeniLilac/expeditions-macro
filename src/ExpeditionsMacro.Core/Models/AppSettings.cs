@@ -20,6 +20,8 @@ public sealed record AppSettings
 
     public const int DefaultShiftLockVirtualKey = KeyboardKey.LeftControl;
 
+    public const int DefaultQuickPlacementVirtualKey = 0;
+
     public const string DefaultPlayMenuKey = "";
 
     public const string DefaultUnitMenuKey = "";
@@ -91,6 +93,9 @@ public sealed record AppSettings
 
     public int ShiftLockVirtualKey { get; init; } = DefaultShiftLockVirtualKey;
 
+    public int QuickPlacementVirtualKey { get; init; } =
+        DefaultQuickPlacementVirtualKey;
+
     public string PlayMenuKey { get; init; } = DefaultPlayMenuKey;
 
     public string UnitMenuKey { get; init; } = DefaultUnitMenuKey;
@@ -124,7 +129,8 @@ public sealed record AppSettings
         string? playMenuKey,
         string? unitMenuKey,
         string? areasMenuKey = null,
-        string? cancelPlacementKey = null)
+        string? cancelPlacementKey = null,
+        int quickPlacementVirtualKey = 0)
     {
         string displayName = KeyboardKey.GetDisplayName(virtualKey);
         if (!KeyboardKey.IsSupportedShiftLockKey(virtualKey))
@@ -154,6 +160,12 @@ public sealed record AppSettings
                     $"The Toggle Shift Lock key and {binding.Label} key cannot both be {displayName}." +
                     ControlConflictGuidance);
             }
+        }
+        if (quickPlacementVirtualKey == virtualKey)
+        {
+            throw new InvalidDataException(
+                $"The Toggle Shift Lock key and Quick Placement key cannot both be {displayName}." +
+                ControlConflictGuidance);
         }
 
         return virtualKey;
@@ -354,6 +366,17 @@ public sealed record AppSettings
             settings.AutoUpgradeUnitKey,
             "Auto Upgrade Unit");
 
+    public static int ParseQuickPlacementKey(
+        AppSettings settings) =>
+        AppControlKeyPolicy
+            .ParseQuickPlacementKey(settings);
+
+    public static int? ParseOptionalQuickPlacementKey(
+        AppSettings settings) =>
+        AppControlKeyPolicy
+            .ParseOptionalQuickPlacementKey(
+                settings);
+
     public static UnitActionKeys ParseRequiredUnitActionKeys(
         AppSettings settings)
     {
@@ -392,105 +415,15 @@ public sealed record AppSettings
 
     public static void ValidateControlKeySet(
         AppSettings settings,
-        bool requireUnitActionKeys)
-    {
-        ArgumentNullException.ThrowIfNull(settings);
-        List<(string Label, char Key)> bindings = [];
-        AddLetter(
-            bindings,
-            "Toggle Play Menu",
-            settings.PlayMenuKey,
-            required: false);
-        AddLetter(
-            bindings,
-            "Toggle Unit Inventory",
-            settings.UnitMenuKey,
-            required: false);
-        AddLetter(
-            bindings,
-            "Toggle Areas Menu",
-            settings.AreasMenuKey,
-            required: false);
-        AddLetter(
-            bindings,
-            "Toggle Cancel Unit Placement",
-            settings.CancelPlacementKey,
-            required: false);
-        AddLetter(
-            bindings,
-            "Change Unit Targeting",
-            settings.ChangeUnitTargetingKey,
+        bool requireUnitActionKeys) =>
+        AppControlKeyPolicy.ValidateControlKeySet(
+            settings,
             requireUnitActionKeys);
-        AddLetter(
-            bindings,
-            "Upgrade Unit",
-            settings.UpgradeUnitKey,
-            requireUnitActionKeys);
-        AddLetter(
-            bindings,
-            "Auto Upgrade Unit",
-            settings.AutoUpgradeUnitKey,
-            requireUnitActionKeys);
-        AddLetter(
-            bindings,
-            "Toggle Auto Upgrade Placed Units",
-            settings.ToggleAutoUpgradePlacedUnitsKey,
-            requireUnitActionKeys);
-
-        foreach ((string label, char key) in bindings)
-        {
-            if (settings.MacroHotkeyVirtualKey == key)
-            {
-                throw new InvalidDataException(
-                    $"{label} and the macro start/stop hotkey cannot both be {key}." +
-                    ControlConflictGuidance);
-            }
-            if (settings.ShiftLockVirtualKey == key)
-            {
-                throw new InvalidDataException(
-                    $"{label} and Toggle Shift Lock cannot both be {key}." +
-                    ControlConflictGuidance);
-            }
-        }
-
-        IGrouping<char, (string Label, char Key)>? duplicate =
-            bindings
-                .GroupBy(binding => binding.Key)
-                .FirstOrDefault(group => group.Count() > 1);
-        if (duplicate is not null)
-        {
-            string names = string.Join(
-                " and ",
-                duplicate.Select(binding => binding.Label));
-            throw new InvalidDataException(
-                $"{names} cannot all use {duplicate.Key}." +
-                ControlConflictGuidance);
-        }
-    }
-
-    private static void AddLetter(
-        ICollection<(string Label, char Key)> bindings,
-        string label,
-        string? value,
-        bool required)
-    {
-        string candidate = value?.Trim() ?? string.Empty;
-        if (candidate.Length == 0 && !required) return;
-        bindings.Add(
-            (label, ParseRequiredLetter(candidate, label)));
-    }
 
     private static char ParseRequiredLetter(
         string? value,
-        string label)
-    {
-        string candidate = value?.Trim() ?? string.Empty;
-        if (candidate.Length != 1 ||
-            !char.IsAsciiLetter(candidate[0]))
-        {
-            throw new InvalidDataException(
-                $"Scroll down to Controls on the Dashboard, then set {label} key to the same letter assigned in Anime Expeditions.");
-        }
-        return char.ToUpperInvariant(candidate[0]);
-    }
+        string label) =>
+        AppControlKeyPolicy.ParseRequiredLetter(
+            value,
+            label);
 }

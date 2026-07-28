@@ -12,6 +12,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <StackPanel Margin="0,0,0,28">
                 <TextBlock Style="{StaticResource PageTitle}" Text="Settings" />
@@ -33,11 +34,40 @@
                 </Grid>
             </Border>
 
+            <Border Grid.Row="2"
+                    Style="{StaticResource SectionDivider}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="420" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}"
+                                   Text="Experimental" />
+                        <TextBlock Margin="0,5,24,0"
+                                   Style="{StaticResource Caption}"
+                                   Text="Optional features that are still being tested and may change."
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <CheckBox x:Name="ManualRecordingsCheck"
+                                  Content="Enable advanced manual recordings"
+                                  AutomationProperties.HelpText="Shows the Recordings workspace and Recording Mode in Placement Setup."
+                                  Checked="ManualRecordingsCheck_Changed"
+                                  Unchecked="ManualRecordingsCheck_Changed" />
+                        <TextBlock Margin="50,5,0,0"
+                                   Style="{StaticResource Caption}"
+                                   Text="Shows the Recordings workspace and lets Placement Setup replay precisely timed keyboard and mouse input."
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
             <icons:SettingsKeyBindingsPanel x:Name="KeyBindingsPanel"
-                                             Grid.Row="2"
+                                             Grid.Row="3"
                                              Visibility="Collapsed" />
 
-            <Border Grid.Row="3" Style="{StaticResource SectionDivider}">
+            <Border Grid.Row="4" Style="{StaticResource SectionDivider}">
                 <StackPanel Width="640" HorizontalAlignment="Left">
                     <TextBlock Style="{StaticResource SectionTitle}" Text="UI scale calibration" />
                     <TextBlock Margin="0,5,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Compare Roblox's rendered interface with the standard detector scale. The overlay stays click-through while you adjust UI Scale in Roblox settings." />
@@ -49,7 +79,7 @@
                 </StackPanel>
             </Border>
 
-            <Border Grid.Row="4" Style="{StaticResource SectionDivider}">
+            <Border Grid.Row="5" Style="{StaticResource SectionDivider}">
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
                     <StackPanel>
@@ -66,46 +96,58 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Row="5" Style="{StaticResource SectionDivider}">
+            <Border x:Name="DiagnosticsSection"
+                    Grid.Row="6"
+                    Style="{StaticResource SectionDivider}">
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
                     <StackPanel>
                         <TextBlock Style="{StaticResource SectionTitle}" Text="Diagnostics" />
-                        <TextBlock Margin="0,5,24,0" Style="{StaticResource Caption}" Text="Read-only checks for the local automation environment." />
+                        <TextBlock Margin="0,5,24,0" Style="{StaticResource Caption}" Text="Current application and automation status." />
                     </StackPanel>
-                    <Border Grid.Column="1" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
-                        <StackPanel>
-                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Application" /><TextBlock x:Name="VersionText" HorizontalAlignment="Right" /></Grid>
-                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
-                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Roblox window" /><TextBlock x:Name="RobloxText" HorizontalAlignment="Right" /></Grid>
-                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
-                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Global hotkey" /><TextBlock x:Name="HotkeyText" HorizontalAlignment="Right" /></Grid>
-                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
-                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Play Menu key" /><TextBlock x:Name="PlayMenuKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
-                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
-                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Unit Inventory key" /><TextBlock x:Name="UnitMenuKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
-                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
-                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Areas Menu key" /><TextBlock x:Name="AreasMenuKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
-                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
-                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Cancel Unit Placement key" /><TextBlock x:Name="CancelPlacementKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
-                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
-                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Change Unit Targeting key" /><TextBlock x:Name="TargetingKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
-                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
-                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Upgrade Unit key" /><TextBlock x:Name="UpgradeUnitKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
-                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
-                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Auto Upgrade Unit key" /><TextBlock x:Name="AutoUpgradeUnitKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
-                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
-                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Auto Upgrade Placed Units key" /><TextBlock x:Name="ToggleAutoUpgradePlacedUnitsKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
-                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
-                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Shift Lock key" /><TextBlock x:Name="ShiftLockKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
-                            <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
-                            <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Runtime" /><TextBlock HorizontalAlignment="Right" Text=".NET 10, Windows x64" /></Grid>
-                        </StackPanel>
-                    </Border>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock FontWeight="SemiBold"
+                                   Text="Key bindings cannot be changed here." />
+                        <TextBlock Margin="0,4,0,0"
+                                   Style="{StaticResource Caption}"
+                                   Text="To edit them, open Dashboard and scroll to Controls."
+                                   TextWrapping="Wrap" />
+                        <Border Margin="0,12,0,0" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="4">
+                            <StackPanel>
+                                <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Application" /><TextBlock x:Name="VersionText" HorizontalAlignment="Right" /></Grid>
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                                <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Roblox window" /><TextBlock x:Name="RobloxText" HorizontalAlignment="Right" /></Grid>
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                                <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Global hotkey" /><TextBlock x:Name="HotkeyText" HorizontalAlignment="Right" /></Grid>
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                                <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Play Menu key" /><TextBlock x:Name="PlayMenuKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                                <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Unit Inventory key" /><TextBlock x:Name="UnitMenuKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                                <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Areas Menu key" /><TextBlock x:Name="AreasMenuKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                                <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Cancel Unit Placement key" /><TextBlock x:Name="CancelPlacementKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                                <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Quick Placement key" /><TextBlock x:Name="QuickPlacementKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                                <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Change Unit Targeting key" /><TextBlock x:Name="TargetingKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                                <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Upgrade Unit key" /><TextBlock x:Name="UpgradeUnitKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                                <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Auto Upgrade Unit key" /><TextBlock x:Name="AutoUpgradeUnitKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                                <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Auto Upgrade Placed Units key" /><TextBlock x:Name="ToggleAutoUpgradePlacedUnitsKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                                <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Shift Lock key" /><TextBlock x:Name="ShiftLockKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                                <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Runtime" /><TextBlock HorizontalAlignment="Right" Text=".NET 10, Windows x64" /></Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
                 </Grid>
             </Border>
 
-            <StackPanel Grid.Row="6" Width="640" HorizontalAlignment="Left">
+            <StackPanel Grid.Row="7" Width="640" HorizontalAlignment="Left">
                 <TextBlock Style="{StaticResource SectionTitle}" Text="Debug capture" />
                 <CheckBox x:Name="DebugModeCheck"
                           Margin="0,14,0,0"
@@ -116,15 +158,6 @@
                            Style="{StaticResource Caption}"
                            TextWrapping="Wrap"
                            Text="Shows a Debug tab with isolated navigation, team, detector, and live checkpoint tools." />
-                <CheckBox x:Name="ManualRecordingsCheck"
-                          Margin="0,14,0,0"
-                          Content="Enable advanced manual recordings"
-                          Checked="ManualRecordingsCheck_Changed"
-                          Unchecked="ManualRecordingsCheck_Changed" />
-                <TextBlock Margin="50,5,0,0"
-                           Style="{StaticResource Caption}"
-                           TextWrapping="Wrap"
-                           Text="Shows a Recordings tab and lets Fast no align placement setups replace normal placement steps with precisely timed keyboard and mouse playback." />
                 <TextBlock x:Name="DebugCaptureDescription" Margin="0,5,0,0" Style="{StaticResource Caption}" Text="Record the Roblox client at the standard 808 by 611 size. F6 starts and stops capture and saves a ZIP for bug reports." />
                 <CheckBox x:Name="AutoCaptureOnErrorCheck" Margin="0,14,0,0" Content="Automatically save 20 screenshots when a macro fails" Checked="AutoCaptureOnErrorCheck_Changed" Unchecked="AutoCaptureOnErrorCheck_Changed" />
                 <TextBlock Margin="50,5,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Keeps the latest 10 action-state frames, then captures 10 more at 0.5-second intervals after the failure. The 10 newest automatic error ZIPs are retained." />
@@ -149,7 +182,7 @@
                         <TextBlock Margin="0,5,0,0"
                                    Style="{StaticResource Caption}"
                                    TextWrapping="Wrap"
-                                   Text="Every detector frame, key and mouse event, state/action trace, sanitized app settings, selected plans and presets, detector pack, and referenced camera/placement models are saved. This can slow automation, exhaust disk space, and records everything visible inside Roblox. Archives are created after success, cancellation, or failure and are not deleted automatically." />
+                                   Text="Every detector frame, key and mouse event, state/action trace, sanitized app settings, selected plans and presets, detector pack, and referenced Placement Setups are saved. This can slow automation, exhaust disk space, and records everything visible inside Roblox. Archives are created after success, cancellation, or failure and are not deleted automatically." />
                         <TextBlock Margin="0,5,0,0"
                                    Style="{StaticResource Caption}"
                                    TextWrapping="Wrap"

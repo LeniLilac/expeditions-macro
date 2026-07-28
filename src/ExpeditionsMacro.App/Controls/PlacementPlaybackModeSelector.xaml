@@ -1,0 +1,36 @@
+<UserControl x:Class="ExpeditionsMacro.App.Controls.PlacementPlaybackModeSelector"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Width="300">
+    <StackPanel>
+        <UniformGrid Columns="2">
+            <RadioButton x:Name="RecordingModeButton"
+                         GroupName="PlacementPlaybackMode"
+                         Margin="0,0,6,0"
+                         Style="{StaticResource PlacementChoiceButton}"
+                         Content="Recording Mode"
+                         AutomationProperties.Name="Recording Mode"
+                         AutomationProperties.HelpText="Replay a saved manual recording instead of ordinary placement steps."
+                         ToolTip="Replay a saved manual recording instead of ordinary placement steps."
+                         ToolTipService.ShowOnDisabled="True"
+                         Checked="ModeButton_Checked" />
+            <RadioButton x:Name="StepModeButton"
+                         GroupName="PlacementPlaybackMode"
+                         Margin="0"
+                         Style="{StaticResource PlacementChoiceButton}"
+                         Content="Step Mode"
+                         AutomationProperties.Name="Step Mode"
+                         AutomationProperties.HelpText="Use the ordinary placement steps saved for this route."
+                         ToolTip="Use the ordinary placement steps saved for this route."
+                         IsChecked="True"
+                         Checked="ModeButton_Checked" />
+        </UniformGrid>
+        <TextBlock x:Name="DisabledFeatureText"
+                   Margin="0,5,0,0"
+                   HorizontalAlignment="Right"
+                   Style="{StaticResource Caption}"
+                   Text="Manual recordings are disabled in Settings."
+                   TextWrapping="Wrap"
+                   Visibility="Collapsed" />
+    </StackPanel>
+</UserControl>

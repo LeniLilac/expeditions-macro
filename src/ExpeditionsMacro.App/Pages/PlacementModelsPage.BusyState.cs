@@ -14,7 +14,9 @@ public partial class PlacementModelsPage
         TargetMapCombo.IsEnabled = !busy;
         TargetVariantCombo.IsEnabled = !busy;
         FastTeamCombo.IsEnabled = !busy;
-        FastManualRecordingCombo.IsEnabled = !busy;
+        FastEditorPanel
+            .SetPlaybackModeInteractionEnabled(
+                !busy);
         FastUnit1Button.IsEnabled = !busy;
         FastUnit2Button.IsEnabled = !busy;
         FastUnit3Button.IsEnabled = !busy;

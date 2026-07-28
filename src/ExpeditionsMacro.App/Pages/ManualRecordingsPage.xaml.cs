@@ -325,7 +325,7 @@ public partial class ManualRecordingsPage :
                 references.Select(model =>
                     model.Name));
             RecordingStatusText.Text =
-                $"Cannot delete {row.Name}. It is used by Placement Setup route(s): {names}. Turn off Use manual recording for those routes first.";
+                $"Cannot delete {row.Name}. It is used by Placement Setup route(s): {names}. Switch those routes to Step Mode first.";
             return;
         }
 

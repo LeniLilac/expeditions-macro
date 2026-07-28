@@ -2,6 +2,7 @@ using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
+using ExpeditionsMacro.Automation.Placement;
 
 namespace ExpeditionsMacro.Automation.Expeditions;
 

@@ -6,6 +6,16 @@ namespace ExpeditionsMacro.App.Controls;
 
 public partial class SettingsKeyBindingsPanel
 {
+    internal void ShowConfiguredQuickPlacementForSnapshot()
+    {
+        QuickPlacementButton.Content = "Left Shift";
+        QuickPlacementStatusText.Text =
+            "Left Shift must match Anime Expeditions' Quick Placement binding.";
+        ClearQuickPlacementButton.Visibility =
+            System.Windows.Visibility.Visible;
+        ClearQuickPlacementButton.IsEnabled = true;
+    }
+
     private void UpdateMacroDisplay()
     {
         AppServices services = Services;
@@ -195,6 +205,55 @@ public partial class SettingsKeyBindingsPanel
         }
     }
 
+    private void UpdateQuickPlacementDisplay()
+    {
+        int virtualKey =
+            Services.Settings
+                .QuickPlacementVirtualKey;
+        if (virtualKey == 0)
+        {
+            if (_captureTarget !=
+                BindingTarget.QuickPlacement)
+            {
+                QuickPlacementButton.Content =
+                    "Not set";
+            }
+            QuickPlacementStatusText.Text =
+                "Required before starting a plan that uses Step Mode placement steps.";
+            QuickPlacementDiagnostic = "Not set";
+            return;
+        }
+
+        string display =
+            KeyboardKey.GetDisplayName(virtualKey);
+        try
+        {
+            _ = AppSettings.ParseQuickPlacementKey(
+                Services.Settings);
+            if (_captureTarget !=
+                BindingTarget.QuickPlacement)
+            {
+                QuickPlacementButton.Content =
+                    display;
+            }
+            QuickPlacementStatusText.Text =
+                $"{display} must match Anime Expeditions' Quick Placement binding.";
+            QuickPlacementDiagnostic = display;
+        }
+        catch (InvalidDataException error)
+        {
+            if (_captureTarget !=
+                BindingTarget.QuickPlacement)
+            {
+                QuickPlacementButton.Content =
+                    display;
+            }
+            QuickPlacementStatusText.Text =
+                error.Message;
+            QuickPlacementDiagnostic = "Conflict";
+        }
+    }
+
     private void UpdateTargetingDisplay() =>
         UpdateRequiredUnitActionDisplay(
             BindingTarget.Targeting,
@@ -312,7 +371,9 @@ public partial class SettingsKeyBindingsPanel
                 services.Settings.PlayMenuKey,
                 services.Settings.UnitMenuKey,
                 services.Settings.AreasMenuKey,
-                services.Settings.CancelPlacementKey);
+                services.Settings.CancelPlacementKey,
+                services.Settings
+                    .QuickPlacementVirtualKey);
             AppSettings.ValidateControlKeySet(
                 services.Settings,
                 requireUnitActionKeys: false);

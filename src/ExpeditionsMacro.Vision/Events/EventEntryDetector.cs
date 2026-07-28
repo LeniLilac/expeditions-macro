@@ -17,8 +17,8 @@ internal static class EventEntryDetector
         new(435, 555, 126, 2);
     private static readonly ScreenRegion EventHomeActionLabel =
         new(455, 566, 90, 11);
-    private static readonly ScreenRegion EventHomeActionBottomBorder =
-        new(435, 584, 126, 2);
+    private static readonly ScreenRegion EventHomeActionBottomBorderBand =
+        new(435, 582, 126, 4);
 
     public static double HomeScore(
         ImageFrame image)
@@ -70,9 +70,9 @@ internal static class EventEntryDetector
             image,
             EventHomeActionLabel,
             IsNeutralWhite);
-        double bottomBorderRed = ColorFraction(
+        double bottomBorderRed = BestHorizontalLineFraction(
             image,
-            EventHomeActionBottomBorder,
+            EventHomeActionBottomBorderBand,
             IsEventRed);
         if (actionRed < 0.55 ||
             separatorRed > 0.20 ||
@@ -255,6 +255,28 @@ internal static class EventEntryDetector
         }
         return (double)matches /
             (region.Width * region.Height);
+    }
+
+    private static double BestHorizontalLineFraction(
+        ImageFrame image,
+        ScreenRegion region,
+        Func<byte, byte, byte, bool> predicate)
+    {
+        double best = 0;
+        for (int y = region.Y; y < region.Bottom; y++)
+        {
+            best = Math.Max(
+                best,
+                ColorFraction(
+                    image,
+                    new ScreenRegion(
+                        region.X,
+                        y,
+                        region.Width,
+                        1),
+                    predicate));
+        }
+        return best;
     }
 
     private static bool IsEventRed(

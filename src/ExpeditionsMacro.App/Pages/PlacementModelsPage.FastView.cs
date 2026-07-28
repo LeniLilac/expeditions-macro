@@ -110,6 +110,8 @@ public partial class PlacementModelsPage
             FastTimingSettingsApplied;
         FastEditorPanel.ManualRecordingChanged +=
             FastManualRecording_SelectionChanged;
+        FastEditorPanel.PlaybackModeChanged +=
+            FastPlaybackMode_Changed;
         FastEditorPanel.UnitChanged +=
             FastUnitButton_Checked;
         FastEditorPanel.PhaseChanged +=

@@ -171,7 +171,7 @@ public sealed class PlacementServiceKeyValidationTests
                 error.Message,
                 StringComparison.Ordinal);
             Assert.Contains(
-                "Cancel Placement",
+                "Toggle Cancel Unit Placement key",
                 error.Message,
                 StringComparison.Ordinal);
             Assert.Empty(automation.InputActions);

@@ -99,6 +99,44 @@ public sealed class PlacementManualRecordingTests
     }
 
     [Fact]
+    public void ClearingRecordingAssignmentRestoresPreservedSteps()
+    {
+        PlacementStep before =
+            Step(PlacementPhase.BeforeStart);
+        PlacementStep after =
+            Step(PlacementPhase.AfterStart) with
+            {
+                X = 140,
+            };
+        PlacementModel recordingMode =
+            ManualPlacement() with
+            {
+                Steps = [before, after],
+            };
+        PlacementModel stepMode =
+            recordingMode with
+            {
+                ManualInputRecordingId = null,
+            };
+
+        Assert.True(
+            ManualInputRouteService.IsConfigured(
+                recordingMode));
+        Assert.False(
+            ManualInputRouteService.IsConfigured(
+                stepMode));
+        PlacementMatchExecutionPlan execution =
+            PlacementExecutionPlan.ForMatch(
+                stepMode);
+        Assert.Equal(
+            [before],
+            execution.BeforeStart);
+        Assert.Equal(
+            [after],
+            execution.AfterStart);
+    }
+
+    [Fact]
     public async Task RepositoryFindsEveryPlacementThatReferencesRecording()
     {
         string root = Path.Combine(

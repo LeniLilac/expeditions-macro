@@ -33,12 +33,55 @@ public partial class PlacementModelsPage
             .ToArray();
     }
 
-    private void UpdateFastManualRecordingEditor() =>
-        FastEditorPanel.SetManualRecordingMode(
+    private void UpdateFastManualRecordingEditor(
+        bool? featureEnabledOverride = null)
+    {
+        bool recordingMode =
             !string.IsNullOrWhiteSpace(
-                _fastManualRecordingId),
+                _fastManualRecordingId);
+        FastEditorPanel.SetManualRecordingMode(
+            featureEnabledOverride ??
+            _services.Settings
+                .ManualInputRecordingEnabled,
+            recordingMode,
             _fastManualRecordingId,
             _manualRecordingChoices);
+        UpdateFastPositionButtonVisibility(
+            CurrentFastTarget());
+    }
+
+    private void FastPlaybackMode_Changed(
+        object? sender,
+        PlacementPlaybackModeChangedEventArgs e)
+    {
+        string? nextRecordingId =
+            e.RecordingMode
+                ? _fastManualRecordingId ??
+                  _manualRecordingChoices
+                      .FirstOrDefault()?.Id
+                : null;
+        if (e.RecordingMode &&
+            string.IsNullOrWhiteSpace(
+                nextRecordingId))
+        {
+            FastStatusText.Text =
+                "Create a recording on the Recordings page before choosing Recording Mode.";
+            UpdateFastManualRecordingEditor();
+            return;
+        }
+        if (string.Equals(
+                nextRecordingId,
+                _fastManualRecordingId,
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _fastManualRecordingId =
+            nextRecordingId;
+        UpdateFastManualRecordingEditor();
+        SchedulePlacementAutoSave();
+    }
 
     private void FastManualRecording_SelectionChanged(
         object sender,

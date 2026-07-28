@@ -127,7 +127,7 @@ public partial class MainWindow : Window
     internal async Task SelectPageForSnapshotAsync(
         string key,
         bool showPageEnd = false,
-        bool showDebugUtilities = false,
+        bool showAlternateState = false,
         MacroPlanSnapshotState macroPlanState =
             MacroPlanSnapshotState.NestedLoops,
         ManualRecordingsSnapshotState
@@ -172,13 +172,20 @@ public partial class MainWindow : Window
                 showPageEnd,
                 macroPlanState);
         }
-        if (_pages[key] is SettingsPage settings) settings.SetSnapshotScroll(showPageEnd);
+        if (_pages[key] is SettingsPage settings)
+        {
+            settings.SetSnapshotScroll(
+                showPageEnd,
+                showDiagnostics:
+                    showAlternateState);
+        }
         if (_pages[key] is DebugPage debug)
         {
             debug.SetSnapshotState();
             debug.SetSnapshotScroll(
                 showPageEnd,
-                showDebugUtilities);
+                showUtilities:
+                    showAlternateState);
         }
     }
 

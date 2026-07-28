@@ -8,11 +8,19 @@ internal sealed class WindowsKeyboardInput
 {
     private readonly Func<RobloxWindow, bool> _focus;
     private readonly Action<WindowsAutomationTrace> _trace;
+    private readonly Action<byte, byte, uint, nuint>
+        _sendKeyboardEvent;
 
-    public WindowsKeyboardInput(Func<RobloxWindow, bool> focus, Action<WindowsAutomationTrace> trace)
+    public WindowsKeyboardInput(
+        Func<RobloxWindow, bool> focus,
+        Action<WindowsAutomationTrace> trace,
+        Action<byte, byte, uint, nuint>? sendKeyboardEvent = null)
     {
         _focus = focus;
         _trace = trace;
+        _sendKeyboardEvent =
+            sendKeyboardEvent ??
+            NativeMethods.keybd_event;
     }
 
     public Task TapShiftLockKeyAsync(RobloxWindow window, int virtualKey, CancellationToken cancellationToken) =>
@@ -81,6 +89,22 @@ internal sealed class WindowsKeyboardInput
             cancellationToken);
     }
 
+    public Task<TResult> RunWithKeyHeldAsync<TResult>(
+        RobloxWindow window,
+        int virtualKey,
+        Func<CancellationToken, Task<TResult>> action,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        return RunWithKeyHeldAsync(
+            window,
+            KeyboardInputDescriptor.FromAutomationVirtualKey(
+                virtualKey),
+            action,
+            holdMilliseconds: null,
+            cancellationToken);
+    }
+
     public Task TapUnitKeyAsync(RobloxWindow window, int unitKey, int holdMilliseconds, CancellationToken cancellationToken)
     {
         if (unitKey is < 0 or > 9) throw new ArgumentOutOfRangeException(nameof(unitKey));
@@ -94,23 +118,57 @@ internal sealed class WindowsKeyboardInput
         int holdMilliseconds,
         CancellationToken cancellationToken)
     {
+        await RunWithKeyHeldAsync(
+                window,
+                key,
+                async token =>
+                {
+                    await Task.Delay(
+                            holdMilliseconds,
+                            token)
+                        .ConfigureAwait(false);
+                    return true;
+                },
+                holdMilliseconds,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<TResult> RunWithKeyHeldAsync<TResult>(
+        RobloxWindow window,
+        KeyboardInputDescriptor key,
+        Func<CancellationToken, Task<TResult>> action,
+        int? holdMilliseconds,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
         if (!_focus(window)) throw new InvalidOperationException("Windows could not focus Roblox.");
         uint downFlags = key.Extended ? NativeMethods.KeyeventfExtendedKey : 0;
-        NativeMethods.keybd_event((byte)key.VirtualKey, (byte)key.ScanCode, downFlags, 0);
+        cancellationToken.ThrowIfCancellationRequested();
+        _sendKeyboardEvent(
+            (byte)key.VirtualKey,
+            (byte)key.ScanCode,
+            downFlags,
+            0);
         Record(key, "key_down", holdMilliseconds, downFlags);
         try
         {
-            await Task.Delay(holdMilliseconds, cancellationToken).ConfigureAwait(false);
+            return await action(cancellationToken)
+                .ConfigureAwait(false);
         }
         finally
         {
             uint upFlags = NativeMethods.KeyeventfKeyUp | downFlags;
-            NativeMethods.keybd_event((byte)key.VirtualKey, (byte)key.ScanCode, upFlags, 0);
+            _sendKeyboardEvent(
+                (byte)key.VirtualKey,
+                (byte)key.ScanCode,
+                upFlags,
+                0);
             Record(key, "key_up", holdMilliseconds, upFlags);
         }
     }
 
-    private void Record(KeyboardInputDescriptor key, string action, int holdMilliseconds, uint flags) =>
+    private void Record(KeyboardInputDescriptor key, string action, int? holdMilliseconds, uint flags) =>
         _trace(new WindowsAutomationTrace(
             DateTimeOffset.UtcNow,
             "keyboard",
