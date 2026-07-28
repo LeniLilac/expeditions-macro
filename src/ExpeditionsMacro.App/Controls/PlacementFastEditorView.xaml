@@ -145,6 +145,7 @@
                         <TextBlock Style="{StaticResource FieldLabel}"
                                    Text="After Start delay, s" />
                         <TextBox Margin="0,5,0,0"
+                                 AutomationProperties.Name="After Start delay"
                                  Text="{Binding DelayAfterStartSeconds, UpdateSourceTrigger=LostFocus}" />
                     </StackPanel>
                 </Grid>
@@ -333,6 +334,7 @@
                     <ListBox x:Name="FastStepsList"
                              Grid.Row="2"
                              AllowDrop="True"
+                             ScrollViewer.CanContentScroll="False"
                              SelectionMode="Single"
                              ItemTemplate="{StaticResource PlacementStepTemplate}"
                              PreviewMouseLeftButtonUp="FastStepsList_PreviewMouseLeftButtonUp"

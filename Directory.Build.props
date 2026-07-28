@@ -9,7 +9,7 @@
     <DebugType>embedded</DebugType>
     <InvariantGlobalization>false</InvariantGlobalization>
     <VersionPrefix>1.3.0</VersionPrefix>
-    <VersionSuffix>beta.33</VersionSuffix>
+    <VersionSuffix>beta.34</VersionSuffix>
     <Authors>Expeditions Macro contributors</Authors>
     <Copyright>Copyright 2026 Expeditions Macro contributors</Copyright>
     <RepositoryType>git</RepositoryType>

@@ -1,5 +1,10 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using ExpeditionsMacro.App.Models;
+using ExpeditionsMacro.Core.Models;
 
 namespace ExpeditionsMacro.App.Controls;
 
@@ -57,12 +62,163 @@ public partial class PlacementFastEditorView
         if (showPlacementSteps)
         {
             FastTimingButton.BringIntoView();
+            VerifyScrollableStepFieldsForSnapshot();
         }
         else
         {
             FastRouteControls.BringIntoView();
         }
         FastWorkspaceScrollViewer.UpdateLayout();
+    }
+
+    private void VerifyScrollableStepFieldsForSnapshot()
+    {
+        PlacementStepRow afterStart =
+            FastStepsList.Items
+                .OfType<PlacementStepRow>()
+                .First(row =>
+                    row.Phase ==
+                    PlacementPhase.AfterStart);
+        FastStepsList.SelectedItem = afterStart;
+        FastStepsList.ScrollIntoView(afterStart);
+        FastStepsList.UpdateLayout();
+        if (FastStepsList.ItemContainerGenerator
+                .ContainerFromItem(afterStart) is not
+            ListBoxItem container)
+        {
+            throw new InvalidOperationException(
+                "The compact Placement Setup snapshot did not realize its After Start step.");
+        }
+
+        ScrollViewer? viewer =
+            FindVisualChild<ScrollViewer>(
+                FastStepsList);
+        ComboBox? autoUpgrade =
+            FindVisualChild<ComboBox>(
+                container,
+                control =>
+                    string.Equals(
+                        AutomationProperties.GetName(
+                            control),
+                        "Auto upgrade priority",
+                        StringComparison.Ordinal));
+        TextBox? delay =
+            FindVisualChild<TextBox>(
+                container,
+                control =>
+                    string.Equals(
+                        AutomationProperties.GetName(
+                            control),
+                        "After Start delay",
+                        StringComparison.Ordinal));
+        if (viewer is null ||
+            autoUpgrade is null ||
+            delay is null)
+        {
+            throw new InvalidOperationException(
+                "The compact Placement Setup snapshot could not resolve its scrollable step fields.");
+        }
+        if (viewer.CanContentScroll)
+        {
+            throw new InvalidOperationException(
+                "Placement steps must use pixel scrolling so oversized rows remain reachable.");
+        }
+        if (!KeyboardNavigation.GetIsTabStop(
+                autoUpgrade) ||
+            !KeyboardNavigation.GetIsTabStop(delay))
+        {
+            throw new InvalidOperationException(
+                "Placement step fields must remain in the keyboard tab order.");
+        }
+
+        viewer.ScrollToTop();
+        viewer.UpdateLayout();
+        viewer.LineDown();
+        viewer.UpdateLayout();
+        double lineDelta = viewer.VerticalOffset;
+        if (lineDelta <= 0 ||
+            lineDelta >= container.ActualHeight)
+        {
+            throw new InvalidOperationException(
+                "Placement step wheel scrolling did not advance by a pixel range within the oversized row.");
+        }
+
+        const double fractionalOffset = 0.5;
+        viewer.ScrollToVerticalOffset(
+            fractionalOffset);
+        viewer.UpdateLayout();
+        if (Math.Abs(
+                viewer.VerticalOffset -
+                fractionalOffset) > 0.01)
+        {
+            throw new InvalidOperationException(
+                "Placement step scrollbar movement was coerced to a whole-item offset.");
+        }
+
+        autoUpgrade.BringIntoView();
+        delay.BringIntoView();
+        viewer.UpdateLayout();
+        VerifyFullyVisible(
+            autoUpgrade,
+            viewer,
+            "Auto upgrade priority");
+        VerifyFullyVisible(
+            delay,
+            viewer,
+            "After Start delay");
+    }
+
+    private static void VerifyFullyVisible(
+        FrameworkElement control,
+        ScrollViewer viewer,
+        string name)
+    {
+        Point topLeft =
+            control.TranslatePoint(
+                new Point(),
+                viewer);
+        const double tolerance = 0.5;
+        if (topLeft.Y < -tolerance ||
+            topLeft.Y +
+            control.ActualHeight >
+            viewer.ViewportHeight +
+            tolerance)
+        {
+            throw new InvalidOperationException(
+                $"The {name} field was still clipped after keyboard-style BringIntoView.");
+        }
+    }
+
+    private static T? FindVisualChild<T>(
+        DependencyObject parent,
+        Predicate<T> match)
+        where T : DependencyObject
+    {
+        for (int index = 0;
+             index <
+             VisualTreeHelper.GetChildrenCount(
+                 parent);
+             index++)
+        {
+            DependencyObject child =
+                VisualTreeHelper.GetChild(
+                    parent,
+                    index);
+            if (child is T candidate &&
+                match(candidate))
+            {
+                return candidate;
+            }
+            T? nested =
+                FindVisualChild(
+                    child,
+                    match);
+            if (nested is not null)
+            {
+                return nested;
+            }
+        }
+        return null;
     }
 
     private void ApplyResponsiveWorkspaceLayout()

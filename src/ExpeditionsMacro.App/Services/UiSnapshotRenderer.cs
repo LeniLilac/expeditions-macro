@@ -40,6 +40,7 @@ internal static class UiSnapshotRenderer
         ("Placement Setup", "placement-setup-recording", true, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Placement Setup", "placement-setup-small-controls", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Placement Setup", "placement-setup-small-steps", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Placement Setup", "placement-setup-medium-steps", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Placement Setup", "placement-setup-recording-small-controls", true, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Placement Setup", "placement-setup-catalog-collapsed", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Placement Setup", "placement-setup-both-rails-collapsed", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
@@ -165,6 +166,13 @@ internal static class UiSnapshotRenderer
         Size standard = new(1200, 780);
         if (string.Equals(
                 file,
+                "placement-setup-medium-steps",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return new Size(1400, 1080);
+        }
+        if (string.Equals(
+                file,
                 "dashboard",
                 StringComparison.OrdinalIgnoreCase) ||
             string.Equals(
@@ -249,6 +257,9 @@ internal static class UiSnapshotRenderer
                 StringComparison.OrdinalIgnoreCase) ||
             !(file.Contains(
                   "-small",
+                  StringComparison.OrdinalIgnoreCase) ||
+              file.Contains(
+                  "-medium",
                   StringComparison.OrdinalIgnoreCase) ||
               file.Contains(
                   "-collapsed",
