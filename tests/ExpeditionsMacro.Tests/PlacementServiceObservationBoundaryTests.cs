@@ -21,7 +21,7 @@ public sealed class PlacementServiceObservationBoundaryTests
         await PlayOneStepAsync(automation);
 
         Assert.Equal(
-            2,
+            1,
             automation.InputActions.Count(
                 action => action == "click-retain:320,280"));
         Assert.DoesNotContain(

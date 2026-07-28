@@ -214,6 +214,9 @@ public sealed record PlacementModel
                 X = capture.X,
                 Y = capture.Y,
                 DelayAfterMilliseconds = delay,
+                AutoUpgradePriority =
+                    PlacementAuthoringRules
+                        .DefaultAutoUpgradePriority,
             });
         }
 

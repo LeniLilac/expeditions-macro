@@ -100,7 +100,7 @@ public sealed class PlacementSafetyRulesTests
             "click-retain:467,566",
             automation.InputActions);
         Assert.Equal(
-            4,
+            1,
             automation.InputActions.Count(
                 action => action == "key:2"));
         Assert.Single(sent);
@@ -139,14 +139,14 @@ public sealed class PlacementSafetyRulesTests
             sent);
 
         Assert.Equal(
-            4,
+            1,
             automation.InputActions.Count(
                 action => action == "key:1"));
         Assert.DoesNotContain(
             "click-retain:360,280",
             automation.InputActions);
         Assert.Equal(
-            2,
+            1,
             automation.InputActions.Count(
                 action =>
                     action == "click-retain:400,280"));

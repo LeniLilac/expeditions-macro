@@ -13,7 +13,11 @@ namespace ExpeditionsMacro.App.Pages;
 
 public partial class MacroPage
 {
+    private bool _loadingPrivateServerRecoverySettings;
+    private Task _privateServerRecoverySettingsSave =
+        Task.CompletedTask;
     private bool _testingPrivateServer;
+    private bool _updatingPrivateServerRecoverySettings;
 
     private sealed record PrivateServerRecoverySelection(
         string Link,
@@ -118,33 +122,49 @@ public partial class MacroPage
 
     private void LoadPrivateServerRecoverySettings()
     {
-        string link = string.Empty;
+        _loadingPrivateServerRecoverySettings = true;
         try
         {
-            link = _services.SecretProtector.Unprotect(
-                _services.Settings.EncryptedPrivateServerLink);
-        }
-        catch
-        {
-            PrivateServerStatusText.Text =
-                "The saved private-server link could not be read. Enter it again before enabling restart recovery.";
-        }
+            string link = string.Empty;
+            try
+            {
+                link = _services.SecretProtector.Unprotect(
+                    _services.Settings.EncryptedPrivateServerLink);
+            }
+            catch
+            {
+                PrivateServerStatusText.Text =
+                    "The saved private-server link could not be read. Enter it again before enabling restart recovery.";
+            }
 
-        PrivateServerLinkPassword.Password = link;
-        PrivateServerLinkVisible.Text = link;
-        RestartRobloxCheck.IsChecked =
-            _services.Settings.RestartRobloxWithPrivateServer;
-        RestartRobloxAtStartCheck.IsChecked =
-            _services.Settings.RestartRobloxAtMacroStart;
+            PrivateServerLinkPassword.Password = link;
+            PrivateServerLinkVisible.Text = link;
+            RestartRobloxCheck.IsChecked =
+                _services.Settings.RestartRobloxWithPrivateServer;
+            RestartRobloxAtStartCheck.IsChecked =
+                _services.Settings.RestartRobloxAtMacroStart;
+        }
+        finally
+        {
+            _loadingPrivateServerRecoverySettings = false;
+        }
     }
 
     private void ClearPrivateServerRecoverySnapshot()
     {
-        PrivateServerLinkPassword.Password = string.Empty;
-        PrivateServerLinkVisible.Text = string.Empty;
-        RestartRobloxCheck.IsChecked = false;
-        RestartRobloxAtStartCheck.IsChecked = false;
-        PrivateServerStatusText.Text = string.Empty;
+        _loadingPrivateServerRecoverySettings = true;
+        try
+        {
+            PrivateServerLinkPassword.Password = string.Empty;
+            PrivateServerLinkVisible.Text = string.Empty;
+            RestartRobloxCheck.IsChecked = false;
+            RestartRobloxAtStartCheck.IsChecked = false;
+            PrivateServerStatusText.Text = string.Empty;
+        }
+        finally
+        {
+            _loadingPrivateServerRecoverySettings = false;
+        }
     }
 
     private PrivateServerRecoverySelection ReadPrivateServerRecoverySelection()
@@ -192,6 +212,67 @@ public partial class MacroPage
             RestartRobloxAtMacroStart =
                 selection.StartupTarget is not null,
         });
+
+    private async void PrivateServerRestartSetting_Changed(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_loadingPrivateServerRecoverySettings ||
+            _updatingPrivateServerRecoverySettings)
+        {
+            return;
+        }
+
+        bool restartForRecovery =
+            RestartRobloxCheck.IsChecked == true;
+        bool restartAtStart =
+            RestartRobloxAtStartCheck.IsChecked == true;
+        _privateServerRecoverySettingsSave =
+            PersistPrivateServerRestartSettingsAsync(
+                restartForRecovery,
+                restartAtStart);
+        await _privateServerRecoverySettingsSave;
+    }
+
+    private async Task
+        PersistPrivateServerRestartSettingsAsync(
+        bool restartForRecovery,
+        bool restartAtStart)
+    {
+        _updatingPrivateServerRecoverySettings = true;
+        SetPrivateServerRecoveryControlsEnabled(
+            enabled: false);
+        try
+        {
+            await _services.UpdateSettingsAsync(
+                settings => settings with
+                {
+                    RestartRobloxWithPrivateServer =
+                        restartForRecovery,
+                    RestartRobloxAtMacroStart =
+                        restartAtStart,
+                });
+            PrivateServerStatusText.Text =
+                "Restart options saved.";
+        }
+        catch (Exception error)
+        {
+            LoadPrivateServerRecoverySettings();
+            PrivateServerStatusText.Text =
+                $"Could not save restart options: {error.Message}";
+        }
+        finally
+        {
+            _updatingPrivateServerRecoverySettings =
+                false;
+            SetPrivateServerRecoveryControlsEnabled(
+                !_services.Coordinator.IsBusy);
+        }
+    }
+
+    private Task
+        FlushPrivateServerRecoverySettingsAsync() =>
+        _privateServerRecoverySettingsSave;
 
     private void ShowPrivateServerLink_Changed(
         object sender,

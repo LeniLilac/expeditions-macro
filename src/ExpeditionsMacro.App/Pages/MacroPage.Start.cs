@@ -31,7 +31,7 @@ public partial class MacroPage
         MacroPlan plan;
         char playMenuKey;
         char? unitMenuKey = null;
-        char cancelPlacementKey;
+        char cancelPlacementKey = default;
         string webhook = CurrentWebhook();
         string discordUserId =
             DiscordUserIdText.Text.Trim();
@@ -62,17 +62,6 @@ public partial class MacroPage
                             .MacroHotkeyVirtualKey,
                         _services.Settings.PlayMenuKey);
             }
-            cancelPlacementKey =
-                AppSettings.ParseOptionalCancelPlacementKey(
-                    _services.Settings
-                        .CancelPlacementKey,
-                    _services.Settings
-                        .MacroHotkeyVirtualKey,
-                    _services.Settings.PlayMenuKey,
-                    _services.Settings.UnitMenuKey,
-                    _services.Settings.AreasMenuKey,
-                    _services.Settings
-                        .ShiftLockVirtualKey) ?? default;
             ValidateDiscord(
                 webhook,
                 discordUserId);

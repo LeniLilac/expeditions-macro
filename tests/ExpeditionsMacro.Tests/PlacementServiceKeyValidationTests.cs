@@ -138,7 +138,7 @@ public sealed class PlacementServiceKeyValidationTests
     }
 
     [Fact]
-    public async Task Playback_UnsetCancelPlacementKeyUsesDashboardGuidance()
+    public async Task Playback_UnsetCancelPlacementKeyDoesNotBlockQuickPlacement()
     {
         string root = TestPaths.NewTemporaryDirectory();
         try
@@ -150,6 +150,49 @@ public sealed class PlacementServiceKeyValidationTests
                 automation,
                 targetingKey: default,
                 autoUpgradeKey: default);
+
+            await service.PlayAsync(
+                Model(
+                    UnitTargetingPriority.First,
+                    UnitAutoUpgradePriority.Off),
+                useDefaultInterval: true,
+                defaultIntervalMilliseconds: 0,
+                keyHoldMilliseconds: 0,
+                afterKeyMilliseconds: 0,
+                cancelPlacementKey: default);
+
+            Assert.Contains(
+                "key:1",
+                automation.InputActions);
+            Assert.DoesNotContain(
+                automation.InputActions,
+                action => action.StartsWith(
+                    "letter:",
+                    StringComparison.Ordinal));
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Fact]
+    public async Task Playback_UnsetQuickPlacementKeyUsesDashboardGuidance()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            PlacementServiceTests.FakeAutomation
+                automation = new();
+            PlacementService service = new(
+                automation,
+                new PlacementServiceTests
+                    .FakeCaptureService(automation),
+                new PlacementModelRepository(
+                    new AppPaths(root)),
+                targetingKey: () => 'T',
+                autoUpgradeKey: () => 'Y',
+                quickPlacementKey: () => 0);
 
             InvalidDataException error =
                 await Assert.ThrowsAsync<
@@ -163,15 +206,14 @@ public sealed class PlacementServiceKeyValidationTests
                         useDefaultInterval: true,
                         defaultIntervalMilliseconds: 0,
                         keyHoldMilliseconds: 0,
-                        afterKeyMilliseconds: 0,
-                        cancelPlacementKey: default));
+                        afterKeyMilliseconds: 0));
 
             Assert.Contains(
-                "Controls on the Dashboard",
+                "Quick Placement",
                 error.Message,
                 StringComparison.Ordinal);
             Assert.Contains(
-                "Toggle Cancel Unit Placement key",
+                "Controls on the Dashboard",
                 error.Message,
                 StringComparison.Ordinal);
             Assert.Empty(automation.InputActions);

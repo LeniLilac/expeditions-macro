@@ -80,14 +80,11 @@ public sealed class PlacementServiceTests
 
             Assert.Equal(
                 [
+                    $"held:{KeyboardKey.LeftShift}:down",
                     "key:4",
-                    "letter:Z",
-                    "key:4",
-                    "key:4",
-                    "key:4",
-                    "click-retain:320,280",
                     "click-retain:320,280",
                     "park",
+                    $"held:{KeyboardKey.LeftShift}:up",
                     "letter:T",
                     "letter:T",
                     "letter:T",
@@ -97,7 +94,7 @@ public sealed class PlacementServiceTests
                 ],
                 automation.InputActions);
             Assert.Equal(
-                3,
+                2,
                 automation.ClickTimes.Count);
             Assert.Equal(
                 3,
@@ -154,11 +151,11 @@ public sealed class PlacementServiceTests
                 afterKeyMilliseconds: 0);
 
             Assert.Equal(
-                4,
+                1,
                 automation.InputActions.Count(
                     action => action == "key:2"));
             Assert.Equal(
-                2,
+                1,
                 automation.InputActions.Count(
                     action =>
                         action == "click-retain:320,280"));
@@ -168,7 +165,7 @@ public sealed class PlacementServiceTests
                     action =>
                         action ==
                         "move:270,280->320,280:200"));
-            Assert.Single(
+            Assert.DoesNotContain(
                 automation.InputActions,
                 action => action == "letter:Z");
         }
@@ -218,7 +215,7 @@ public sealed class PlacementServiceTests
                 afterKeyMilliseconds: 0);
 
             Assert.Equal(
-                2,
+                1,
                 automation.InputActions.Count(
                     action =>
                         action == "click-retain:320,280"));
@@ -423,10 +420,10 @@ public sealed class PlacementServiceTests
             int Count(string action) =>
                 automation.InputActions.Count(
                     candidate => candidate == action);
-            Assert.Equal(8, Count("key:1"));
-            Assert.Equal(2, Count("letter:Z"));
-            Assert.Equal(2, Count("click-retain:300,280"));
-            Assert.Equal(2, Count("click-retain:340,280"));
+            Assert.Equal(2, Count("key:1"));
+            Assert.Equal(0, Count("letter:Z"));
+            Assert.Equal(1, Count("click-retain:300,280"));
+            Assert.Equal(1, Count("click-retain:340,280"));
             Assert.Equal(6, Count("park"));
             Assert.Equal(2, Count("click:783,586"));
             int firstDismiss = automation.InputActions.IndexOf("click:783,586");
@@ -525,7 +522,7 @@ public sealed class PlacementServiceTests
                     "skipped Unit 6",
                     StringComparison.Ordinal));
             Assert.Equal(
-                4,
+                8,
                 automation.InputActions.Count(
                     action => action == "key:6"));
             Assert.Equal(
@@ -537,11 +534,11 @@ public sealed class PlacementServiceTests
                 "letter:T",
                 automation.InputActions);
             Assert.Equal(
-                4,
+                8,
                 automation.InputActions.Count(
                     action => action == "park"));
             Assert.Equal(
-                6,
+                0,
                 automation.InputActions.Count(
                     action =>
                         action ==
@@ -781,6 +778,23 @@ public sealed class PlacementServiceTests
         {
             InputActions.Add($"key:{unitKey}");
             return Task.CompletedTask;
+        }
+
+        public async Task<TResult> RunWithKeyHeldAsync<TResult>(
+            RobloxWindow window,
+            int virtualKey,
+            Func<CancellationToken, Task<TResult>> action,
+            CancellationToken cancellationToken)
+        {
+            InputActions.Add($"held:{virtualKey}:down");
+            try
+            {
+                return await action(cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                InputActions.Add($"held:{virtualKey}:up");
+            }
         }
     }
 }
