@@ -26,8 +26,10 @@ internal interface IManualInputSink
 
 internal sealed class ManualInputPlaybackEngine
 {
-    internal const long MaximumDriftMicroseconds =
+    internal const long TargetDriftMicroseconds =
         50_000;
+    internal const long HardStopDriftMicroseconds =
+        2_000_000;
 
     public async Task PlayAsync(
         ManualInputRecording recording,
@@ -58,8 +60,8 @@ internal sealed class ManualInputPlaybackEngine
                 long driftMicroseconds =
                     actualMicroseconds -
                     input.OffsetMicroseconds;
-                if (Math.Abs(driftMicroseconds) >
-                    MaximumDriftMicroseconds)
+                if (HasReachedHardStop(
+                    driftMicroseconds))
                 {
                     throw new ManualInputPlaybackTimingException(
                         input.OffsetMicroseconds,
@@ -78,8 +80,8 @@ internal sealed class ManualInputPlaybackEngine
                         input.OffsetMicroseconds,
                         actualMicroseconds,
                         input.Kind));
-                if (Math.Abs(driftMicroseconds) >
-                    MaximumDriftMicroseconds)
+                if (HasReachedHardStop(
+                    driftMicroseconds))
                 {
                     throw new ManualInputPlaybackTimingException(
                         input.OffsetMicroseconds,
@@ -111,6 +113,11 @@ internal sealed class ManualInputPlaybackEngine
             }
         }
     }
+
+    private static bool HasReachedHardStop(
+        long driftMicroseconds) =>
+        driftMicroseconds <= -HardStopDriftMicroseconds ||
+        driftMicroseconds >= HardStopDriftMicroseconds;
 }
 
 internal sealed class StopwatchManualInputClock :

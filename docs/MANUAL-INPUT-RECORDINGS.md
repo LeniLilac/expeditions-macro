@@ -71,13 +71,14 @@ foreground and client-bound checks use direct Win32 probes inside that
 worker rather than synchronous diagnostic wrappers. The player checks
 timing immediately before and after each injected event.
 The difference between the total elapsed playback clock and that event's
-recorded absolute offset must remain within +/- 50 milliseconds. The
-inclusive -50 and +50 millisecond boundaries are accepted; an earlier or
-later offset stops playback with the event kind, boundary, and measured
-drift. A timing miss is local to the recording and never authorizes a
-Roblox restart. This per-event absolute-timeline check makes timing drift a
-visible safe failure instead of silently accumulating, slowing, or
-compressing the route.
+recorded absolute offset targets +/- 50 milliseconds. Drift beyond that
+target does not shift any future deadline: the next event remains tied to
+its original offset and playback can catch up naturally. Playback stops
+only when signed drift reaches +/- 2,000 milliseconds, reporting the event
+kind, before/after-send boundary, and measured drift. A hard-stop timing
+miss is local to the recording and never authorizes a Roblox restart. This
+per-event absolute-timeline check keeps timing drift measurable without
+turning a small scheduling delay into accumulated relative timing error.
 
 The recorder excludes only the global macro start/stop hotkey. Any
 physical game-action key pressed while recording, including Auto Upgrade

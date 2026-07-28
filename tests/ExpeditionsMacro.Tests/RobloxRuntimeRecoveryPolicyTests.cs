@@ -36,7 +36,7 @@ public sealed class RobloxRuntimeRecoveryPolicyTests
             RobloxRuntimeRecoveryPolicy.IsRestartCandidate(
                 new ManualInputPlaybackTimingException(
                     scheduledMicroseconds: 100_000,
-                    actualMicroseconds: 150_001,
+                    actualMicroseconds: 2_100_000,
                     ManualInputEventKind.MouseButtonDown,
                     inputWasSent: true)));
         Assert.False(
