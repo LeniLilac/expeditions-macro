@@ -11,13 +11,16 @@ public sealed record QuickPlacementSelectionMatch(
     int LeftTextPixels,
     int CenterTextPixels,
     int RightTextPixels,
-    int IconPixels);
+    int IconPixels,
+    int VerticalOffset);
 
 public static class QuickPlacementSelectionDetector
 {
     public const int ClientWidth = 808;
     public const int ClientHeight = 611;
 
+    private const int MinimumVerticalOffset = -10;
+    private const int MaximumVerticalOffset = 0;
     private const int MinimumCyanPixels = 250;
     private const int MaximumCyanPixels = 430;
     private const int MinimumLeftTextPixels = 65;
@@ -41,11 +44,67 @@ public static class QuickPlacementSelectionDetector
     {
         Validate(image);
 
-        int cyan = CountCyan(image, IndicatorRegion);
-        int left = CountCyan(image, LeftTextRegion);
-        int center = CountCyan(image, CenterTextRegion);
-        int right = CountCyan(image, RightTextRegion);
-        int icon = CountCyan(image, IconRegion);
+        QuickPlacementSelectionMatch baseline =
+            DetectAtOffset(image, 0);
+        QuickPlacementSelectionMatch match = baseline;
+        for (int offset = MinimumVerticalOffset;
+             offset <= MaximumVerticalOffset;
+             offset++)
+        {
+            if (offset == 0)
+            {
+                continue;
+            }
+            QuickPlacementSelectionMatch candidate =
+                DetectAtOffset(image, offset);
+            if (!candidate.Visible)
+            {
+                continue;
+            }
+            if (!match.Visible ||
+                candidate.Confidence > match.Confidence ||
+                candidate.Confidence == match.Confidence &&
+                Math.Abs(candidate.VerticalOffset) <
+                Math.Abs(match.VerticalOffset))
+            {
+                match = candidate;
+            }
+        }
+        VisionTrace.Emit(
+            "quick_placement_selection",
+            match.Visible ? "visible" : "none",
+            match.Confidence,
+            new
+            {
+                cyan = match.CyanPixels,
+                left = match.LeftTextPixels,
+                center = match.CenterTextPixels,
+                right = match.RightTextPixels,
+                icon = match.IconPixels,
+                vertical_offset = match.VerticalOffset,
+            });
+        return match;
+    }
+
+    private static QuickPlacementSelectionMatch DetectAtOffset(
+        ImageFrame image,
+        int verticalOffset)
+    {
+        int cyan = CountCyan(
+            image,
+            IndicatorRegion.Translate(0, verticalOffset));
+        int left = CountCyan(
+            image,
+            LeftTextRegion.Translate(0, verticalOffset));
+        int center = CountCyan(
+            image,
+            CenterTextRegion.Translate(0, verticalOffset));
+        int right = CountCyan(
+            image,
+            RightTextRegion.Translate(0, verticalOffset));
+        int icon = CountCyan(
+            image,
+            IconRegion.Translate(0, verticalOffset));
         bool visible =
             cyan is >= MinimumCyanPixels and <= MaximumCyanPixels &&
             left >= MinimumLeftTextPixels &&
@@ -63,28 +122,15 @@ public static class QuickPlacementSelectionDetector
                 0,
                 1)
             : 0;
-
-        QuickPlacementSelectionMatch match = new(
+        return new QuickPlacementSelectionMatch(
             visible,
             confidence,
             cyan,
             left,
             center,
             right,
-            icon);
-        VisionTrace.Emit(
-            "quick_placement_selection",
-            visible ? "visible" : "none",
-            confidence,
-            new
-            {
-                cyan,
-                left,
-                center,
-                right,
-                icon,
-            });
-        return match;
+            icon,
+            verticalOffset);
     }
 
     private static int CountCyan(

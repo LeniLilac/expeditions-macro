@@ -4,6 +4,17 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.36] - 2026-07-28
+
+### Fixed
+
+- Quick Placement selection proof now follows the complete cyan title/icon through the field-confirmed upward prestart HUD phase while retaining every original component and pixel-population threshold. A real selected unit is no longer skipped merely because that stable indicator renders above the retained baseline.
+- Expedition prestart logging now reports confirmed placements against configured placements instead of describing skipped rows as sent input.
+
+### Tests
+
+- Revalidated `1,250` application and detector tests, `5` Deep Debug Viewer tests, repository policy, and the zero-warning Release build.
+
 ## [1.3.0-beta.35] - 2026-07-28
 
 ### Added
@@ -1053,7 +1064,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.35...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.36...HEAD
+[1.3.0-beta.36]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.35...v1.3.0-beta.36
 [1.3.0-beta.35]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.34...v1.3.0-beta.35
 [1.3.0-beta.34]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.33...v1.3.0-beta.34
 [1.3.0-beta.33]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.32...v1.3.0-beta.33

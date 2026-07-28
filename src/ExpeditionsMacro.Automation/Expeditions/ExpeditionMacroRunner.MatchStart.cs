@@ -27,6 +27,7 @@ public sealed partial class ExpeditionMacroRunner
                 placement);
         if (execution.BeforeStart.Count > 0)
         {
+            int confirmedPlacements = 0;
             report(
                 "Placement",
                 0,
@@ -40,10 +41,12 @@ public sealed partial class ExpeditionMacroRunner
                     preset,
                     log,
                     cancelPlacementKey,
+                    stepSent: (_, _, _) =>
+                        confirmedPlacements++,
                     cancellationToken)
                 .ConfigureAwait(false);
             log(
-                $"Preplace pass sent {execution.BeforeStart.Count} placement(s).",
+                $"Preplace pass confirmed {confirmedPlacements}/{execution.BeforeStart.Count} placement(s).",
                 MacroEventLevel.Information,
                 null,
                 null);
