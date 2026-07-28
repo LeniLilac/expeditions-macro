@@ -25,6 +25,8 @@ public partial class PlacementFastEditorView : UserControl
             FastRouteControls_PhaseChanged;
         FastRouteControls.RecordingChanged +=
             FastRouteControls_RecordingChanged;
+        FastPlaybackModeSelector.SelectionChanged +=
+            FastPlaybackModeSelector_SelectionChanged;
         FastTimingEditor.ApplyRequested +=
             FastTimingEditor_ApplyRequested;
     }
@@ -40,6 +42,9 @@ public partial class PlacementFastEditorView : UserControl
     public event RoutedEventHandler? PhaseChanged;
     public event SelectionChangedEventHandler?
         ManualRecordingChanged;
+    public event EventHandler<
+        PlacementPlaybackModeChangedEventArgs>?
+        PlaybackModeChanged;
     public event SelectionChangedEventHandler? ModeChanged;
     public event SelectionChangedEventHandler? RouteChanged;
     public event MouseButtonEventHandler? CanvasClicked;
@@ -83,15 +88,21 @@ public partial class PlacementFastEditorView : UserControl
         FastRouteControls.SelectedRecordingId;
 
     internal void SetManualRecordingMode(
+        bool featureEnabled,
         bool enabled,
         string? selectedRecordingId,
         IReadOnlyList<ManualRecordingChoice>
             recordings)
     {
         FastRouteControls.SetManualRecordingMode(
+            featureEnabled,
             enabled,
             selectedRecordingId,
             recordings);
+        FastPlaybackModeSelector.SetState(
+            featureEnabled,
+            enabled,
+            recordings.Count > 0);
         PlacementCanvas.IsHitTestVisible = !enabled;
         PlacementCanvas.Cursor =
             enabled
@@ -129,21 +140,24 @@ public partial class PlacementFastEditorView : UserControl
             authoringVisibility;
     }
 
+    internal void SetPlaybackModeInteractionEnabled(
+        bool enabled)
+    {
+        FastPlaybackModeSelector
+            .SetInteractionEnabled(enabled);
+        FastRouteControls.SetInteractionEnabled(enabled);
+    }
+
     public void SetTimingSettings(
         int placementIntervalMilliseconds,
         int defaultAfterStartDelayMilliseconds,
         int impossibilityThresholdMinutes,
-        bool manualRecordingEnabled,
-        string? selectedRecordingId,
-        IReadOnlyList<ManualRecordingChoice>
-            recordings) =>
+        bool recordingMode) =>
         FastTimingEditor.SetValues(
             placementIntervalMilliseconds,
             defaultAfterStartDelayMilliseconds,
             impossibilityThresholdMinutes,
-            manualRecordingEnabled,
-            selectedRecordingId,
-            recordings);
+            recordingMode);
 
     public void ShowTimingError(string message) =>
         FastTimingEditor.ShowError(message);
@@ -155,20 +169,13 @@ public partial class PlacementFastEditorView : UserControl
         int placementIntervalMilliseconds,
         int defaultAfterStartDelayMilliseconds,
         int impossibilityThresholdMinutes,
-        string recordingId,
-        string recordingName)
+        bool recordingMode)
     {
         SnapshotTimingEditor.SetValues(
             placementIntervalMilliseconds,
             defaultAfterStartDelayMilliseconds,
             impossibilityThresholdMinutes,
-            manualRecordingEnabled: true,
-            recordingId,
-            [
-                new ManualRecordingChoice(
-                    recordingId,
-                    recordingName),
-            ]);
+            recordingMode);
         SnapshotSettingsOverlay.Visibility =
             Visibility.Visible;
     }
@@ -267,6 +274,11 @@ public partial class PlacementFastEditorView : UserControl
         object sender,
         SelectionChangedEventArgs e) =>
         ManualRecordingChanged?.Invoke(sender, e);
+
+    private void FastPlaybackModeSelector_SelectionChanged(
+        object? sender,
+        PlacementPlaybackModeChangedEventArgs e) =>
+        PlaybackModeChanged?.Invoke(this, e);
 
     private void TargetModeCombo_SelectionChanged(
         object sender,

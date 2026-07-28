@@ -85,8 +85,9 @@ public sealed class PlacementServiceTests
                     "key:4",
                     "key:4",
                     "key:4",
-                    "move:270,280->320,280:200",
                     "click-retain:320,280",
+                    "click-retain:320,280",
+                    "park",
                     "letter:T",
                     "letter:T",
                     "letter:T",
@@ -95,12 +96,11 @@ public sealed class PlacementServiceTests
                     "park",
                 ],
                 automation.InputActions);
-            Assert.NotNull(automation.TargetPrimedAt);
             Assert.Equal(
-                2,
+                3,
                 automation.ClickTimes.Count);
             Assert.Equal(
-                2,
+                3,
                 automation.InputActions.Count(
                     action => action == "park"));
         }
@@ -158,12 +158,12 @@ public sealed class PlacementServiceTests
                 automation.InputActions.Count(
                     action => action == "key:2"));
             Assert.Equal(
-                1,
+                2,
                 automation.InputActions.Count(
                     action =>
                         action == "click-retain:320,280"));
             Assert.Equal(
-                1,
+                0,
                 automation.InputActions.Count(
                     action =>
                         action ==
@@ -218,7 +218,7 @@ public sealed class PlacementServiceTests
                 afterKeyMilliseconds: 0);
 
             Assert.Equal(
-                1,
+                2,
                 automation.InputActions.Count(
                     action =>
                         action == "click-retain:320,280"));
@@ -374,9 +374,9 @@ public sealed class PlacementServiceTests
             Assert.Single(
                 automation.InputActions,
                 action => action == "letter:Y");
-            Assert.DoesNotContain(
-                "park",
-                automation.InputActions);
+            Assert.Single(
+                automation.InputActions,
+                action => action == "park");
         }
         finally
         {
@@ -385,7 +385,7 @@ public sealed class PlacementServiceTests
     }
 
     [Fact]
-    public async Task Playback_DismissesSelectionAfterEveryPlacedUnit()
+    public async Task Playback_ConsumesDuplicateUnitRowsOnceAndDismissesBetweenThem()
     {
         string root = TestPaths.NewTemporaryDirectory();
         try
@@ -407,7 +407,7 @@ public sealed class PlacementServiceTests
                 },
                 new PlacementStep
                 {
-                    UnitKey = 2,
+                    UnitKey = 1,
                     X = 340,
                     Y = 280,
                     DelayAfterMilliseconds = 0,
@@ -420,33 +420,17 @@ public sealed class PlacementServiceTests
                 keyHoldMilliseconds: 0,
                 afterKeyMilliseconds: 0);
 
-            Assert.Equal(
-                4,
+            int Count(string action) =>
                 automation.InputActions.Count(
-                    action => action == "park"));
-            Assert.Equal(
-                2,
-                automation.InputActions.Count(
-                    action =>
-                        action == "click:783,586"));
-            int park =
-                automation.InputActions.IndexOf(
-                    "park");
-            Assert.True(
-                park >
-                automation.InputActions.IndexOf(
-                    "click-retain:300,280"));
-            Assert.True(
-                park <
-                automation.InputActions.IndexOf(
-                    "move:290,280->340,280:200"));
-            int firstDismiss =
-                automation.InputActions.IndexOf(
-                    "click:783,586");
-            Assert.True(
-                firstDismiss <
-                automation.InputActions.IndexOf(
-                    "move:290,280->340,280:200"));
+                    candidate => candidate == action);
+            Assert.Equal(8, Count("key:1"));
+            Assert.Equal(2, Count("letter:Z"));
+            Assert.Equal(2, Count("click-retain:300,280"));
+            Assert.Equal(2, Count("click-retain:340,280"));
+            Assert.Equal(6, Count("park"));
+            Assert.Equal(2, Count("click:783,586"));
+            int firstDismiss = automation.InputActions.IndexOf("click:783,586");
+            Assert.True(firstDismiss < automation.InputActions.IndexOf("click-retain:340,280"));
         }
         finally
         {
@@ -501,7 +485,7 @@ public sealed class PlacementServiceTests
     }
 
     [Fact]
-    public async Task Playback_StopsAfterEightUnconfirmedClicks()
+    public async Task Playback_SkipsAfterEightUnconfirmedClicks()
     {
         string root = TestPaths.NewTemporaryDirectory();
         try
@@ -525,21 +509,21 @@ public sealed class PlacementServiceTests
                     Y = 280,
                     DelayAfterMilliseconds = 0,
                 });
+            List<string> status = [];
 
-            RobloxUiUnavailableException error =
-                await Assert.ThrowsAsync<
-                    RobloxUiUnavailableException>(
-                    () => service.PlayAsync(
-                        model,
-                        useDefaultInterval: true,
-                        defaultIntervalMilliseconds: 0,
-                        keyHoldMilliseconds: 0,
-                        afterKeyMilliseconds: 0));
+            await service.PlayAsync(
+                model,
+                useDefaultInterval: true,
+                defaultIntervalMilliseconds: 0,
+                keyHoldMilliseconds: 0,
+                afterKeyMilliseconds: 0,
+                status: status.Add);
 
             Assert.Contains(
-                "after 8 click attempts",
-                error.Message,
-                StringComparison.Ordinal);
+                status,
+                message => message.Contains(
+                    "skipped Unit 6",
+                    StringComparison.Ordinal));
             Assert.Equal(
                 4,
                 automation.InputActions.Count(
@@ -552,9 +536,16 @@ public sealed class PlacementServiceTests
             Assert.DoesNotContain(
                 "letter:T",
                 automation.InputActions);
-            Assert.DoesNotContain(
-                "park",
-                automation.InputActions);
+            Assert.Equal(
+                4,
+                automation.InputActions.Count(
+                    action => action == "park"));
+            Assert.Equal(
+                6,
+                automation.InputActions.Count(
+                    action =>
+                        action ==
+                        "move:270,280->320,280:200"));
         }
         finally
         {

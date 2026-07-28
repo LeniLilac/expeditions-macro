@@ -40,7 +40,7 @@ public sealed class WindowsManualInputPlayback :
             window,
             bounds);
         int sentEvents = 0;
-        long maximumDriftMicroseconds = 0;
+        long maximumAbsoluteDriftMicroseconds = 0;
         bool succeeded = false;
         try
         {
@@ -52,10 +52,10 @@ public sealed class WindowsManualInputPlayback :
                     timing =>
                     {
                         sentEvents++;
-                        maximumDriftMicroseconds =
+                        maximumAbsoluteDriftMicroseconds =
                             Math.Max(
-                                maximumDriftMicroseconds,
-                                timing.DriftMicroseconds);
+                                maximumAbsoluteDriftMicroseconds,
+                                Math.Abs(timing.DriftMicroseconds));
                         EmitTiming(timing);
                     },
                     cancellationToken)
@@ -69,7 +69,7 @@ public sealed class WindowsManualInputPlayback :
                     recording.Id,
                     sentEvents,
                     recording.Events.Count,
-                    maximumDriftMicroseconds,
+                    maximumAbsoluteDriftMicroseconds,
                     succeeded));
         }
     }

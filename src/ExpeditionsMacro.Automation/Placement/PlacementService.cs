@@ -1,10 +1,8 @@
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
-using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
 using ExpeditionsMacro.Core.Runtime;
-using ExpeditionsMacro.Vision.Placement;
 
 namespace ExpeditionsMacro.Automation.Placement;
 
@@ -13,33 +11,57 @@ public sealed class PlacementService
     private const int PlacementApproachDistancePixels = 50;
     private const int PlacementApproachDurationMilliseconds = 200;
     private const int PlacementClickAttempts = 8;
-    private const int SelectionPollMilliseconds = 100;
-    private const int SelectionTimeoutMilliseconds = 800;
-    private const int RequiredStableSelectionFrames = 2;
-    private const int SelectionDismissAttempts = 8;
-    private const int SelectionDismissPollMilliseconds = 100;
-    private const int SelectionDismissSamples = 4;
-    private const int IdleCursorInsetPixels = 24;
     private const int UnitActionTapIntervalMilliseconds = 100;
 
     private readonly IRobloxAutomation _automation;
     private readonly IPlacementCaptureService _capture;
     private readonly PlacementModelRepository _models;
+    private readonly SelectedUnitPanelPlayback _selectedUnitPanel;
     private readonly Func<char> _targetingKey;
     private readonly Func<char> _autoUpgradeKey;
+    private readonly Func<int>? _quickPlacementKey;
+    private readonly IQuickPlacementSelectionProof?
+        _quickPlacementSelectionProof;
 
     public PlacementService(
         IRobloxAutomation automation,
         IPlacementCaptureService capture,
         PlacementModelRepository models,
+        Func<char> targetingKey,
+        Func<char> autoUpgradeKey,
+        Func<int> quickPlacementKey)
+        : this(
+            automation,
+            capture,
+            models,
+            targetingKey,
+            autoUpgradeKey,
+            quickPlacementKey,
+            new QuickPlacementSelectionProof(
+                automation))
+    {
+    }
+
+    internal PlacementService(
+        IRobloxAutomation automation,
+        IPlacementCaptureService capture,
+        PlacementModelRepository models,
         Func<char>? targetingKey = null,
-        Func<char>? autoUpgradeKey = null)
+        Func<char>? autoUpgradeKey = null,
+        Func<int>? quickPlacementKey = null,
+        IQuickPlacementSelectionProof?
+            quickPlacementSelectionProof = null)
     {
         _automation = automation;
         _capture = capture;
         _models = models;
+        _selectedUnitPanel =
+            new SelectedUnitPanelPlayback(automation);
         _targetingKey = targetingKey ?? (() => 'T');
         _autoUpgradeKey = autoUpgradeKey ?? (() => 'Y');
+        _quickPlacementKey = quickPlacementKey;
+        _quickPlacementSelectionProof =
+            quickPlacementSelectionProof;
     }
 
     public async Task<PlacementModel> RecordAsync(
@@ -114,7 +136,6 @@ public sealed class PlacementService
             status,
             cancellationToken).ConfigureAwait(false);
     }
-
     public async Task PlayStepsAsync(
         RobloxWindow window,
         PlacementModel model,
@@ -133,15 +154,39 @@ public sealed class PlacementService
         {
             return;
         }
-        if (!char.IsAsciiLetter(cancelPlacementKey))
+        PlacementStep[] playableSteps = steps
+            .Where(step =>
+                PlacementSafetyRules
+                    .GetPlaybackSkipReason(
+                        model,
+                        step) is null)
+            .ToArray();
+        if (playableSteps.Length > 0 &&
+            !char.IsAsciiLetter(cancelPlacementKey))
         {
             throw new InvalidDataException(
-                "Scroll down to Controls on the Dashboard and set Cancel Placement key to the same A-Z letter assigned in Anime Expeditions.");
+                "Scroll down to Controls on the Dashboard and set Toggle Cancel Unit Placement key to the same A-Z letter assigned in Anime Expeditions.");
         }
-        cancelPlacementKey =
-            char.ToUpperInvariant(cancelPlacementKey);
+        cancelPlacementKey = char.ToUpperInvariant(cancelPlacementKey);
+        int quickPlacementKey = default;
+        bool proveQuickPlacement =
+            _quickPlacementKey is not null &&
+            _quickPlacementSelectionProof is not null;
+        if (playableSteps.Length > 0 &&
+            proveQuickPlacement)
+        {
+            quickPlacementKey =
+                _quickPlacementKey!();
+            if (!KeyboardKey
+                    .IsSupportedQuickPlacementKey(
+                        quickPlacementKey))
+            {
+                throw new InvalidDataException(
+                    "Scroll down to Controls on the Dashboard, then set Quick Placement key to the same physical key assigned in Anime Expeditions.");
+            }
+        }
         char targetingKey = default;
-        if (steps.Any(step =>
+        if (playableSteps.Any(step =>
                 (int)step.TargetingPriority > 0))
         {
             targetingKey = _targetingKey();
@@ -150,13 +195,11 @@ public sealed class PlacementService
                 throw new InvalidDataException(
                     "Scroll down to Controls on the Dashboard and set Change Unit Targeting key to the same A-Z letter assigned in Anime Expeditions.");
             }
-            targetingKey =
-                char.ToUpperInvariant(targetingKey);
+            targetingKey = char.ToUpperInvariant(targetingKey);
         }
         char autoUpgradeKey = default;
-        if (steps.Any(step =>
-                step.AutoUpgradePriority !=
-                    UnitAutoUpgradePriority.Off))
+        if (playableSteps.Any(step =>
+                step.AutoUpgradePriority != UnitAutoUpgradePriority.Off))
         {
             autoUpgradeKey = _autoUpgradeKey();
             if (!char.IsAsciiLetter(autoUpgradeKey))
@@ -164,15 +207,19 @@ public sealed class PlacementService
                 throw new InvalidDataException(
                     "Scroll down to Controls on the Dashboard and set Auto Upgrade Unit key to the same A-Z letter assigned in Anime Expeditions.");
             }
-            autoUpgradeKey =
-                char.ToUpperInvariant(autoUpgradeKey);
+            autoUpgradeKey = char.ToUpperInvariant(autoUpgradeKey);
         }
-        EnsureFocus(window);
-        await EnsureSizeAsync(window, model.ClientWidth, model.ClientHeight, cancellationToken).ConfigureAwait(false);
         for (int index = 0; index < steps.Count; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             PlacementStep step = steps[index];
+            string? skipReason = PlacementSafetyRules
+                .GetPlaybackSkipReason(model, step);
+            if (skipReason is not null)
+            {
+                status?.Invoke($"Step {index + 1}/{steps.Count}: skipped because {skipReason}");
+                continue;
+            }
             await EnsureSizeAsync(window, model.ClientWidth, model.ClientHeight, cancellationToken).ConfigureAwait(false);
             EnsureFocus(window);
             status?.Invoke(
@@ -183,10 +230,46 @@ public sealed class PlacementService
                 keyHoldMilliseconds,
                 cancelPlacementKey,
                 cancellationToken).ConfigureAwait(false);
+            if (proveQuickPlacement)
+            {
+                bool ready =
+                    await _quickPlacementSelectionProof!
+                        .HasStableSelectionAsync(
+                            window,
+                            quickPlacementKey,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                if (!ready)
+                {
+                    status?.Invoke(
+                        $"Step {index + 1}/{steps.Count}: Quick Placement selection proof was absent; selecting Unit {step.UnitKey} once more.");
+                    EnsureFocus(window);
+                    await _automation.TapUnitKeyAsync(
+                        window,
+                        step.UnitKey,
+                        keyHoldMilliseconds,
+                        cancellationToken).ConfigureAwait(false);
+                    ready =
+                        await _quickPlacementSelectionProof
+                            .HasStableSelectionAsync(
+                                window,
+                                quickPlacementKey,
+                                cancellationToken)
+                            .ConfigureAwait(false);
+                }
+                if (!ready)
+                {
+                    status?.Invoke(
+                        $"Step {index + 1}/{steps.Count}: skipped Unit {step.UnitKey} before coordinate input because Quick Placement did not confirm a selected unit.");
+                    continue;
+                }
+                status?.Invoke(
+                    $"Step {index + 1}/{steps.Count}: Quick Placement confirmed Unit {step.UnitKey} is selected.");
+            }
             bool selected = false;
-            for (int attempt = 1;
-                 attempt <= PlacementClickAttempts;
-                 attempt++)
+            for (int firstClick = 1;
+                 firstClick <= PlacementClickAttempts;
+                 firstClick += 2)
             {
                 await EnsureSizeAsync(
                     window,
@@ -194,77 +277,91 @@ public sealed class PlacementService
                     model.ClientHeight,
                     cancellationToken).ConfigureAwait(false);
                 EnsureFocus(window);
+                bool useTimedApproach = firstClick > 1;
                 status?.Invoke(
-                    $"Step {index + 1}/{steps.Count}: placement click {attempt}/{PlacementClickAttempts} at ({step.X}, {step.Y}).");
+                    $"Step {index + 1}/{steps.Count}: {(useTimedApproach ? "slow" : "fast")} place/select clicks {firstClick}-{firstClick + 1}/{PlacementClickAttempts} at ({step.X}, {step.Y}).");
                 await ClickPlacementAsync(
                     window,
                     step,
+                    useTimedApproach,
                     cancellationToken).ConfigureAwait(false);
-                selected = await WaitForSelectedUnitAsync(
+                await ClickPlacementAsync(
+                    window,
+                    step,
+                    useTimedApproach,
+                    cancellationToken).ConfigureAwait(false);
+                // Clear hover before capture because its unit card can cover the red Close control required for proof.
+                await _automation.ParkCursorAsync(
                     window,
                     cancellationToken).ConfigureAwait(false);
+                selected = await _selectedUnitPanel
+                    .WaitForVisibleAsync(
+                        window,
+                        cancellationToken).ConfigureAwait(false);
                 if (selected) break;
                 status?.Invoke(
-                    $"Step {index + 1}/{steps.Count}: the selected-unit panel did not appear after click {attempt}; retrying only the timed approach and click.");
+                    $"Step {index + 1}/{steps.Count}: selected-unit proof missing after {firstClick + 1}/{PlacementClickAttempts} clicks.");
             }
             if (!selected)
             {
-                throw new RobloxUiUnavailableException(
-                    $"Unit {step.UnitKey} could not be placed and selected at ({step.X}, {step.Y}) after {PlacementClickAttempts} click attempts.");
+                status?.Invoke(
+                    $"Step {index + 1}/{steps.Count}: skipped Unit {step.UnitKey} at ({step.X}, {step.Y}) after {PlacementClickAttempts} clicks because selected-unit proof never appeared.");
+                continue;
             }
 
-            int targetingTaps =
-                (int)step.TargetingPriority;
-            status?.Invoke(
-                $"Step {index + 1}/{steps.Count}: selected unit confirmed; applying {step.TargetingPriority} targeting ({targetingTaps} key taps).");
-            for (int tap = 0;
-                 tap < targetingTaps;
-                 tap++)
+            if (selected)
             {
-                EnsureFocus(window);
-                await _automation.TapLetterKeyAsync(
-                    window,
-                    targetingKey,
-                    cancellationToken).ConfigureAwait(false);
-                if (tap + 1 < targetingTaps)
-                {
-                    await Task.Delay(
-                        UnitActionTapIntervalMilliseconds,
-                        cancellationToken).ConfigureAwait(false);
-                }
-            }
-            int autoUpgradeTaps =
-                (int)step.AutoUpgradePriority;
-            if (autoUpgradeTaps > 0)
-            {
+                int targetingTaps = (int)step.TargetingPriority;
                 status?.Invoke(
-                    $"Step {index + 1}/{steps.Count}: applying Auto Upgrade {FormatAutoUpgradePriority(step.AutoUpgradePriority)} ({autoUpgradeTaps} key taps).");
+                    $"Step {index + 1}/{steps.Count}: selected unit confirmed; applying {step.TargetingPriority} targeting ({targetingTaps} key taps).");
                 for (int tap = 0;
-                     tap < autoUpgradeTaps;
+                     tap < targetingTaps;
                      tap++)
                 {
                     EnsureFocus(window);
                     await _automation.TapLetterKeyAsync(
                         window,
-                        autoUpgradeKey,
+                        targetingKey,
                         cancellationToken).ConfigureAwait(false);
-                    cancellationToken
-                        .ThrowIfCancellationRequested();
-                    if (tap + 1 < autoUpgradeTaps)
+                    if (tap + 1 < targetingTaps)
                     {
                         await Task.Delay(
                             UnitActionTapIntervalMilliseconds,
                             cancellationToken).ConfigureAwait(false);
                     }
                 }
+                int autoUpgradeTaps = (int)step.AutoUpgradePriority;
+                if (autoUpgradeTaps > 0)
+                {
+                    status?.Invoke(
+                        $"Step {index + 1}/{steps.Count}: applying Auto Upgrade {FormatAutoUpgradePriority(step.AutoUpgradePriority)} ({autoUpgradeTaps} key taps).");
+                    for (int tap = 0;
+                         tap < autoUpgradeTaps;
+                         tap++)
+                    {
+                        EnsureFocus(window);
+                        await _automation.TapLetterKeyAsync(
+                            window,
+                            autoUpgradeKey,
+                            cancellationToken).ConfigureAwait(false);
+                        cancellationToken
+                            .ThrowIfCancellationRequested();
+                        if (tap + 1 < autoUpgradeTaps)
+                        {
+                            await Task.Delay(
+                                UnitActionTapIntervalMilliseconds,
+                                cancellationToken).ConfigureAwait(false);
+                        }
+                    }
+                }
+                status?.Invoke(
+                    $"Step {index + 1}/{steps.Count}: closing the selected-unit panel before the next action.");
+                await _selectedUnitPanel.DismissAsync(
+                    window,
+                    model.ClientWidth,
+                    model.ClientHeight,
+                    cancellationToken).ConfigureAwait(false);
             }
-            status?.Invoke(
-                $"Step {index + 1}/{steps.Count}: closing the selected-unit panel before the next action.");
-            await DismissSelectedUnitPanelAsync(
-                window,
-                model.ClientWidth,
-                model.ClientHeight,
-                cancellationToken).ConfigureAwait(false);
             stepSent?.Invoke(index + 1, steps.Count, step);
             int delay = useDefaultInterval ? defaultIntervalMilliseconds : step.DelayAfterMilliseconds;
             status?.Invoke($"Step {index + 1}/{steps.Count}: waiting {delay} ms after click.");
@@ -314,158 +411,30 @@ public sealed class PlacementService
     private async Task ClickPlacementAsync(
         RobloxWindow window,
         PlacementStep step,
+        bool useTimedApproach,
         CancellationToken cancellationToken)
     {
         EnsureFocus(window);
-        int approachX =
-            step.X >= PlacementApproachDistancePixels
-                ? step.X -
-                    PlacementApproachDistancePixels
-                : step.X +
-                    PlacementApproachDistancePixels;
-        await _automation.MoveCursorBetweenClientPointsAsync(
-            window,
-            approachX,
-            step.Y,
-            step.X,
-            step.Y,
-            PlacementApproachDurationMilliseconds,
-            cancellationToken).ConfigureAwait(false);
+        if (useTimedApproach)
+        {
+            int approachX =
+                step.X >= PlacementApproachDistancePixels
+                    ? step.X - PlacementApproachDistancePixels
+                    : step.X + PlacementApproachDistancePixels;
+            await _automation.MoveCursorBetweenClientPointsAsync(
+                window,
+                approachX,
+                step.Y,
+                step.X,
+                step.Y,
+                PlacementApproachDurationMilliseconds,
+                cancellationToken).ConfigureAwait(false);
+        }
         await _automation.ClickClientRetainingCursorAsync(
             window,
             step.X,
             step.Y,
             cancellationToken).ConfigureAwait(false);
-    }
-
-    private async Task<bool> WaitForSelectedUnitAsync(
-        RobloxWindow window,
-        CancellationToken cancellationToken)
-    {
-        int stable = 0;
-        int samples = Math.Max(
-            RequiredStableSelectionFrames,
-            1 +
-            SelectionTimeoutMilliseconds /
-            SelectionPollMilliseconds);
-        for (int sample = 0;
-             sample < samples ||
-             stable > 0;
-             sample++)
-        {
-            EnsureFocus(window);
-            ImageFrame frame =
-                _automation.CaptureClient(window);
-            SelectedUnitPanelMatch match =
-                SelectedUnitPanelDetector.Detect(frame);
-            stable = match.Visible ? stable + 1 : 0;
-            if (stable >= RequiredStableSelectionFrames)
-            {
-                return true;
-            }
-            if (sample + 1 < samples ||
-                stable > 0)
-            {
-                await Task.Delay(
-                    SelectionPollMilliseconds,
-                    cancellationToken).ConfigureAwait(false);
-            }
-        }
-        return false;
-    }
-
-    private async Task DismissSelectedUnitPanelAsync(
-        RobloxWindow window,
-        int clientWidth,
-        int clientHeight,
-        CancellationToken cancellationToken)
-    {
-        int idleX = Math.Max(
-            0,
-            clientWidth -
-            1 -
-            IdleCursorInsetPixels);
-        int idleY = Math.Max(
-            0,
-            clientHeight -
-            1 -
-            IdleCursorInsetPixels);
-        await _automation.ParkCursorAsync(
-            window,
-            cancellationToken).ConfigureAwait(false);
-        if (await WaitForSelectedUnitHiddenAsync(
-            window,
-            cancellationToken).ConfigureAwait(false))
-        {
-            return;
-        }
-
-        for (int attempt = 0;
-             attempt < SelectionDismissAttempts;
-             attempt++)
-        {
-            EnsureFocus(window);
-            await _automation.ClickClientAsync(
-                window,
-                idleX,
-                idleY,
-                cancellationToken).ConfigureAwait(false);
-            if (await WaitForSelectedUnitHiddenAsync(
-                window,
-                cancellationToken).ConfigureAwait(false))
-            {
-                await _automation.ParkCursorAsync(
-                    window,
-                    cancellationToken).ConfigureAwait(false);
-                return;
-            }
-        }
-
-        throw new RobloxUiUnavailableException(
-            "The selected-unit panel remained open after " +
-            $"{SelectionDismissAttempts} clicks at the safe idle point.");
-    }
-
-    private async Task<bool> WaitForSelectedUnitHiddenAsync(
-        RobloxWindow window,
-        CancellationToken cancellationToken)
-    {
-        int stable = 0;
-        for (int sample = 0;
-             sample < SelectionDismissSamples ||
-             stable > 0;
-             sample++)
-        {
-            EnsureFocus(window);
-            stable =
-                SelectedUnitPanelIsVisible(window)
-                    ? 0
-                    : stable + 1;
-            if (stable >=
-                RequiredStableSelectionFrames)
-            {
-                return true;
-            }
-            if (sample + 1 <
-                    SelectionDismissSamples ||
-                stable > 0)
-            {
-                await Task.Delay(
-                    SelectionDismissPollMilliseconds,
-                    cancellationToken).ConfigureAwait(false);
-            }
-        }
-        return false;
-    }
-
-    private bool SelectedUnitPanelIsVisible(
-        RobloxWindow window)
-    {
-        ImageFrame frame =
-            _automation.CaptureClient(window);
-        return SelectedUnitPanelDetector
-            .Detect(frame)
-            .PanelVisible;
     }
 
     private async Task EnsureSizeAsync(RobloxWindow window, int width, int height, CancellationToken cancellationToken)

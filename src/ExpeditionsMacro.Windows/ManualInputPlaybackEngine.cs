@@ -26,7 +26,7 @@ internal interface IManualInputSink
 internal sealed class ManualInputPlaybackEngine
 {
     internal const long MaximumDriftMicroseconds =
-        10_000;
+        50_000;
 
     public async Task PlayAsync(
         ManualInputRecording recording,
@@ -57,11 +57,11 @@ internal sealed class ManualInputPlaybackEngine
                 long driftMicroseconds =
                     actualMicroseconds -
                     input.OffsetMicroseconds;
-                if (driftMicroseconds >
+                if (Math.Abs(driftMicroseconds) >
                     MaximumDriftMicroseconds)
                 {
                     throw new TimeoutException(
-                        "Manual playback could not maintain the required 10 ms timing accuracy.");
+                        "Manual playback could not maintain the required +/- 50 ms timing accuracy.");
                 }
                 sink.Send(input);
                 actualMicroseconds =
@@ -74,11 +74,11 @@ internal sealed class ManualInputPlaybackEngine
                         input.OffsetMicroseconds,
                         actualMicroseconds,
                         input.Kind));
-                if (driftMicroseconds >
+                if (Math.Abs(driftMicroseconds) >
                     MaximumDriftMicroseconds)
                 {
                     throw new TimeoutException(
-                        "Manual playback could not maintain the required 10 ms timing accuracy.");
+                        "Manual playback could not maintain the required +/- 50 ms timing accuracy.");
                 }
             }
 

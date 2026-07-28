@@ -73,29 +73,28 @@ public partial class PlacementModelsPage
         FastStepsList.SelectedIndex = 1;
         FastStatusText.Text = string.Empty;
         UpdateFastPlacementCount();
+        const string recordingId =
+            "snapshot-event-angle-2";
+        _manualRecordingChoices =
+        [
+            new ManualRecordingChoice(
+                recordingId,
+                "Event Act 1 Angle 2 run"),
+        ];
         if (showRecordingSettings)
         {
-            const string recordingId =
-                "snapshot-event-angle-2";
             _fastImpossibilityThresholdMinutes =
                 18;
             _fastManualRecordingId =
                 recordingId;
-            FastEditorPanel.SetManualRecordingMode(
-                enabled: true,
-                recordingId,
-                [
-                    new ManualRecordingChoice(
-                        recordingId,
-                        "Event Act 1 Angle 2 run"),
-                ]);
             FastEditorPanel.SetSnapshotSettings(
                 _fastPlacementIntervalMilliseconds,
                 _fastDefaultAfterStartDelayMilliseconds,
                 _fastImpossibilityThresholdMinutes,
-                recordingId,
-                "Event Act 1 Angle 2 run");
+                recordingMode: true);
         }
+        UpdateFastManualRecordingEditor(
+            featureEnabledOverride: true);
     }
 
 }

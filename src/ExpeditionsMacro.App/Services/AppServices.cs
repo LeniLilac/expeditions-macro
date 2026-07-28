@@ -126,7 +126,9 @@ public sealed class AppServices : IDisposable
             () => AppSettings
                 .ParseChangeUnitTargetingKey(Settings),
             () => AppSettings
-                .ParseAutoUpgradeUnitKey(Settings));
+                .ParseAutoUpgradeUnitKey(Settings),
+            () => AppSettings
+                .ParseQuickPlacementKey(Settings));
         ManualRecorder =
             new WindowsManualInputRecorder(Automation);
         WindowsManualInputPlayback manualPlayback =
@@ -158,7 +160,8 @@ public sealed class AppServices : IDisposable
                 Settings.PlayMenuKey,
                 Settings.UnitMenuKey,
                 Settings.AreasMenuKey,
-                Settings.CancelPlacementKey));
+                Settings.CancelPlacementKey,
+                Settings.QuickPlacementVirtualKey));
         FastNoAlign = new FastNoAlignPreparationSession(
             CameraPose);
         RobloxRecovery = new RobloxPrivateServerRecoveryService(

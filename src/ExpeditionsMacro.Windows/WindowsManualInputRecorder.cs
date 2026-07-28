@@ -47,8 +47,7 @@ public sealed class WindowsManualInputRecorder : IManualInputRecorder
         bounds = ValidateTarget(window, focus: false);
         HashSet<int> ignoredVirtualKeys =
             options.IgnoredVirtualKeys.ToHashSet();
-        List<ManualInputEvent> inputs = [];
-        object inputsGate = new();
+        ManualInputCaptureTimeline timeline = new();
         ConcurrentQueue<Exception> failures = new();
         Stopwatch stopwatch = new();
 
@@ -77,10 +76,9 @@ public sealed class WindowsManualInputRecorder : IManualInputRecorder
                         ignoredVirtualKeys,
                         out ManualInputEvent? input))
                     {
-                        lock (inputsGate)
-                        {
-                            inputs.Add(input!);
-                        }
+                        timeline.Add(
+                            input!,
+                            data.Time);
                     }
                 }
                 catch (Exception error)
@@ -126,10 +124,9 @@ public sealed class WindowsManualInputRecorder : IManualInputRecorder
                     }
                     else if (observation.Input is not null)
                     {
-                        lock (inputsGate)
-                        {
-                            inputs.Add(observation.Input);
-                        }
+                        timeline.Add(
+                            observation.Input,
+                            data.Time);
                     }
                 }
                 catch (Exception error)
@@ -151,6 +148,9 @@ public sealed class WindowsManualInputRecorder : IManualInputRecorder
         {
             (int X, int Y) initialPointer =
                 ReadClientPointer(bounds);
+            timeline.Start(
+                unchecked(
+                    (uint)Environment.TickCount));
             stopwatch.Start();
             long nextTargetCheck = 0;
             while (!stopToken.IsCancellationRequested &&
@@ -207,11 +207,14 @@ public sealed class WindowsManualInputRecorder : IManualInputRecorder
                 }
             }
 
-            ManualInputEvent[] snapshot;
-            lock (inputsGate)
-            {
-                snapshot = inputs.ToArray();
-            }
+            stopwatch.Stop();
+            long durationMicroseconds =
+                ElapsedMicroseconds(stopwatch);
+            ManualInputEvent[] snapshot =
+                timeline.BuildSnapshot(
+                    initialPointer.X,
+                    initialPointer.Y,
+                    durationMicroseconds);
             ManualInputRecording recording = new()
             {
                 Id = options.RecordingId,
@@ -222,7 +225,7 @@ public sealed class WindowsManualInputRecorder : IManualInputRecorder
                     initialPointer.Y,
                 CreatedAtUtc = DateTimeOffset.UtcNow,
                 DurationMicroseconds =
-                    ElapsedMicroseconds(stopwatch),
+                    durationMicroseconds,
                 Events = snapshot,
             };
             if (snapshot.Length > 0)

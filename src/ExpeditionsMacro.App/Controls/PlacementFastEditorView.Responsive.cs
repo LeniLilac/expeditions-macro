@@ -11,6 +11,7 @@ namespace ExpeditionsMacro.App.Controls;
 public partial class PlacementFastEditorView
 {
     private const double CompactWorkspaceBreakpoint = 980;
+    private const double StackedRouteHeaderBreakpoint = 640;
     private const double CompactMapHeight = 520;
     private const double CompactStepsHeight = 320;
     private const double CompactWorkspaceGap = 14;
@@ -28,6 +29,8 @@ public partial class PlacementFastEditorView
             !(FastWorkspaceGrid.Height > 0);
         _compactWorkspace = compact;
         ApplyResponsiveActionLayout(e.NewSize.Width);
+        ApplyResponsiveRouteHeaderLayout(
+            e.NewSize.Width);
         if (!layoutChanged)
         {
             return;
@@ -166,6 +169,109 @@ public partial class PlacementFastEditorView
             delay,
             viewer,
             "After Start delay");
+
+        double restoredInnerOffset =
+            viewer.VerticalOffset;
+        viewer.ScrollToEnd();
+        double restoredOuterOffset =
+            FastWorkspaceScrollViewer.VerticalOffset;
+        FastWorkspaceScrollViewer.ScrollToTop();
+        FastWorkspaceScrollViewer.UpdateLayout();
+        double outerOffset =
+            FastWorkspaceScrollViewer.VerticalOffset;
+        MouseWheelEventArgs wheel =
+            new(
+                Mouse.PrimaryDevice,
+                Environment.TickCount,
+                -120)
+            {
+                RoutedEvent =
+                    Mouse.PreviewMouseWheelEvent,
+            };
+        delay.RaiseEvent(wheel);
+        FastWorkspaceScrollViewer.UpdateLayout();
+        if (FastWorkspaceScrollViewer.VerticalOffset <=
+            outerOffset)
+        {
+            throw new InvalidOperationException(
+                "The compact Placement Setup trapped a downward wheel gesture at the placement-step boundary.");
+        }
+
+        viewer.ScrollToTop();
+        FastWorkspaceScrollViewer.ScrollToEnd();
+        FastWorkspaceScrollViewer.UpdateLayout();
+        outerOffset =
+            FastWorkspaceScrollViewer.VerticalOffset;
+        wheel =
+            new MouseWheelEventArgs(
+                Mouse.PrimaryDevice,
+                Environment.TickCount,
+                120)
+            {
+                RoutedEvent =
+                    Mouse.PreviewMouseWheelEvent,
+            };
+        autoUpgrade.RaiseEvent(wheel);
+        FastWorkspaceScrollViewer.UpdateLayout();
+        if (FastWorkspaceScrollViewer.VerticalOffset >=
+            outerOffset)
+        {
+            throw new InvalidOperationException(
+                "The compact Placement Setup trapped an upward wheel gesture at the placement-step boundary.");
+        }
+
+        FastWorkspaceScrollViewer.ScrollToVerticalOffset(
+            restoredOuterOffset);
+        FastWorkspaceScrollViewer.UpdateLayout();
+        viewer.ScrollToVerticalOffset(
+            restoredInnerOffset);
+        viewer.UpdateLayout();
+    }
+
+    private void FastStepsList_PreviewMouseWheel(
+        object sender,
+        MouseWheelEventArgs e)
+    {
+        if (!_compactWorkspace ||
+            e.Handled ||
+            e.Delta == 0)
+        {
+            return;
+        }
+
+        ScrollViewer? viewer =
+            FindVisualChild<ScrollViewer>(
+                FastStepsList);
+        if (viewer is null)
+        {
+            return;
+        }
+
+        const double boundaryTolerance = 0.5;
+        bool atBoundary =
+            e.Delta > 0
+                ? viewer.VerticalOffset <=
+                  boundaryTolerance
+                : viewer.VerticalOffset >=
+                  viewer.ScrollableHeight -
+                  boundaryTolerance;
+        if (!atBoundary)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        MouseWheelEventArgs forwarded =
+            new(
+                e.MouseDevice,
+                e.Timestamp,
+                e.Delta)
+            {
+                RoutedEvent =
+                    Mouse.MouseWheelEvent,
+            };
+        FastWorkspaceScrollViewer.RaiseEvent(
+            forwarded);
     }
 
     private static void VerifyFullyVisible(
@@ -298,5 +404,31 @@ public partial class PlacementFastEditorView
             HorizontalAlignment.Right;
         FastActionPanel.ClearValue(WidthProperty);
         Grid.SetRow(FastOperationProgress, 1);
+    }
+
+    private void ApplyResponsiveRouteHeaderLayout(
+        double availableWidth)
+    {
+        bool stacked =
+            availableWidth <
+            StackedRouteHeaderBreakpoint;
+        Grid.SetRow(
+            FastPlaybackModeSelector,
+            stacked ? 1 : 0);
+        Grid.SetColumn(
+            FastPlaybackModeSelector,
+            stacked ? 0 : 1);
+        Grid.SetColumnSpan(
+            FastPlaybackModeSelector,
+            stacked ? 2 : 1);
+        FastPlaybackModeSelector.Margin =
+            stacked
+                ? new Thickness(0, 12, 0, 0)
+                : new Thickness(24, 0, 0, 0);
+        FastPlaybackModeSelector
+            .HorizontalAlignment =
+            stacked
+                ? HorizontalAlignment.Left
+                : HorizontalAlignment.Right;
     }
 }

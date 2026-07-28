@@ -161,6 +161,39 @@
 
         <Grid Margin="0,14,0,0">
             <StackPanel Margin="0,0,204,0" VerticalAlignment="Center">
+                <TextBlock Style="{StaticResource FieldLabel}" Text="Quick Placement key" />
+                <TextBlock x:Name="QuickPlacementStatusText"
+                           Margin="0,5,0,0"
+                           Style="{StaticResource Caption}"
+                           TextWrapping="Wrap"
+                           Text="Required before starting a plan that uses Step Mode placement steps." />
+            </StackPanel>
+            <StackPanel HorizontalAlignment="Right"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                <Button x:Name="ClearQuickPlacementButton"
+                        Width="36"
+                        MinWidth="36"
+                        Height="36"
+                        Margin="0,0,8,0"
+                        Style="{StaticResource IconButton}"
+                        IsEnabled="False"
+                        Visibility="Collapsed"
+                        controls:Lucide.Icon="X"
+                        AutomationProperties.Name="Unset Quick Placement key"
+                        ToolTip="Unset Quick Placement key"
+                        Tag="QuickPlacement"
+                        Click="ClearBindingButton_Click" />
+                <Button x:Name="QuickPlacementButton"
+                        Width="152"
+                        controls:Lucide.Icon="Keyboard"
+                        Content="Not set"
+                        Click="QuickPlacementButton_Click" />
+            </StackPanel>
+        </Grid>
+
+        <Grid Margin="0,14,0,0">
+            <StackPanel Margin="0,0,204,0" VerticalAlignment="Center">
                 <TextBlock Style="{StaticResource FieldLabel}" Text="Change Unit Targeting key" />
                 <TextBlock x:Name="TargetingStatusText"
                            Margin="0,5,0,0"

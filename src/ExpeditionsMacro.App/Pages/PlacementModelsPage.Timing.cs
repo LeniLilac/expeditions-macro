@@ -29,10 +29,8 @@ public partial class PlacementModelsPage
             _fastPlacementIntervalMilliseconds,
             _fastDefaultAfterStartDelayMilliseconds,
             _fastImpossibilityThresholdMinutes,
-            _services.Settings
-                .ManualInputRecordingEnabled,
-            _fastManualRecordingId,
-            _manualRecordingChoices);
+            !string.IsNullOrWhiteSpace(
+                _fastManualRecordingId));
 
     private void FastTimingSettingsApplied(
         object? sender,
@@ -79,15 +77,6 @@ public partial class PlacementModelsPage
                 $"Enter an impossibility threshold from 0 to {PlacementModel.MaximumImpossibilityThresholdMinutes} minutes.");
             return;
         }
-        if (e.UseManualRecording &&
-            string.IsNullOrWhiteSpace(
-                e.ManualRecordingId))
-        {
-            FastEditorPanel.ShowTimingError(
-                "Create a manual recording before enabling playback.");
-            return;
-        }
-
         int previousDefault =
             _fastDefaultAfterStartDelayMilliseconds;
         int afterStartMilliseconds =
@@ -114,12 +103,7 @@ public partial class PlacementModelsPage
                 afterStartMilliseconds;
             _fastImpossibilityThresholdMinutes =
                 impossibilityThreshold;
-            _fastManualRecordingId =
-                e.UseManualRecording
-                    ? e.ManualRecordingId
-                    : null;
         }
-        UpdateFastManualRecordingEditor();
         FastEditorPanel.CloseTimingSettings();
         SchedulePlacementAutoSave();
     }

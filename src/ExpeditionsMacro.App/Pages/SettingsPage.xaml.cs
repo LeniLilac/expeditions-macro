@@ -38,14 +38,26 @@ public partial class SettingsPage : UserControl, IAppPage
 
     public Func<Task>? IdleHotkeyAction => null;
 
-    internal void SetSnapshotScroll(bool showDebug)
+    internal void SetSnapshotScroll(
+        bool showDebug,
+        bool showDiagnostics = false)
     {
         // CI publishes UI snapshots as build artifacts; keep the local Windows
         // profile path out of those images.
         DataPath.Text = @"C:\Users\example\AppData\Local\ExpeditionsMacro";
         SettingsScroll.UpdateLayout();
-        if (showDebug) SettingsScroll.ScrollToEnd();
-        else SettingsScroll.ScrollToTop();
+        if (showDiagnostics)
+        {
+            DiagnosticsSection.BringIntoView();
+        }
+        else if (showDebug)
+        {
+            SettingsScroll.ScrollToEnd();
+        }
+        else
+        {
+            SettingsScroll.ScrollToTop();
+        }
     }
 
     public Task OnShownAsync()
@@ -134,7 +146,7 @@ public partial class SettingsPage : UserControl, IAppPage
         {
             MessageBoxResult confirmation = MessageBox.Show(
                 Window.GetWindow(this),
-                "Deep debug saves every detector frame and input event, plus the selected settings, presets, detector pack, and camera/placement models. A single long run can create a multi-gigabyte ZIP, slow automation, and fill the disk. Files are not deleted automatically.\n\nWebhook values and Discord user IDs are excluded.\n\nEnable deep debug logging?",
+                "Deep debug saves every detector frame and input event, plus the selected settings, presets, detector pack, and referenced Placement Setups. A single long run can create a multi-gigabyte ZIP, slow automation, and fill the disk. Files are not deleted automatically.\n\nWebhook values and Discord user IDs are excluded.\n\nEnable deep debug logging?",
                 "Enable deep debug logging?",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning,
@@ -177,6 +189,8 @@ public partial class SettingsPage : UserControl, IAppPage
             KeyBindingsPanel.AreasDiagnostic;
         CancelPlacementKeyDiagnosticText.Text =
             KeyBindingsPanel.CancelPlacementDiagnostic;
+        QuickPlacementKeyDiagnosticText.Text =
+            KeyBindingsPanel.QuickPlacementDiagnostic;
         TargetingKeyDiagnosticText.Text =
             KeyBindingsPanel.TargetingDiagnostic;
         UpgradeUnitKeyDiagnosticText.Text =

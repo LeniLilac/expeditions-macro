@@ -354,7 +354,7 @@ public sealed class FastNoAlignShareService
                 setup.ManualInputRecordingId))
         {
             throw new InvalidOperationException(
-                $"Placement setup '{setup.Name}' uses a device-local manual recording. Turn off Use manual recording before exporting this plan.");
+                $"Placement setup '{setup.Name}' uses a device-local manual recording. Choose Step Mode before exporting this plan.");
         }
     }
 }

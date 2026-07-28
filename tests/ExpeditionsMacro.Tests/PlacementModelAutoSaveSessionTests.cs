@@ -235,6 +235,70 @@ public sealed class PlacementModelAutoSaveSessionTests
             deleted);
     }
 
+    [Fact]
+    public async Task
+        PlaybackModeChangesPersistOnlyTheRecordingAssignment()
+    {
+        string root =
+            TestPaths.NewTemporaryDirectory();
+        try
+        {
+            PlacementModelRepository repository =
+                new(new AppPaths(root));
+            PlacementModelAutoSaveSession session =
+                new(
+                    repository.SaveAsync,
+                    (id, _) =>
+                    {
+                        repository.Delete(id);
+                        return Task.CompletedTask;
+                    },
+                    TimeSpan.Zero);
+            PlacementModel stepMode =
+                Model(team: 3);
+            PlacementModel recordingMode =
+                stepMode with
+                {
+                    ManualInputRecordingId =
+                        "recording-one",
+                };
+
+            session.ScheduleSave(recordingMode);
+            Assert.True(await session.FlushAsync());
+            PlacementModel savedRecording =
+                Assert.IsType<PlacementModel>(
+                    await repository.LoadAsync(
+                        stepMode.Id));
+            Assert.Equal(
+                "recording-one",
+                savedRecording
+                    .ManualInputRecordingId);
+            Assert.Equal(
+                stepMode.Steps,
+                savedRecording.Steps);
+
+            session.ScheduleSave(stepMode);
+            Assert.True(await session.FlushAsync());
+            PlacementModel savedSteps =
+                Assert.IsType<PlacementModel>(
+                    await repository.LoadAsync(
+                        stepMode.Id));
+            Assert.Null(
+                savedSteps.ManualInputRecordingId);
+            Assert.Equal(
+                stepMode.Steps,
+                savedSteps.Steps);
+            Assert.Equal(
+                stepMode.TeamSlot,
+                savedSteps.TeamSlot);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(
+                root);
+        }
+    }
+
     private static PlacementModelAutoSaveSession
         CreateSession(
             Func<

@@ -249,6 +249,36 @@ public sealed class EventScreenDetectorTests
             match.ActionY);
     }
 
+    [Fact]
+    public void EventHome_AcceptsOneRenderedBottomBorderRow()
+    {
+        ImageFrame frame = Load(
+            "EventHome_BeginnerPathPresent_01.png")
+            .Clone();
+        FillRegion(
+            frame,
+            x: 435,
+            y: 585,
+            width: 126,
+            height: 1,
+            red: 12,
+            green: 12,
+            blue: 12);
+
+        EventScreenMatch match =
+            EventScreenDetector.Detect(frame);
+
+        Assert.Equal(
+            EventScreenState.EventHome,
+            match.State);
+        Assert.Equal(
+            EventScreenDetector.EventGameModeAction.X,
+            match.ActionX);
+        Assert.Equal(
+            EventScreenDetector.EventGameModeAction.Y,
+            match.ActionY);
+    }
+
     [Theory]
     [InlineData(
         "ActSelector.png",

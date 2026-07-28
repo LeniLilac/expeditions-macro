@@ -292,6 +292,31 @@ public sealed class DebugSteppingRobloxAutomation : IRobloxAutomation, IDisposab
                 cancellationToken),
             cancellationToken);
 
+    public async Task<TResult> RunWithKeyHeldAsync<TResult>(
+        RobloxWindow window,
+        int virtualKey,
+        Func<CancellationToken, Task<TResult>> action,
+        CancellationToken cancellationToken)
+    {
+        TResult result = default!;
+        await TraceAsync(
+                $"Hold {KeyboardKey.GetDisplayName(virtualKey)} during observation",
+                $"Hold {KeyboardKey.GetDisplayName(virtualKey)} while Roblox is observed, then release it.",
+                async () =>
+                {
+                    result =
+                        await _inner.RunWithKeyHeldAsync(
+                                window,
+                                virtualKey,
+                                action,
+                                cancellationToken)
+                            .ConfigureAwait(false);
+                },
+                cancellationToken)
+            .ConfigureAwait(false);
+        return result;
+    }
+
     public Task TapUnitKeyAsync(
         RobloxWindow window,
         int unitKey,

@@ -4,8 +4,9 @@ Manual recordings are an opt-in advanced Fast pose workflow for
 routes where replaying one complete manual input sequence is faster than
 detector-driven placement.
 
-Turn on **Enable advanced manual recordings** under Settings to expose the
-**Recordings** page and the recording selector under Placement Setup.
+Turn on **Enable advanced manual recordings** under
+**Settings > Experimental** to expose the **Recordings** page and
+**Recording Mode** under Placement Setup.
 
 ## User workflow
 
@@ -17,12 +18,14 @@ Turn on **Enable advanced manual recordings** under Settings to expose the
 4. Focus Roblox and press the global macro hotkey. Record the complete
    sequence, including the click on **Start Game**.
 5. Press the macro hotkey again before Victory or Defeat appears.
-6. Select the saved recording in that route's Placement Setup. The
-   assignment saves automatically.
+6. In that route's Placement Setup, choose **Recording Mode**, then select
+   the saved recording from the main controls. Both changes save
+   automatically. Every ordinary placement step remains stored.
 7. Select the recording and choose **Arm playback**. Focus Roblox, then
    press the global macro hotkey to start the test from the same prestart
    state. Press the hotkey again to stop playback. The Placement Setup
-   playback action uses the same armed-hotkey boundary.
+   playback action uses the same armed-hotkey boundary. Choose
+   **Step Mode** to restore the preserved ordinary steps.
 
 At runtime, the mode runner still verifies prestart and performs its
 normal route, team, Fast pose, and deterministic positioning preparation.
@@ -49,13 +52,26 @@ Schema 1 stores:
 - client-relative mouse movement and all mouse-button transitions;
 - vertical and horizontal wheel deltas.
 
+Windows can deliver a low-level button callback after newer high-rate
+movement callbacks even though the button's native timestamp is earlier.
+The recorder therefore buffers keyboard and mouse observations together,
+orders them by the wrap-safe native Windows timestamp, and uses callback
+sequence only to keep events from the same native millisecond stable. It
+then makes any one-pixel button or wheel gap an explicit saved mouse move
+at the action coordinate. A larger unreconciled path stops capture with a
+rerecord message instead of saving a sequence that would fail during
+playback.
+
 Playback schedules every event against its absolute microsecond offset
 from one monotonic `Stopwatch`; it never accumulates a chain of relative
 delays. Long waits end before the target and use a bounded final spin.
-The player checks timing immediately before and after each injected event
-and stops if the actual event time differs from its recording by more
-than 10 milliseconds. This makes timing drift a visible safe failure
-instead of silently slowing or compressing the route.
+The player checks timing immediately before and after each injected event.
+The difference between the total elapsed playback clock and that event's
+recorded absolute offset must remain within +/- 50 milliseconds. The
+inclusive -50 and +50 millisecond boundaries are accepted; an earlier or
+later offset stops playback. This per-event absolute-timeline check makes
+timing drift a visible safe failure instead of silently accumulating,
+slowing, or compressing the route.
 
 The recorder excludes only the global macro start/stop hotkey. Any
 physical game-action key pressed while recording, including Auto Upgrade
@@ -74,6 +90,9 @@ Windows implementations:
 - require Roblox to remain foreground with stationary screen bounds;
 - observe only physical low-level keyboard and mouse input;
 - ignore injected and lower-integrity-injected events;
+- order keyboard and mouse callbacks on one native Windows timeline;
+- persist one-pixel action anchors and reject larger incomplete pointer
+  paths before the recording can be saved;
 - exclude the macro hotkey on both key-down and key-up;
 - reject pointer input outside the Roblox client;
 - establish the saved initial pointer through acknowledged motion before
@@ -101,13 +120,12 @@ while listing so one damaged file cannot hide the others.
 
 Manual recordings are device-local and excluded from every Fast share
 schema. Export stops if any Placement Setup resolved by the selected plan
-has **Use manual recording** enabled. Turn off that option before
-exporting; the ordinary placement steps remain saved and become the
-shareable route again. Import rejects both raw recording payloads and
-recording references instead of silently collecting replayable input.
-Schema 1 recording-free bundles remain readable, while schema 2 adds
-referenced Fast no-align presets and their complete ordinary placement
-dependencies.
+uses **Recording Mode**. Return that route to **Step Mode** before
+exporting; the preserved ordinary placement steps become the shareable
+route again. Import rejects both raw recording payloads and recording
+references instead of silently collecting replayable input. Schema 1
+recording-free bundles remain readable, while schema 2 adds referenced
+Fast no-align presets and their complete ordinary placement dependencies.
 
 A recording contains replayable raw keyboard, mouse movement, click,
 wheel, and timing data. Do not type chat messages, credentials,
@@ -115,15 +133,17 @@ private-server codes, or other sensitive text while recording.
 
 Raw recorded inputs remain excluded from Deep Debug archives. Deep Debug
 records only one metadata summary after playback, including the recording
-ID, event count, maximum timing drift, and success state. Share bundles
-never collect recordings, screenshots, app settings, webhooks,
+ID, event count, maximum absolute timing drift, and success state. Share
+bundles never collect recordings, screenshots, app settings, webhooks,
 private-server links, diagnostics, or Windows profile paths.
 
-Turning off **Enable advanced manual recordings** hides its authoring surfaces but
-does not erase saved route assignments. A plan cannot start a route that
-references a manual recording until the feature is re-enabled or the
-recording assignment is removed.
+Turning off **Enable advanced manual recordings** hides the Recordings
+workspace but does not erase saved route assignments. A route already in
+Recording Mode remains visibly identified in Placement Setup, with its
+recording picker disabled and guidance to re-enable the experimental
+feature. A plan cannot start that route until the feature is re-enabled
+or the route returns to Step Mode.
 
 A recording cannot be deleted while any saved Placement Setup route
-references it. Turn off **Use manual recording** on each referencing
-route before deleting the recording.
+references it. Return every referencing route to **Step Mode** before
+deleting the recording.

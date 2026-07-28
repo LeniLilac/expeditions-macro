@@ -27,6 +27,11 @@ public static class KeyboardKey
         _ => IsSupportedGeneralKey(virtualKey),
     };
 
+    public static bool IsSupportedQuickPlacementKey(
+        int virtualKey) =>
+        virtualKey is not (>= 0x30 and <= 0x39) &&
+        IsSupportedShiftLockKey(virtualKey);
+
     public static bool IsSupportedAutomationKey(int virtualKey) =>
         virtualKey switch
         {

@@ -39,4 +39,7 @@ Event Home. The selected Villain Invasion sidebar is shared evidence,
 so the full-width selector rail and opaque subtitle are required before
 selector ownership can win. Event Home remains independently owned by
 the selected Villain Invasion card plus the live Event Gamemode action;
-its decorative red header may still be loading.
+its decorative red header may still be loading. A deterministic
+privacy-safe transform of the retained Home fixture removes the second
+lower-border row and reproduces the one-pixel border thickness observed
+in a beta.34 field failure without retaining that private capture.

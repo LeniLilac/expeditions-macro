@@ -263,7 +263,7 @@ public partial class MacroPage
                 .ManualInputRecordingEnabled)
         {
             throw new InvalidOperationException(
-                $"{model.Name} uses a manual recording, but Advanced manual recordings are disabled. Re-enable them in Settings or turn off Use manual recording for this Placement Setup route.");
+                $"{model.Name} uses a manual recording, but manual recordings are disabled under Experimental in Settings. Re-enable them there or switch this Placement Setup route to Step Mode.");
         }
 
         ManualInputRecording? recording =
@@ -274,7 +274,7 @@ public partial class MacroPage
         if (recording is null)
         {
             throw new InvalidOperationException(
-                $"{model.Name} references a manual recording that no longer exists. Select an available recording or turn off Use manual recording in Placement Setup.");
+                $"{model.Name} references a manual recording that no longer exists. Select an available recording or switch this Placement Setup route to Step Mode.");
         }
     }
 

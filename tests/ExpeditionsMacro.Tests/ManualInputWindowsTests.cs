@@ -374,10 +374,9 @@ public sealed class ManualInputWindowsTests
         Assert.Equal(1, clock.StartCalls);
         Assert.All(
             timings,
-            timing => Assert.InRange(
-                timing.DriftMicroseconds,
-                0,
-                10_000));
+            timing => Assert.Equal(
+                4_000,
+                timing.DriftMicroseconds));
         Assert.Equal(1, sink.ReleaseCalls);
     }
 
@@ -515,13 +514,43 @@ public sealed class ManualInputWindowsTests
         Assert.Equal(1, sink.ReleaseCalls);
     }
 
-    [Fact]
-    public async Task PlaybackEngine_RejectsTimingDriftOverTenMilliseconds()
+    [Theory]
+    [InlineData(-50_000L)]
+    [InlineData(50_000L)]
+    public async Task PlaybackEngine_AllowsSignedFiftyMillisecondBoundary(
+        long driftMicroseconds)
     {
-        ManualInputRecording recording =
-            ManualInputRecordingTests.ValidRecording();
+        ManualInputRecording recording = ShiftRecordingOffsets(
+            ManualInputRecordingTests.ValidRecording(),
+            100_000);
         FakePlaybackClock clock = new(
-            driftMicroseconds: 10_001);
+            driftMicroseconds);
+        FakeInputSink sink = new();
+        ManualInputPlaybackEngine engine = new();
+
+        await engine.PlayAsync(
+            recording,
+            clock,
+            sink,
+            playbackStarting: null,
+            timing: null,
+            CancellationToken.None);
+
+        Assert.Equal(recording.Events, sink.Sent);
+        Assert.Equal(1, sink.ReleaseCalls);
+    }
+
+    [Theory]
+    [InlineData(-50_001L)]
+    [InlineData(50_001L)]
+    public async Task PlaybackEngine_RejectsSignedTimingOffsetBeyondFiftyMillisecondsBeforeSend(
+        long driftMicroseconds)
+    {
+        ManualInputRecording recording = ShiftRecordingOffsets(
+            ManualInputRecordingTests.ValidRecording(),
+            100_000);
+        FakePlaybackClock clock = new(
+            driftMicroseconds);
         FakeInputSink sink = new();
         ManualInputPlaybackEngine engine = new();
 
@@ -536,23 +565,27 @@ public sealed class ManualInputWindowsTests
                     CancellationToken.None));
 
         Assert.Contains(
-            "10 ms",
+            "50 ms",
             error.Message,
             StringComparison.Ordinal);
         Assert.Empty(sink.Sent);
         Assert.Equal(1, sink.ReleaseCalls);
     }
 
-    [Fact]
-    public async Task PlaybackEngine_RejectsSendThatFinishesOverTenMillisecondsLate()
+    [Theory]
+    [InlineData(-50_001L)]
+    [InlineData(50_001L)]
+    public async Task PlaybackEngine_RejectsSignedTimingOffsetBeyondFiftyMillisecondsAfterSend(
+        long sendOffsetMicroseconds)
     {
-        ManualInputRecording recording =
-            ManualInputRecordingTests.ValidRecording();
+        ManualInputRecording recording = ShiftRecordingOffsets(
+            ManualInputRecordingTests.ValidRecording(),
+            100_000);
         FakePlaybackClock clock = new();
         FakeInputSink sink = new()
         {
             AfterSend = () =>
-                clock.AdvanceBy(10_001),
+                clock.AdvanceBy(sendOffsetMicroseconds),
         };
         ManualInputPlaybackEngine engine = new();
 
@@ -567,7 +600,7 @@ public sealed class ManualInputWindowsTests
                     CancellationToken.None));
 
         Assert.Contains(
-            "10 ms",
+            "50 ms",
             error.Message,
             StringComparison.Ordinal);
         Assert.Single(sink.Sent);
@@ -591,6 +624,25 @@ public sealed class ManualInputWindowsTests
             expected,
             desktop.NormalizeX(coordinate));
     }
+
+    private static ManualInputRecording ShiftRecordingOffsets(
+        ManualInputRecording recording,
+        long offsetMicroseconds) =>
+        recording with
+        {
+            DurationMicroseconds =
+                recording.DurationMicroseconds +
+                offsetMicroseconds,
+            Events =
+                recording.Events
+                    .Select(input => input with
+                    {
+                        OffsetMicroseconds =
+                            input.OffsetMicroseconds +
+                            offsetMicroseconds,
+                    })
+                    .ToArray(),
+        };
 
     private sealed class FakePlaybackClock :
         IManualInputPlaybackClock

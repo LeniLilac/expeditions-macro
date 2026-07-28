@@ -3,9 +3,15 @@ using System.Windows.Controls;
 
 namespace ExpeditionsMacro.App.Controls;
 
+public sealed record ManualRecordingChoice(
+    string Id,
+    string Name);
+
 public partial class PlacementRouteControls : UserControl
 {
     private bool _updatingRecording;
+    private bool _recordingFeatureEnabled;
+    private bool _interactionEnabled = true;
 
     public PlacementRouteControls()
     {
@@ -47,11 +53,13 @@ public partial class PlacementRouteControls : UserControl
             ManualRecordingChoice)?.Id;
 
     internal void SetManualRecordingMode(
+        bool featureEnabled,
         bool enabled,
         string? selectedRecordingId,
         IReadOnlyList<ManualRecordingChoice>
             recordings)
     {
+        _recordingFeatureEnabled = featureEnabled;
         PhasePanel.Visibility =
             enabled
                 ? Visibility.Collapsed
@@ -93,6 +101,13 @@ public partial class PlacementRouteControls : UserControl
         {
             _updatingRecording = false;
         }
+        UpdateRecordingAvailability();
+    }
+
+    internal void SetInteractionEnabled(bool enabled)
+    {
+        _interactionEnabled = enabled;
+        UpdateRecordingAvailability();
     }
 
     private void UnitButton_Checked(
@@ -114,4 +129,9 @@ public partial class PlacementRouteControls : UserControl
             RecordingChanged?.Invoke(sender, e);
         }
     }
+
+    private void UpdateRecordingAvailability() =>
+        RecordingCombo.IsEnabled =
+            _interactionEnabled &&
+            _recordingFeatureEnabled;
 }

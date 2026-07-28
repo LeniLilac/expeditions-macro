@@ -43,6 +43,26 @@
                             <Setter Property="Foreground"
                                     Value="{DynamicResource OnAccentBrush}" />
                         </Trigger>
+                        <Trigger Property="IsKeyboardFocused"
+                                 Value="True">
+                            <Setter TargetName="ChoiceBorder"
+                                    Property="BorderBrush"
+                                    Value="{DynamicResource AccentBrush}" />
+                            <Setter TargetName="ChoiceBorder"
+                                    Property="BorderThickness"
+                                    Value="2" />
+                        </Trigger>
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="IsChecked"
+                                           Value="True" />
+                                <Condition Property="IsKeyboardFocused"
+                                           Value="True" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="ChoiceBorder"
+                                    Property="BorderBrush"
+                                    Value="{DynamicResource OnAccentBrush}" />
+                        </MultiTrigger>
                         <Trigger Property="IsEnabled"
                                  Value="False">
                             <Setter Property="Opacity" Value="0.45" />

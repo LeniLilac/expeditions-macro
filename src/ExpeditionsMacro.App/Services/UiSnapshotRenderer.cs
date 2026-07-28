@@ -23,6 +23,7 @@ internal static class UiSnapshotRenderer
         ("Dashboard", "dashboard", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Dashboard", "dashboard-run-log", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Dashboard", "dashboard-controls", true, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Dashboard", "dashboard-controls-configured", true, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Dashboard", "dashboard-navigation-collapsed", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Dashboard", "dashboard-small-navigation-collapsed", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Dashboard", "dashboard-run-log-small-navigation-collapsed", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
@@ -53,6 +54,7 @@ internal static class UiSnapshotRenderer
         ("Debug", "debug-refuel", true, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Debug", "debug-utilities", false, true, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Settings", "settings", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Settings", "settings-diagnostics", false, true, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Settings", "settings-debug", true, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
     ];
 
@@ -93,7 +95,7 @@ internal static class UiSnapshotRenderer
                     string key,
                     string file,
                     bool showPageEnd,
-                    bool showDebugUtilities,
+                    bool showAlternateState,
                     MacroPlanSnapshotState macroPlanState,
                     ManualRecordingsSnapshotState
                         recordingsState) in Pages)
@@ -104,7 +106,7 @@ internal static class UiSnapshotRenderer
                     await window.SelectPageForSnapshotAsync(
                         key,
                         showPageEnd,
-                        showDebugUtilities,
+                        showAlternateState,
                         macroPlanState,
                         recordingsState);
                     Size size = SnapshotSize(key, file);
@@ -293,16 +295,35 @@ internal static class UiSnapshotRenderer
         FrameworkElement root,
         string file)
     {
+        bool showConfiguredQuickPlacement =
+            string.Equals(
+                file,
+                "dashboard-controls-configured",
+                StringComparison.OrdinalIgnoreCase);
         bool showCurrentRun = file.Contains(
             "dashboard-small",
             StringComparison.OrdinalIgnoreCase);
         bool showLongRunLog = file.Contains(
             "dashboard-run-log",
             StringComparison.OrdinalIgnoreCase);
-        if (!showCurrentRun &&
+        if (!showConfiguredQuickPlacement &&
+            !showCurrentRun &&
             !showLongRunLog)
         {
             return;
+        }
+
+        if (showConfiguredQuickPlacement)
+        {
+            SettingsKeyBindingsPanel? panel =
+                FindVisualChild<
+                    SettingsKeyBindingsPanel>(root);
+            if (panel is null)
+            {
+                throw new InvalidOperationException(
+                    "The configured Controls snapshot did not contain its key-binding panel.");
+            }
+            panel.ShowConfiguredQuickPlacementForSnapshot();
         }
 
         MacroPage? page =

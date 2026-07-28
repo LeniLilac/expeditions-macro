@@ -40,6 +40,13 @@ public partial class MacroPage
         try
         {
             plan = await SavePlanInternalAsync();
+            if (await PlanRequiresQuickPlacementKeyAsync(
+                    plan,
+                    CancellationToken.None))
+            {
+                _ = AppSettings.ParseQuickPlacementKey(
+                    _services.Settings);
+            }
             playMenuKey =
                 AppSettings.ParsePlayMenuKey(
                     _services.Settings.PlayMenuKey,

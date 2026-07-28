@@ -1,7 +1,9 @@
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
+using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Windows;
+using ExpeditionsMacro.Windows.Interop;
 
 namespace ExpeditionsMacro.Tests;
 
@@ -110,6 +112,149 @@ public sealed class WindowsRobloxAutomationTests
         Assert.Equal(expectedVirtualKey, key.VirtualKey);
         Assert.Equal(expectedScanCode, key.ScanCode);
         Assert.Equal(expectedExtended, key.Extended);
+    }
+
+    [Fact]
+    public async Task ScopedHeldKey_UsesOnePhysicalKeyIdentityAroundTheObservation()
+    {
+        List<(byte VirtualKey, byte ScanCode, uint Flags)>
+            sent = [];
+        List<WindowsAutomationTrace> traces = [];
+        var keyboard = new WindowsKeyboardInput(
+            _ => true,
+            traces.Add,
+            (virtualKey, scanCode, flags, _) =>
+                sent.Add((virtualKey, scanCode, flags)));
+
+        int result =
+            await keyboard.RunWithKeyHeldAsync(
+                new RobloxWindow((nint)1, "Roblox"),
+                KeyboardKey.RightControl,
+                _ =>
+                {
+                    Assert.Single(sent);
+                    Assert.Equal(
+                        NativeMethods.KeyeventfExtendedKey,
+                        sent[0].Flags);
+                    return Task.FromResult(42);
+                },
+                CancellationToken.None);
+
+        Assert.Equal(42, result);
+        Assert.Equal(
+            [
+                (
+                    (byte)KeyboardKey.RightControl,
+                    (byte)0x1D,
+                    NativeMethods.KeyeventfExtendedKey),
+                (
+                    (byte)KeyboardKey.RightControl,
+                    (byte)0x1D,
+                    NativeMethods.KeyeventfExtendedKey |
+                    NativeMethods.KeyeventfKeyUp),
+            ],
+            sent);
+        Assert.Equal(
+            ["key_down", "key_up"],
+            traces.Select(trace => trace.Action));
+        Assert.All(
+            traces,
+            trace =>
+            {
+                Assert.Equal(
+                    KeyboardKey.RightControl,
+                    trace.VirtualKey);
+                Assert.Equal(0x1D, trace.ScanCode);
+                Assert.True(trace.Extended);
+                Assert.Null(trace.HoldMilliseconds);
+            });
+    }
+
+    [Fact]
+    public async Task ScopedHeldKey_CancellationDuringObservationStillReleasesThePhysicalKey()
+    {
+        List<uint> flags = [];
+        using var cancellation = new CancellationTokenSource();
+        var keyboard = new WindowsKeyboardInput(
+            _ => true,
+            _ => { },
+            (_, _, sentFlags, _) => flags.Add(sentFlags));
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => keyboard.RunWithKeyHeldAsync(
+                new RobloxWindow((nint)1, "Roblox"),
+                KeyboardKey.LeftShift,
+                async token =>
+                {
+                    cancellation.Cancel();
+                    await Task.Delay(
+                        Timeout.InfiniteTimeSpan,
+                        token);
+                    return true;
+                },
+                cancellation.Token));
+
+        Assert.Equal(
+            [
+                0u,
+                NativeMethods.KeyeventfKeyUp,
+            ],
+            flags);
+    }
+
+    [Fact]
+    public async Task ScopedHeldKey_ObservationFailureStillReleasesThePhysicalKey()
+    {
+        List<uint> flags = [];
+        var keyboard = new WindowsKeyboardInput(
+            _ => true,
+            _ => { },
+            (_, _, sentFlags, _) => flags.Add(sentFlags));
+
+        InvalidOperationException error =
+            await Assert.ThrowsAsync<InvalidOperationException>(
+                () => keyboard.RunWithKeyHeldAsync<bool>(
+                    new RobloxWindow((nint)1, "Roblox"),
+                    KeyboardKey.LeftShift,
+                    _ => throw new InvalidOperationException(
+                        "Observation failed."),
+                    CancellationToken.None));
+
+        Assert.Equal("Observation failed.", error.Message);
+        Assert.Equal(
+            [
+                0u,
+                NativeMethods.KeyeventfKeyUp,
+            ],
+            flags);
+    }
+
+    [Fact]
+    public async Task ScopedHeldKey_PreCanceledObservationSendsNoInput()
+    {
+        int focusCalls = 0;
+        int inputCalls = 0;
+        using var cancellation =
+            new CancellationTokenSource();
+        cancellation.Cancel();
+        var keyboard = new WindowsKeyboardInput(
+            _ =>
+            {
+                focusCalls++;
+                return true;
+            },
+            _ => { },
+            (_, _, _, _) => inputCalls++);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => keyboard.RunWithKeyHeldAsync(
+                new RobloxWindow((nint)1, "Roblox"),
+                KeyboardKey.LeftShift,
+                _ => Task.FromResult(true),
+                cancellation.Token));
+
+        Assert.Equal(0, focusCalls);
+        Assert.Equal(0, inputCalls);
     }
 
     [Theory]
