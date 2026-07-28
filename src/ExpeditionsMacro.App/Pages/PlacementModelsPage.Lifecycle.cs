@@ -89,6 +89,7 @@ public partial class PlacementModelsPage
                 recordingId;
             FastEditorPanel.SetSnapshotSettings(
                 _fastPlacementIntervalMilliseconds,
+                _fastPlacementAttempts,
                 _fastDefaultAfterStartDelayMilliseconds,
                 _fastImpossibilityThresholdMinutes,
                 recordingMode: true);

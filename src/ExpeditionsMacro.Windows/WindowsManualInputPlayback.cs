@@ -36,7 +36,6 @@ public sealed class WindowsManualInputPlayback :
         ClientBounds bounds =
             ValidateTarget(window, focus: true);
         WindowsManualInputSink sink = new(
-            _automation,
             window,
             bounds);
         int sentEvents = 0;
@@ -44,21 +43,22 @@ public sealed class WindowsManualInputPlayback :
         bool succeeded = false;
         try
         {
-            await _engine.PlayAsync(
-                    recording,
-                    new StopwatchManualInputClock(),
-                    sink,
-                    playbackStarting,
-                    timing =>
-                    {
-                        sentEvents++;
-                        maximumAbsoluteDriftMicroseconds =
-                            Math.Max(
-                                maximumAbsoluteDriftMicroseconds,
-                                Math.Abs(timing.DriftMicroseconds));
-                        EmitTiming(timing);
-                    },
-                    cancellationToken)
+            await ManualInputPlaybackWorker.RunAsync(
+                    () => _engine.PlayAsync(
+                        recording,
+                        new StopwatchManualInputClock(),
+                        sink,
+                        playbackStarting,
+                        timing =>
+                        {
+                            sentEvents++;
+                            maximumAbsoluteDriftMicroseconds =
+                                Math.Max(
+                                    maximumAbsoluteDriftMicroseconds,
+                                    Math.Abs(timing.DriftMicroseconds));
+                            EmitTiming(timing);
+                        },
+                        cancellationToken))
                 .ConfigureAwait(false);
             succeeded = true;
         }
@@ -150,7 +150,6 @@ internal sealed class WindowsManualInputSink :
     private const int BoundsRefreshMilliseconds = 100;
     private const int PointerPreflightSettleMilliseconds = 75;
 
-    private readonly IRobloxAutomation _automation;
     private readonly RobloxWindow _window;
     private readonly VirtualDesktop _desktop;
     private readonly HashSet<ManualKeyboardIdentity> _heldKeys = [];
@@ -160,11 +159,9 @@ internal sealed class WindowsManualInputSink :
     private ClientBounds _bounds;
     private long _nextBoundsRefreshMilliseconds;
     public WindowsManualInputSink(
-        IRobloxAutomation automation,
         RobloxWindow window,
         ClientBounds bounds)
     {
-        _automation = automation;
         _window = window;
         _bounds = bounds;
         _desktop = VirtualDesktop.Read();
@@ -297,7 +294,8 @@ internal sealed class WindowsManualInputSink :
         }
 
         ClientBounds current =
-            _automation.GetClientBounds(_window);
+            ManualInputTargetProbe.ReadClientBounds(
+                _window);
         if (current.Width != RobloxClientProfile.Width ||
             current.Height != RobloxClientProfile.Height)
         {

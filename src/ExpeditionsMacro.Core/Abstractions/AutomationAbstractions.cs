@@ -91,6 +91,36 @@ public interface IRobloxAutomation
         throw new NotSupportedException(
             "This automation backend does not support cursor-retaining client clicks.");
 
+    async Task ClickClientBurstRetainingCursorAsync(
+        RobloxWindow window,
+        int x,
+        int y,
+        int clickCount,
+        int durationMilliseconds,
+        CancellationToken cancellationToken)
+    {
+        if (clickCount <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(clickCount));
+        }
+        if (durationMilliseconds < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(durationMilliseconds));
+        }
+
+        for (int click = 0; click < clickCount; click++)
+        {
+            await ClickClientRetainingCursorAsync(
+                    window,
+                    x,
+                    y,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+    }
+
     Task DragClientAsync(
         RobloxWindow window,
         int startX,

@@ -4,6 +4,23 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.38] - 2026-07-28
+
+### Added
+
+- Step Mode Placement Setups now expose one through eight total placement attempts. The default is one fast attempt, and any additional attempt retries only the row whose selected-unit proof was missing.
+
+### Changed
+
+- Step Mode now places each Before Start phase or equal-due After Start batch through one bounded Quick Placement transaction: Cancel Placement, hold Quick Placement, select only when the consecutive unit slot changes, send three clicks per coordinate over 50 milliseconds, then release and verify/configure each row separately.
+- Manual recording playback now runs its absolute event clock on a dedicated timing worker and performs target checks through direct Win32 probes, reducing scheduler and diagnostic interference while retaining the exact inclusive +/- 50-millisecond safety bound.
+- The process-recovery circuit now permits ten Roblox restarts in ten minutes and blocks the eleventh.
+
+### Fixed
+
+- Manual-playback timing misses now report their signed drift and event boundary as local playback errors instead of being mistaken for recoverable Roblox timeouts that relaunch the private server.
+- Equal-due After Start placement rows now remain in one Quick Placement batch, while later offsets retain their independent schedule.
+
 ## [1.3.0-beta.37] - 2026-07-28
 
 ### Added
@@ -1082,7 +1099,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.37...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.38...HEAD
+[1.3.0-beta.38]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.37...v1.3.0-beta.38
 [1.3.0-beta.37]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.36...v1.3.0-beta.37
 [1.3.0-beta.36]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.35...v1.3.0-beta.36
 [1.3.0-beta.35]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.34...v1.3.0-beta.35

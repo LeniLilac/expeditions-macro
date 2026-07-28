@@ -138,7 +138,7 @@ public sealed class PlacementServiceKeyValidationTests
     }
 
     [Fact]
-    public async Task Playback_UnsetCancelPlacementKeyDoesNotBlockQuickPlacement()
+    public async Task Playback_UnsetCancelPlacementKeyUsesDashboardGuidance()
     {
         string root = TestPaths.NewTemporaryDirectory();
         try
@@ -151,24 +151,28 @@ public sealed class PlacementServiceKeyValidationTests
                 targetingKey: default,
                 autoUpgradeKey: default);
 
-            await service.PlayAsync(
-                Model(
-                    UnitTargetingPriority.First,
-                    UnitAutoUpgradePriority.Off),
-                useDefaultInterval: true,
-                defaultIntervalMilliseconds: 0,
-                keyHoldMilliseconds: 0,
-                afterKeyMilliseconds: 0,
-                cancelPlacementKey: default);
+            InvalidDataException error =
+                await Assert.ThrowsAsync<
+                    InvalidDataException>(
+                    () => service.PlayAsync(
+                        Model(
+                            UnitTargetingPriority.First,
+                            UnitAutoUpgradePriority.Off),
+                        useDefaultInterval: true,
+                        defaultIntervalMilliseconds: 0,
+                        keyHoldMilliseconds: 0,
+                        afterKeyMilliseconds: 0,
+                        cancelPlacementKey: default));
 
             Assert.Contains(
-                "key:1",
-                automation.InputActions);
-            Assert.DoesNotContain(
-                automation.InputActions,
-                action => action.StartsWith(
-                    "letter:",
-                    StringComparison.Ordinal));
+                "Toggle Cancel Unit Placement",
+                error.Message,
+                StringComparison.Ordinal);
+            Assert.Contains(
+                "Controls on the Dashboard",
+                error.Message,
+                StringComparison.Ordinal);
+            Assert.Empty(automation.InputActions);
         }
         finally
         {

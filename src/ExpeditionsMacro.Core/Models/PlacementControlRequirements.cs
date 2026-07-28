@@ -44,6 +44,31 @@ public static class PlacementControlRequirements
         }
     }
 
+    public static char ValidateStepModeBindingsForPlayback(
+        PlacementModel model,
+        AppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        return RequiresQuickPlacementKey(model)
+            ? ValidateStepModeBindings(settings)
+            : default;
+    }
+
+    public static char ValidateStepModeBindings(
+        AppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        _ = AppSettings.ParseQuickPlacementKey(
+            settings);
+        return AppSettings.ParseCancelPlacementKey(
+            settings.CancelPlacementKey,
+            settings.MacroHotkeyVirtualKey,
+            settings.PlayMenuKey,
+            settings.UnitMenuKey,
+            settings.AreasMenuKey,
+            settings.ShiftLockVirtualKey);
+    }
+
     public static bool RequiresQuickPlacementKey(
         PlacementModel model)
     {

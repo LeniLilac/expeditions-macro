@@ -49,6 +49,8 @@ public partial class PlacementModelsPage
                 : 0,
             PlacementIntervalMilliseconds =
                 _fastPlacementIntervalMilliseconds,
+            PlacementAttempts =
+                _fastPlacementAttempts,
             DefaultAfterStartDelayMilliseconds =
                 _fastDefaultAfterStartDelayMilliseconds,
             ManualInputRecordingId =

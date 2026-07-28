@@ -64,14 +64,20 @@ playback.
 
 Playback schedules every event against its absolute microsecond offset
 from one monotonic `Stopwatch`; it never accumulates a chain of relative
-delays. Long waits end before the target and use a bounded final spin.
-The player checks timing immediately before and after each injected event.
+delays. A dedicated timing worker owns the complete timed loop, so ordinary
+thread-pool continuation delays cannot repeatedly interrupt the recording.
+Long waits end before the target and use a bounded final spin. Live
+foreground and client-bound checks use direct Win32 probes inside that
+worker rather than synchronous diagnostic wrappers. The player checks
+timing immediately before and after each injected event.
 The difference between the total elapsed playback clock and that event's
 recorded absolute offset must remain within +/- 50 milliseconds. The
 inclusive -50 and +50 millisecond boundaries are accepted; an earlier or
-later offset stops playback. This per-event absolute-timeline check makes
-timing drift a visible safe failure instead of silently accumulating,
-slowing, or compressing the route.
+later offset stops playback with the event kind, boundary, and measured
+drift. A timing miss is local to the recording and never authorizes a
+Roblox restart. This per-event absolute-timeline check makes timing drift a
+visible safe failure instead of silently accumulating, slowing, or
+compressing the route.
 
 The recorder excludes only the global macro start/stop hotkey. Any
 physical game-action key pressed while recording, including Auto Upgrade
@@ -133,9 +139,11 @@ private-server codes, or other sensitive text while recording.
 
 Raw recorded inputs remain excluded from Deep Debug archives. Deep Debug
 records only one metadata summary after playback, including the recording
-ID, event count, maximum absolute timing drift, and success state. Share
-bundles never collect recordings, screenshots, app settings, webhooks,
-private-server links, diagnostics, or Windows profile paths.
+ID, event count, maximum absolute timing drift, and success state. The
+timing-critical loop does not emit per-event or repeated client-bound
+diagnostics. Share bundles never collect recordings, screenshots, app
+settings, webhooks, private-server links, diagnostics, or Windows profile
+paths.
 
 Turning off **Enable advanced manual recordings** hides the Recordings
 workspace but does not erase saved route assignments. A route already in

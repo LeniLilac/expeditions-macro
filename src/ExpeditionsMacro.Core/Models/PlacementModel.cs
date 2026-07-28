@@ -58,6 +58,8 @@ public sealed record PlacementModel
 {
     public const int CurrentSchemaVersion = 1;
     public const int MaximumImpossibilityThresholdMinutes = 180;
+    public const int DefaultPlacementAttempts = 1;
+    public const int MaximumPlacementAttempts = 8;
 
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
 
@@ -84,6 +86,9 @@ public sealed record PlacementModel
     public int DefaultAfterStartDelayMilliseconds { get; init; } =
         PlacementAuthoringRules
             .DefaultAfterStartDelayMilliseconds;
+
+    public int PlacementAttempts { get; init; } =
+        DefaultPlacementAttempts;
 
     public string? ManualInputRecordingId { get; init; }
 
@@ -118,6 +123,12 @@ public sealed record PlacementModel
         {
             throw new InvalidDataException(
                 "Default After Start delay cannot be negative.");
+        }
+        if (PlacementAttempts is < 1 or
+            > MaximumPlacementAttempts)
+        {
+            throw new InvalidDataException(
+                $"Placement attempts must be 1 through {MaximumPlacementAttempts}.");
         }
         if (ImpossibilityThresholdMinutes is < 0 or
             > MaximumImpossibilityThresholdMinutes)

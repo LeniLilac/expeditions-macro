@@ -6,11 +6,15 @@ namespace ExpeditionsMacro.App.Controls;
 
 public sealed class PlacementTimingApplyEventArgs(
     string placementIntervalText,
+    string placementAttemptsText,
     string defaultAfterStartDelayText,
     string impossibilityThresholdText) : EventArgs
 {
     public string PlacementIntervalText { get; } =
         placementIntervalText;
+
+    public string PlacementAttemptsText { get; } =
+        placementAttemptsText;
 
     public string DefaultAfterStartDelayText { get; } =
         defaultAfterStartDelayText;
@@ -31,12 +35,16 @@ public partial class PlacementTimingPopover : UserControl
 
     public void SetValues(
         int placementIntervalMilliseconds,
+        int placementAttempts,
         int defaultAfterStartDelayMilliseconds,
         int impossibilityThresholdMinutes,
         bool recordingMode)
     {
         PlacementIntervalText.Text =
             placementIntervalMilliseconds.ToString(
+                CultureInfo.CurrentCulture);
+        PlacementAttemptsText.Text =
+            placementAttempts.ToString(
                 CultureInfo.CurrentCulture);
         DefaultAfterStartDelayText.Text =
             (defaultAfterStartDelayMilliseconds / 1000d)
@@ -75,6 +83,7 @@ public partial class PlacementTimingPopover : UserControl
             this,
             new PlacementTimingApplyEventArgs(
                 PlacementIntervalText.Text,
+                PlacementAttemptsText.Text,
                 DefaultAfterStartDelayText.Text,
                 ImpossibilityThresholdText.Text));
 }

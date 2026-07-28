@@ -107,19 +107,21 @@ public sealed partial class ExpeditionMacroRunner
                         ? candidateScore
                         : null);
             }
-            if (candidate is null &&
-                nextAfterStartStep <
-                    afterStartSteps.Count &&
-                PlacementExecutionPlan.IsAfterStartDue(
-                    afterStartSteps[nextAfterStartStep],
-                    matchRuntime.Elapsed))
+            IReadOnlyList<PlacementStep>
+                dueAfterStart =
+                    candidate is null
+                        ? PlacementExecutionPlan
+                            .DueAfterStartBatch(
+                                afterStartSteps,
+                                nextAfterStartStep,
+                                matchRuntime.Elapsed)
+                        : [];
+            if (dueAfterStart.Count > 0)
             {
-                PlacementStep step =
-                    afterStartSteps[nextAfterStartStep];
                 report(
                     "Placement",
                     5,
-                    $"Placing Unit {step.UnitKey} at " +
+                    $"Placing {dueAfterStart.Count} unit(s) at " +
                     $"{matchRuntime.Elapsed.TotalSeconds:F1}s " +
                     "after Start.",
                     null,
@@ -127,14 +129,16 @@ public sealed partial class ExpeditionMacroRunner
                 await PlaceStepsAsync(
                     window,
                     placement,
-                    [step],
+                    dueAfterStart,
                     preset,
                     log,
                     cancelPlacementKey,
                     stepSent: null,
                     cancellationToken).ConfigureAwait(false);
-                retryableSteps.Add(step);
-                nextAfterStartStep++;
+                retryableSteps.AddRange(
+                    dueAfterStart);
+                nextAfterStartStep +=
+                    dueAfterStart.Count;
             }
             if (candidate is null) await keepAlive.TryPulseAsync((key, token) => _automation.TapLetterKeyAsync(window, key, token), cancellationToken).ConfigureAwait(false);
             string? state = stateTracker.Update(candidate);

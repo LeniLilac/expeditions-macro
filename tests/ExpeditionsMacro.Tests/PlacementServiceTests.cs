@@ -36,7 +36,7 @@ public sealed class PlacementServiceTests
     }
 
     [Fact]
-    public async Task Playback_NormalizesSelectionThenDismissesFinalPanelAtIdlePoint()
+    public async Task Playback_BatchesPlacementThenDismissesConfirmedPanelAtIdlePoint()
     {
         string root = Path.Combine(
             Path.GetTempPath(),
@@ -80,11 +80,16 @@ public sealed class PlacementServiceTests
 
             Assert.Equal(
                 [
+                    "letter:Z",
                     $"held:{KeyboardKey.LeftShift}:down",
                     "key:4",
                     "click-retain:320,280",
-                    "park",
+                    "click-retain:320,280",
+                    "click-retain:320,280",
                     $"held:{KeyboardKey.LeftShift}:up",
+                    "letter:Z",
+                    "click-retain:320,280",
+                    "park",
                     "letter:T",
                     "letter:T",
                     "letter:T",
@@ -94,7 +99,7 @@ public sealed class PlacementServiceTests
                 ],
                 automation.InputActions);
             Assert.Equal(
-                2,
+                5,
                 automation.ClickTimes.Count);
             Assert.Equal(
                 3,
@@ -155,7 +160,7 @@ public sealed class PlacementServiceTests
                 automation.InputActions.Count(
                     action => action == "key:2"));
             Assert.Equal(
-                1,
+                4,
                 automation.InputActions.Count(
                     action =>
                         action == "click-retain:320,280"));
@@ -165,60 +170,10 @@ public sealed class PlacementServiceTests
                     action =>
                         action ==
                         "move:270,280->320,280:200"));
-            Assert.DoesNotContain(
-                automation.InputActions,
-                action => action == "letter:Z");
-        }
-        finally
-        {
-            TestPaths.DeleteTemporaryDirectory(root);
-        }
-    }
-
-    [Fact]
-    public async Task Playback_AcceptsPanelAtTimeoutBoundaryWithoutAnotherClick()
-    {
-        string root = TestPaths.NewTemporaryDirectory();
-        try
-        {
-            ImageFrame negative = ImageCodec.Load(
-                Path.Combine(
-                    TestPaths.StageDatasets,
-                    "SelectedUnitPanelHoverNegative_01.png"));
-            ImageFrame positive = ImageCodec.Load(
-                Path.Combine(
-                    TestPaths.StageDatasets,
-                    "SelectedUnitPanel_01.png"));
-            FakeAutomation automation = new(
-                Enumerable.Repeat(negative, 7)
-                    .Concat([positive, positive])
-                    .ToArray());
-            PlacementService service = new(
-                automation,
-                new FakeCaptureService(automation),
-                new PlacementModelRepository(
-                    new AppPaths(root)),
-                () => 'T');
-
-            await service.PlayAsync(
-                ModelWithSteps(
-                    new PlacementStep
-                    {
-                        UnitKey = 2,
-                        X = 320,
-                        Y = 280,
-                        DelayAfterMilliseconds = 0,
-                    }),
-                useDefaultInterval: true,
-                defaultIntervalMilliseconds: 0,
-                keyHoldMilliseconds: 0,
-                afterKeyMilliseconds: 0);
-
             Assert.Equal(
-                1,
+                2,
                 automation.InputActions.Count(
-                    action =>
-                        action == "click-retain:320,280"));
+                    action => action == "letter:Z"));
         }
         finally
         {
@@ -420,14 +375,17 @@ public sealed class PlacementServiceTests
             int Count(string action) =>
                 automation.InputActions.Count(
                     candidate => candidate == action);
-            Assert.Equal(2, Count("key:1"));
-            Assert.Equal(0, Count("letter:Z"));
-            Assert.Equal(1, Count("click-retain:300,280"));
-            Assert.Equal(1, Count("click-retain:340,280"));
+            Assert.Equal(1, Count("key:1"));
+            Assert.Equal(2, Count("letter:Z"));
+            Assert.Equal(4, Count("click-retain:300,280"));
+            Assert.Equal(4, Count("click-retain:340,280"));
             Assert.Equal(6, Count("park"));
             Assert.Equal(2, Count("click:783,586"));
             int firstDismiss = automation.InputActions.IndexOf("click:783,586");
-            Assert.True(firstDismiss < automation.InputActions.IndexOf("click-retain:340,280"));
+            Assert.True(
+                firstDismiss <
+                automation.InputActions.LastIndexOf(
+                    "click-retain:340,280"));
         }
         finally
         {
@@ -482,7 +440,7 @@ public sealed class PlacementServiceTests
     }
 
     [Fact]
-    public async Task Playback_SkipsAfterEightUnconfirmedClicks()
+    public async Task Playback_DefaultAttemptSkipsAfterOneUnconfirmedCheck()
     {
         string root = TestPaths.NewTemporaryDirectory();
         try
@@ -522,11 +480,11 @@ public sealed class PlacementServiceTests
                     "skipped Unit 6",
                     StringComparison.Ordinal));
             Assert.Equal(
-                8,
+                1,
                 automation.InputActions.Count(
                     action => action == "key:6"));
             Assert.Equal(
-                8,
+                4,
                 automation.InputActions.Count(
                     action =>
                         action == "click-retain:320,280"));
@@ -534,7 +492,7 @@ public sealed class PlacementServiceTests
                 "letter:T",
                 automation.InputActions);
             Assert.Equal(
-                8,
+                1,
                 automation.InputActions.Count(
                     action => action == "park"));
             Assert.Equal(

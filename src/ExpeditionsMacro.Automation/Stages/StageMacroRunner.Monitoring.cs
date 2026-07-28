@@ -119,24 +119,27 @@ public sealed partial class StageMacroRunner
             await keepAlive.TryPulseAsync((key, token) => _automation.TapLetterKeyAsync(window, key, token), cancellationToken).ConfigureAwait(false);
 
             bool placementCompletedThisIteration = false;
-            if (terminalCandidate is null &&
+            IReadOnlyList<PlacementStep> dueSteps =
+                terminalCandidate is null &&
                 recovery is null &&
-                !placed &&
-                PlacementExecutionPlan.IsAfterStartDue(
-                    delayedSteps[nextFastStep],
-                    matchRuntime.Elapsed))
+                !placed
+                    ? PlacementExecutionPlan
+                        .DueAfterStartBatch(
+                            delayedSteps,
+                            nextFastStep,
+                            matchRuntime.Elapsed)
+                    : [];
+            if (dueSteps.Count > 0)
             {
-                PlacementStep step =
-                    delayedSteps[nextFastStep];
                 await PlayPlacementAsync(
                     window,
                     delayedPlacement!,
-                    [step],
+                    dueSteps,
                     story,
                     raid,
                     cancelPlacementKey,
                     cancellationToken).ConfigureAwait(false);
-                nextFastStep++;
+                nextFastStep += dueSteps.Count;
                 placed =
                     nextFastStep >= delayedSteps.Count;
                 placementCompletedThisIteration = true;

@@ -14,11 +14,13 @@ public partial class PlacementModelsPage
         RoutedEventArgs e)
     {
         PlacementModel model;
+        char cancelPlacementKey;
         try
         {
             model = BuildModel();
-            PlacementControlRequirements
-                .ValidateQuickPlacementForPlayback(
+            cancelPlacementKey =
+                PlacementControlRequirements
+                    .ValidateStepModeBindingsForPlayback(
                     model,
                     _services.Settings);
             _placementAutoSave.ScheduleSave(
@@ -42,6 +44,7 @@ public partial class PlacementModelsPage
             token => TestPlacementAsync(
                 model,
                 delay,
+                cancelPlacementKey,
                 token),
             new DeepDebugOperationContext
             {
@@ -64,6 +67,7 @@ public partial class PlacementModelsPage
     private async Task TestPlacementAsync(
         PlacementModel model,
         int delay,
+        char cancelPlacementKey,
         CancellationToken token)
     {
         Progress<MacroProgress> progress =
@@ -108,6 +112,8 @@ public partial class PlacementModelsPage
             model,
             useDefaultInterval: true,
             delay,
+            cancelPlacementKey:
+                cancelPlacementKey,
             stepSent: (index, total, step) =>
             {
                 _services.DeepDebug.RecordEvent(

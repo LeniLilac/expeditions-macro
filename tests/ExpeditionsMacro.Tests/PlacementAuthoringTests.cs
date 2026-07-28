@@ -19,6 +19,7 @@ public sealed class PlacementAuthoringTests
         json.Remove("camera_preparation_mode");
         json.Remove("target");
         json.Remove("placement_interval_milliseconds");
+        json.Remove("placement_attempts");
         json.Remove(
             "default_after_start_delay_milliseconds");
         json["steps"]!.AsArray()[0]!
@@ -52,6 +53,9 @@ public sealed class PlacementAuthoringTests
             PlacementAuthoringRules
                 .DefaultAfterStartDelayMilliseconds,
             legacy.DefaultAfterStartDelayMilliseconds);
+        Assert.Equal(
+            PlacementModel.DefaultPlacementAttempts,
+            legacy.PlacementAttempts);
         Assert.Equal(
             UnitAutoUpgradePriority.Off,
             Assert.Single(legacy.Steps)
@@ -379,6 +383,9 @@ public sealed class PlacementAuthoringTests
         Assert.Equal(
             30_000,
             model.DefaultAfterStartDelayMilliseconds);
+        Assert.Equal(
+            1,
+            model.PlacementAttempts);
     }
 
     [Fact]
@@ -406,6 +413,12 @@ public sealed class PlacementAuthoringTests
                 {
                     DefaultAfterStartDelayMilliseconds = -1,
                 }).Validate());
+        InvalidDataException attemptsError =
+            Assert.Throws<InvalidDataException>(
+                () => (model with
+                {
+                    PlacementAttempts = 0,
+                }).Validate());
 
         Assert.Contains(
             "Placement interval",
@@ -415,6 +428,18 @@ public sealed class PlacementAuthoringTests
             "Default After Start delay",
             afterStartError.Message,
             StringComparison.Ordinal);
+        Assert.Contains(
+            "Placement attempts",
+            attemptsError.Message,
+            StringComparison.Ordinal);
+        Assert.Throws<InvalidDataException>(
+            () => (model with
+            {
+                PlacementAttempts =
+                    PlacementModel
+                        .MaximumPlacementAttempts +
+                    1,
+            }).Validate());
     }
 
     [Fact]

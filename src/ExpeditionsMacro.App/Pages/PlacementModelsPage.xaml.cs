@@ -29,6 +29,8 @@ public partial class PlacementModelsPage :
     private int _fastPlacementIntervalMilliseconds =
         PlacementAuthoringRules
             .DefaultStepDelayMilliseconds;
+    private int _fastPlacementAttempts =
+        PlacementModel.DefaultPlacementAttempts;
     private int _fastDefaultAfterStartDelayMilliseconds =
         PlacementAuthoringRules
             .DefaultAfterStartDelayMilliseconds;
@@ -111,6 +113,8 @@ public partial class PlacementModelsPage :
         _selectedModel = model;
         _fastPlacementIntervalMilliseconds =
             model.PlacementIntervalMilliseconds;
+        _fastPlacementAttempts =
+            model.PlacementAttempts;
         _fastDefaultAfterStartDelayMilliseconds =
             model.DefaultAfterStartDelayMilliseconds;
         _fastImpossibilityThresholdMinutes =

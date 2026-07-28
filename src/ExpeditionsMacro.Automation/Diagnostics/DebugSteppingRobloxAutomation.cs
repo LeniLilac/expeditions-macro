@@ -161,6 +161,27 @@ public sealed class DebugSteppingRobloxAutomation : IRobloxAutomation, IDisposab
                 cancellationToken),
             cancellationToken);
 
+    public Task ClickClientBurstRetainingCursorAsync(
+        RobloxWindow window,
+        int x,
+        int y,
+        int clickCount,
+        int durationMilliseconds,
+        CancellationToken cancellationToken) =>
+        TraceAsync(
+            "Rapid-click Roblox",
+            $"Click client coordinate ({x}, {y}) {clickCount} times over {durationMilliseconds} ms and keep the cursor there.",
+            () =>
+                _inner
+                    .ClickClientBurstRetainingCursorAsync(
+                        window,
+                        x,
+                        y,
+                        clickCount,
+                        durationMilliseconds,
+                        cancellationToken),
+            cancellationToken);
+
     public Task DragClientAsync(
         RobloxWindow window,
         int startX,

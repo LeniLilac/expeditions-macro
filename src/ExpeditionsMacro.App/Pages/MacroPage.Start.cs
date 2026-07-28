@@ -44,8 +44,10 @@ public partial class MacroPage
                     plan,
                     CancellationToken.None))
             {
-                _ = AppSettings.ParseQuickPlacementKey(
-                    _services.Settings);
+                cancelPlacementKey =
+                    PlacementControlRequirements
+                        .ValidateStepModeBindings(
+                            _services.Settings);
             }
             playMenuKey =
                 AppSettings.ParsePlayMenuKey(

@@ -96,19 +96,23 @@ public sealed partial class ChallengeMacroRunner
                         models),
                     "Challenge match");
             }
-            if (candidate == ChallengeScreenState.None &&
+            IReadOnlyList<PlacementStep> dueSteps =
+                candidate ==
+                    ChallengeScreenState.None &&
                 recovery is null &&
-                !delayedPlaced &&
-                PlacementExecutionPlan.IsAfterStartDue(
-                    fastAfterStartSteps[nextFastStep],
-                    matchRuntime.Elapsed))
+                !delayedPlaced
+                    ? PlacementExecutionPlan
+                        .DueAfterStartBatch(
+                            fastAfterStartSteps,
+                            nextFastStep,
+                            matchRuntime.Elapsed)
+                    : [];
+            if (dueSteps.Count > 0)
             {
-                PlacementStep step =
-                    fastAfterStartSteps[nextFastStep];
                 report(
                     "Placement",
                     65,
-                    $"Placing Unit {step.UnitKey} at " +
+                    $"Placing {dueSteps.Count} unit(s) at " +
                     $"{matchRuntime.Elapsed.TotalSeconds:F1}s " +
                     "after Start.",
                     null,
@@ -117,11 +121,11 @@ public sealed partial class ChallengeMacroRunner
                     window,
                     preset,
                     models.Placement!,
-                    [step],
+                    dueSteps,
                     log,
                     cancelPlacementKey,
                     cancellationToken).ConfigureAwait(false);
-                nextFastStep++;
+                nextFastStep += dueSteps.Count;
                 delayedPlaced =
                     nextFastStep >=
                     fastAfterStartSteps.Count;

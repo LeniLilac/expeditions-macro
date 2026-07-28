@@ -45,6 +45,14 @@ public sealed class DeepDebugRobloxAutomationTests
                         120,
                         240,
                         token);
+                    await automation
+                        .ClickClientBurstRetainingCursorAsync(
+                            inner.Window,
+                            140,
+                            260,
+                            3,
+                            50,
+                            token);
                     await automation.MoveCursorBetweenClientPointsAsync(
                         inner.Window,
                         70,
@@ -56,7 +64,7 @@ public sealed class DeepDebugRobloxAutomationTests
                 },
                 CancellationToken.None);
 
-            Assert.Equal(6, inner.CaptureCount);
+            Assert.Equal(8, inner.CaptureCount);
             string archivePath = Assert.Single(
                 Directory.EnumerateFiles(
                     paths.Diagnostics,
@@ -64,7 +72,7 @@ public sealed class DeepDebugRobloxAutomationTests
             using ZipArchive archive =
                 ZipFile.OpenRead(archivePath);
             Assert.Equal(
-                6,
+                8,
                 archive.Entries.Count(entry =>
                     entry.FullName.StartsWith(
                         "frames/",
@@ -75,6 +83,8 @@ public sealed class DeepDebugRobloxAutomationTests
                     ("tap_keyboard_key", "after"),
                     ("click_client", "before"),
                     ("click_client", "after"),
+                    ("click_client_burst_retaining_cursor", "before"),
+                    ("click_client_burst_retaining_cursor", "after"),
                     ("move_cursor_between_client_points", "before"),
                     ("move_cursor_between_client_points", "after"),
                 ],
@@ -251,6 +261,15 @@ public sealed class DeepDebugRobloxAutomationTests
             RobloxWindow window,
             int x,
             int y,
+            CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task ClickClientBurstRetainingCursorAsync(
+            RobloxWindow window,
+            int x,
+            int y,
+            int clickCount,
+            int durationMilliseconds,
             CancellationToken cancellationToken) =>
             Task.CompletedTask;
 

@@ -146,7 +146,7 @@ public sealed class PlacementSafetyRulesTests
             "click-retain:360,280",
             automation.InputActions);
         Assert.Equal(
-            1,
+            4,
             automation.InputActions.Count(
                 action =>
                     action == "click-retain:400,280"));

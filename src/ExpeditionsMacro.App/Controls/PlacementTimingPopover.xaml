@@ -22,13 +22,24 @@
             <StackPanel x:Name="PlacementTimingFieldsPanel">
                 <TextBlock Margin="0,16,0,0"
                            Style="{StaticResource FieldLabel}"
-                           Text="Between placements, ms" />
+                           Text="Between unit checks, ms" />
                 <TextBox x:Name="PlacementIntervalText"
                          Margin="0,6,0,0"
-                         AutomationProperties.Name="Delay between placements in milliseconds" />
+                         AutomationProperties.Name="Delay between unit checks in milliseconds" />
                 <TextBlock Margin="0,5,0,0"
                            Style="{StaticResource Caption}"
-                           Text="Updates every step in this setup."
+                           Text="Waits after a verified unit before checking the next row. Updates every step in this setup."
+                           TextWrapping="Wrap" />
+
+                <TextBlock Margin="0,14,0,0"
+                           Style="{StaticResource FieldLabel}"
+                           Text="Placement attempts" />
+                <TextBox x:Name="PlacementAttemptsText"
+                         Margin="0,6,0,0"
+                         AutomationProperties.Name="Placement attempts per unit" />
+                <TextBlock Margin="0,5,0,0"
+                           Style="{StaticResource Caption}"
+                           Text="1 uses the initial fast batch only. Higher values re-place only a row whose selected-unit check failed."
                            TextWrapping="Wrap" />
 
                 <TextBlock Margin="0,14,0,0"

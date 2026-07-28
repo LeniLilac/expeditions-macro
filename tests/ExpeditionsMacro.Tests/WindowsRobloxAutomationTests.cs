@@ -46,6 +46,22 @@ public sealed class WindowsRobloxAutomationTests
         Assert.True(useWheelFallback);
     }
 
+    [Fact]
+    public void RapidClickTiming_ThreePulsesSpanFiftyMilliseconds()
+    {
+        (int hold, int gap) =
+            WindowsRobloxAutomation
+                .RapidClickTiming(
+                    clickCount: 3,
+                    durationMilliseconds: 50);
+
+        Assert.Equal(8, hold);
+        Assert.Equal(13, gap);
+        Assert.Equal(
+            50,
+            (hold * 3) + (gap * 2));
+    }
+
     [Theory]
     [InlineData(0xA0, 0x2A, false)]
     [InlineData(0xA1, 0x36, false)]

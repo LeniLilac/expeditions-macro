@@ -60,6 +60,135 @@ public sealed partial class WindowsRobloxAutomation
             parkCursorAfterClick: false,
             cancellationToken);
 
+    public async Task ClickClientBurstRetainingCursorAsync(
+        RobloxWindow window,
+        int x,
+        int y,
+        int clickCount,
+        int durationMilliseconds,
+        CancellationToken cancellationToken)
+    {
+        if (clickCount is < 1 or > 10)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(clickCount));
+        }
+        if (durationMilliseconds is < 0 or > 1000)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(durationMilliseconds));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+        ClientBounds bounds = GetClientBounds(window);
+        ValidateClientPoint(bounds, x, y);
+        int clickNudge = x < bounds.Width - 1 ? 1 : -1;
+        MoveCursorWithRegisteredMotion(
+            bounds.X + x,
+            bounds.Y + y,
+            clickNudge,
+            "Windows could not move the cursor to the Roblox coordinate.");
+        await Task.Delay(
+                ClickPositionSettleMilliseconds,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        (int holdMilliseconds, int gapMilliseconds) =
+            RapidClickTiming(
+                clickCount,
+                durationMilliseconds);
+        for (int click = 0; click < clickCount; click++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            NativeMethods.mouse_event(
+                NativeMethods.MouseeventfLeftDown,
+                0,
+                0,
+                0,
+                0);
+            EmitTrace(
+                new WindowsAutomationTrace(
+                    DateTimeOffset.UtcNow,
+                    "mouse",
+                    "left_down",
+                    X: x,
+                    Y: y,
+                    Flags:
+                        NativeMethods
+                            .MouseeventfLeftDown));
+            try
+            {
+                if (holdMilliseconds > 0)
+                {
+                    await Task.Delay(
+                            holdMilliseconds,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                NativeMethods.mouse_event(
+                    NativeMethods.MouseeventfLeftUp,
+                    0,
+                    0,
+                    0,
+                    0);
+                EmitTrace(
+                    new WindowsAutomationTrace(
+                        DateTimeOffset.UtcNow,
+                        "mouse",
+                        "left_up",
+                        X: x,
+                        Y: y,
+                        Flags:
+                            NativeMethods
+                                .MouseeventfLeftUp));
+            }
+            if (click + 1 < clickCount &&
+                gapMilliseconds > 0)
+            {
+                await Task.Delay(
+                        gapMilliseconds,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+        }
+    }
+
+    internal static (int HoldMilliseconds, int GapMilliseconds)
+        RapidClickTiming(
+        int clickCount,
+        int durationMilliseconds)
+    {
+        if (clickCount <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(clickCount));
+        }
+        if (durationMilliseconds < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(durationMilliseconds));
+        }
+        if (clickCount == 1)
+        {
+            return (durationMilliseconds, 0);
+        }
+
+        int hold = Math.Min(
+            ClickHoldMilliseconds,
+            durationMilliseconds /
+                (clickCount * 2));
+        int gap =
+            (durationMilliseconds -
+             (hold * clickCount)) /
+            (clickCount - 1);
+        return (
+            Math.Max(0, hold),
+            Math.Max(0, gap));
+    }
+
     private async Task ClickClientCoreAsync(
         RobloxWindow window,
         int x,
@@ -69,15 +198,7 @@ public sealed partial class WindowsRobloxAutomation
     {
         cancellationToken.ThrowIfCancellationRequested();
         ClientBounds bounds = GetClientBounds(window);
-        if (x < 0 ||
-            y < 0 ||
-            x >= bounds.Width ||
-            y >= bounds.Height)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(x),
-                "Click falls outside the Roblox client.");
-        }
+        ValidateClientPoint(bounds, x, y);
 
         int clickNudge = x < bounds.Width - 1 ? 1 : -1;
         MoveCursorWithRegisteredMotion(
@@ -146,4 +267,5 @@ public sealed partial class WindowsRobloxAutomation
                 cancellationToken)
             .ConfigureAwait(false);
     }
+
 }

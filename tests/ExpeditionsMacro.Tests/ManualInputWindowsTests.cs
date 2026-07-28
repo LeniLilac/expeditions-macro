@@ -1,5 +1,6 @@
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Models;
+using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Windows;
 using ExpeditionsMacro.Windows.Interop;
 
@@ -346,6 +347,22 @@ public sealed class ManualInputWindowsTests
     }
 
     [Fact]
+    public async Task PlaybackWorker_UsesDedicatedThread()
+    {
+        bool? isThreadPoolThread = null;
+
+        await ManualInputPlaybackWorker.RunAsync(
+            () =>
+            {
+                isThreadPoolThread =
+                    Thread.CurrentThread.IsThreadPoolThread;
+                return Task.CompletedTask;
+            });
+
+        Assert.False(isThreadPoolThread);
+    }
+
+    [Fact]
     public async Task PlaybackEngine_UsesAbsoluteMicrosecondDeadlines()
     {
         ManualInputRecording recording =
@@ -554,8 +571,8 @@ public sealed class ManualInputWindowsTests
         FakeInputSink sink = new();
         ManualInputPlaybackEngine engine = new();
 
-        TimeoutException error =
-            await Assert.ThrowsAsync<TimeoutException>(
+        ManualInputPlaybackTimingException error =
+            await Assert.ThrowsAsync<ManualInputPlaybackTimingException>(
                 () => engine.PlayAsync(
                     recording,
                     clock,
@@ -568,6 +585,13 @@ public sealed class ManualInputWindowsTests
             "50 ms",
             error.Message,
             StringComparison.Ordinal);
+        Assert.False(error.InputWasSent);
+        Assert.Equal(
+            recording.Events[0].Kind,
+            error.EventKind);
+        Assert.Equal(
+            driftMicroseconds,
+            error.DriftMicroseconds);
         Assert.Empty(sink.Sent);
         Assert.Equal(1, sink.ReleaseCalls);
     }
@@ -589,8 +613,8 @@ public sealed class ManualInputWindowsTests
         };
         ManualInputPlaybackEngine engine = new();
 
-        TimeoutException error =
-            await Assert.ThrowsAsync<TimeoutException>(
+        ManualInputPlaybackTimingException error =
+            await Assert.ThrowsAsync<ManualInputPlaybackTimingException>(
                 () => engine.PlayAsync(
                     recording,
                     clock,
@@ -603,6 +627,13 @@ public sealed class ManualInputWindowsTests
             "50 ms",
             error.Message,
             StringComparison.Ordinal);
+        Assert.True(error.InputWasSent);
+        Assert.Equal(
+            recording.Events[0].Kind,
+            error.EventKind);
+        Assert.Equal(
+            sendOffsetMicroseconds,
+            error.DriftMicroseconds);
         Assert.Single(sink.Sent);
         Assert.Equal(1, sink.ReleaseCalls);
     }

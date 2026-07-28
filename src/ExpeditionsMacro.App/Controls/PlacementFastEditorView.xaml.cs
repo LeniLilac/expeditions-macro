@@ -150,11 +150,13 @@ public partial class PlacementFastEditorView : UserControl
 
     public void SetTimingSettings(
         int placementIntervalMilliseconds,
+        int placementAttempts,
         int defaultAfterStartDelayMilliseconds,
         int impossibilityThresholdMinutes,
         bool recordingMode) =>
         FastTimingEditor.SetValues(
             placementIntervalMilliseconds,
+            placementAttempts,
             defaultAfterStartDelayMilliseconds,
             impossibilityThresholdMinutes,
             recordingMode);
@@ -167,12 +169,14 @@ public partial class PlacementFastEditorView : UserControl
 
     internal void SetSnapshotSettings(
         int placementIntervalMilliseconds,
+        int placementAttempts,
         int defaultAfterStartDelayMilliseconds,
         int impossibilityThresholdMinutes,
         bool recordingMode)
     {
         SnapshotTimingEditor.SetValues(
             placementIntervalMilliseconds,
+            placementAttempts,
             defaultAfterStartDelayMilliseconds,
             impossibilityThresholdMinutes,
             recordingMode);

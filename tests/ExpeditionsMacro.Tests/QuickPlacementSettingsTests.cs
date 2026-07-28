@@ -158,7 +158,7 @@ public sealed class QuickPlacementSettingsTests
                 () =>
                 {
                     PlacementControlRequirements
-                        .ValidateQuickPlacementForPlayback(
+                        .ValidateStepModeBindingsForPlayback(
                             stepMode,
                             settings);
                     coordinatorArms++;
@@ -184,14 +184,14 @@ public sealed class QuickPlacementSettingsTests
         int operationStarts = 0;
 
         PlacementControlRequirements
-            .ValidateQuickPlacementForPlayback(
+            .ValidateStepModeBindingsForPlayback(
                 Placement(
                     recordingId: "recording-1",
                     steps: [Step()]),
                 invalidQuickPlacement);
         operationStarts++;
         PlacementControlRequirements
-            .ValidateQuickPlacementForPlayback(
+            .ValidateStepModeBindingsForPlayback(
                 Placement(
                     recordingId: null,
                     steps: []),
@@ -199,6 +199,32 @@ public sealed class QuickPlacementSettingsTests
         operationStarts++;
 
         Assert.Equal(2, operationStarts);
+    }
+
+    [Fact]
+    public void PlacementTestPlaybackPreflight_RequiresCancelPlacementForStepMode()
+    {
+        AppSettings settings = new()
+        {
+            QuickPlacementVirtualKey =
+                KeyboardKey.LeftShift,
+            CancelPlacementKey = string.Empty,
+        };
+
+        InvalidDataException error =
+            Assert.Throws<InvalidDataException>(
+                () =>
+                    PlacementControlRequirements
+                        .ValidateStepModeBindingsForPlayback(
+                            Placement(
+                                recordingId: null,
+                                steps: [Step()]),
+                            settings));
+
+        Assert.Contains(
+            "Toggle Cancel Unit Placement",
+            error.Message,
+            StringComparison.Ordinal);
     }
 
     [Fact]
