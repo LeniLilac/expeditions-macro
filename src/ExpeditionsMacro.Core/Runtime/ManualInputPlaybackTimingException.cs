@@ -58,7 +58,7 @@ public sealed class ManualInputPlaybackTimingException :
                 CultureInfo.InvariantCulture);
         return
             $"Manual playback was {formattedMilliseconds} ms " +
-            $"{direction} {boundary} {eventKind}; required timing is " +
-            "within +/- 50 ms.";
+            $"{direction} {boundary} {eventKind}; target timing is " +
+            "within +/- 50 ms and playback stops at +/- 2000 ms.";
     }
 }

@@ -368,7 +368,7 @@ public sealed class ManualInputWindowsTests
         ManualInputRecording recording =
             ManualInputRecordingTests.ValidRecording();
         FakePlaybackClock clock = new(
-            driftMicroseconds: 4_000);
+            driftMicroseconds: 117_000);
         FakeInputSink sink = new();
         List<ManualInputPlaybackTiming> timings = [];
         ManualInputPlaybackEngine engine = new();
@@ -392,7 +392,7 @@ public sealed class ManualInputWindowsTests
         Assert.All(
             timings,
             timing => Assert.Equal(
-                4_000,
+                117_000,
                 timing.DriftMicroseconds));
         Assert.Equal(1, sink.ReleaseCalls);
     }
@@ -534,7 +534,11 @@ public sealed class ManualInputWindowsTests
     [Theory]
     [InlineData(-50_000L)]
     [InlineData(50_000L)]
-    public async Task PlaybackEngine_AllowsSignedFiftyMillisecondBoundary(
+    [InlineData(-50_001L)]
+    [InlineData(50_001L)]
+    [InlineData(-1_999_999L)]
+    [InlineData(1_999_999L)]
+    public async Task PlaybackEngine_AllowsSignedDriftBelowTwoSecondHardStop(
         long driftMicroseconds)
     {
         ManualInputRecording recording = ShiftRecordingOffsets(
@@ -558,9 +562,11 @@ public sealed class ManualInputWindowsTests
     }
 
     [Theory]
-    [InlineData(-50_001L)]
-    [InlineData(50_001L)]
-    public async Task PlaybackEngine_RejectsSignedTimingOffsetBeyondFiftyMillisecondsBeforeSend(
+    [InlineData(-2_000_000L)]
+    [InlineData(2_000_000L)]
+    [InlineData(-2_000_001L)]
+    [InlineData(2_000_001L)]
+    public async Task PlaybackEngine_RejectsSignedTimingOffsetAtTwoSecondHardStopBeforeSend(
         long driftMicroseconds)
     {
         ManualInputRecording recording = ShiftRecordingOffsets(
@@ -582,7 +588,11 @@ public sealed class ManualInputWindowsTests
                     CancellationToken.None));
 
         Assert.Contains(
-            "50 ms",
+            "target timing is within +/- 50 ms",
+            error.Message,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "stops at +/- 2000 ms",
             error.Message,
             StringComparison.Ordinal);
         Assert.False(error.InputWasSent);
@@ -597,9 +607,11 @@ public sealed class ManualInputWindowsTests
     }
 
     [Theory]
-    [InlineData(-50_001L)]
-    [InlineData(50_001L)]
-    public async Task PlaybackEngine_RejectsSignedTimingOffsetBeyondFiftyMillisecondsAfterSend(
+    [InlineData(-2_000_000L)]
+    [InlineData(2_000_000L)]
+    [InlineData(-2_000_001L)]
+    [InlineData(2_000_001L)]
+    public async Task PlaybackEngine_RejectsSignedTimingOffsetAtTwoSecondHardStopAfterSend(
         long sendOffsetMicroseconds)
     {
         ManualInputRecording recording = ShiftRecordingOffsets(
@@ -624,7 +636,11 @@ public sealed class ManualInputWindowsTests
                     CancellationToken.None));
 
         Assert.Contains(
-            "50 ms",
+            "target timing is within +/- 50 ms",
+            error.Message,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "stops at +/- 2000 ms",
             error.Message,
             StringComparison.Ordinal);
         Assert.True(error.InputWasSent);
