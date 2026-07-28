@@ -1,8 +1,8 @@
+using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
-using ExpeditionsMacro.Automation.Placement;
 
 namespace ExpeditionsMacro.Automation.Expeditions;
 
@@ -49,6 +49,7 @@ public sealed partial class ExpeditionMacroRunner
             preset,
             log,
             cancelPlacementKey,
+            stepSent: null,
             cancellationToken).ConfigureAwait(false);
     }
 
@@ -60,6 +61,7 @@ public sealed partial class ExpeditionMacroRunner
         Action<string, MacroEventLevel, string?, double?>
             log,
         char cancelPlacementKey,
+        Action<int, int, PlacementStep>? stepSent,
         CancellationToken cancellationToken) =>
         _placements.PlayStepsAsync(
             window,
@@ -70,7 +72,7 @@ public sealed partial class ExpeditionMacroRunner
             preset.UnitKeyHoldMilliseconds,
             preset.UnitSelectDelayMilliseconds,
             cancelPlacementKey,
-            stepSent: null,
+            stepSent,
             status: message => log(
                 message,
                 MacroEventLevel.Information,

@@ -20,6 +20,25 @@ public sealed class QuickPlacementSelectionDetectorTests
         Assert.True(match.CenterTextPixels >= 105);
         Assert.True(match.RightTextPixels >= 62);
         Assert.True(match.IconPixels >= 5);
+        Assert.Equal(0, match.VerticalOffset);
+    }
+
+    [Fact]
+    public void PrestartShiftedIndicator_UsesOneSharedVerticalPhase()
+    {
+        QuickPlacementSelectionMatch match =
+            QuickPlacementSelectionDetector.Detect(
+                LoadStage(
+                    "QuickPlacementSelection_PrestartShifted_01.png"));
+
+        Assert.True(match.Visible);
+        Assert.InRange(match.Confidence, 0.80, 1);
+        Assert.InRange(match.VerticalOffset, -10, -1);
+        Assert.InRange(match.CyanPixels, 250, 430);
+        Assert.True(match.LeftTextPixels >= 65);
+        Assert.True(match.CenterTextPixels >= 105);
+        Assert.True(match.RightTextPixels >= 62);
+        Assert.True(match.IconPixels >= 5);
     }
 
     [Fact]
@@ -94,20 +113,26 @@ public sealed class QuickPlacementSelectionDetectorTests
             TestPaths.RepositoryRoot,
             "datasets",
             "anime-expeditions");
-        string positive = Path.GetFullPath(
-            Path.Combine(
-                TestPaths.StageDatasets,
-                "QuickPlacementSelection_01.png"));
+        HashSet<string> positives =
+            new(StringComparer.OrdinalIgnoreCase)
+        {
+            Path.GetFullPath(
+                Path.Combine(
+                    TestPaths.StageDatasets,
+                    "QuickPlacementSelection_01.png")),
+            Path.GetFullPath(
+                Path.Combine(
+                    TestPaths.StageDatasets,
+                    "QuickPlacementSelection_PrestartShifted_01.png")),
+        };
         string[] falseMatches = Directory
             .EnumerateFiles(
                 datasetRoot,
                 "*.png",
                 SearchOption.AllDirectories)
             .Where(path =>
-                !string.Equals(
-                    Path.GetFullPath(path),
-                    positive,
-                    StringComparison.OrdinalIgnoreCase))
+                !positives.Contains(
+                    Path.GetFullPath(path)))
             .Where(path =>
                 QuickPlacementSelectionDetector
                     .Detect(ImageCodec.Load(path))

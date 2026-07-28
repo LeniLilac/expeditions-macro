@@ -131,6 +131,7 @@ public sealed partial class ExpeditionMacroRunner
                     preset,
                     log,
                     cancelPlacementKey,
+                    stepSent: null,
                     cancellationToken).ConfigureAwait(false);
                 retryableSteps.Add(step);
                 nextAfterStartStep++;
