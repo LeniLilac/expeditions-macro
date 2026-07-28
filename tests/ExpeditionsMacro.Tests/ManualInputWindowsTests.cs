@@ -284,6 +284,36 @@ public sealed class ManualInputWindowsTests
         Assert.Null(observation.Input);
     }
 
+    [Theory]
+    [InlineData(299, 420, true)]
+    [InlineData(300, 420, true)]
+    [InlineData(301, 421, true)]
+    [InlineData(302, 420, false)]
+    [InlineData(300, 422, false)]
+    public void PlaybackPointerProof_AllowsOnlyOnePixelCoordinateVariance(
+        int screenX,
+        int screenY,
+        bool expected)
+    {
+        bool matches =
+            WindowsManualInputSink
+                .IsPointerAtRecordedPosition(
+                    new NativeMethods.Point
+                    {
+                        X = screenX,
+                        Y = screenY,
+                    },
+                    new ClientBounds(
+                        100,
+                        200,
+                        808,
+                        611),
+                    clientX: 200,
+                    clientY: 220);
+
+        Assert.Equal(expected, matches);
+    }
+
     [Fact]
     public void Recorder_StopFocusGraceAcceptsOnlyStopSignal()
     {

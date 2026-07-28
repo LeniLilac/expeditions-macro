@@ -37,8 +37,6 @@ public partial class MacroPage
         TaskEditorDialog.TaskSelectionPanel;
     private TextBlock TaskSelectionLabel =>
         TaskEditorDialog.TaskSelectionLabel;
-    private ComboBox TaskPresetCombo =>
-        TaskEditorDialog.TaskPresetCombo;
     private ComboBox TaskRouteCombo =>
         TaskEditorDialog.TaskRouteCombo;
     private TextBlock TaskTargetLabel =>
@@ -82,8 +80,6 @@ public partial class MacroPage
     {
         TaskKindCombo.SelectionChanged +=
             TaskKindCombo_SelectionChanged;
-        TaskPresetCombo.SelectionChanged +=
-            TaskPresetCombo_SelectionChanged;
         TaskRouteCombo.SelectionChanged +=
             TaskRouteCombo_SelectionChanged;
         foreach (RadioButton button in

@@ -15,7 +15,6 @@ public sealed partial class StageMacroRunner
     private Task<TerminalObservation> RunConfiguredMatchAsync(
         RobloxWindow window,
         StageRuntimeModels models,
-        CameraPreparationMode cameraMode,
         StoryPreset? story,
         RaidPreset? raid,
         IDetectorPack detector,
@@ -26,35 +25,23 @@ public sealed partial class StageMacroRunner
         CancellationToken cancellationToken)
     {
         PlacementModel? afterStartModel =
-            cameraMode == CameraPreparationMode.FastNoAlign
-                ? models.PrestartPlacement
-                : models.DelayedPlacement;
+            models.Placement;
         IReadOnlyList<PlacementStep> afterStart =
             manualPlayback
                 ? []
                 : PlacementExecutionPlan.AfterStart(
-                    cameraMode,
-                    models.PrestartPlacement,
-                    models.DelayedPlacement);
-        int delaySeconds =
-            cameraMode == CameraPreparationMode.FastNoAlign
-                ? 0
-                : story?.DelayedPlacementSeconds ??
-                    raid!.DelayedPlacementSeconds;
+                    models.Placement);
         return RunMatchAsync(
             window,
             afterStartModel,
             afterStart,
-            cameraMode,
-            delaySeconds,
             story,
             raid,
             detector,
             matchRuntime,
             stableDetections,
             cancelPlacementKey,
-            models.PrestartPlacement ??
-                models.DelayedPlacement,
+            models.Placement,
             cancellationToken);
     }
 
@@ -62,8 +49,6 @@ public sealed partial class StageMacroRunner
         RobloxWindow window,
         PlacementModel? delayedPlacement,
         IReadOnlyList<PlacementStep> delayedSteps,
-        CameraPreparationMode cameraMode,
-        int delaySeconds,
         StoryPreset? story,
         RaidPreset? raid,
         IDetectorPack detector,
@@ -73,9 +58,6 @@ public sealed partial class StageMacroRunner
         PlacementModel? runtimePolicyPlacement,
         CancellationToken cancellationToken)
     {
-        bool fast =
-            cameraMode ==
-            CameraPreparationMode.FastNoAlign;
         int nextFastStep = 0;
         bool placed = delayedPlacement is null ||
             delayedSteps.Count == 0;
@@ -139,7 +121,6 @@ public sealed partial class StageMacroRunner
             bool placementCompletedThisIteration = false;
             if (terminalCandidate is null &&
                 recovery is null &&
-                fast &&
                 !placed &&
                 PlacementExecutionPlan.IsAfterStartDue(
                     delayedSteps[nextFastStep],
@@ -160,24 +141,6 @@ public sealed partial class StageMacroRunner
                     nextFastStep >= delayedSteps.Count;
                 placementCompletedThisIteration = true;
             }
-            else if (terminalCandidate is null &&
-                recovery is null &&
-                !fast &&
-                !placed &&
-                matchRuntime.Elapsed >= TimeSpan.FromSeconds(delaySeconds))
-            {
-                placed = true;
-                await PlayPlacementAsync(
-                    window,
-                    delayedPlacement!,
-                    delayedSteps,
-                    story,
-                    raid,
-                    cancelPlacementKey,
-                    cancellationToken).ConfigureAwait(false);
-                placementCompletedThisIteration = true;
-            }
-
             if (dropDismissal.Enabled &&
                 placed &&
                 !placementCompletedThisIteration &&

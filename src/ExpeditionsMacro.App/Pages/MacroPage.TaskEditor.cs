@@ -9,23 +9,14 @@ namespace ExpeditionsMacro.App.Pages;
 
 public partial class MacroPage
 {
-    private bool FastTaskWorkflow =>
-        _services.Settings.FastNoAlignEnabled;
-
     private void TaskKindCombo_SelectionChanged(
         object sender,
         SelectionChangedEventArgs e)
     {
-        if (TaskPresetCombo is null) return;
         SyncTaskKindButtons();
-        RefreshVisiblePresets();
+        RefreshVisibleRoutes();
         UpdateTaskTargetEditor();
     }
-
-    private void TaskPresetCombo_SelectionChanged(
-        object sender,
-        SelectionChangedEventArgs e) =>
-        UpdateTaskTargetEditor();
 
     private void TaskRouteCombo_SelectionChanged(
         object sender,
@@ -39,9 +30,7 @@ public partial class MacroPage
         try
         {
             MacroTaskDefinition definition =
-                FastTaskWorkflow
-                    ? BuildPlacementSetupTask()
-                    : BuildLegacyPresetTask();
+                BuildPlacementSetupTask();
             int existingIndex =
                 IndexOfTask(_editingTaskId);
             MacroTaskProgress progress =
@@ -132,45 +121,46 @@ public partial class MacroPage
         string name = kind == MacroTaskKind.Challenge
             ? "Challenge rotation"
             : route!.Name;
-        MacroTaskDefinition definition = new()
-        {
-            Id = _editingTaskId ??
-                $"task-{Guid.NewGuid():N}",
-            Kind = kind,
-            Name = name,
-            Priority = 1,
-            PlacementTarget = route?.Target,
-            TargetVictories =
-                runtimeTarget ? 1 : target,
-            TargetRuntimeMinutes =
-                runtimeTarget ? target : 180,
-            CompleteOnRuntimeDefeat =
-                runtimeTarget,
-            Difficulty = difficulty,
-            HardMode =
-                TaskHardModeCheck.IsChecked == true,
-            DefeatRetries = retries,
-            RunTraitChallenge =
-                TaskTraitCheck.IsChecked == true,
-            RunStatChallenge =
-                TaskStatCheck.IsChecked == true,
-            RunSpriteChallenge =
-                TaskSpriteCheck.IsChecked == true,
-            ExtractAtCheckpoint =
-                TaskExtractCheck.IsChecked == true,
-            BossesBeforeExtract = bosses,
-        };
+        MacroTaskDefinition definition =
+            StoryHardModePolicy.Normalize(
+                new MacroTaskDefinition
+                {
+                    Id = _editingTaskId ??
+                        $"task-{Guid.NewGuid():N}",
+                    Kind = kind,
+                    Name = name,
+                    Priority = 1,
+                    PlacementTarget = route?.Target,
+                    TargetVictories =
+                        runtimeTarget ? 1 : target,
+                    TargetRuntimeMinutes =
+                        runtimeTarget ? target : 180,
+                    CompleteOnRuntimeDefeat =
+                        runtimeTarget,
+                    Difficulty = difficulty,
+                    HardMode =
+                        TaskHardModeCheck.IsChecked == true,
+                    DefeatRetries = retries,
+                    RunTraitChallenge =
+                        TaskTraitCheck.IsChecked == true,
+                    RunStatChallenge =
+                        TaskStatCheck.IsChecked == true,
+                    RunSpriteChallenge =
+                        TaskSpriteCheck.IsChecked == true,
+                    ExtractAtCheckpoint =
+                        TaskExtractCheck.IsChecked == true,
+                    BossesBeforeExtract = bosses,
+                });
         definition.Validate();
         return definition;
     }
 
     private void BeginTaskEdit(MacroTaskRow row)
     {
-        if (FastTaskWorkflow &&
-            !row.Definition.UsesPlacementSetup)
+        if (!row.Definition.UsesPlacementSetup)
         {
             ShowPlanBlocksStatus(
-                "This is a legacy preset task. Remove it and add a Fast no align route to replace it.");
+                "This legacy preset task is read-only. Remove it and add a Placement Setup route to replace it.");
             return;
         }
         PopulateTaskDestinations(
@@ -182,22 +172,8 @@ public partial class MacroPage
                 .First(value =>
                     value.Value ==
                     row.Definition.Kind);
-        RefreshVisiblePresets();
-        if (FastTaskWorkflow &&
-            row.Definition.UsesPlacementSetup)
-        {
-            ApplyPlacementSetupTask(row.Definition);
-        }
-        else
-        {
-            TaskPresetCombo.SelectedItem =
-                _visiblePresets.FirstOrDefault(
-                    value =>
-                        value.Kind ==
-                            row.Definition.Kind &&
-                        value.Id ==
-                            row.Definition.PresetId);
-        }
+        RefreshVisibleRoutes();
+        ApplyPlacementSetupTask(row.Definition);
         TaskTargetText.Text =
             row.Definition.CompleteOnRuntimeDefeat
                 ? row.Definition
@@ -299,76 +275,12 @@ public partial class MacroPage
 
     private void UpdateTaskTargetEditor()
     {
-        if (SharePlanCard is not null)
-        {
-            SharePlanCard.Visibility =
-                FastTaskWorkflow
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
-        }
         if (TaskTargetLabel is null ||
             TaskTargetText is null)
         {
             return;
         }
-        if (FastTaskWorkflow)
-        {
-            UpdatePlacementSetupTaskEditor();
-            return;
-        }
-
-        TaskSelectionLabel.Text = "Preset";
-        TaskSelectionPanel.Visibility =
-            Visibility.Visible;
-        TaskSelectionGapColumn.Width =
-            new GridLength(16);
-        TaskSelectionColumn.Width =
-            new GridLength(
-                1,
-                GridUnitType.Star);
-        TaskTargetColumn.Width =
-            new GridLength(132);
-        TaskPresetCombo.Visibility =
-            Visibility.Visible;
-        TaskRouteCombo.Visibility =
-            Visibility.Collapsed;
-        FastTaskOptionsPanel.Visibility =
-            Visibility.Collapsed;
-        MacroTaskKind kind = SelectedTaskKind();
-        bool challenge =
-            kind == MacroTaskKind.Challenge;
-        bool runtime =
-            TaskPresetCombo.SelectedItem is
-                MacroPresetChoice preset &&
-            IsInfiniteStory(preset);
-        TaskTargetLabel.Text = challenge
-            ? "Schedule"
-            : runtime
-                ? "Runtime, min"
-                : "Victories";
-        TaskTargetLabel.Visibility =
-            Visibility.Visible;
-        TaskTargetText.IsEnabled =
-            !challenge &&
-            !_services.Coordinator.IsBusy;
-        if (challenge)
-        {
-            TaskTargetText.Text = "Every reset";
-        }
-        else if (runtime &&
-                 !int.TryParse(
-                     TaskTargetText.Text,
-                     out _))
-        {
-            TaskTargetText.Text = "180";
-        }
-        else if (!runtime &&
-                 !int.TryParse(
-                     TaskTargetText.Text,
-                     out _))
-        {
-            TaskTargetText.Text = "1";
-        }
+        UpdatePlacementSetupTaskEditor();
     }
 
     private void UpdatePlacementSetupTaskEditor()
@@ -414,8 +326,6 @@ public partial class MacroPage
                     1,
                     GridUnitType.Star)
                 : new GridLength(132);
-        TaskPresetCombo.Visibility =
-            Visibility.Collapsed;
         TaskRouteCombo.Visibility =
             challenge
                 ? Visibility.Collapsed
@@ -434,8 +344,15 @@ public partial class MacroPage
             expedition
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+        bool supportsHardMode =
+            story &&
+            SelectedStoryRouteSupportsHardMode();
+        if (!supportsHardMode)
+        {
+            TaskHardModeCheck.IsChecked = false;
+        }
         TaskStoryOptionsPanel.Visibility =
-            story
+            supportsHardMode
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         TaskTargetLabel.Text = challenge
@@ -469,6 +386,12 @@ public partial class MacroPage
             TaskTargetText.Text = "1";
         }
     }
+
+    private bool SelectedStoryRouteSupportsHardMode() =>
+        TaskRouteCombo.SelectedItem is
+            PlacementSetupRoute route &&
+        StoryHardModePolicy.SupportsHardMode(
+            route.Target);
 
     private static int ParseWholeNumber(
         TextBox field,

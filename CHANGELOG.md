@@ -4,6 +4,26 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.33] - 2026-07-27
+
+### Changed
+
+- Placement Setup is now Fast-only. Camera Models, learned yaw alignment, and their authoring surfaces are removed; public-beta plans and presets that still contain legacy camera-model fields remain readable but stop safely with clear replacement guidance before Roblox input.
+- UI recognition waits across navigation, recovery, setup, match start, and terminal handoff are observation-aware for slower devices while preserving each workflow's hard deadline and input-attempt cap.
+- Story Hard mode is available only for Act routes. Mastery and Infinite routes hide the unsupported option and clear any stale Hard-mode value.
+
+### Fixed
+
+- Settings preparation recognizes the field-observed high-contrast gear without accepting selected, shifted, or unrelated top-bar controls.
+- Event navigation recognizes the shifted Act selector before retained home evidence, waits for delayed Event content, and accepts a selected Villain Invasion home whose decorative header has not finished rendering while still requiring its owned selected tab and live Event Gamemode action.
+- Navigation and recovery actions now require fresh state-owned evidence, bounded retries and recovery transactions, and never authorize input from a static fallback coordinate.
+- Manual recording playback accepts the one-pixel client-coordinate variance observed after acknowledged pointer movement while retaining its focus, timing, button-state, and drift safeguards.
+- Fast-only cleanup preserves automatic Macro Plan and Placement Setup saving, editable placement phases, Auto Upgrade priorities, recording exclusivity, and the existing pinned-Roblox coverage policy.
+
+### Tests
+
+- Revalidated all 1,181 application and detector tests, all 5 Deep Debug Viewer tests, repository policy, and 66 dark/light UI snapshots.
+
 ## [1.3.0-beta.32] - 2026-07-27
 
 ### Added
@@ -996,7 +1016,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.32...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.33...HEAD
+[1.3.0-beta.33]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.32...v1.3.0-beta.33
 [1.3.0-beta.32]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.31...v1.3.0-beta.32
 [1.3.0-beta.31]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.30...v1.3.0-beta.31
 [1.3.0-beta.30]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.28...v1.3.0-beta.30

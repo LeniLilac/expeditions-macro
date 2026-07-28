@@ -503,7 +503,7 @@ public sealed class CoreModelTests
     }
 
     [Fact]
-    public void AppPaths_CreatesTheDiagnosticsFolder()
+    public void AppPaths_CreatesActiveFoldersWithoutRecreatingRetiredCameraFolders()
     {
         string root = TestPaths.NewTemporaryDirectory();
         try
@@ -513,6 +513,20 @@ public sealed class CoreModelTests
 
             Assert.True(Directory.Exists(paths.Diagnostics));
             Assert.StartsWith(Path.GetFullPath(root), Path.GetFullPath(paths.Diagnostics), StringComparison.OrdinalIgnoreCase);
+            Assert.False(Directory.Exists(paths.CameraModels));
+            Assert.False(Directory.Exists(paths.CameraShortcuts));
+
+            Directory.CreateDirectory(paths.CameraModels);
+            Directory.CreateDirectory(paths.CameraShortcuts);
+            string legacyModel = Path.Combine(paths.CameraModels, "legacy.txt");
+            string legacyShortcut = Path.Combine(paths.CameraShortcuts, "legacy.json");
+            File.WriteAllText(legacyModel, "keep");
+            File.WriteAllText(legacyShortcut, "keep");
+
+            paths.EnsureCreated();
+
+            Assert.True(File.Exists(legacyModel));
+            Assert.True(File.Exists(legacyShortcut));
         }
         finally
         {

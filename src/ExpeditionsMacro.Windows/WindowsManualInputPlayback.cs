@@ -159,8 +159,6 @@ internal sealed class WindowsManualInputSink :
         System.Diagnostics.Stopwatch.StartNew();
     private ClientBounds _bounds;
     private long _nextBoundsRefreshMilliseconds;
-    private (int X, int Y)? _lastClientPosition;
-
     public WindowsManualInputSink(
         IRobloxAutomation automation,
         RobloxWindow window,
@@ -242,8 +240,6 @@ internal sealed class WindowsManualInputSink :
             screenY,
             nudgeX,
             "Windows could not establish the recorded pointer start.");
-        _lastClientPosition =
-            (clientX, clientY);
         VerifyPointer(
             clientX,
             clientY);
@@ -331,11 +327,6 @@ internal sealed class WindowsManualInputSink :
         (int X, int Y) target = (
             input.ClientX!.Value,
             input.ClientY!.Value);
-        if (_lastClientPosition != target)
-        {
-            throw new InvalidOperationException(
-                "Recorded pointer movement was missing before a mouse action.");
-        }
         VerifyPointer(
             target.X,
             target.Y);
@@ -347,17 +338,24 @@ internal sealed class WindowsManualInputSink :
     {
         if (!NativeMethods.GetCursorPos(
                 out NativeMethods.Point pointer) ||
-            Math.Abs(
-                pointer.X -
-                (_bounds.X + clientX)) > 1 ||
-            Math.Abs(
-                pointer.Y -
-                (_bounds.Y + clientY)) > 1)
+            !IsPointerAtRecordedPosition(
+                pointer,
+                _bounds,
+                clientX,
+                clientY))
         {
             throw new InvalidOperationException(
                 "Windows did not preserve the recorded pointer path before a mouse action.");
         }
     }
+
+    internal static bool IsPointerAtRecordedPosition(
+        NativeMethods.Point pointer,
+        ClientBounds bounds,
+        int clientX,
+        int clientY) =>
+        Math.Abs(pointer.X - (bounds.X + clientX)) <= 1 &&
+        Math.Abs(pointer.Y - (bounds.Y + clientY)) <= 1;
 
     private void MoveTo(ManualInputEvent input)
     {
@@ -377,9 +375,6 @@ internal sealed class WindowsManualInputSink :
             data: 0,
             normalizedX,
             normalizedY);
-        _lastClientPosition = (
-            input.ClientX.Value,
-            input.ClientY.Value);
     }
 
     private static void SendKey(

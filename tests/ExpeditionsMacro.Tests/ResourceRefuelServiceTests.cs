@@ -362,13 +362,6 @@ public sealed class ResourceRefuelServiceTests
             CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
-        public Task PulseCameraYawAsync(
-            RobloxWindow window,
-            CameraYawDirection direction,
-            int holdMilliseconds,
-            CancellationToken cancellationToken) =>
-            Task.CompletedTask;
-
         public Task ZoomOutFullyAsync(
             RobloxWindow window,
             int ticks,

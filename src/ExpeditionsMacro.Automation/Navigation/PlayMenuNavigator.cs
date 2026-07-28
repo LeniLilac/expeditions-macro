@@ -11,7 +11,11 @@ internal static class PlayMenuNavigator
         char playMenuKey,
         Func<ImageFrame> capture,
         Func<char, CancellationToken, Task> pressKey,
-        Func<TimeSpan, CancellationToken, Task<ImageFrame?>> waitForPreview,
+        Func<
+            ImageFrame?,
+            TimeSpan,
+            CancellationToken,
+            Task<ImageFrame?>> waitForPreview,
         Action<int>? attemptStarted,
         Action<int>? attemptMissed,
         CancellationToken cancellationToken)
@@ -31,6 +35,7 @@ internal static class PlayMenuNavigator
                 ChallengeScreenState.PostMatchPreview)
             {
                 ImageFrame? verified = await waitForPreview(
+                    current,
                     transitionTimeout,
                     cancellationToken).ConfigureAwait(false);
                 if (verified is not null) return verified;
@@ -39,7 +44,10 @@ internal static class PlayMenuNavigator
 
             attemptStarted?.Invoke(attempt);
             await pressKey(key, cancellationToken).ConfigureAwait(false);
-            ImageFrame? preview = await waitForPreview(transitionTimeout, cancellationToken).ConfigureAwait(false);
+            ImageFrame? preview = await waitForPreview(
+                null,
+                transitionTimeout,
+                cancellationToken).ConfigureAwait(false);
             if (preview is not null) return preview;
             attemptMissed?.Invoke(attempt);
         }

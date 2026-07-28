@@ -96,7 +96,7 @@ public sealed partial class ChallengeMacroRunner
             type,
             Log,
             cancellationToken).ConfigureAwait(false);
-        ChallengeScreenMatch detail =
+        (ImageFrame detailFrame, ChallengeScreenMatch detail) =
             await OpenChallengeTypeAsync(
                 window,
                 navigationPreset,
@@ -110,21 +110,14 @@ public sealed partial class ChallengeMacroRunner
                 $"{Label(type)} Challenge is currently on cooldown.");
         }
 
-        ImageFrame available = CaptureClient(window, detector);
-        (int X, int Y)? stage =
-            ChallengeScreenDetector.ActionFor(
-                ChallengeScreenState.ChallengeAvailable,
-                available);
-        if (stage is null)
-        {
-            throw new InvalidOperationException(
-                "The Challenge Select Stage button could not be located.");
-        }
-        await ClickAsync(
-            window,
-            stage.Value.X,
-            stage.Value.Y,
-            cancellationToken).ConfigureAwait(false);
+        await ClickAvailableStageAsync(
+                window,
+                navigationPreset,
+                detector,
+                (detailFrame, detail),
+                Report,
+                cancellationToken)
+            .ConfigureAwait(false);
         (_, ChallengeScreenMatch preview) =
             await WaitForPreviewStartAsync(
             window,

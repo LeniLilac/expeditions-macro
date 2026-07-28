@@ -19,11 +19,6 @@ public partial class MainWindow
     [
         DashboardNav,
         MacroPlanNav,
-        ExpeditionsNav,
-        ChallengesNav,
-        StoryNav,
-        RaidNav,
-        CameraNav,
         PlacementNav,
         RecordingsNav,
         DebugNav,
@@ -110,12 +105,6 @@ public partial class MainWindow
         WorkspaceHeader.Visibility = collapsed
             ? Visibility.Collapsed
             : Visibility.Visible;
-        PresetsHeader.Visibility = collapsed
-            || (!_snapshotMode &&
-                _services.Settings
-                    .FastNoAlignEnabled)
-                ? Visibility.Collapsed
-                : Visibility.Visible;
         ToolsHeader.Visibility = collapsed
             ? Visibility.Collapsed
             : Visibility.Visible;

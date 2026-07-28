@@ -4,9 +4,7 @@ using ExpeditionsMacro.Core.Models;
 namespace ExpeditionsMacro.Automation.Stages;
 
 public sealed record StageRuntimeModels(
-    CameraModel? Camera,
-    PlacementModel? PrestartPlacement,
-    PlacementModel? DelayedPlacement);
+    PlacementModel? Placement);
 
 public enum StageRunOutcome
 {

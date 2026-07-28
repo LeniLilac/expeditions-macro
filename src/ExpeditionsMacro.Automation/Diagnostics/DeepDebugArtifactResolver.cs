@@ -173,9 +173,6 @@ internal sealed class DeepDebugArtifactResolver
                 .ConfigureAwait(false);
         if (preset is null) return;
         AddId(
-            resolved.CameraModelIds,
-            preset.CameraModelId);
-        AddId(
             resolved.PlacementModelIds,
             preset.PlacementModelId);
         AddId(
@@ -211,9 +208,6 @@ internal sealed class DeepDebugArtifactResolver
         foreach (ChallengeMapProfile profile in preset.Maps)
         {
             AddId(
-                resolved.CameraModelIds,
-                profile.CameraModelId);
-            AddId(
                 resolved.PlacementModelIds,
                 profile.PrestartPlacementModelId);
             AddId(
@@ -245,9 +239,6 @@ internal sealed class DeepDebugArtifactResolver
                 .ConfigureAwait(false);
         if (preset is null) return;
         AddId(
-            resolved.CameraModelIds,
-            preset.CameraModelId);
-        AddId(
             resolved.PlacementModelIds,
             preset.PrestartPlacementModelId);
         AddId(
@@ -278,9 +269,6 @@ internal sealed class DeepDebugArtifactResolver
                     $"{safeId}.json"))
                 .ConfigureAwait(false);
         if (preset is null) return;
-        AddId(
-            resolved.CameraModelIds,
-            preset.CameraModelId);
         AddId(
             resolved.PlacementModelIds,
             preset.PrestartPlacementModelId);
@@ -342,8 +330,6 @@ internal sealed class ResolvedArtifacts
     public HashSet<string> StoryPresetIds { get; } =
         new(StringComparer.OrdinalIgnoreCase);
     public HashSet<string> RaidPresetIds { get; } =
-        new(StringComparer.OrdinalIgnoreCase);
-    public HashSet<string> CameraModelIds { get; } =
         new(StringComparer.OrdinalIgnoreCase);
     public HashSet<string> PlacementModelIds { get; } =
         new(StringComparer.OrdinalIgnoreCase);

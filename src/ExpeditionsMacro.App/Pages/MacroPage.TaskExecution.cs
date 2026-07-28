@@ -1,4 +1,3 @@
-using ExpeditionsMacro.Automation.Camera;
 using ExpeditionsMacro.Automation.Challenges;
 using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Scheduling;
@@ -123,6 +122,9 @@ public partial class MacroPage
                 .ConfigureAwait(false)
                 ?? throw new InvalidOperationException(
                     $"Challenge preset '{task.PresetId}' could not be loaded.");
+            CameraPreparationExecutionPolicy.ValidateForExecution(
+                preset.CameraPreparationMode,
+                "The selected Challenge preset");
             preset.ValidateReady();
             models = await LoadChallengeModelsAsync(
                 preset,
@@ -144,17 +146,12 @@ public partial class MacroPage
             entry => DispatchLog(entry),
             value => summary = value,
             cancellationToken,
-            (error, token) => HandleRecoverableFailureAsync(
-                "Challenge Macro",
-                webhook,
-                discordUserId,
-                error,
-                token),
             maximumCompletedRuns: 1,
             returnWhenUnavailable: true,
-            unitMenuKey,
-            macroTotals,
-            cancelPlacementKey).ConfigureAwait(false);
+            unitMenuKey: unitMenuKey,
+            macroTotals: macroTotals,
+            cancelPlacementKey: cancelPlacementKey)
+            .ConfigureAwait(false);
 
         ChallengeRunSummary result = summary
             ?? throw new InvalidOperationException(
@@ -186,7 +183,6 @@ public partial class MacroPage
         CancellationToken cancellationToken)
     {
         ExpeditionPreset preset;
-        CameraModel? camera;
         PlacementModel placement;
         if (task.UsesPlacementSetup)
         {
@@ -195,7 +191,6 @@ public partial class MacroPage
                     task,
                     cancellationToken)
                     .ConfigureAwait(false);
-            camera = null;
         }
         else
         {
@@ -206,17 +201,9 @@ public partial class MacroPage
                 .ConfigureAwait(false)
                 ?? throw new InvalidOperationException(
                     $"Expedition preset '{task.PresetId}' could not be loaded.");
-            camera =
-                preset.CameraPreparationMode ==
-                    CameraPreparationMode.CameraModel
-                    ? await _services.CameraModels
-                        .LoadAsync(
-                            preset.CameraModelId,
-                            cancellationToken)
-                        .ConfigureAwait(false)
-                        ?? throw new InvalidOperationException(
-                            "The selected Expedition camera model could not be loaded.")
-                    : null;
+            CameraPreparationExecutionPolicy.ValidateForExecution(
+                preset.CameraPreparationMode,
+                "The selected Expedition preset");
             placement = await _services.PlacementModels
                 .LoadAsync(
                     preset.PlacementModelId,
@@ -231,7 +218,6 @@ public partial class MacroPage
         ExpeditionRunSummary? summary = null;
         await _services.Expeditions.RunAsync(
             preset,
-            camera,
             placement,
             detector,
             webhook,
@@ -241,13 +227,6 @@ public partial class MacroPage
             value => summary = value,
             cancellationToken,
             stopAfterCurrentRunUtc: null,
-            recoverableFailure: (error, token) =>
-                HandleRecoverableFailureAsync(
-                    "Expeditions Macro",
-                    webhook,
-                    discordUserId,
-                    error,
-                    token),
             maximumRuns: null,
             unitMenuKey,
             continueScheduledRoute: async (
@@ -312,20 +291,19 @@ public partial class MacroPage
                 .ConfigureAwait(false)
                 ?? throw new InvalidOperationException(
                     $"Story preset '{task.PresetId}' could not be loaded.");
+            CameraPreparationExecutionPolicy.ValidateForExecution(
+                preset.CameraPreparationMode,
+                "The selected Story preset");
             models = await LoadStageModelsAsync(
                 preset.CameraPreparationMode,
-                preset.CameraModelId,
                 preset.PrestartPlacementModelId,
-                preset.DelayedPlacementModelId,
                 cancellationToken)
                 .ConfigureAwait(false);
         }
         IDetectorPack detector = await LoadDetectorAsync(
             AnimeExpeditionsDetectorSpec.PackId,
             cancellationToken).ConfigureAwait(false);
-        try
-        {
-            StageRunResult result = await _services.Stages.RunStoryAsync(
+        StageRunResult result = await _services.Stages.RunStoryAsync(
                 preset,
                 models,
                 detector,
@@ -349,29 +327,7 @@ public partial class MacroPage
                 macroTotals: macroTotals,
                 cancelPlacementKey:
                     cancelPlacementKey).ConfigureAwait(false);
-            return ToScheduledResult(result);
-        }
-        catch (CameraAlignmentException error)
-        {
-            await HandleRecoverableFailureAsync(
-                "Story Macro",
-                webhook,
-                discordUserId,
-                error,
-                cancellationToken).ConfigureAwait(false);
-            DispatchLog(new MacroEvent(
-                DateTimeOffset.Now,
-                MacroEventLevel.Warning,
-                $"Story task skipped for {SafeSkipDelay.TotalMinutes:0} minutes after camera alignment failed.",
-                "camera_alignment_skipped",
-                error.BestConfidence));
-            return new ScheduledTaskResult(
-                0,
-                0,
-                TimeSpan.Zero,
-                DateTimeOffset.UtcNow + SafeSkipDelay,
-                Skipped: true);
-        }
+        return ToScheduledResult(result);
     }
 
     private async Task<ScheduledTaskResult> ExecuteRaidAsync(
@@ -405,20 +361,19 @@ public partial class MacroPage
                 .ConfigureAwait(false)
                 ?? throw new InvalidOperationException(
                     $"Raid preset '{task.PresetId}' could not be loaded.");
+            CameraPreparationExecutionPolicy.ValidateForExecution(
+                preset.CameraPreparationMode,
+                "The selected Raid preset");
             models = await LoadStageModelsAsync(
                 preset.CameraPreparationMode,
-                preset.CameraModelId,
                 preset.PrestartPlacementModelId,
-                preset.DelayedPlacementModelId,
                 cancellationToken)
                 .ConfigureAwait(false);
         }
         IDetectorPack detector = await LoadDetectorAsync(
             AnimeExpeditionsDetectorSpec.PackId,
             cancellationToken).ConfigureAwait(false);
-        try
-        {
-            StageRunResult result = await _services.Stages.RunRaidAsync(
+        StageRunResult result = await _services.Stages.RunRaidAsync(
                 preset,
                 models,
                 detector,
@@ -442,29 +397,7 @@ public partial class MacroPage
                 macroTotals: macroTotals,
                 cancelPlacementKey:
                     cancelPlacementKey).ConfigureAwait(false);
-            return ToScheduledResult(result);
-        }
-        catch (CameraAlignmentException error)
-        {
-            await HandleRecoverableFailureAsync(
-                "Raid Macro",
-                webhook,
-                discordUserId,
-                error,
-                cancellationToken).ConfigureAwait(false);
-            DispatchLog(new MacroEvent(
-                DateTimeOffset.Now,
-                MacroEventLevel.Warning,
-                $"Raid task skipped for {SafeSkipDelay.TotalMinutes:0} minutes after camera alignment failed.",
-                "camera_alignment_skipped",
-                error.BestConfidence));
-            return new ScheduledTaskResult(
-                0,
-                0,
-                TimeSpan.Zero,
-                DateTimeOffset.UtcNow + SafeSkipDelay,
-                Skipped: true);
-        }
+        return ToScheduledResult(result);
     }
 
 }

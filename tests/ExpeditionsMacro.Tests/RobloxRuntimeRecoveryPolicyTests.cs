@@ -1,4 +1,3 @@
-using ExpeditionsMacro.Automation.Camera;
 using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Automation.Recovery;
 using ExpeditionsMacro.Core.Runtime;
@@ -19,9 +18,6 @@ public sealed class RobloxRuntimeRecoveryPolicyTests
                     "verified team UI stopped responding")));
         Assert.True(
             RobloxRuntimeRecoveryPolicy.IsRestartCandidate(
-                new CameraWorldNotRenderedException(0.02, 1)));
-        Assert.True(
-            RobloxRuntimeRecoveryPolicy.IsRestartCandidate(
                 new TimeoutException("navigation stalled")));
         Assert.True(
             RobloxRuntimeRecoveryPolicy.IsRestartCandidate(
@@ -29,12 +25,6 @@ public sealed class RobloxRuntimeRecoveryPolicyTests
                     "wrapper",
                     new TimeoutException("nested stall"))));
 
-        Assert.False(
-            RobloxRuntimeRecoveryPolicy.IsRestartCandidate(
-                new CameraAlignmentException(
-                    "ordinary low confidence",
-                    0.4,
-                    3)));
         Assert.False(
             RobloxRuntimeRecoveryPolicy.IsRestartCandidate(
                 new PlayMenuBindingException('P')));

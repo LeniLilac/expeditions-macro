@@ -101,4 +101,35 @@ public static class ExpeditionRunPolicy
             scores.TryGetValue(definition.Name, out double score) &&
             score >= definition.Threshold;
     }
+
+    public static string ActionOwnerState(string action)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(action);
+        return action.ToLowerInvariant() switch
+        {
+            "map_1" or
+            "map_2" or
+            "map_3" or
+            "difficulty_minus" or
+            "difficulty_plus" or
+            "select_stage" => "map_select",
+            "extract" => "checkpoint",
+            "afk" or
+            "disconnect" or
+            "play" or
+            "map_preview" or
+            "checkpoint" or
+            "continue" or
+            "start" or
+            "reward" or
+            "confirm" or
+            "extract_confirm" or
+            "victory" or
+            "defeat" => action.ToLowerInvariant(),
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(action),
+                action,
+                "The Expedition action does not have an owning screen state."),
+        };
+    }
 }

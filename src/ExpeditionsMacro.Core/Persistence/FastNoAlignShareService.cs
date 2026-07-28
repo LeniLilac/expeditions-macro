@@ -173,6 +173,7 @@ public sealed class FastNoAlignShareService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(bundle);
+        bundle = StoryHardModePolicy.Normalize(bundle);
         bundle.Validate();
 
         foreach (PlacementModel setup in

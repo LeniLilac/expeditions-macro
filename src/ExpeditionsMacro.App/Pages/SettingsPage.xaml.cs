@@ -60,8 +60,6 @@ public partial class SettingsPage : UserControl, IAppPage
         ManualRecordingsCheck.IsChecked =
             _services.Settings
                 .ManualInputRecordingEnabled;
-        FastNoAlignCheck.IsChecked =
-            _services.Settings.FastNoAlignEnabled;
         _loading = false;
         VersionText.Text = ProductVersion.Current;
         RobloxText.Text = _services.Automation.FindWindow() is { } window
@@ -119,35 +117,6 @@ public partial class SettingsPage : UserControl, IAppPage
             _loading = true;
             DebugModeCheck.IsChecked =
                 _services.Settings.DebugModeEnabled;
-            _loading = false;
-            throw;
-        }
-        finally
-        {
-            UpdateCaptureState();
-        }
-    }
-
-    private async void FastNoAlignCheck_Changed(
-        object sender,
-        RoutedEventArgs e)
-    {
-        if (_loading) return;
-        FastNoAlignCheck.IsEnabled = false;
-        try
-        {
-            await _services.UpdateSettingsAsync(
-                settings => settings with
-                {
-                    FastNoAlignEnabled =
-                        FastNoAlignCheck.IsChecked == true,
-                });
-        }
-        catch
-        {
-            _loading = true;
-            FastNoAlignCheck.IsChecked =
-                _services.Settings.FastNoAlignEnabled;
             _loading = false;
             throw;
         }
@@ -381,7 +350,6 @@ public partial class SettingsPage : UserControl, IAppPage
         DeepDebugCheck.IsEnabled = !busy;
         DebugModeCheck.IsEnabled = !busy;
         ManualRecordingsCheck.IsEnabled = !busy;
-        FastNoAlignCheck.IsEnabled = !busy;
         KeyBindingsPanel.UpdateBusyState(busy);
         CaptureStopButton.IsEnabled = _captureOperationActive && busy;
         CaptureStopButton.Content = _services.Coordinator.State == OperationState.Armed ? "Cancel" : "Stop and save";

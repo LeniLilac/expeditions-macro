@@ -40,12 +40,6 @@ internal static class TestPaths
         "anime-expeditions",
         "navigation-variants");
 
-    public static string CameraRotations => Path.Combine(
-        RepositoryRoot,
-        "datasets",
-        "anime-expeditions",
-        "camera-rotations");
-
     public static string RefuelDatasets => Path.Combine(
         RepositoryRoot,
         "datasets",

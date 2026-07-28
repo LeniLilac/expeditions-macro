@@ -16,12 +16,6 @@ public readonly record struct RobloxWindow(
         : "process unavailable";
 }
 
-public enum CameraYawDirection
-{
-    Left = -1,
-    Right = 1,
-}
-
 public enum RobloxKeyboardKey
 {
     Backspace,
@@ -42,14 +36,6 @@ public enum RobloxKeyboardKey
     RightArrow,
     DownArrow,
 }
-
-public readonly record struct CameraYawSweepSample(
-    TimeSpan Elapsed,
-    ImageFrame Frame);
-
-public readonly record struct CameraFineYawSweepSample(
-    int Offset,
-    ImageFrame Frame);
 
 public interface IRobloxAutomation
 {
@@ -116,28 +102,6 @@ public interface IRobloxAutomation
     Task ScrollClientAsync(RobloxWindow window, int notches, CancellationToken cancellationToken);
 
     Task DragCameraAsync(RobloxWindow window, int deltaX, int deltaY, int chunkPixels, CancellationToken cancellationToken);
-
-    Task PulseCameraYawAsync(RobloxWindow window, CameraYawDirection direction, int holdMilliseconds, CancellationToken cancellationToken);
-
-    Task CaptureCameraYawSweepAsync(
-        RobloxWindow window,
-        CameraYawDirection direction,
-        TimeSpan maximumDuration,
-        int maximumSamples,
-        int sampleIntervalMilliseconds,
-        Func<CameraYawSweepSample, bool> observe,
-        CancellationToken cancellationToken) =>
-        throw new NotSupportedException(
-            "This automation backend does not support dense camera sweeps.");
-
-    Task CaptureCameraFineYawSweepAsync(
-        RobloxWindow window,
-        int radiusPixels,
-        int sampleStridePixels,
-        Action<CameraFineYawSweepSample> observe,
-        CancellationToken cancellationToken) =>
-        throw new NotSupportedException(
-            "This automation backend does not support dense fine-yaw sweeps.");
 
     Task ZoomOutFullyAsync(RobloxWindow window, int ticks, CancellationToken cancellationToken);
 

@@ -10,7 +10,7 @@ public sealed class CameraPosePreparationServiceTests
     [Fact]
     public async Task PrepareWithoutYaw_ClampsPoseWithoutYawInput()
     {
-        FakeAutomation automation = new(
+        CameraPoseTestAutomation automation = new(
             VisionScorerTests.Pattern(
                 RobloxClientProfile.Width,
                 RobloxClientProfile.Height));
@@ -39,14 +39,13 @@ public sealed class CameraPosePreparationServiceTests
         Assert.All(
             automation.DragShiftLockStates,
             state => Assert.True(state));
-        Assert.Empty(automation.ArrowPulses);
         Assert.False(automation.ShiftLockState);
     }
 
     [Fact]
     public async Task PrepareWithoutYaw_WhenPitchFails_RestoresShiftLock()
     {
-        FakeAutomation automation = new(
+        CameraPoseTestAutomation automation = new(
             VisionScorerTests.Pattern(
                 RobloxClientProfile.Width,
                 RobloxClientProfile.Height))
@@ -64,14 +63,13 @@ public sealed class CameraPosePreparationServiceTests
                 settleMilliseconds: 25));
 
         Assert.Equal(2, automation.ShiftLockKeys.Count);
-        Assert.Empty(automation.ArrowPulses);
         Assert.False(automation.ShiftLockState);
     }
 
     [Fact]
     public async Task PreparePitchOnly_PreservesZoomAndYaw()
     {
-        FakeAutomation automation = new(
+        CameraPoseTestAutomation automation = new(
             VisionScorerTests.Pattern(
                 RobloxClientProfile.Width,
                 RobloxClientProfile.Height));
@@ -98,7 +96,6 @@ public sealed class CameraPosePreparationServiceTests
         Assert.All(
             automation.DragShiftLockStates,
             state => Assert.True(state));
-        Assert.Empty(automation.ArrowPulses);
         Assert.False(automation.ShiftLockState);
     }
 }

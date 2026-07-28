@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
 
@@ -101,7 +102,7 @@ public sealed class AppSettingsStoreTests
                 await File.ReadAllTextAsync(
                     paths.SettingsFile);
             Assert.Contains(
-                "\"schema_version\": 3",
+                "\"schema_version\": 4",
                 normalized,
                 StringComparison.Ordinal);
 
@@ -166,6 +167,121 @@ public sealed class AppSettingsStoreTests
             Assert.Equal(
                 AppSettings.CurrentSchemaVersion,
                 migrated.SchemaVersion);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task
+        SchemaThreeFastNoAlignChoice_IsRetiredWithoutLosingSettings()
+    {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            $"expeditions-settings-{Guid.NewGuid():N}");
+        const string schemaThree =
+            """
+            {
+              "schema_version": 3,
+              "theme": "light",
+              "selected_preset_id": "legacy-expedition",
+              "selected_challenge_preset_id": "legacy-challenge",
+              "selected_story_preset_id": "legacy-story",
+              "selected_raid_preset_id": "legacy-raid",
+              "selected_macro_plan_id": "legacy-plan",
+              "encrypted_webhook": "protected-webhook",
+              "encrypted_private_server_link": "protected-server",
+              "restart_roblox_with_private_server": false,
+              "restart_roblox_at_macro_start": false,
+              "discord_error_user_id": "123456789012345678",
+              "auto_capture_on_macro_error": false,
+              "include_logs_in_diagnostic_archives": false,
+              "deep_debug_enabled": true,
+              "debug_mode_enabled": true,
+              "auto_check_ui_scale_on_start": false,
+              "auto_check_game_settings_on_start": true,
+              "fast_no_align_enabled": false,
+              "manual_input_recording_enabled": true,
+              "minimize_during_automation": true,
+              "macro_hotkey_virtual_key": 119,
+              "shift_lock_virtual_key": 160,
+              "play_menu_key": "P",
+              "unit_menu_key": "H",
+              "areas_menu_key": "U",
+              "cancel_placement_key": "Z",
+              "change_unit_targeting_key": "R",
+              "upgrade_unit_key": "T",
+              "auto_upgrade_unit_key": "K",
+              "toggle_auto_upgrade_unit_key": "L"
+            }
+            """;
+        try
+        {
+            AppPaths paths = new(root);
+            paths.EnsureCreated();
+            await File.WriteAllTextAsync(
+                paths.SettingsFile,
+                schemaThree);
+
+            AppSettings loaded =
+                await new AppSettingsStore(paths).LoadAsync();
+            string normalized =
+                await File.ReadAllTextAsync(
+                    paths.SettingsFile);
+
+            Assert.Equal(
+                AppSettings.CurrentSchemaVersion,
+                loaded.SchemaVersion);
+            Assert.Equal(AppTheme.Light, loaded.Theme);
+            Assert.False(
+                loaded.RestartRobloxWithPrivateServer);
+            Assert.False(
+                loaded.RestartRobloxAtMacroStart);
+            Assert.False(
+                loaded.AutoCheckUiScaleOnStart);
+            Assert.True(
+                loaded.AutoCheckGameSettingsOnStart);
+            Assert.True(
+                loaded.ManualInputRecordingEnabled);
+            Assert.True(loaded.MinimizeDuringAutomation);
+            Assert.DoesNotContain(
+                "fast_no_align_enabled",
+                normalized,
+                StringComparison.Ordinal);
+
+            using JsonDocument before =
+                JsonDocument.Parse(schemaThree);
+            using JsonDocument after =
+                JsonDocument.Parse(normalized);
+            Assert.Equal(
+                AppSettings.CurrentSchemaVersion,
+                after.RootElement
+                    .GetProperty("schema_version")
+                    .GetInt32());
+            foreach (JsonProperty property in
+                     before.RootElement
+                         .EnumerateObject()
+                         .Where(property =>
+                             property.Name is not
+                                 ("schema_version" or
+                                  "fast_no_align_enabled")))
+            {
+                Assert.True(
+                    after.RootElement.TryGetProperty(
+                        property.Name,
+                        out JsonElement migrated),
+                    $"The migrated settings lost {property.Name}.");
+                Assert.True(
+                    JsonElement.DeepEquals(
+                        property.Value,
+                        migrated),
+                    $"The migrated settings changed {property.Name}.");
+            }
         }
         finally
         {
@@ -324,7 +440,7 @@ public sealed class AppSettingsStoreTests
     }
 
     [Fact]
-    public async Task Beta20Settings_DefaultToFastNoAlignWithoutLosingLegacySelections()
+    public async Task Beta20Settings_PreserveLegacySelections()
     {
         string root = Path.Combine(
             Path.GetTempPath(),
@@ -348,7 +464,6 @@ public sealed class AppSettingsStoreTests
             AppSettings loaded =
                 await new AppSettingsStore(paths).LoadAsync();
 
-            Assert.True(loaded.FastNoAlignEnabled);
             Assert.Equal(
                 "legacy-expedition",
                 loaded.SelectedPresetId);
@@ -424,7 +539,6 @@ public sealed class AppSettingsStoreTests
                 loaded.AutoCheckUiScaleOnStart);
             Assert.True(
                 loaded.AutoCheckGameSettingsOnStart);
-            Assert.True(loaded.FastNoAlignEnabled);
             Assert.Equal("123456789012345678", loaded.DiscordErrorUserId);
             Assert.Equal(KeyboardKey.RightShift, loaded.ShiftLockVirtualKey);
             Assert.Equal("G", loaded.AreasMenuKey);

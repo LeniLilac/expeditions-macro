@@ -349,7 +349,8 @@ public sealed class PlacementService
             SelectionTimeoutMilliseconds /
             SelectionPollMilliseconds);
         for (int sample = 0;
-             sample < samples;
+             sample < samples ||
+             stable > 0;
              sample++)
         {
             EnsureFocus(window);
@@ -362,7 +363,8 @@ public sealed class PlacementService
             {
                 return true;
             }
-            if (sample + 1 < samples)
+            if (sample + 1 < samples ||
+                stable > 0)
             {
                 await Task.Delay(
                     SelectionPollMilliseconds,
@@ -430,7 +432,8 @@ public sealed class PlacementService
     {
         int stable = 0;
         for (int sample = 0;
-             sample < SelectionDismissSamples;
+             sample < SelectionDismissSamples ||
+             stable > 0;
              sample++)
         {
             EnsureFocus(window);
@@ -444,7 +447,8 @@ public sealed class PlacementService
                 return true;
             }
             if (sample + 1 <
-                SelectionDismissSamples)
+                    SelectionDismissSamples ||
+                stable > 0)
             {
                 await Task.Delay(
                     SelectionDismissPollMilliseconds,

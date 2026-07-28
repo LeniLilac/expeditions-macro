@@ -240,7 +240,8 @@ public sealed class DetectionOptimizationTests
             Path.Combine(
                 TestPaths.StageDatasets,
                 "StoryVictory_Act_01.png"));
-        FakeAutomation automation = new(frame);
+        CameraPoseTestAutomation automation =
+            new(frame);
         DetectionBenchmarkService service =
             new(automation);
 

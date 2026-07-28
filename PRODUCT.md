@@ -6,11 +6,11 @@ product
 
 ## Users
 
-Windows players configuring and supervising repeatable Anime Expeditions runs in Roblox. They need to create camera and placement models, choose a route, start or stop automation quickly, and understand the current run state without studying the interface.
+Windows players configuring and supervising repeatable Anime Expeditions runs in Roblox. They need to choose routes, create Placement Setups, start or stop automation quickly, and understand the current run state without studying the interface.
 
 ## Product Purpose
 
-Provide one dependable desktop tool for camera alignment, unit placement, Expeditions progression, recovery, and optional run reporting. Success means a user can configure a run once, start it with the chosen global hotkey, and trust the app to make its state and any required intervention obvious.
+Provide one dependable desktop tool for deterministic Fast pose preparation, unit placement, mode progression, recovery, and optional run reporting. Success means a user can configure a run once, have every committed plan and Placement Setup change saved automatically, start it with the chosen global hotkey, and trust the app to make its state and any required intervention obvious.
 
 ## Brand Personality
 
@@ -25,7 +25,7 @@ Avoid legacy auto-clicker and WinForms aesthetics, oversized controls, nested ca
 - Keep the current action and automation state unmistakable.
 - Prefer compact, aligned controls with enough room for real values and localization.
 - Reveal advanced tuning progressively while keeping the primary workflow calm.
-- Use one consistent visual and interaction system across Expeditions, camera models, placements, and settings.
+- Use one consistent visual and interaction system across Macro Plan, Placement Setup, recordings, and settings.
 - Treat recovery, validation, and stopping behavior as first-class product states.
 
 ## Accessibility & Inclusion

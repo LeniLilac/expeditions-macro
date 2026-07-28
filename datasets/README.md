@@ -1,6 +1,8 @@
 # Detector image dataset
 
-This repository includes 484 image fixtures used to build and regression-test the bundled Anime Expeditions detector pack, specialized UI detectors, and automatic camera-region selection. Of these, 481 are 808 by 611 Roblox client captures: 286 Expeditions fixtures, 81 selective Challenge fixtures, 50 Story/Raid/team/placement fixtures, 11 navigation variants, 15 camera fixtures, 6 experimental resource-refuel fixtures, 15 game-settings fixtures, and 17 Event fixtures. The remaining three are privacy-safe 304 by 192 grayscale camera composites derived from a reported runtime-alignment failure. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
+This repository includes 467 reviewed 808 by 611 Roblox client image fixtures used to build and regression-test the bundled Anime Expeditions detector pack and specialized UI detectors: 286 Expeditions fixtures, 81 selective Challenge fixtures, 50 Story/Raid/team/placement fixtures, 11 navigation variants, 6 experimental resource-refuel fixtures, 15 game-settings fixtures, and 18 Event fixtures. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
+
+There is no camera-model, yaw-atlas, or automatic camera-region dataset. Beta.33 supports only deterministic Fast preparation, and the retired Camera Model workflow is retained solely as a deserialize-and-migrate compatibility boundary for public-beta user data.
 
 Captures are 808 by 611 PNG files organized under:
 
@@ -12,11 +14,9 @@ Story, Raid, and saved-team fixtures are organized under `datasets/anime-expedit
 
 Lobby-entry and post-match Story, Raid, Challenge, and Expedition detail variants are organized under `datasets/anime-expeditions/navigation-variants/`. These fixtures prove that **Enter Matchmaking** is optional and that navigation must use the live **Select Stage** action in either party context.
 
-Camera-alignment fixtures are organized under `datasets/anime-expeditions/camera-rotations/`. Each of the three Expedition and four Story/Challenge maps contributes a goal frame plus a clearly incorrect yaw from a continuous right-arrow rotation. These fixtures verify that automatic setup selects four textured regions spanning the left, center, and right of the client and keeps an incorrect yaw well below the alignment threshold. The `RuntimeProjectionDrift` composites additionally verify that final alignment accepts a coherent cross-session vertical projection shift without broadening the thumbnail atlas or accepting a nearby wrong yaw. `UnrenderedWorld` preserves the textureless blue load failure that must be rejected before the macro moves the camera or places units.
-
 Experimental Areas, Gold Mine, and Resource Drill fixtures are organized under `datasets/anime-expeditions/refuel/`. They support only the Debug-page route calibration tool; no released Macro task or automatic refuel schedule consumes them.
 
-Startup settings fixtures are organized under `datasets/anime-expeditions/settings/`. They cover the closed Lobby, both fixed Roblox Settings-gear offsets, the Settings opening animation, supported UI Scale values, each required settings page, and the Units page at both scroll boundaries.
+Startup settings fixtures are organized under `datasets/anime-expeditions/settings/`. They cover the closed Lobby, both fixed Roblox Settings-gear offsets, their normal and derived high-contrast outline behavior, the Settings opening animation, supported UI Scale values, each required settings page, and the Units page at both scroll boundaries.
 
 Villain Invasion Event fixtures are organized under `datasets/anime-expeditions/events/`. They cover the Event catalog when another Event is initially selected, both observed positions of the selected Villain Invasion card, act selection/detail, the horizontally scrolled Act 4 selector and detail, prestart, Defeat, and reviewed Victory action rails—with and without **Next Stage**, including the final Act 4 rail. Event navigation uses these specialized fixtures and remains separate from the shared Play-interface detector because Event is available only from Lobby.
 

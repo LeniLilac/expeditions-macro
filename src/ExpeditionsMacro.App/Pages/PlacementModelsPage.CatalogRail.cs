@@ -38,11 +38,11 @@ public partial class PlacementModelsPage
             CatalogRailToggleButton,
             collapsed
                 ? 0
-                : 2);
+                : 1);
         Grid.SetColumnSpan(
             CatalogRailToggleButton,
             collapsed
-                ? 3
+                ? 2
                 : 1);
         CatalogRailToggleButton.HorizontalAlignment =
             collapsed
@@ -66,21 +66,8 @@ public partial class PlacementModelsPage
 
     private void ApplyCatalogContentVisibility()
     {
-        bool fast = FastWorkflow;
-        ModelsList.Visibility =
-            !_catalogCollapsed && !fast
-                ? Visibility.Visible
-                : Visibility.Collapsed;
         FastSetupList.Visibility =
-            !_catalogCollapsed && fast
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-        NewModelButton.Visibility =
-            !_catalogCollapsed && !fast
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-        DeleteModelButton.Visibility =
-            !_catalogCollapsed && !fast
+            !_catalogCollapsed
                 ? Visibility.Visible
                 : Visibility.Collapsed;
     }

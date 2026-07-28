@@ -27,8 +27,10 @@ Expeditions Macro is a Windows-only .NET/WPF utility that automates repeatable A
 - Workflows standardize Roblox to the canonical client size and leave it there.
 - Only one workflow may own Roblox input. Route operations through the coordinator, remain cancellation-aware, and release held keys, mouse buttons, and temporary shift lock on every exit path.
 - Revalidate and focus the Roblox window before input after delays or external transitions. Use the shared acknowledged-motion click path; do not replace it with direct cursor teleportation.
-- Coarse camera yaw uses extended scan-code arrow pulses; fine yaw uses relative motion while right mouse is held. Never rotate with visible absolute cursor motion.
+- Camera preparation is Fast-only: standardize the client, clamp zoom, and clamp top-down pitch through balanced Shift Lock input. Do not add horizontal yaw correction or learned camera-model execution.
 - Detect and verify each owned state before acting or handing control to another runner. Preserve the transitions recorded in the game-behavior ledger.
+- Every owned UI wait must use fresh, observation-aware evidence while preserving its hard deadline and input-attempt cap. A manifest coordinate or other static fallback never authorizes input.
+- Macro Plan and Placement Setup authoring autosave every committed edit. Flush queued and in-flight writes before switching ownership, starting/exporting, or shutting down.
 - Webhook URLs are secrets: protect them with DPAPI and redact them from errors, logs, captures, tests, and release output.
 
 ## Architecture and source health

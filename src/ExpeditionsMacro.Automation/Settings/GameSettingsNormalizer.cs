@@ -1,3 +1,4 @@
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
@@ -25,6 +26,8 @@ internal sealed class GameSettingsNormalizer
         TimeSpan,
         CancellationToken,
         Task> _delay;
+    private readonly StableGameSettingsControlWaiter
+        _controlWaiter;
 
     public GameSettingsNormalizer(
         IRobloxAutomation automation)
@@ -44,6 +47,10 @@ internal sealed class GameSettingsNormalizer
         _automation = automation;
         _utcNow = utcNow;
         _delay = delay;
+        _controlWaiter = new(
+            utcNow,
+            delay,
+            PollInterval);
     }
 
     public async Task<int> NormalizeAsync(
@@ -214,22 +221,24 @@ internal sealed class GameSettingsNormalizer
         bool clicked = false;
         for (int attempt = 1; attempt <= 2; attempt++)
         {
-            GameSettingToggleMatch current =
-                GameSettingsScreenDetector.DetectToggle(
-                    Capture(window),
-                    requirement.Setting);
-            if (current.State == desired) return clicked;
-            if (current.State ==
-                GameSettingToggleState.Unknown)
+            GameSettingToggleMatch? current =
+                await _controlWaiter.WaitForToggleAsync(
+                        () => Capture(window),
+                        requirement.Setting,
+                        ToggleTimeout,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            if (current is null)
             {
                 throw new InvalidOperationException(
                     $"Anime Expeditions displayed an unrecognized {Label(requirement.Setting)} control. It was not clicked.");
             }
+            if (current.Value.State == desired) return clicked;
 
             await _automation.ClickClientAsync(
                 window,
-                current.ActionX,
-                current.ActionY,
+                current.Value.ActionX,
+                current.Value.ActionY,
                 cancellationToken).ConfigureAwait(false);
             clicked = true;
             if (await WaitForStableAsync(
@@ -259,10 +268,13 @@ internal sealed class GameSettingsNormalizer
     {
         for (int attempt = 1; attempt <= 2; attempt++)
         {
-            ImageFrame frame = Capture(window);
             GameSettingsScrollbarThumb? thumb =
-                GameSettingsScreenDetector
-                    .FindUnitsScrollbarThumb(frame);
+                await _controlWaiter
+                    .WaitForUnitsScrollbarAsync(
+                        () => Capture(window),
+                        PageTimeout,
+                        cancellationToken)
+                    .ConfigureAwait(false);
             if (thumb is null)
             {
                 throw new RobloxUiUnavailableException(
@@ -349,10 +361,14 @@ internal sealed class GameSettingsNormalizer
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
-        DateTimeOffset deadline =
-            _utcNow() + timeout;
         int stableFrames = 0;
-        while (_utcNow() < deadline)
+        ObservationWaitBudget budget = new(
+            timeout,
+            minimumObservations: 2,
+            _utcNow);
+        while (budget.ShouldObserve(
+                   confirmationPending:
+                       stableFrames == 1))
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (predicate(Capture(window)))
@@ -364,6 +380,7 @@ internal sealed class GameSettingsNormalizer
             {
                 stableFrames = 0;
             }
+            budget.MarkObserved();
             await _delay(
                 PollInterval,
                 cancellationToken).ConfigureAwait(false);

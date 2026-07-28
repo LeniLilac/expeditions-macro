@@ -79,14 +79,9 @@ public sealed partial class ExpeditionMacroRunner
 
     private static void ValidateCompatibility(
         ExpeditionPreset preset,
-        CameraModel? camera,
         PlacementModel placement,
         DetectorPackManifest detector)
     {
-        ValidateCameraCompatibility(
-            preset,
-            camera,
-            detector);
         if (!string.Equals(
                 preset.PlacementModelId,
                 placement.Id,
@@ -114,36 +109,4 @@ public sealed partial class ExpeditionMacroRunner
         }
     }
 
-    private static void ValidateCameraCompatibility(
-        ExpeditionPreset preset,
-        CameraModel? camera,
-        DetectorPackManifest detector)
-    {
-        if (preset.CameraPreparationMode !=
-            CameraPreparationMode.CameraModel)
-        {
-            return;
-        }
-        if (camera is null)
-        {
-            throw new InvalidDataException(
-                "The selected camera model could not be loaded.");
-        }
-        if (!string.Equals(
-                preset.CameraModelId,
-                camera.Manifest.Id,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidDataException(
-                "The preset camera model does not match the loaded model.");
-        }
-        if (camera.Manifest.ClientWidth !=
-                detector.ClientWidth ||
-            camera.Manifest.ClientHeight !=
-                detector.ClientHeight)
-        {
-            throw new InvalidDataException(
-                "Camera model and detector pack use different Roblox client sizes.");
-        }
-    }
 }

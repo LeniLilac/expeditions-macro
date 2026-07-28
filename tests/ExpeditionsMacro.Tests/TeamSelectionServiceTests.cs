@@ -196,6 +196,120 @@ public sealed class TeamSelectionServiceTests
             automation.Actions);
     }
 
+    [Fact]
+    public async Task Select_SlowTopObservationsDoNotConsumeTheNextBoundedDrag()
+    {
+        FakeAutomation automation = new(
+            teamSlot: 1,
+            equipmentFixture: "TeamEquipmentConfirm_01.png",
+            initialTeamFixture: "TeamList_Aligned_Team2_01.png",
+            topDragFixtures:
+            [
+                "TeamList_Aligned_Team2_01.png",
+                "TeamList_Aligned_Team1_Current_01.png",
+            ]);
+        DateTimeOffset now = DateTimeOffset.UnixEpoch;
+        automation.CaptureObserved =
+            () => now += TimeSpan.FromSeconds(8);
+        TeamSelectionService service = new(
+            automation,
+            () => now,
+            static (_, _) => Task.CompletedTask);
+
+        await service.SelectAsync(
+            automation.Window,
+            teamSlot: 1,
+            unitMenuKey: 'u');
+
+        Assert.Equal(
+            2,
+            automation.Actions.Count(action =>
+                action.EndsWith(
+                    $",{TeamScreenDetector.TopScrollbarDragLimitY}",
+                    StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public async Task Select_SlowObservationsDoNotConsumeTheNextTeamAlignmentDrag()
+    {
+        FakeAutomation automation = new(
+            teamSlot: 3,
+            equipmentFixture: "TeamEquipmentConfirm_01.png",
+            settledDragFixtures:
+            [
+                "TeamList_Aligned_Team2_01.png",
+                "TeamList_Aligned_Team3_01.png",
+            ]);
+        DateTimeOffset now = DateTimeOffset.UnixEpoch;
+        automation.CaptureObserved =
+            () => now += TimeSpan.FromSeconds(8);
+        TeamSelectionService service = new(
+            automation,
+            () => now,
+            static (_, _) => Task.CompletedTask);
+
+        await service.SelectAsync(
+            automation.Window,
+            teamSlot: 3,
+            unitMenuKey: 'u');
+
+        Assert.Equal(
+            2,
+            automation.Actions.Count(action =>
+                action.StartsWith(
+                    "drag:",
+                    StringComparison.Ordinal)));
+        TeamScrollbarThumb thumb =
+            TeamScreenDetector.FindScrollbarThumb(
+                automation.AlignedTeamFrame)!.Value;
+        (int X, int Y) action =
+            TeamScreenDetector.AlignedLoadTeamAction(
+                automation.AlignedTeamFrame,
+                teamSlot: 3,
+                thumb.CenterY)!.Value;
+        Assert.Contains(
+            $"click:{action.X},{action.Y}",
+            automation.Actions);
+    }
+
+    [Fact]
+    public async Task Select_TopNormalizationStopsAfterThreeBoundedDrags()
+    {
+        FakeAutomation automation = new(
+            teamSlot: 1,
+            equipmentFixture: "TeamEquipmentConfirm_01.png",
+            initialTeamFixture: "TeamList_Aligned_Team2_01.png",
+            topDragFixtures:
+            [
+                "TeamList_Aligned_Team2_01.png",
+                "TeamList_Aligned_Team2_01.png",
+                "TeamList_Aligned_Team2_01.png",
+            ]);
+        DateTimeOffset now = DateTimeOffset.UnixEpoch;
+        TeamSelectionService service = new(
+            automation,
+            () => now,
+            static (_, _) => Task.CompletedTask);
+
+        RobloxUiUnavailableException error =
+            await Assert.ThrowsAsync<RobloxUiUnavailableException>(
+                () => service.SelectAsync(
+                    automation.Window,
+                    teamSlot: 1,
+                    unitMenuKey: 'u'));
+
+        Assert.Contains(
+            "after 3 bounded drag attempts",
+            error.Message,
+            StringComparison.Ordinal);
+        Assert.Equal(
+            3,
+            automation.Actions.Count(action =>
+                action.StartsWith(
+                    "drag:",
+                    StringComparison.Ordinal)));
+    }
+
     private sealed class FakeAutomation : IRobloxAutomation
     {
         private readonly IReadOnlyDictionary<TeamScreenState, ImageFrame> _frames;
@@ -204,6 +318,8 @@ public sealed class TeamSelectionServiceTests
         private readonly ImageFrame _topTeamFrame;
         private readonly Queue<ImageFrame>
             _settledDragFrames;
+        private readonly Queue<ImageFrame>
+            _topDragFrames;
         private Queue<ImageFrame> _pendingOpeningFrames = [];
 
         private ImageFrame _teamFrame;
@@ -215,12 +331,18 @@ public sealed class TeamSelectionServiceTests
             string initialTeamFixture =
                 "TeamList_Aligned_Team1_Current_01.png",
             IReadOnlyList<string>?
-                settledDragFixtures = null)
+                settledDragFixtures = null,
+            IReadOnlyList<string>?
+                topDragFixtures = null)
         {
             _teamSlot = teamSlot;
             _openingFrames = openingFixtures?.Select(Load).ToArray() ?? [];
             _settledDragFrames = new Queue<ImageFrame>(
                 settledDragFixtures?
+                    .Select(Load) ??
+                []);
+            _topDragFrames = new Queue<ImageFrame>(
+                topDragFixtures?
                     .Select(Load) ??
                 []);
             _topTeamFrame =
@@ -259,6 +381,8 @@ public sealed class TeamSelectionServiceTests
 
         public int FocusCount { get; private set; }
 
+        public Action? CaptureObserved { get; set; }
+
         public RobloxWindow? FindWindow(string titleFragment = "Roblox") => Window;
 
         public RobloxWindow? ForegroundWindow() => Window;
@@ -282,6 +406,7 @@ public sealed class TeamSelectionServiceTests
 
         public ImageFrame CaptureClient(RobloxWindow window)
         {
+            CaptureObserved?.Invoke();
             if (State != TeamScreenState.Teams)
             {
                 return _frames[State];
@@ -343,7 +468,9 @@ public sealed class TeamSelectionServiceTests
             Assert.Equal(thumb.X, endX);
             if (endY == TeamScreenDetector.TopScrollbarDragLimitY)
             {
-                _teamFrame = _topTeamFrame;
+                _teamFrame = _topDragFrames.Count > 0
+                    ? _topDragFrames.Dequeue()
+                    : _topTeamFrame;
             }
             else if (_settledDragFrames.Count > 0)
             {
@@ -369,8 +496,6 @@ public sealed class TeamSelectionServiceTests
             throw new InvalidOperationException("Team selection must not wheel-scroll over unit cards.");
 
         public Task DragCameraAsync(RobloxWindow window, int deltaX, int deltaY, int chunkPixels, CancellationToken cancellationToken) => Task.CompletedTask;
-
-        public Task PulseCameraYawAsync(RobloxWindow window, CameraYawDirection direction, int holdMilliseconds, CancellationToken cancellationToken) => Task.CompletedTask;
 
         public Task ZoomOutFullyAsync(RobloxWindow window, int ticks, CancellationToken cancellationToken) => Task.CompletedTask;
 

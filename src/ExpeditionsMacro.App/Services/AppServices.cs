@@ -18,7 +18,6 @@ using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
 using ExpeditionsMacro.Core.Runtime;
-using ExpeditionsMacro.Vision.Camera;
 using ExpeditionsMacro.Vision.Diagnostics;
 using ExpeditionsMacro.Vision.Packs;
 using ExpeditionsMacro.Windows;
@@ -59,8 +58,6 @@ public sealed class AppServices : IDisposable
             StoryPresets,
             RaidPresets);
         PresetDeletion = new PresetDeletionService(Presets, ChallengePresets, StoryPresets, RaidPresets, MacroPlans);
-        CameraModels = new CameraModelRepository(Paths);
-        CameraShortcuts = new CameraSpawnShortcutRepository(Paths);
         DetectorPacks = new DetectorPackRepository(Paths);
         WindowsRobloxAutomation automation = new();
         automation.DiagnosticMessage += Log.Info;
@@ -164,11 +161,6 @@ public sealed class AppServices : IDisposable
                 Settings.CancelPlacementKey));
         FastNoAlign = new FastNoAlignPreparationSession(
             CameraPose);
-        Camera = new CameraAlignmentEngine(
-            Automation,
-            CameraModels,
-            CameraShortcuts,
-            posePreparation: CameraPose);
         RobloxRecovery = new RobloxPrivateServerRecoveryService(
             Automation,
             new WindowsRobloxProcessController(),
@@ -194,7 +186,6 @@ public sealed class AppServices : IDisposable
         Teams = new TeamSelectionService(Automation);
         Stages = new StageMacroRunner(
             Automation,
-            Camera,
             Placement,
             Teams,
             _discord,
@@ -207,7 +198,6 @@ public sealed class AppServices : IDisposable
             RobloxRecovery);
         Challenges = new ChallengeMacroRunner(
             Automation,
-            Camera,
             Placement,
             Teams,
             _discord,
@@ -215,7 +205,6 @@ public sealed class AppServices : IDisposable
             ManualRoutes);
         Expeditions = new ExpeditionMacroRunner(
             Automation,
-            Camera,
             Placement,
             Teams,
             _discord,
@@ -248,8 +237,6 @@ public sealed class AppServices : IDisposable
     public MacroPlanRepository MacroPlans { get; }
     public FastNoAlignShareService FastNoAlignShare { get; }
     public PresetDeletionService PresetDeletion { get; }
-    public CameraModelRepository CameraModels { get; }
-    public CameraSpawnShortcutRepository CameraShortcuts { get; }
     public DetectorPackRepository DetectorPacks { get; }
     public DeepDebugSessionService DeepDebug { get; }
     public DebugCheckpointController DebugCheckpoints { get; }
@@ -267,7 +254,6 @@ public sealed class AppServices : IDisposable
     public PlacementRoutePositioningService RoutePositioning { get; }
     public CameraPosePreparationService CameraPose { get; }
     public FastNoAlignPreparationSession FastNoAlign { get; }
-    public CameraAlignmentEngine Camera { get; }
     public RobloxPrivateServerRecoveryService RobloxRecovery { get; }
     public ResourceRefuelService ResourceRefuel { get; }
     public MacroStartupPreflightService StartupPreflight { get; }

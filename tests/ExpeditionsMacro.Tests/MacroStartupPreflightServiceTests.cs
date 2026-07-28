@@ -444,7 +444,17 @@ public sealed partial class MacroStartupPreflightServiceTests
             init;
         }
 
+        public Func<ImageFrame, ImageFrame>? CaptureOverride
+        {
+            get;
+            init;
+        }
+
         public bool IgnoreSettingsGearClicks { get; init; }
+
+        public bool IgnoreGameplayToggleClicks { get; init; }
+
+        public bool IgnoreUnitsScrollbarDrags { get; init; }
 
         public List<(int X, int Y)> Clicks { get; } = [];
 
@@ -516,6 +526,7 @@ public sealed partial class MacroStartupPreflightServiceTests
 
         public ImageFrame CaptureClient(
             RobloxWindow window) =>
+            CaptureOverride?.Invoke(CurrentFrame) ??
             CurrentFrame;
 
         public Task MoveCursorToClientCenterAsync(
@@ -614,7 +625,10 @@ public sealed partial class MacroStartupPreflightServiceTests
             }
             if ((x, y) == (638, 222))
             {
-                CurrentFrame = GameplayFrameAfterToggle;
+                if (!IgnoreGameplayToggleClicks)
+                {
+                    CurrentFrame = GameplayFrameAfterToggle;
+                }
                 return Task.CompletedTask;
             }
             throw new InvalidOperationException(
@@ -630,10 +644,13 @@ public sealed partial class MacroStartupPreflightServiceTests
             CancellationToken cancellationToken)
         {
             Drags.Add((startX, startY, endX, endY));
-            CurrentFrame =
-                endY >= 400
-                    ? _frames.UnitsBottom
-                    : _frames.UnitsTop;
+            if (!IgnoreUnitsScrollbarDrags)
+            {
+                CurrentFrame =
+                    endY >= 400
+                        ? _frames.UnitsBottom
+                        : _frames.UnitsTop;
+            }
             return Task.CompletedTask;
         }
 
@@ -648,13 +665,6 @@ public sealed partial class MacroStartupPreflightServiceTests
             int deltaX,
             int deltaY,
             int chunkPixels,
-            CancellationToken cancellationToken) =>
-            Task.CompletedTask;
-
-        public Task PulseCameraYawAsync(
-            RobloxWindow window,
-            CameraYawDirection direction,
-            int holdMilliseconds,
             CancellationToken cancellationToken) =>
             Task.CompletedTask;
 

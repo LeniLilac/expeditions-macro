@@ -210,67 +210,6 @@ public sealed class DebugSteppingRobloxAutomation : IRobloxAutomation, IDisposab
                 cancellationToken),
             cancellationToken);
 
-    public Task PulseCameraYawAsync(
-        RobloxWindow window,
-        CameraYawDirection direction,
-        int holdMilliseconds,
-        CancellationToken cancellationToken) =>
-        TraceAsync(
-            "Pulse camera yaw",
-            $"Hold {direction} for {holdMilliseconds} ms.",
-            () => _inner.PulseCameraYawAsync(
-                window,
-                direction,
-                holdMilliseconds,
-                cancellationToken),
-            cancellationToken);
-
-    public Task CaptureCameraYawSweepAsync(
-        RobloxWindow window,
-        CameraYawDirection direction,
-        TimeSpan maximumDuration,
-        int maximumSamples,
-        int sampleIntervalMilliseconds,
-        Func<CameraYawSweepSample, bool> observe,
-        CancellationToken cancellationToken) =>
-        TraceAsync(
-            "Capture camera sweep",
-            $"Sweep {direction} for up to {maximumDuration.TotalSeconds:0.#} seconds.",
-            () => _inner.CaptureCameraYawSweepAsync(
-                window,
-                direction,
-                maximumDuration,
-                maximumSamples,
-                sampleIntervalMilliseconds,
-                sample =>
-                {
-                    _checkpoints.RecordFrame(sample.Frame);
-                    return observe(sample);
-                },
-                cancellationToken),
-            cancellationToken);
-
-    public Task CaptureCameraFineYawSweepAsync(
-        RobloxWindow window,
-        int radiusPixels,
-        int sampleStridePixels,
-        Action<CameraFineYawSweepSample> observe,
-        CancellationToken cancellationToken) =>
-        TraceAsync(
-            "Capture fine yaw sweep",
-            $"Sweep ±{radiusPixels} pixels in {sampleStridePixels}-pixel samples.",
-            () => _inner.CaptureCameraFineYawSweepAsync(
-                window,
-                radiusPixels,
-                sampleStridePixels,
-                sample =>
-                {
-                    _checkpoints.RecordFrame(sample.Frame);
-                    observe(sample);
-                },
-                cancellationToken),
-            cancellationToken);
-
     public Task ZoomOutFullyAsync(
         RobloxWindow window,
         int ticks,

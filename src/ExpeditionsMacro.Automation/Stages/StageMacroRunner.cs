@@ -18,7 +18,6 @@ namespace ExpeditionsMacro.Automation.Stages;
 public sealed partial class StageMacroRunner
 {
     private readonly IRobloxAutomation _automation;
-    private readonly CameraAlignmentEngine _camera;
     private readonly FastNoAlignPreparationSession _fastNoAlign;
     private readonly PlacementService _placements;
     private readonly TeamSelectionService _teams;
@@ -27,7 +26,6 @@ public sealed partial class StageMacroRunner
 
     public StageMacroRunner(
         IRobloxAutomation automation,
-        CameraAlignmentEngine camera,
         PlacementService placements,
         TeamSelectionService teams,
         IDiscordNotifier discord,
@@ -35,7 +33,6 @@ public sealed partial class StageMacroRunner
         ManualInputRouteService? manualInputs = null)
     {
         _automation = automation;
-        _camera = camera;
         _fastNoAlign = fastNoAlign ??
             new FastNoAlignPreparationSession(
                 new CameraPosePreparationService(automation));
@@ -78,6 +75,9 @@ public sealed partial class StageMacroRunner
         CameraPreparationMode cameraMode =
             story?.CameraPreparationMode ??
             raid!.CameraPreparationMode;
+        CameraPreparationExecutionPolicy.ValidateForExecution(
+            cameraMode,
+            $"The selected {Label(mode)} preset");
         ManualInputRecording? manualRecording =
             await ValidateAndResolveManualRecordingAsync(
                     mode,
@@ -179,10 +179,10 @@ public sealed partial class StageMacroRunner
                             window,
                             mode,
                             models,
-                            cameraMode,
                             story,
                             raid,
                             detector,
+                            stableDetections,
                             manualRecording,
                             progress,
                             Report,
@@ -194,7 +194,6 @@ public sealed partial class StageMacroRunner
                     await RunConfiguredMatchAsync(
                         window,
                         models,
-                        cameraMode,
                         story,
                         raid,
                         detector,
@@ -262,74 +261,6 @@ public sealed partial class StageMacroRunner
                 if (outcome == StageRunOutcome.Victory || attempts > retries) return last;
                 Write($"Retrying after defeat ({attempts}/{retries + 1}).", MacroEventLevel.Warning);
             }
-            catch (CameraWorldNotRenderedException world)
-                when (autoRecover)
-            {
-                preparation.Invalidate();
-                attempts = Math.Max(0, attempts - 1);
-                string detail =
-                    $"{RouteLabel(mode, story, raid)} loaded without world geometry. Returning through Play and retrying the same stage without placement.";
-                Write(
-                    detail,
-                    MacroEventLevel.Warning,
-                    "camera_world_missing",
-                    world.BestConfidence);
-                Report(
-                    "Recovery",
-                    0,
-                    detail,
-                    "camera_world_missing",
-                    world.BestConfidence);
-                await EnsureGameModeSelectorAsync(
-                    window,
-                    mode,
-                    playMenuKey,
-                    detector,
-                    autoRecover,
-                    stableDetections,
-                    Report,
-                    Write,
-                    cancellationToken).ConfigureAwait(false);
-                continue;
-            }
-            catch (CameraAlignmentException alignment)
-            {
-                Report(
-                    "Handoff",
-                    100,
-                    $"Camera alignment failed. Returning to shared navigation before {Label(mode)} is skipped.",
-                    "camera_alignment_skipped",
-                    alignment.BestConfidence);
-                try
-                {
-                    await EnsureGameModeSelectorAsync(
-                        window,
-                        mode,
-                        playMenuKey,
-                        detector,
-                        autoRecover,
-                        stableDetections,
-                        Report,
-                        Write,
-                        cancellationToken).ConfigureAwait(false);
-                    Write(
-                        $"{Label(mode)} returned to the game-mode selector after camera alignment failed.",
-                        MacroEventLevel.Success,
-                        "game_mode_selector",
-                        null);
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception handoffError)
-                {
-                    throw new RobloxUiUnavailableException(
-                        $"{Label(mode)} camera alignment failed and shared navigation could not be restored.",
-                        new AggregateException(alignment, handoffError));
-                }
-                throw;
-            }
             catch (StageRecoveryException recovery)
             {
                 if (!autoRecover)
@@ -360,80 +291,6 @@ public sealed partial class StageMacroRunner
             log?.Invoke(new MacroEvent(DateTimeOffset.Now, level, message, state, confidence));
         void Report(string phase, int percent, string message, string? state = null, double? confidence = null) =>
             progress?.Report(new MacroProgress(phase, percent, message, state, confidence));
-    }
-
-    private async Task NavigateToPrestartAsync(
-        RobloxWindow window,
-        StageMode mode,
-        StoryPreset? story,
-        RaidPreset? raid,
-        char playMenuKey,
-        IDetectorPack detector,
-        int stableDetections,
-        CancellationToken cancellationToken)
-    {
-        await EnsureGameModeSelectorAsync(
-            window,
-            mode,
-            playMenuKey,
-            detector,
-            autoRecover: false,
-            stableDetections,
-            report: null,
-            log: null,
-            cancellationToken).ConfigureAwait(false);
-        (int tileX, int tileY) = StageScreenDetector.ModeTileAction(mode);
-        await ClickAsync(window, tileX, tileY, cancellationToken).ConfigureAwait(false);
-
-        if (mode == StageMode.Story)
-        {
-            await WaitForStateAsync(window, StageScreenState.StorySelector, NavigationTimeout, detector, stableDetections, cancellationToken).ConfigureAwait(false);
-            Focus(window);
-            await _automation.ScrollClientAsync(window, 20, cancellationToken).ConfigureAwait(false);
-            if (StageScreenDetector.StoryMapRequiresLaterScroll(story!.Map))
-            {
-                Focus(window);
-                await _automation.ScrollClientAsync(window, -10, cancellationToken).ConfigureAwait(false);
-            }
-            (int mapX, int mapY) = StageScreenDetector.StoryMapAction(story.Map);
-            await ClickAsync(window, mapX, mapY, cancellationToken).ConfigureAwait(false);
-            await WaitForStateAsync(window, StageScreenState.StoryDetail, NavigationTimeout, detector, stableDetections, cancellationToken).ConfigureAwait(false);
-            (int runX, int runY) = StageScreenDetector.StoryRunAction(story.RunKind, story.ActNumber);
-            await ClickAsync(window, runX, runY, cancellationToken).ConfigureAwait(false);
-            if (story.RunKind == StoryRunKind.Act)
-            {
-                (int difficultyX, int difficultyY) = StageScreenDetector.StoryDifficultyAction(story.HardMode);
-                await ClickAsync(window, difficultyX, difficultyY, cancellationToken).ConfigureAwait(false);
-            }
-        }
-        else
-        {
-            await WaitForStateAsync(window, StageScreenState.RaidSelector, NavigationTimeout, detector, stableDetections, cancellationToken).ConfigureAwait(false);
-            (int mapX, int mapY) = StageScreenDetector.RaidMapAction;
-            await ClickAsync(window, mapX, mapY, cancellationToken).ConfigureAwait(false);
-            await WaitForStateAsync(window, StageScreenState.RaidDetail, NavigationTimeout, detector, stableDetections, cancellationToken).ConfigureAwait(false);
-            (int actX, int actY) = StageScreenDetector.RaidActAction(raid!.Act);
-            await ClickAsync(window, actX, actY, cancellationToken).ConfigureAwait(false);
-        }
-
-        StageScreenMatch detailMatch = await WaitForStateAsync(
-            window,
-            mode == StageMode.Story
-                ? StageScreenState.StoryDetail
-                : StageScreenState.RaidDetail,
-            NavigationTimeout,
-            detector,
-            stableDetections,
-            cancellationToken).ConfigureAwait(false);
-        if (detailMatch.ActionX is null || detailMatch.ActionY is null)
-        {
-            throw new RobloxUiUnavailableException($"The {Label(mode)} Select Stage button could not be located.");
-        }
-        await ClickAsync(window, detailMatch.ActionX.Value, detailMatch.ActionY.Value, cancellationToken).ConfigureAwait(false);
-        StageScreenMatch preview = await WaitForStateAsync(window, StageScreenState.PreviewReady, NavigationTimeout, detector, stableDetections, cancellationToken).ConfigureAwait(false);
-        if (preview.ActionX is not int previewX || preview.ActionY is not int previewY) throw new RobloxUiUnavailableException($"The {Label(mode)} preview Start button could not be located.");
-        await ClickAsync(window, previewX, previewY, cancellationToken).ConfigureAwait(false);
-        await WaitForStateAsync(window, StageScreenState.Prestart, TimeSpan.FromSeconds(45), detector, stableDetections, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task ClickAsync(RobloxWindow window, int x, int y, CancellationToken cancellationToken)

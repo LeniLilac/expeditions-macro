@@ -117,11 +117,11 @@ public static class RobloxSettingsButtonDetector
             middleRing +
             outerRing;
         bool outline =
-            glyphPixels is >= 96 and <= 142 &&
-            core is >= 5 and <= 11 &&
-            innerRing is >= 16 and <= 28 &&
-            middleRing is >= 36 and <= 58 &&
-            outerRing is >= 30 and <= 50;
+            glyphPixels is >= 96 and <= 170 &&
+            core is >= 5 and <= 14 &&
+            innerRing is >= 16 and <= 34 &&
+            middleRing is >= 36 and <= 72 &&
+            outerRing is >= 30 and <= 60;
         bool selected =
             glyphPixels is >= 190 and <= 275 &&
             core is >= 3 and <= 12 &&

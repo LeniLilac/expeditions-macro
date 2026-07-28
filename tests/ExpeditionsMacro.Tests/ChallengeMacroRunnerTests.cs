@@ -218,7 +218,119 @@ public sealed class ChallengeMacroRunnerTests
                     delay: (_, _) => Task.CompletedTask);
 
         Assert.Null(result);
-        Assert.Equal(2, observations);
+        Assert.Equal(12, observations);
+    }
+
+    [Fact]
+    public async Task PlayMenuWaiter_InitialPreviewSeedsStableActionProof()
+    {
+        ImageFrame initialFrame = new(
+            1,
+            1,
+            PixelFormat.Rgb24,
+            new byte[3],
+            takeOwnership: true);
+        ImageFrame confirmedFrame = initialFrame.Clone();
+        ChallengeScreenMatch initialMatch = new(
+            ChallengeScreenState.PostMatchPreview,
+            0.94,
+            668,
+            377);
+        int observations = 0;
+
+        (ImageFrame Frame, ChallengeScreenMatch Match)? result =
+            await ChallengeMacroRunner
+                .WaitForStableActionAsync(
+                    ChallengeScreenState.PostMatchPreview,
+                    stableDetections: 2,
+                    observe: () =>
+                    {
+                        observations++;
+                        return (
+                            confirmedFrame,
+                            initialMatch with
+                            {
+                                Confidence = 0.95,
+                                ActionX = 669,
+                            });
+                    },
+                    timeout: TimeSpan.FromSeconds(2),
+                    pollMilliseconds: 0,
+                    observed: null,
+                    CancellationToken.None,
+                    delay: (_, _) => Task.CompletedTask,
+                    initialObservation: (
+                        initialFrame,
+                        initialMatch));
+
+        Assert.NotNull(result);
+        Assert.Same(confirmedFrame, result.Value.Frame);
+        Assert.Equal(669, result.Value.Match.ActionX);
+        Assert.Equal(377, result.Value.Match.ActionY);
+        Assert.Equal(1, observations);
+    }
+
+    [Fact]
+    public async Task DefeatRetryWaiter_RequiresFreshStableLiveAction()
+    {
+        ImageFrame initialFrame = new(
+            1,
+            1,
+            PixelFormat.Rgb24,
+            new byte[3],
+            takeOwnership: true);
+        ImageFrame confirmedFrame = initialFrame.Clone();
+        ChallengeScreenMatch initialMatch = new(
+            ChallengeScreenState.Defeat,
+            0.94,
+            225,
+            438);
+        Queue<ChallengeScreenMatch> observations = new(
+        [
+            initialMatch with
+            {
+                Confidence = 0.95,
+                ActionX = null,
+                ActionY = null,
+            },
+            initialMatch with { Confidence = 0.96 },
+            initialMatch with { Confidence = 0.97 },
+        ]);
+        DateTimeOffset now =
+            new(2026, 7, 27, 18, 5, 37, TimeSpan.Zero);
+        int captures = 0;
+
+        (ImageFrame Frame, ChallengeScreenMatch Match)? result =
+            await ChallengeMacroRunner
+                .WaitForStableActionAsync(
+                    ChallengeScreenState.Defeat,
+                    stableDetections: 2,
+                    observe: () =>
+                    {
+                        captures++;
+                        now += captures == 3
+                            ? TimeSpan.FromSeconds(13)
+                            : TimeSpan.FromSeconds(1);
+                        return (
+                            confirmedFrame,
+                            observations.Dequeue());
+                    },
+                    timeout: TimeSpan.FromSeconds(2),
+                    pollMilliseconds: 0,
+                    observed: null,
+                    CancellationToken.None,
+                    utcNow: () => now,
+                    delay: (_, _) => Task.CompletedTask,
+                    initialObservation: (
+                        initialFrame,
+                        initialMatch));
+
+        Assert.NotNull(result);
+        Assert.Same(confirmedFrame, result.Value.Frame);
+        Assert.Equal(225, result.Value.Match.ActionX);
+        Assert.Equal(438, result.Value.Match.ActionY);
+        Assert.Equal(3, captures);
+        Assert.Empty(observations);
     }
 
     [Fact]
@@ -280,7 +392,12 @@ public sealed class ChallengeMacroRunnerTests
                 presses.Add(key);
                 return Task.CompletedTask;
             },
-            waitForPreview: (_, _) => Task.FromResult<ImageFrame?>(++waits == 1 ? null : preview),
+            waitForPreview: (initial, _, _) =>
+            {
+                Assert.Null(initial);
+                return Task.FromResult<ImageFrame?>(
+                    ++waits == 1 ? null : preview);
+            },
             attemptStarted: null,
             attemptMissed: null,
             CancellationToken.None);
@@ -309,9 +426,10 @@ public sealed class ChallengeMacroRunnerTests
                 presses++;
                 return Task.CompletedTask;
             },
-            waitForPreview: (_, _) =>
+            waitForPreview: (initial, _, _) =>
             {
                 waits++;
+                Assert.Same(preview, initial);
                 return Task.FromResult<ImageFrame?>(preview);
             },
             attemptStarted: null,
@@ -346,9 +464,20 @@ public sealed class ChallengeMacroRunnerTests
                 presses++;
                 return Task.CompletedTask;
             },
-            waitForPreview: (_, _) =>
+            waitForPreview: (initial, _, _) =>
             {
                 waits++;
+                if (waits == 1)
+                {
+                    Assert.Null(initial);
+                }
+                else
+                {
+                    Assert.NotNull(initial);
+                    Assert.Equal(
+                        ChallengeScreenState.PostMatchPreview,
+                        ChallengeScreenDetector.Detect(initial).State);
+                }
                 return Task.FromResult<ImageFrame?>(
                     waits == 1 ? null : preview);
             },

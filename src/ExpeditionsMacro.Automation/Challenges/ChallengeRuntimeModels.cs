@@ -3,9 +3,7 @@ using ExpeditionsMacro.Core.Models;
 namespace ExpeditionsMacro.Automation.Challenges;
 
 public sealed record ChallengeMapRuntimeModels(
-    CameraModel? Camera,
-    PlacementModel? PrestartPlacement,
-    PlacementModel? DelayedPlacement);
+    PlacementModel? Placement);
 
 public sealed record ChallengeRunSummary(
     DateTimeOffset StartedAt,

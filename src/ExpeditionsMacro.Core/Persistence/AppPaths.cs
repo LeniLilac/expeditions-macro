@@ -53,8 +53,6 @@ public sealed class AppPaths
     public void EnsureCreated()
     {
         Directory.CreateDirectory(Root);
-        Directory.CreateDirectory(CameraModels);
-        Directory.CreateDirectory(CameraShortcuts);
         Directory.CreateDirectory(PlacementModels);
         Directory.CreateDirectory(Presets);
         Directory.CreateDirectory(ChallengePresets);

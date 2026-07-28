@@ -279,34 +279,6 @@ public sealed partial class WindowsRobloxAutomation : IRobloxAutomation, IDispos
         }
     }
 
-    public async Task PulseCameraYawAsync(
-        RobloxWindow window,
-        CameraYawDirection direction,
-        int holdMilliseconds,
-        CancellationToken cancellationToken)
-    {
-        if (!Focus(window)) throw new InvalidOperationException("Windows could not focus Roblox.");
-        if (holdMilliseconds is < 1 or > 5000) throw new ArgumentOutOfRangeException(nameof(holdMilliseconds));
-        ushort scanCode = direction switch
-        {
-            CameraYawDirection.Left => 0x4B,
-            CameraYawDirection.Right => 0x4D,
-            _ => throw new ArgumentOutOfRangeException(nameof(direction)),
-        };
-
-        SendKeyboard(scanCode, keyUp: false);
-        try
-        {
-            await Task.Delay(holdMilliseconds, cancellationToken).ConfigureAwait(false);
-        }
-        finally
-        {
-            // Arrow keys are extended scan-code inputs. Releasing through the same
-            // SendInput path prevents a canceled setup from leaving Roblox rotating.
-            SendKeyboard(scanCode, keyUp: true);
-        }
-    }
-
     public async Task ZoomOutFullyAsync(RobloxWindow window, int ticks, CancellationToken cancellationToken)
     {
         if (!Focus(window)) throw new InvalidOperationException("Windows could not focus Roblox.");

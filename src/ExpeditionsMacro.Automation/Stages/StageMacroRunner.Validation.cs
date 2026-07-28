@@ -16,9 +16,7 @@ public sealed partial class StageMacroRunner
         DetectorPackManifest detector,
         CancellationToken cancellationToken)
     {
-        models.Camera?.Manifest.Validate();
-        models.PrestartPlacement?.Validate();
-        models.DelayedPlacement?.Validate();
+        models.Placement?.Validate();
         ValidateCompatibility(
             mode,
             story,
@@ -28,7 +26,7 @@ public sealed partial class StageMacroRunner
             detector);
         return await ManualInputMatchPlayback.ResolveAsync(
                 _manualInputs,
-                models.PrestartPlacement,
+                models.Placement,
                 cancellationToken)
             .ConfigureAwait(false);
     }

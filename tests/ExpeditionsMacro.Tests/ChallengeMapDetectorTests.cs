@@ -120,11 +120,12 @@ public sealed class ChallengeMapDetectorTests
         {
             Id = "unsupported-pack",
             Name = "Unsupported pack",
+            CameraPreparationMode =
+                CameraPreparationMode.FastNoAlign,
             Maps = Enum.GetValues<ChallengeMapId>()
                 .Select(map => new ChallengeMapProfile
                 {
                     Map = map,
-                    CameraModelId = "camera",
                     PrestartPlacementModelId = "placement",
                 })
                 .ToArray(),

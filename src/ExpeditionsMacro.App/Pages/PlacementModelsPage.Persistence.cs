@@ -1,34 +1,10 @@
-using System.Windows;
 using ExpeditionsMacro.App.Models;
 using ExpeditionsMacro.Core.Models;
-using ExpeditionsMacro.Core.Persistence;
 
 namespace ExpeditionsMacro.App.Pages;
 
 public partial class PlacementModelsPage
 {
-    private async void DeleteModel_Click(
-        object sender,
-        RoutedEventArgs e)
-    {
-        if (ModelsList.SelectedItem is not PlacementModel model)
-        {
-            return;
-        }
-        if (MessageBox.Show(
-            Window.GetWindow(this),
-            $"Delete placement model '{model.Name}'?",
-            "Delete model",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning) != MessageBoxResult.Yes)
-        {
-            return;
-        }
-        _services.PlacementModels.Delete(model.Id);
-        NewModel_Click(sender, e);
-        await RefreshModelsAsync();
-    }
-
     private PlacementModel BuildModel()
     {
         if (_steps.Count == 0 &&
@@ -39,9 +15,8 @@ public partial class PlacementModelsPage
                 "Add at least one placement.");
         }
 
-        CameraPreparationMode mode = FastWorkflow
-            ? CameraPreparationMode.FastNoAlign
-            : CameraPreparationMode.CameraModel;
+        const CameraPreparationMode mode =
+            CameraPreparationMode.FastNoAlign;
         if (_selectedModel is not null &&
             _selectedModel.CameraPreparationMode != mode)
         {
@@ -49,14 +24,10 @@ public partial class PlacementModelsPage
                 "Create a new model instead of converting an incompatible placement model.");
         }
 
-        PlacementTarget? target =
-            FastWorkflow
-                ? CurrentFastTarget()
-                : null;
-        string name = (FastWorkflow
-            ? PlacementSetupCatalog.NameFor(
-                target!)
-            : ModelNameText.Text).Trim();
+        PlacementTarget target = CurrentFastTarget();
+        string name = PlacementSetupCatalog
+            .NameFor(target)
+            .Trim();
         if (name.Length == 0)
         {
             throw new InvalidOperationException(
@@ -64,39 +35,26 @@ public partial class PlacementModelsPage
         }
         PlacementModel model = new()
         {
-            Id = FastWorkflow
-                ? PlacementSetupCatalog.IdFor(
-                    target!)
-                : _selectedModel?.Id ??
-                    ModelId.FromName(name),
+            Id = PlacementSetupCatalog.IdFor(
+                target),
             Name = name,
             ClientWidth = 808,
             ClientHeight = 611,
             CameraPreparationMode = mode,
             Target = target,
-            TeamSlot = FastWorkflow &&
+            TeamSlot =
                 FastTeamCombo.SelectedItem is
                     TeamChoice team
                 ? team.Value
                 : 0,
             PlacementIntervalMilliseconds =
-                FastWorkflow
-                    ? _fastPlacementIntervalMilliseconds
-                    : PlacementAuthoringRules
-                        .DefaultStepDelayMilliseconds,
+                _fastPlacementIntervalMilliseconds,
             DefaultAfterStartDelayMilliseconds =
-                FastWorkflow
-                    ? _fastDefaultAfterStartDelayMilliseconds
-                    : PlacementAuthoringRules
-                        .DefaultAfterStartDelayMilliseconds,
+                _fastDefaultAfterStartDelayMilliseconds,
             ManualInputRecordingId =
-                FastWorkflow
-                    ? _fastManualRecordingId
-                    : null,
+                _fastManualRecordingId,
             ImpossibilityThresholdMinutes =
-                FastWorkflow
-                    ? _fastImpossibilityThresholdMinutes
-                    : 0,
+                _fastImpossibilityThresholdMinutes,
             Steps =
                 PlacementAuthoringRules
                     .OrderForAuthoring(

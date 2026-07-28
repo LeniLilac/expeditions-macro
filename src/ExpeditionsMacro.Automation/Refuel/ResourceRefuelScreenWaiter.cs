@@ -115,6 +115,7 @@ internal sealed class ResourceRefuelScreenWaiter
 
     internal async Task<ImageFrame?> WaitForPlayAsync(
         RobloxWindow window,
+        ImageFrame? initialFrame,
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
@@ -136,7 +137,8 @@ internal sealed class ResourceRefuelScreenWaiter
             },
             timeout,
             failureMessage: null,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken: cancellationToken,
+            initialFrame: initialFrame).ConfigureAwait(false);
         return found ? matched : null;
     }
 
@@ -214,7 +216,8 @@ internal sealed class ResourceRefuelScreenWaiter
         Func<ImageFrame, bool> accept,
         TimeSpan timeout,
         string? failureMessage,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        ImageFrame? initialFrame = null)
     {
         int maximumPolls = Math.Max(
             1,
@@ -222,6 +225,10 @@ internal sealed class ResourceRefuelScreenWaiter
                 timeout.TotalMilliseconds /
                 PollDelay.TotalMilliseconds));
         int stable = 0;
+        if (initialFrame is not null)
+        {
+            stable = accept(initialFrame) ? 1 : 0;
+        }
         for (int poll = 0; poll < maximumPolls; poll++)
         {
             cancellationToken.ThrowIfCancellationRequested();

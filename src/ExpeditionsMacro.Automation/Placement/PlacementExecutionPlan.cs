@@ -10,13 +10,11 @@ public readonly record struct PlacementMatchExecutionPlan(
 public static class PlacementExecutionPlan
 {
     public static PlacementMatchExecutionPlan ForMatch(
-        CameraPreparationMode mode,
-        PlacementModel? primary,
-        PlacementModel? delayed = null)
+        PlacementModel? placement)
     {
         bool manualPlayback =
-            primary is not null &&
-            ManualInputRouteService.IsConfigured(primary);
+            placement is not null &&
+            ManualInputRouteService.IsConfigured(placement);
         return manualPlayback
             ? new PlacementMatchExecutionPlan(
                 true,
@@ -24,47 +22,38 @@ public static class PlacementExecutionPlan
                 [])
             : new PlacementMatchExecutionPlan(
                 false,
-                BeforeStart(mode, primary),
-                AfterStart(mode, primary, delayed));
+                BeforeStart(placement),
+                AfterStart(placement));
     }
 
     public static IReadOnlyList<PlacementStep> BeforeStart(
-        CameraPreparationMode mode,
-        PlacementModel? primary)
+        PlacementModel? placement)
     {
-        if (primary is null) return [];
-        return mode == CameraPreparationMode.FastNoAlign
-            ? primary.Steps
-                .Where(step =>
-                    step.Phase == PlacementPhase.BeforeStart)
-                .ToArray()
-            : primary.Steps;
+        if (placement is null) return [];
+        return placement.Steps
+            .Where(step =>
+                step.Phase == PlacementPhase.BeforeStart)
+            .ToArray();
     }
 
     public static IReadOnlyList<PlacementStep> AfterStart(
-        CameraPreparationMode mode,
-        PlacementModel? primary,
-        PlacementModel? delayed = null)
+        PlacementModel? placement)
     {
-        if (mode == CameraPreparationMode.FastNoAlign)
-        {
-            return primary?.Steps
-                .Select((step, index) =>
-                    new
-                    {
-                        Step = step,
-                        Index = index,
-                    })
-                .Where(step =>
-                    step.Step.Phase ==
-                    PlacementPhase.AfterStart)
-                .OrderBy(step =>
-                    step.Step.DelayAfterStartMilliseconds)
-                .ThenBy(step => step.Index)
-                .Select(step => step.Step)
-                .ToArray() ?? [];
-        }
-        return delayed?.Steps ?? [];
+        return placement?.Steps
+            .Select((step, index) =>
+                new
+                {
+                    Step = step,
+                    Index = index,
+                })
+            .Where(step =>
+                step.Step.Phase ==
+                PlacementPhase.AfterStart)
+            .OrderBy(step =>
+                step.Step.DelayAfterStartMilliseconds)
+            .ThenBy(step => step.Index)
+            .Select(step => step.Step)
+            .ToArray() ?? [];
     }
 
     public static bool IsAfterStartDue(

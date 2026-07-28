@@ -118,9 +118,8 @@ public partial class MainWindow
             key,
             "Dashboard",
             StringComparison.OrdinalIgnoreCase) ||
-        (string.Equals(
+        string.Equals(
             key,
             "Placement Setup",
-            StringComparison.OrdinalIgnoreCase) &&
-         _services.Settings.FastNoAlignEnabled);
+            StringComparison.OrdinalIgnoreCase);
 }

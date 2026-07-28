@@ -75,6 +75,54 @@ public sealed class RobloxSettingsButtonDetectorTests
     }
 
     [Fact]
+    public void HighContrastVoiceGear_RemainsClosed()
+    {
+        ImageFrame frame = Brighten(
+            Load("SettingsButtonVoiceClosed.png"),
+            amount: 65);
+
+        RobloxSettingsButtonMatch match =
+            RobloxSettingsButtonDetector.Detect(frame);
+
+        Assert.Equal(
+            RobloxSettingsButtonState.Closed,
+            match.State);
+        Assert.Equal(
+            RobloxSettingsButtonDetector.VoiceActionX,
+            match.ActionX);
+    }
+
+    [Fact]
+    public void HighContrastNoVoiceGear_RemainsClosed()
+    {
+        ImageFrame frame = Brighten(
+            Load("LobbyClosed.png"),
+            amount: 65);
+
+        RobloxSettingsButtonMatch match =
+            RobloxSettingsButtonDetector.Detect(frame);
+
+        Assert.Equal(
+            RobloxSettingsButtonState.Closed,
+            match.State);
+        Assert.Equal(
+            RobloxSettingsButtonDetector.NoVoiceActionX,
+            match.ActionX);
+    }
+
+    [Fact]
+    public void HighContrastSelectedGear_RemainsSelected()
+    {
+        ImageFrame frame = Brighten(
+            Load("SettingsScale100.png"),
+            amount: 65);
+
+        Assert.Equal(
+            RobloxSettingsButtonState.Selected,
+            RobloxSettingsButtonDetector.Detect(frame).State);
+    }
+
+    [Fact]
     public void EllipsisAndDoorWithoutGear_AreRejected()
     {
         ImageFrame frame = PaintRegion(
@@ -91,6 +139,23 @@ public sealed class RobloxSettingsButtonDetectorTests
             RobloxSettingsButtonState.None,
             match.State);
         Assert.False(match.Available);
+    }
+
+    [Fact]
+    public void HighContrastEllipsisAndDoorWithoutGear_AreRejected()
+    {
+        ImageFrame frame = Brighten(
+            PaintRegion(
+                Load("SettingsButtonVoiceClosed.png"),
+                left: 262,
+                top: 20,
+                right: 290,
+                bottom: 49),
+            amount: 65);
+
+        Assert.Equal(
+            RobloxSettingsButtonState.None,
+            RobloxSettingsButtonDetector.Detect(frame).State);
     }
 
     private static ImageFrame Load(string fileName) =>
@@ -119,6 +184,24 @@ public sealed class RobloxSettingsButtonDetectorTests
             }
         }
 
+        return new ImageFrame(
+            source.Width,
+            source.Height,
+            source.Format,
+            pixels,
+            takeOwnership: true);
+    }
+
+    private static ImageFrame Brighten(
+        ImageFrame source,
+        byte amount)
+    {
+        byte[] pixels = source.Pixels
+            .Select(value =>
+                (byte)Math.Min(
+                    byte.MaxValue,
+                    value + amount))
+            .ToArray();
         return new ImageFrame(
             source.Width,
             source.Height,

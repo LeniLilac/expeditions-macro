@@ -2,26 +2,6 @@ using ExpeditionsMacro.Core.Models;
 
 namespace ExpeditionsMacro.Core.Abstractions;
 
-public interface ICameraModelRepository
-{
-    Task<IReadOnlyList<CameraModelManifest>> ListAsync(CancellationToken cancellationToken = default);
-
-    Task<CameraModel?> LoadAsync(string id, CancellationToken cancellationToken = default);
-
-    Task SaveAsync(CameraModel model, CancellationToken cancellationToken = default);
-
-    Task DeleteAsync(string id, CancellationToken cancellationToken = default);
-}
-
-public interface ICameraSpawnShortcutRepository
-{
-    Task<CameraSpawnShortcut?> LoadAsync(string cameraModelId, CancellationToken cancellationToken = default);
-
-    Task SaveAsync(CameraSpawnShortcut shortcut, CancellationToken cancellationToken = default);
-
-    Task DeleteAsync(string cameraModelId, CancellationToken cancellationToken = default);
-}
-
 public interface IDetectorPack
 {
     DetectorPackManifest Manifest { get; }

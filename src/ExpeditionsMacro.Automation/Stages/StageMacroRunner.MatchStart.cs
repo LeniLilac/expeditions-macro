@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
@@ -14,10 +15,10 @@ public sealed partial class StageMacroRunner
         RobloxWindow window,
         StageMode mode,
         StageRuntimeModels models,
-        CameraPreparationMode cameraMode,
         StoryPreset? story,
         RaidPreset? raid,
         IDetectorPack detector,
+        int stableDetections,
         ManualInputRecording? manualRecording,
         IProgress<MacroProgress>? progress,
         Action<string, int, string, string?, double?> report,
@@ -26,11 +27,9 @@ public sealed partial class StageMacroRunner
     {
         PlacementMatchExecutionPlan execution =
             PlacementExecutionPlan.ForMatch(
-                cameraMode,
-                models.PrestartPlacement,
-                models.DelayedPlacement);
+                models.Placement);
         if (execution.BeforeStart.Count > 0 &&
-            models.PrestartPlacement is not null)
+            models.Placement is not null)
         {
             report(
                 "Placement",
@@ -40,7 +39,7 @@ public sealed partial class StageMacroRunner
                 null);
             await PlayPlacementAsync(
                     window,
-                    models.PrestartPlacement,
+                    models.Placement,
                     execution.BeforeStart,
                     story,
                     raid,
@@ -49,13 +48,27 @@ public sealed partial class StageMacroRunner
                 .ConfigureAwait(false);
         }
 
-        StageScreenMatch prestart =
-            StageScreenDetector.Detect(
-                CaptureClient(window, detector));
-        if (prestart.State !=
-                StageScreenState.Prestart ||
-            prestart.ActionX is null ||
-            prestart.ActionY is null)
+        StableScreenAction<StageScreenMatch>? liveStart =
+            await StableScreenActionWaiter.WaitAsync(
+                    StageScreenState.Prestart,
+                    stableDetections,
+                    () => StageScreenDetector.Detect(
+                        CaptureClient(window, detector)),
+                    static match => match.State,
+                    static match =>
+                        match.ActionX is int x &&
+                        match.ActionY is int y
+                            ? (x, y)
+                            : null,
+                    TimeSpan.FromSeconds(12),
+                    TimeSpan.FromMilliseconds(
+                        Math.Max(
+                            200,
+                            story?.PollMilliseconds ??
+                                raid!.PollMilliseconds)),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        if (liveStart is null)
         {
             throw new RobloxUiUnavailableException(
                 $"The {Label(mode)} Start Game button disappeared before it could be clicked.");
@@ -85,8 +98,8 @@ public sealed partial class StageMacroRunner
             runtime = Stopwatch.StartNew();
             await ClickAsync(
                     window,
-                    prestart.ActionX.Value,
-                    prestart.ActionY.Value,
+                    liveStart.Value.X,
+                    liveStart.Value.Y,
                     cancellationToken)
                 .ConfigureAwait(false);
             await Task.Delay(

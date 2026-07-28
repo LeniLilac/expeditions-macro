@@ -3,7 +3,7 @@
 These fifteen 808 by 611 Roblox client captures reproduce the startup
 settings-normalization flow:
 
-- a fully loaded Lobby with Settings closed;
+- a fully loaded Lobby with the no-voice Settings gear closed;
 - the shifted Roblox Settings gear when the top bar includes a voice control;
 - an in-progress Settings opening animation;
 - the settled panel at UI Scale 0.80, 1.00, and 1.20;
@@ -34,3 +34,11 @@ pixels from a field capture and replaces the rest of the canonical client
 frame with opaque black. It preserves the exact opaque gear glyph at
 `(276, 34)` and the variable translucent pill behind it. No player,
 account, chat, desktop, notification, or secret-bearing pixels remain.
+
+`LobbyClosed.png` and `SettingsButtonVoiceClosed.png` are the two fixed
+gear-offset anchors. Focused detector tests derive brightened variants
+from both images to preserve the field-observed high-contrast opaque
+outline without adding duplicate corpus files. The detector still
+requires the gear structure and distinguishes its outline from the
+filled selected state; the optional microphone/headset pixels are never
+used as evidence.

@@ -38,32 +38,12 @@ public sealed partial class StageMacroRunner
         StageRuntimeModels models,
         DetectorPackManifest detector)
     {
-        if (cameraMode == CameraPreparationMode.CameraModel)
-        {
-            CameraModel camera = models.Camera ??
-                throw new InvalidDataException(
-                    $"Choose a camera model for {Label(mode)}.");
-            if (camera.Manifest.ClientWidth !=
-                    detector.ClientWidth ||
-                camera.Manifest.ClientHeight !=
-                    detector.ClientHeight)
-            {
-                throw new InvalidDataException(
-                    "The camera model and detector pack use different Roblox client sizes.");
-            }
-        }
-
         PlacementTarget expectedTarget = story is not null
             ? PlacementTarget.ForStory(story)
             : PlacementTarget.ForRaid(raid!);
-        foreach (PlacementModel? placement in
-                 new[]
-                 {
-                     models.PrestartPlacement,
-                     models.DelayedPlacement,
-                 })
+        PlacementModel? placement = models.Placement;
+        if (placement is not null)
         {
-            if (placement is null) continue;
             placement.ValidateCompatibility(
                 cameraMode,
                 expectedTarget);

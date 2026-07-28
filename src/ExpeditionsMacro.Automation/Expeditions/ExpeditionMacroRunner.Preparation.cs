@@ -10,7 +10,6 @@ public sealed partial class ExpeditionMacroRunner
     private async Task PrepareMatchAsync(
         RobloxWindow window,
         ExpeditionPreset preset,
-        CameraModel? model,
         char? unitMenuKey,
         RepeatedRoutePreparationState preparation,
         bool arrivedFromRepeatStage,
@@ -46,38 +45,8 @@ public sealed partial class ExpeditionMacroRunner
             return;
         }
 
-        if (preset.CameraPreparationMode ==
-            CameraPreparationMode.FastNoAlign)
-        {
-            bool prepared =
-                await _fastNoAlign.EnsurePreparedAsync(
-                    window,
-                    preset.ZoomTicks,
-                    preset.PitchDragPixels,
-                    progress,
-                    cancellationToken).ConfigureAwait(false);
-            preparation.MarkCameraAligned();
-            log(
-                prepared
-                    ? "Fast no align prepared zoom and pitch without changing yaw."
-                    : "Fast no align reused the camera pose preserved from the previous match.",
-                MacroEventLevel.Success,
-                prepared
-                    ? "fast_no_align"
-                    : "fast_no_align_reused",
-                null);
-            return;
-        }
-
-        log(
-            "Prestart screen recognized. Preparing camera.",
-            MacroEventLevel.Success,
-            null,
-            null);
-        double score = await _camera.PrepareAndAlignAsync(
-            model ??
-                throw new InvalidDataException(
-                    "Choose a camera model for this Expedition preset."),
+        bool prepared =
+            await _fastNoAlign.EnsurePreparedAsync(
             window,
             preset.ZoomTicks,
             preset.PitchDragPixels,
@@ -85,10 +54,13 @@ public sealed partial class ExpeditionMacroRunner
             cancellationToken).ConfigureAwait(false);
         preparation.MarkCameraAligned();
         log(
-            $"Camera alignment finished at {score:P0} confidence.",
-            MacroEventLevel.Information,
-            null,
-            score);
-        await Task.Delay(350, cancellationToken).ConfigureAwait(false);
+            prepared
+                ? "Fast no align prepared zoom and pitch without changing yaw."
+                : "Fast no align reused the camera pose preserved from the previous match.",
+            MacroEventLevel.Success,
+            prepared
+                ? "fast_no_align"
+                : "fast_no_align_reused",
+            null);
     }
 }

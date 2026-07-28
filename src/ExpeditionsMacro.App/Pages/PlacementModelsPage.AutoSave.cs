@@ -86,7 +86,6 @@ public partial class PlacementModelsPage
     {
         if (_suppressPlacementAutoSave ||
             _changingSetupSelection ||
-            !FastWorkflow ||
             _selectedSetupTarget is null)
         {
             return;

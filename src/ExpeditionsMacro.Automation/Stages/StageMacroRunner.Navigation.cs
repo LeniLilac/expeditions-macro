@@ -8,10 +8,8 @@ namespace ExpeditionsMacro.Automation.Stages;
 
 public sealed partial class StageMacroRunner
 {
-    private static readonly TimeSpan NavigationTimeout =
-        TimeSpan.FromSeconds(12);
-    private static readonly TimeSpan RecoveryTimeout =
-        TimeSpan.FromSeconds(90);
+    private static readonly TimeSpan NavigationTimeout = TimeSpan.FromSeconds(12);
+    private static readonly TimeSpan RecoveryTimeout = TimeSpan.FromSeconds(90);
 
     private async Task<bool> EnsureGameModeSelectorAsync(
         RobloxWindow window,
@@ -24,7 +22,6 @@ public sealed partial class StageMacroRunner
         Action<string, MacroEventLevel, string?, double?>? log,
         CancellationToken cancellationToken)
     {
-        DateTimeOffset deadline = DateTimeOffset.UtcNow + RecoveryTimeout;
         StableStateTracker<string> recoveryTracker =
             new(stableDetections);
         StableStateTracker<StageScreenState> navigationTracker =
@@ -36,26 +33,39 @@ public sealed partial class StageMacroRunner
         string? lastRecovery = null;
         bool recovered = false;
         bool recoveryTransitionPending = false;
-        while (DateTimeOffset.UtcNow < deadline)
+        StageNavigationTransactionState transaction = new();
+        ObservationWaitBudget budget = new(
+            RecoveryTimeout,
+            Math.Max(2, stableDetections));
+        while (budget.ShouldObserve(
+                   navigationTracker.HasPendingCandidate ||
+                   recoveryTracker.HasPendingCandidate ||
+                   changeModeTracker.HasPendingCandidate))
         {
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = CaptureClient(window, detector);
             StageScreenMatch current = StageScreenDetector.Detect(frame);
             string? recovery = detector.RecoveryState(frame);
+            budget.MarkObserved();
             StageScreenState selectorAwareState =
                 StageNavigationPolicy.ResolveGameModeSelectorState(
                     current.State,
                     recovery);
             StageScreenState? stableNavigation =
                 navigationTracker.Update(selectorAwareState);
-            if (stableNavigation ==
-                StageScreenState.GameModeSelector)
-            {
-                return recovered;
-            }
-
             string? stableRecovery = recoveryTracker.Update(
                 IsRootRecovery(recovery) ? recovery : null);
+            if (stableNavigation == StageScreenState.GameModeSelector)
+                return recovered;
+            if (stableRecovery is null &&
+                stableNavigation is not
+                (null or StageScreenState.None))
+            {
+                transaction.ObserveVerifiedState(
+                    stableNavigation.Value.ToString());
+                recoveryTransitionPending = false;
+            }
+
             if (stableRecovery is not null)
             {
                 if (!autoRecover)
@@ -120,12 +130,20 @@ public sealed partial class StageMacroRunner
                     return recovered;
                 }
 
+                string recoveryActionLabel =
+                    stableRecovery == "disconnect"
+                        ? "Reconnect"
+                        : "Return to Lobby";
+                StageNavigationActionIdentity recoveryAction =
+                    new(stableRecovery, recoveryActionLabel);
+                transaction.ObserveVerified(recoveryAction);
+                int attempt = transaction.BeginAttempt(recoveryAction, cancellationToken);
                 report?.Invoke(
                     "Recovery",
                     0,
                     stableRecovery == "disconnect"
-                        ? "Disconnected. Rejoining Roblox."
-                        : "AFK Chamber recognized. Returning to the lobby.",
+                        ? $"Disconnected. Sending Reconnect ({attempt}/{StageNavigationTransactionState.MaximumAttemptsPerAction})."
+                        : $"AFK Chamber recognized. Sending Return to Lobby ({attempt}/{StageNavigationTransactionState.MaximumAttemptsPerAction}).",
                     stableRecovery,
                     null);
                 (int x, int y) = detector.ActionFor(
@@ -141,6 +159,8 @@ public sealed partial class StageMacroRunner
                     stableRecovery == "disconnect" ? 5000 : 2200,
                     cancellationToken).ConfigureAwait(false);
                 recoveryTracker.Reset();
+                navigationTracker.Reset();
+                changeModeTracker.Reset();
                 continue;
             }
 
@@ -153,22 +173,33 @@ public sealed partial class StageMacroRunner
                         ? current.State
                         : StageScreenState.None,
                     changeMode);
+            StageNavigationActionIdentity? stableTransactionAction =
+                StageNavigationTransactionState.ForVerifiedNavigation(
+                    stableNavigation,
+                    stableChangeMode is not null);
+            if (stableTransactionAction is { } verifiedAction)
+                transaction.ObserveVerified(verifiedAction);
             GameModeHandoffCommand command =
                 StageNavigationPolicy.SelectGameModeHandoffCommand(
                     stableNavigation ?? StageScreenState.None,
                     stableChangeMode is not null,
                     recoveryTransitionPending,
                     selectorAwareState ==
-                        StageScreenState.GameModeSelector);
+                        StageScreenState.GameModeSelector ||
+                    changeModeTracker.HasPendingCandidate ||
+                    transaction.ConfirmationPending);
             switch (command)
             {
                 case GameModeHandoffCommand.Complete:
                     return recovered;
                 case GameModeHandoffCommand.ChangeGamemode:
+                    int changeModeAttempt =
+                        transaction.BeginAttempt(
+                            stableTransactionAction!.Value, cancellationToken);
                     report?.Invoke(
                         "Handoff",
                         0,
-                        $"Leaving the completed {Label(mode)} party through Change Gamemode.",
+                        $"Leaving the completed {Label(mode)} party through Change Gamemode ({changeModeAttempt}/{StageNavigationTransactionState.MaximumAttemptsPerAction}).",
                         "stage_change_gamemode",
                         current.Confidence);
                     await ClickAsync(
@@ -191,10 +222,13 @@ public sealed partial class StageMacroRunner
                     }
                     continue;
                 case GameModeHandoffCommand.Back:
+                    int backAttempt =
+                        transaction.BeginAttempt(
+                            stableTransactionAction!.Value, cancellationToken);
                     report?.Invoke(
                         "Handoff",
                         0,
-                        $"Leaving the nested {Label(mode)} interface through Back.",
+                        $"Leaving the nested {Label(mode)} interface through Back ({backAttempt}/{StageNavigationTransactionState.MaximumAttemptsPerAction}).",
                         "stage_back",
                         current.Confidence);
                     (int backX, int backY) =
@@ -205,6 +239,9 @@ public sealed partial class StageMacroRunner
                         backY,
                         cancellationToken).ConfigureAwait(false);
                     playMenuAttempts = 0;
+                    navigationTracker.Reset();
+                    recoveryTracker.Reset();
+                    changeModeTracker.Reset();
                     if (await TryWaitForStateAsync(
                         window,
                         StageScreenState.GameModeSelector,
@@ -283,7 +320,7 @@ public sealed partial class StageMacroRunner
                 new(Math.Max(2, stableDetections));
         ObservationWaitBudget budget = new(
             timeout,
-            stableDetections);
+            Math.Max(2, stableDetections));
         while (budget.ShouldObserve(
                    tracker.HasPendingCandidate ||
                    actionTracker.HasPendingCandidate))
@@ -347,7 +384,9 @@ public sealed partial class StageMacroRunner
             new(stableDetections);
         ObservationWaitBudget budget = new(
             timeout,
-            stableDetections);
+            RequiresStableAction(expected)
+                ? Math.Max(2, stableDetections)
+                : stableDetections);
         if (initialExpectedObservation &&
             !RequiresStableAction(expected))
         {

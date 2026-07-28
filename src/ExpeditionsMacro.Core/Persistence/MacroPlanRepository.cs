@@ -8,16 +8,49 @@ public sealed class MacroPlanRepository
 
     public MacroPlanRepository(AppPaths paths) => _paths = paths;
 
-    public Task<IReadOnlyList<MacroPlan>> ListAsync(CancellationToken cancellationToken = default) =>
-        NamedJsonRepository.ListAsync<MacroPlan>(_paths.MacroPlans, plan => plan.Name, plan => plan.Validate(), cancellationToken);
+    public async Task<IReadOnlyList<MacroPlan>> ListAsync(
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<MacroPlan> plans =
+            await NamedJsonRepository
+                .ListAsync<MacroPlan>(
+                    _paths.MacroPlans,
+                    plan => plan.Name,
+                    plan => plan.Validate(),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        return plans
+            .Select(StoryHardModePolicy.Normalize)
+            .ToArray();
+    }
 
-    public Task<MacroPlan?> LoadAsync(string id, CancellationToken cancellationToken = default) =>
-        NamedJsonRepository.LoadAsync<MacroPlan>(_paths.MacroPlans, id, plan => plan.Validate(), cancellationToken);
+    public async Task<MacroPlan?> LoadAsync(
+        string id,
+        CancellationToken cancellationToken = default)
+    {
+        MacroPlan? plan =
+            await NamedJsonRepository
+                .LoadAsync<MacroPlan>(
+                    _paths.MacroPlans,
+                    id,
+                    value => value.Validate(),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        return plan is null
+            ? null
+            : StoryHardModePolicy.Normalize(plan);
+    }
 
     public Task SaveAsync(MacroPlan plan, CancellationToken cancellationToken = default)
     {
-        plan.Validate();
-        return NamedJsonRepository.SaveAsync(_paths.MacroPlans, plan.Id, plan, cancellationToken);
+        MacroPlan normalized =
+            StoryHardModePolicy.Normalize(plan);
+        normalized.Validate();
+        return NamedJsonRepository.SaveAsync(
+            _paths.MacroPlans,
+            normalized.Id,
+            normalized,
+            cancellationToken);
     }
 
     public async Task SaveReplacingAsync(
@@ -26,6 +59,7 @@ public sealed class MacroPlanRepository
         CancellationToken cancellationToken =
             default)
     {
+        plan = StoryHardModePolicy.Normalize(plan);
         if (!string.Equals(
                 previousId,
                 plan.Id,

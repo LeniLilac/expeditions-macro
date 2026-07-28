@@ -48,25 +48,32 @@ public sealed class AppSettingsStore
             return settings;
         }
 
-        AppSettings migrated =
-            persistedSchemaVersion < 2
-                ? settings with
-                {
-                    SchemaVersion =
-                        AppSettings.CurrentSchemaVersion,
-                    RestartRobloxWithPrivateServer = true,
-                    RestartRobloxAtMacroStart = true,
-                    AutoCheckUiScaleOnStart = true,
-                    AutoCheckGameSettingsOnStart = true,
-                }
-                : settings with
-                {
-                    SchemaVersion =
-                        AppSettings.CurrentSchemaVersion,
-                    AutoCheckUiScaleOnStart =
-                        settings
-                            .AutoCheckGameSettingsOnStart,
-                };
+        // Rewriting schema 3 removes the retired Fast workflow toggle while
+        // preserving every setting that remains part of the product.
+        AppSettings migrated = settings with
+        {
+            SchemaVersion =
+                AppSettings.CurrentSchemaVersion,
+        };
+        if (persistedSchemaVersion < 2)
+        {
+            migrated = migrated with
+            {
+                RestartRobloxWithPrivateServer = true,
+                RestartRobloxAtMacroStart = true,
+                AutoCheckUiScaleOnStart = true,
+                AutoCheckGameSettingsOnStart = true,
+            };
+        }
+        else if (persistedSchemaVersion < 3)
+        {
+            migrated = migrated with
+            {
+                AutoCheckUiScaleOnStart =
+                    settings
+                        .AutoCheckGameSettingsOnStart,
+            };
+        }
         await SaveAsync(
             migrated,
             cancellationToken).ConfigureAwait(false);

@@ -12,12 +12,13 @@ namespace ExpeditionsMacro.Tests;
 public sealed class DeepDebugSessionTests
 {
     [Fact]
-    public async Task SuccessfulSessionArchivesFramesEventsSanitizedSettingsAndReferencedModels()
+    public async Task SuccessfulSessionArchivesFramesEventsSanitizedSettingsAndReferencedFastArtifacts()
     {
         using TestDirectory directory = new();
         AppPaths paths = new(directory.Path);
         paths.EnsureCreated();
         Directory.CreateDirectory(Path.Combine(paths.CameraModels, "camera-one"));
+        Directory.CreateDirectory(paths.CameraShortcuts);
         string windowsProfile = Environment.GetFolderPath(
             Environment.SpecialFolder.UserProfile);
         string windowsUserName = Environment.UserName;
@@ -33,8 +34,18 @@ public sealed class DeepDebugSessionTests
                 ImportedFrom = privateCapturePath,
                 CapturedBy = windowsUserName,
             }));
+        await File.WriteAllTextAsync(
+            Path.Combine(paths.CameraShortcuts, "camera-one.json"),
+            "retired-camera-shortcut");
         Directory.CreateDirectory(Path.Combine(paths.PlacementModels, "placement-one"));
-        await File.WriteAllTextAsync(Path.Combine(paths.PlacementModels, "placement-one", "placement.json"), "placement-model");
+        await File.WriteAllTextAsync(
+            Path.Combine(paths.PlacementModels, "placement-one", "placement.json"),
+            JsonSerializer.Serialize(new
+            {
+                Model = "placement-model",
+                ImportedFrom = privateCapturePath,
+                CapturedBy = windowsUserName,
+            }));
         string log = Path.Combine(paths.Logs, "macro-run.log");
         const string webhook = "https://canary.discord.com/api/webhooks/123456789012345678/secret-token";
         const string userId = "123456789012345678";
@@ -77,7 +88,6 @@ public sealed class DeepDebugSessionTests
             "Test operation",
             new DeepDebugOperationContext
             {
-                CameraModelIds = ["camera-one"],
                 PlacementModelIds = ["placement-one"],
                 DebugTool = "team-swap",
                 DebugStepMode = "BeforeActions",
@@ -105,8 +115,12 @@ public sealed class DeepDebugSessionTests
         Assert.NotNull(archive.GetEntry("frames/frame-000000001.png"));
         Assert.NotNull(archive.GetEntry("events.jsonl"));
         Assert.NotNull(archive.GetEntry("configuration/start/settings-sanitized.json"));
-        Assert.NotNull(archive.GetEntry("models/start/camera/camera-one/manifest.json"));
         Assert.NotNull(archive.GetEntry("models/start/placement/placement-one/placement.json"));
+        Assert.DoesNotContain(
+            archive.Entries,
+            entry => entry.FullName.Contains(
+                "camera",
+                StringComparison.OrdinalIgnoreCase));
         using JsonDocument sanitized = JsonDocument.Parse(await ReadEntryAsync(archive, "configuration/start/settings-sanitized.json"));
         Assert.Equal(KeyboardKey.RightControl, sanitized.RootElement.GetProperty("shift_lock_virtual_key").GetInt32());
         Assert.Equal(
@@ -162,6 +176,10 @@ public sealed class DeepDebugSessionTests
                 .GetProperty(
                     "auto_check_game_settings_on_start")
                 .GetBoolean());
+        Assert.False(
+            sanitized.RootElement.TryGetProperty(
+                "fast_no_align_enabled",
+                out _));
         Assert.True(
             sanitized.RootElement
                 .GetProperty("private_server_link_configured")
@@ -348,8 +366,8 @@ public sealed class DeepDebugSessionTests
         Assert.NotNull(archive.GetEntry("configuration/start/macro-plan.json"));
         Assert.NotNull(archive.GetEntry($"configuration/start/presets/expeditions/{expedition.Id}.json"));
         Assert.NotNull(archive.GetEntry($"configuration/start/presets/challenges/{challenge.Id}.json"));
-        Assert.NotNull(archive.GetEntry("models/start/camera/camera-expedition/manifest.json"));
-        Assert.NotNull(archive.GetEntry("models/start/camera/camera-challenge/manifest.json"));
+        Assert.Null(archive.GetEntry("models/start/camera/camera-expedition/manifest.json"));
+        Assert.Null(archive.GetEntry("models/start/camera/camera-challenge/manifest.json"));
         Assert.NotNull(archive.GetEntry("models/start/placement/placement-expedition/placement.json"));
         Assert.NotNull(archive.GetEntry("models/start/placement/placement-challenge/placement.json"));
         Assert.NotNull(archive.GetEntry("models/start/detector-packs/anime-expeditions-expeditions/manifest.json"));

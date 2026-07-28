@@ -94,7 +94,7 @@ public sealed class RobloxLobbyReadinessGateTests
     }
 
     [Fact]
-    public async Task TwoLobbyFrames_AreNotEnough()
+    public async Task TwoLobbyFrames_AreNotEnoughAcrossMinimumLoadWindow()
     {
         DateTimeOffset now =
             new(2026, 7, 25, 0, 0, 0, TimeSpan.Zero);
@@ -114,7 +114,7 @@ public sealed class RobloxLobbyReadinessGateTests
                     return Task.CompletedTask;
                 }));
 
-        Assert.Equal(3, observations);
+        Assert.Equal(12, observations);
         Assert.Equal(
             3,
             RobloxLobbyReadinessGate.StableLobbyFrames);

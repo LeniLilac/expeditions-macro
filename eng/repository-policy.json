@@ -20,38 +20,18 @@
   "lineDebt": [
     {
       "path": "src/ExpeditionsMacro.Automation/Challenges/ChallengeMacroRunner.cs",
-      "maxLines": 775,
-      "reason": "Existing mode-runner orchestration debt; extract state-specific workflow services when touched."
-    },
-    {
-      "path": "src/ExpeditionsMacro.Automation/Camera/CameraAlignmentEngine.cs",
-      "maxLines": 1194,
-      "reason": "Existing calibration/alignment orchestration debt; split observation, search, and verification ownership."
-    },
-    {
-      "path": "src/ExpeditionsMacro.Automation/Expeditions/ExpeditionMacroRunner.cs",
-      "maxLines": 973,
+      "maxLines": 746,
       "reason": "Existing mode-runner orchestration debt; extract state-specific workflow services when touched."
     },
     {
       "path": "src/ExpeditionsMacro.Windows/WindowsRobloxAutomation.cs",
-      "maxLines": 794,
+      "maxLines": 766,
       "reason": "Existing Windows adapter debt; separate window, capture, keyboard, pointer, and diagnostics concerns."
     },
     {
-      "path": "src/ExpeditionsMacro.Automation/Stages/StageMacroRunner.cs",
-      "maxLines": 505,
-      "reason": "Existing shared Story/Raid orchestration debt; extract navigation and terminal handoff services."
-    },
-    {
       "path": "src/ExpeditionsMacro.Automation/Diagnostics/DeepDebugSessionService.cs",
-      "maxLines": 569,
+      "maxLines": 555,
       "reason": "Existing diagnostic lifecycle debt; split archive writing, manifest capture, and retention."
-    },
-    {
-      "path": "src/ExpeditionsMacro.App/Pages/ChallengesPage.xaml.cs",
-      "maxLines": 536,
-      "reason": "Existing page-controller debt; extract preset editing and operation coordination."
     },
     {
       "path": "tools/ExpeditionsMacro.DeepDebugViewer/MainWindow.xaml.cs",

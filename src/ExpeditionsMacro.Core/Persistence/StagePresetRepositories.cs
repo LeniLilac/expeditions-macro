@@ -8,16 +8,49 @@ public sealed class StoryPresetRepository
 
     public StoryPresetRepository(AppPaths paths) => _paths = paths;
 
-    public Task<IReadOnlyList<StoryPreset>> ListAsync(CancellationToken cancellationToken = default) =>
-        NamedJsonRepository.ListAsync<StoryPreset>(_paths.StoryPresets, preset => preset.Name, preset => preset.Validate(), cancellationToken);
+    public async Task<IReadOnlyList<StoryPreset>> ListAsync(
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<StoryPreset> presets =
+            await NamedJsonRepository
+                .ListAsync<StoryPreset>(
+                    _paths.StoryPresets,
+                    preset => preset.Name,
+                    preset => preset.Validate(),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        return presets
+            .Select(StoryHardModePolicy.Normalize)
+            .ToArray();
+    }
 
-    public Task<StoryPreset?> LoadAsync(string id, CancellationToken cancellationToken = default) =>
-        NamedJsonRepository.LoadAsync<StoryPreset>(_paths.StoryPresets, id, preset => preset.Validate(), cancellationToken);
+    public async Task<StoryPreset?> LoadAsync(
+        string id,
+        CancellationToken cancellationToken = default)
+    {
+        StoryPreset? preset =
+            await NamedJsonRepository
+                .LoadAsync<StoryPreset>(
+                    _paths.StoryPresets,
+                    id,
+                    value => value.Validate(),
+                    cancellationToken)
+                .ConfigureAwait(false);
+        return preset is null
+            ? null
+            : StoryHardModePolicy.Normalize(preset);
+    }
 
     public Task SaveAsync(StoryPreset preset, CancellationToken cancellationToken = default)
     {
-        preset.Validate();
-        return NamedJsonRepository.SaveAsync(_paths.StoryPresets, preset.Id, preset, cancellationToken);
+        StoryPreset normalized =
+            StoryHardModePolicy.Normalize(preset);
+        normalized.Validate();
+        return NamedJsonRepository.SaveAsync(
+            _paths.StoryPresets,
+            normalized.Id,
+            normalized,
+            cancellationToken);
     }
 
     public Task DeleteAsync(string id, CancellationToken cancellationToken = default) =>

@@ -91,7 +91,6 @@ public sealed class PlacementManualRecordingTests
 
         PlacementMatchExecutionPlan execution =
             PlacementExecutionPlan.ForMatch(
-                CameraPreparationMode.FastNoAlign,
                 model);
 
         Assert.True(execution.ManualPlayback);
