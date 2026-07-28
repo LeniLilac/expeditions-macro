@@ -79,6 +79,11 @@ public sealed class CoreModelTests
 
         Assert.Equal([350, 400, 125], recorded.Select(step => step.DelayAfterMilliseconds));
         Assert.All(defaults, step => Assert.Equal(125, step.DelayAfterMilliseconds));
+        Assert.All(
+            recorded.Concat(defaults),
+            step => Assert.Equal(
+                UnitAutoUpgradePriority.Priority1,
+                step.AutoUpgradePriority));
     }
 
     [Fact]

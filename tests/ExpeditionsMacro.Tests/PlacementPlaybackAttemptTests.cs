@@ -12,7 +12,7 @@ namespace ExpeditionsMacro.Tests;
 public sealed class PlacementPlaybackAttemptTests
 {
     [Fact]
-    public async Task FastAttempt_ClicksPlaceThenSelectAndParksHoverCardBeforeProof()
+    public async Task FirstAttempt_HoldsQuickPlacementTapsUnitClicksAndParksBeforeProof()
     {
         AttemptAutomation automation = new()
         {
@@ -24,19 +24,15 @@ public sealed class PlacementPlaybackAttemptTests
         int firstCapture = automation.Actions.IndexOf("capture");
         Assert.Equal(
             [
+                $"held:{KeyboardKey.LeftShift}:down",
                 "unit:4",
-                "letter:Z",
-                "unit:4",
-                "unit:4",
-                "unit:4",
-                "click-retain:320,280",
                 "click-retain:320,280",
                 "park",
                 "capture",
             ],
             automation.Actions.Take(firstCapture + 1));
         Assert.Equal(
-            2,
+            1,
             automation.Actions.Count(
                 action => action == "click-retain:320,280"));
         Assert.DoesNotContain(
@@ -47,7 +43,7 @@ public sealed class PlacementPlaybackAttemptTests
     }
 
     [Fact]
-    public async Task FailedFastAttempt_UsesOneSlowPlaceSelectPairThenStopsOnProof()
+    public async Task MissingFirstProof_RepeatsUnitTapAndDirectClickWithoutMouseApproach()
     {
         AttemptAutomation automation = new()
         {
@@ -58,42 +54,36 @@ public sealed class PlacementPlaybackAttemptTests
 
         string[] attemptActions = automation.Actions
             .Where(action => action != "capture")
-            .Take(13)
+            .Take(8)
             .ToArray();
         Assert.Equal(
             [
+                $"held:{KeyboardKey.LeftShift}:down",
                 "unit:3",
-                "letter:Z",
-                "unit:3",
-                "unit:3",
-                "unit:3",
-                "click-retain:320,280",
                 "click-retain:320,280",
                 "park",
-                "move:270,280->320,280:200",
-                "click-retain:320,280",
-                "move:270,280->320,280:200",
+                "unit:3",
                 "click-retain:320,280",
                 "park",
+                $"held:{KeyboardKey.LeftShift}:up",
             ],
             attemptActions);
-        Assert.Equal(
-            2,
-            automation.Actions.Count(
-                action => action.StartsWith(
-                    "move:",
-                    StringComparison.Ordinal)));
+        Assert.DoesNotContain(
+            automation.Actions,
+            action => action.StartsWith(
+                "move:",
+                StringComparison.Ordinal));
         AssertSelectionParksPrecedeCapture(
             automation,
             expectedSelectionAttempts: 2);
     }
 
     [Fact]
-    public async Task MissingProof_SkipsAfterEightClicksAndPlacesNextStep()
+    public async Task MissingProof_SkipsAfterEightTapClickAttemptsAndPlacesNextStep()
     {
         AttemptAutomation automation = new()
         {
-            SuccessfulSelectionAttempt = 5,
+            SuccessfulSelectionAttempt = 9,
         };
         List<string> status = [];
         List<PlacementStep> sent = [];
@@ -134,29 +124,29 @@ public sealed class PlacementPlaybackAttemptTests
             automation.Actions.Count(
                 action => action == "click-retain:320,280"));
         Assert.Equal(
-            2,
+            1,
             automation.Actions.Count(
                 action => action == "click-retain:360,280"));
         Assert.Equal(
-            6,
-            automation.Actions.Count(
-                action => action ==
-                    "move:270,280->320,280:200"));
-        Assert.Equal(
-            4,
+            8,
             automation.Actions.Count(
                 action => action == "unit:6"));
+        Assert.DoesNotContain(
+            automation.Actions,
+            action => action.StartsWith(
+                "move:",
+                StringComparison.Ordinal));
         Assert.DoesNotContain("letter:T", automation.Actions);
         Assert.DoesNotContain("letter:Y", automation.Actions);
         Assert.Single(sent);
         Assert.Equal(2, sent[0].UnitKey);
         AssertSelectionParksPrecedeCapture(
             automation,
-            expectedSelectionAttempts: 5);
+            expectedSelectionAttempts: 9);
     }
 
     [Fact]
-    public async Task CancellationDuringFastClick_ReleasesAtomicClickAndStopsInput()
+    public async Task CancellationDuringClick_ReleasesMouseAndQuickPlacementKey()
     {
         using CancellationTokenSource cancellation = new();
         AttemptAutomation automation = new()
@@ -174,18 +164,54 @@ public sealed class PlacementPlaybackAttemptTests
 
         Assert.Equal(
             [
-                "unit:2",
-                "letter:Z",
-                "unit:2",
-                "unit:2",
+                $"held:{KeyboardKey.LeftShift}:down",
                 "unit:2",
                 "click-retain:320,280",
                 "mouse-down",
                 "mouse-up",
+                $"held:{KeyboardKey.LeftShift}:up",
             ],
             automation.Actions);
         Assert.DoesNotContain("park", automation.Actions);
         Assert.DoesNotContain("capture", automation.Actions);
+    }
+
+    [Fact]
+    public async Task QuickPlacementKeyReleasesBeforeTargetingAndAutoUpgrade()
+    {
+        AttemptAutomation automation = new()
+        {
+            SuccessfulSelectionAttempt = 1,
+        };
+        PlacementStep step = new()
+        {
+            UnitKey = 5,
+            X = 320,
+            Y = 280,
+            DelayAfterMilliseconds = 0,
+            TargetingPriority =
+                UnitTargetingPriority.Strongest,
+            AutoUpgradePriority =
+                UnitAutoUpgradePriority.Priority2,
+        };
+
+        await PlayStepsAsync(
+            automation,
+            [step]);
+
+        int released = automation.Actions.IndexOf(
+            $"held:{KeyboardKey.LeftShift}:up");
+        Assert.True(released >= 0);
+        Assert.True(
+            released <
+            automation.Actions.IndexOf("letter:T"));
+        Assert.True(
+            released <
+            automation.Actions.IndexOf("letter:Y"));
+        Assert.Equal(
+            2,
+            automation.Actions.Count(action =>
+                action == "letter:Y"));
     }
 
     private static void AssertSelectionParksPrecedeCapture(
@@ -507,6 +533,27 @@ public sealed class PlacementPlaybackAttemptTests
             cancellationToken.ThrowIfCancellationRequested();
             Actions.Add($"unit:{unitKey}");
             return Task.CompletedTask;
+        }
+
+        public async Task<TResult>
+            RunWithKeyHeldAsync<TResult>(
+            RobloxWindow window,
+            int virtualKey,
+            Func<CancellationToken, Task<TResult>> action,
+            CancellationToken cancellationToken)
+        {
+            Actions.Add(
+                $"held:{virtualKey}:down");
+            try
+            {
+                return await action(cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            finally
+            {
+                Actions.Add(
+                    $"held:{virtualKey}:up");
+            }
         }
 
         private static ImageFrame Load(

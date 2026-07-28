@@ -36,6 +36,10 @@ public static class PlacementAuthoringRules
 
     public const int DefaultAfterStartDelayMilliseconds = 30_000;
 
+    public const UnitAutoUpgradePriority
+        DefaultAutoUpgradePriority =
+            UnitAutoUpgradePriority.Priority1;
+
     private const int StartDialogLeft = 310;
     private const int StartDialogTop = 92;
     private const int StartDialogRight = 498;

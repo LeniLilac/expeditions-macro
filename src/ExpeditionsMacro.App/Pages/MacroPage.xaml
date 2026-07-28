@@ -189,8 +189,16 @@
                 <Border Grid.Row="3" Margin="0,14,0,0" Style="{StaticResource FormCard}">
                     <StackPanel>
                         <TextBlock Style="{StaticResource SectionTitle}" Text="Roblox reconnect" />
-                        <CheckBox x:Name="RestartRobloxAtStartCheck" Margin="0,14,0,0" Content="Restart Roblox through this private server when a Macro plan starts" />
-                        <CheckBox x:Name="RestartRobloxCheck" Margin="0,14,0,0" Content="Restart Roblox through this private server when recovery fails" />
+                        <CheckBox x:Name="RestartRobloxAtStartCheck"
+                                  Margin="0,14,0,0"
+                                  Checked="PrivateServerRestartSetting_Changed"
+                                  Content="Restart Roblox through this private server when a Macro plan starts"
+                                  Unchecked="PrivateServerRestartSetting_Changed" />
+                        <CheckBox x:Name="RestartRobloxCheck"
+                                  Margin="0,14,0,0"
+                                  Checked="PrivateServerRestartSetting_Changed"
+                                  Content="Restart Roblox through this private server when recovery fails"
+                                  Unchecked="PrivateServerRestartSetting_Changed" />
                         <TextBlock Margin="0,18,0,0" Style="{StaticResource FieldLabel}" Text="Private server link" />
                         <Border Margin="0,7,0,0" Style="{StaticResource InputGroup}">
                             <Grid>

@@ -14,7 +14,6 @@ public partial class PlacementModelsPage
         RoutedEventArgs e)
     {
         PlacementModel model;
-        char cancelPlacementKey;
         try
         {
             model = BuildModel();
@@ -29,19 +28,6 @@ public partial class PlacementModelsPage
                 return;
             }
             _selectedModel = model;
-            cancelPlacementKey =
-                ManualInputRouteService.IsConfigured(model)
-                    ? default
-                    : AppSettings.ParseCancelPlacementKey(
-                        _services.Settings
-                            .CancelPlacementKey,
-                        _services.Settings
-                            .MacroHotkeyVirtualKey,
-                        _services.Settings.PlayMenuKey,
-                        _services.Settings.UnitMenuKey,
-                        _services.Settings.AreasMenuKey,
-                        _services.Settings
-                            .ShiftLockVirtualKey);
         }
         catch (Exception error)
         {
@@ -56,7 +42,6 @@ public partial class PlacementModelsPage
             token => TestPlacementAsync(
                 model,
                 delay,
-                cancelPlacementKey,
                 token),
             new DeepDebugOperationContext
             {
@@ -79,7 +64,6 @@ public partial class PlacementModelsPage
     private async Task TestPlacementAsync(
         PlacementModel model,
         int delay,
-        char cancelPlacementKey,
         CancellationToken token)
     {
         Progress<MacroProgress> progress =
@@ -124,8 +108,6 @@ public partial class PlacementModelsPage
             model,
             useDefaultInterval: true,
             delay,
-            cancelPlacementKey:
-                cancelPlacementKey,
             stepSent: (index, total, step) =>
             {
                 _services.DeepDebug.RecordEvent(

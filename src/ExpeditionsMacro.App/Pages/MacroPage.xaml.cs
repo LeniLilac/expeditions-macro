@@ -96,6 +96,7 @@ public partial class MacroPage : UserControl, IAppPage
                 $"Could not save: {error.Message}");
             return;
         }
+        await FlushPrivateServerRecoverySettingsAsync();
         _loading = true;
         try
         {

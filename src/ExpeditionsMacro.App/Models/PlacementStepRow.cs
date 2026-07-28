@@ -42,7 +42,8 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
     private PlacementPhase _phase;
     private UnitTargetingPriority _targetingPriority;
     private UnitAutoUpgradePriority
-        _autoUpgradePriority;
+        _autoUpgradePriority =
+            PlacementAuthoringRules.DefaultAutoUpgradePriority;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

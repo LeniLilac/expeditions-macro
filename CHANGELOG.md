@@ -4,6 +4,24 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.37] - 2026-07-28
+
+### Added
+
+- Newly authored placement steps now default Auto Upgrade to Priority 1. Existing saved steps remain unchanged, and missing legacy values still load as Off.
+
+### Changed
+
+- Step Mode now holds the configured Quick Placement key and repeats one direct unit-slot tap plus one saved-coordinate click until the selected-unit panel is confirmed, with an eight-attempt hard cap. The retired Cancel Placement normalization, cyan Quick Placement image gate, double-click pairs, and timed mouse approaches are removed.
+
+### Fixed
+
+- Private-server restart checkboxes now save immediately. Navigating away from the Dashboard no longer restores the previous **Restart Roblox at Macro start** or recovery setting.
+
+### Tests
+
+- Passed 1,238 application and detector tests, 5 Deep Debug Viewer tests, and all 72 dark/light UI snapshot states.
+
 ## [1.3.0-beta.36] - 2026-07-28
 
 ### Fixed
@@ -1064,7 +1082,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.36...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.37...HEAD
+[1.3.0-beta.37]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.36...v1.3.0-beta.37
 [1.3.0-beta.36]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.35...v1.3.0-beta.36
 [1.3.0-beta.35]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.34...v1.3.0-beta.35
 [1.3.0-beta.34]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.33...v1.3.0-beta.34
