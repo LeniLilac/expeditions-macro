@@ -4,6 +4,16 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.34] - 2026-07-27
+
+### Fixed
+
+- Placement Setup now scrolls oversized placement-step rows by pixels, keeping Auto Upgrade priority and After Start delay reachable with the mouse wheel, scrollbar, and keyboard at compact and medium window sizes.
+
+### Tests
+
+- Added structural reachability checks at 960 by 640 and 1400 by 1080, and expanded the dark/light UI snapshot matrix to 68 states.
+
 ## [1.3.0-beta.33] - 2026-07-27
 
 ### Changed
@@ -1016,7 +1026,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.33...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.34...HEAD
+[1.3.0-beta.34]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.33...v1.3.0-beta.34
 [1.3.0-beta.33]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.32...v1.3.0-beta.33
 [1.3.0-beta.32]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.31...v1.3.0-beta.32
 [1.3.0-beta.31]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.30...v1.3.0-beta.31

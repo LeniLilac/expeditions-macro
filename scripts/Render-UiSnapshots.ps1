@@ -40,5 +40,5 @@ if ($process.ExitCode -ne 0) {
     throw "UI snapshot renderer exited with code $($process.ExitCode). $details"
 }
 $files = @(Get-ChildItem -LiteralPath $output -File -Filter '*.png')
-if ($files.Count -ne 66) { throw "Expected 66 dark/light UI snapshots, found $($files.Count)." }
+if ($files.Count -ne 68) { throw "Expected 68 dark/light UI snapshots, found $($files.Count)." }
 $files | Sort-Object Name | Select-Object Name, Length
