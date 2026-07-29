@@ -6,64 +6,10 @@
              SizeChanged="Editor_SizeChanged">
     <UserControl.Resources>
         <DataTemplate x:Key="PlacementMarkerTemplate">
-            <Canvas Width="66"
-                    Height="46"
-                    Cursor="Hand"
-                    ToolTip="Right-click to remove this placement"
-                    MouseLeftButtonDown="PlacementMarker_MouseLeftButtonDown"
-                    MouseRightButtonDown="PlacementMarker_MouseRightButtonDown">
-                <Canvas.RenderTransform>
-                    <TranslateTransform X="-8"
-                                        Y="-38" />
-                </Canvas.RenderTransform>
-                <Path x:Name="MarkerConnector"
-                      Data="M 8,34 L 8,12 L 18,12"
-                      Stroke="{DynamicResource AccentBrush}"
-                      StrokeThickness="3" />
-                <Ellipse x:Name="MarkerPoint"
-                         Canvas.Left="1"
-                         Canvas.Top="27"
-                         Width="14"
-                         Height="14"
-                         Fill="{DynamicResource SurfaceBrush}"
-                         Stroke="{DynamicResource AccentBrush}"
-                         StrokeThickness="4" />
-                <Border x:Name="MarkerLabelBox"
-                        Canvas.Left="18"
-                        Canvas.Top="0"
-                        MinWidth="36"
-                        Height="24"
-                        Padding="8,0"
-                        Background="{DynamicResource SurfaceBrush}"
-                        BorderBrush="{DynamicResource AccentBrush}"
-                        BorderThickness="2"
-                        CornerRadius="3">
-                    <StackPanel HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Orientation="Horizontal">
-                        <TextBlock FontWeight="Bold"
-                                   Text="{Binding MarkerLabel}" />
-                        <TextBlock Margin="4,0,0,0"
-                                   FontSize="9"
-                                   Foreground="{DynamicResource MutedBrush}"
-                                   Text="{Binding PhaseShortLabel}" />
-                    </StackPanel>
-                </Border>
-            </Canvas>
-            <DataTemplate.Triggers>
-                <DataTrigger Binding="{Binding Phase}"
-                             Value="AfterStart">
-                    <Setter TargetName="MarkerConnector"
-                            Property="Stroke"
-                            Value="{DynamicResource WarningBrush}" />
-                    <Setter TargetName="MarkerPoint"
-                            Property="Stroke"
-                            Value="{DynamicResource WarningBrush}" />
-                    <Setter TargetName="MarkerLabelBox"
-                            Property="BorderBrush"
-                            Value="{DynamicResource WarningBrush}" />
-                </DataTrigger>
-            </DataTemplate.Triggers>
+            <icons:PlacementMarkerView Cursor="Hand"
+                                       ToolTip="Right-click to remove this placement"
+                                       MouseLeftButtonDown="PlacementMarker_MouseLeftButtonDown"
+                                       MouseRightButtonDown="PlacementMarker_MouseRightButtonDown" />
         </DataTemplate>
         <DataTemplate x:Key="PlacementStepTemplate">
             <Grid>
@@ -287,8 +233,8 @@
                                         <ItemsControl.ItemsPanel><ItemsPanelTemplate><Canvas /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemContainerStyle>
                                             <Style TargetType="ContentPresenter">
-                                                <Setter Property="Canvas.Left" Value="{Binding X}" />
-                                                <Setter Property="Canvas.Top" Value="{Binding Y}" />
+                                                <Setter Property="Canvas.Left" Value="{Binding MarkerLayout.CanvasLeft}" />
+                                                <Setter Property="Canvas.Top" Value="{Binding MarkerLayout.CanvasTop}" />
                                             </Style>
                                         </ItemsControl.ItemContainerStyle>
                                     </ItemsControl>
