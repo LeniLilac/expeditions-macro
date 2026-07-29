@@ -61,6 +61,7 @@ public partial class MacroPage
             MacroTaskKind.Event =>
                 throw new InvalidOperationException(
                     "Event routes require Fast no align Placement Setup."),
+            MacroTaskKind.Utility => [],
             _ => throw new ArgumentOutOfRangeException(
                 nameof(task),
                 task.Kind,
@@ -115,6 +116,7 @@ public partial class MacroPage
                         .ConfigureAwait(false))
                     .Placement,
                 ],
+            MacroTaskKind.Utility => [],
             _ => throw new ArgumentOutOfRangeException(
                 nameof(task),
                 task.Kind,

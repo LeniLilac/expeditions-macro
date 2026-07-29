@@ -1,5 +1,7 @@
 using System.Windows.Controls;
 using ExpeditionsMacro.App.Controls;
+using ExpeditionsMacro.App.Models;
+using ExpeditionsMacro.Core.Models;
 
 namespace ExpeditionsMacro.App.Pages;
 
@@ -37,12 +39,6 @@ public partial class PlacementModelsPage
 
     private ItemsControl PlacementMarkers =>
         FastEditorPanel.PlacementMarkers;
-
-    private RadioButton FastBeforeStartButton =>
-        FastEditorPanel.FastBeforeStartButton;
-
-    private RadioButton FastAfterStartButton =>
-        FastEditorPanel.FastAfterStartButton;
 
     private RadioButton FastUnit1Button =>
         FastEditorPanel.FastUnit1Button;
@@ -92,6 +88,33 @@ public partial class PlacementModelsPage
     private ProgressBar FastOperationProgress =>
         FastEditorPanel.FastOperationProgress;
 
+    internal void SetCompactSnapshotViewport(
+        bool showMatchSteps) =>
+        FastEditorPanel.SetCompactSnapshotViewport(
+            showMatchSteps);
+
+    internal void SetSnapshotStepSettings(
+        PlacementStepRow step)
+    {
+        PlacementStepRow? target =
+            _steps.FirstOrDefault(row =>
+                row.Kind ==
+                MatchStepKind.Placement);
+        if (step.HasPlacementReference &&
+            target is not null)
+        {
+            step.TargetPlacementId =
+                target.PlacementId;
+            step.UnitKey = target.UnitKey;
+            step.SetDisplayUnitId(
+                target.DisplayUnitId);
+        }
+        OpenMatchStepEditor(
+            new PlacementStepEditorOpeningEventArgs(
+                step,
+                null));
+    }
+
     private void WireFastEditorEvents()
     {
         FastEditorPanel.PrepareRequested += FastPrepare_Click;
@@ -106,16 +129,22 @@ public partial class PlacementModelsPage
             FastStepReorderRequested;
         FastEditorPanel.TimingSettingsOpening +=
             FastTimingSettingsOpening;
-        FastEditorPanel.TimingSettingsApplied +=
+        MatchSettingsDialog.ApplyRequested +=
             FastTimingSettingsApplied;
+        MatchSettingsDialog.CancelRequested +=
+            MatchSettingsDialog_CancelRequested;
+        FastEditorPanel.StepSettingsOpening +=
+            FastStepSettingsOpening;
+        MatchStepEditorDialog.ApplyRequested +=
+            FastStepSettingsApplied;
+        MatchStepEditorDialog.CancelRequested +=
+            MatchStepEditorDialog_CancelRequested;
         FastEditorPanel.ManualRecordingChanged +=
             FastManualRecording_SelectionChanged;
         FastEditorPanel.PlaybackModeChanged +=
             FastPlaybackMode_Changed;
         FastEditorPanel.UnitChanged +=
             FastUnitButton_Checked;
-        FastEditorPanel.PhaseChanged +=
-            FastPhaseButton_Checked;
         FastEditorPanel.ModeChanged +=
             TargetModeCombo_SelectionChanged;
         FastEditorPanel.RouteChanged +=

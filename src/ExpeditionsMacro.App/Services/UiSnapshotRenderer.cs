@@ -4,6 +4,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using ExpeditionsMacro.App.Controls;
+using ExpeditionsMacro.App.Models;
 using ExpeditionsMacro.App.Pages;
 using ExpeditionsMacro.Core.Models;
 
@@ -36,9 +37,15 @@ internal static class UiSnapshotRenderer
         ("Macro Plan", "macro-plan-add-story-act", false, false, MacroPlanSnapshotState.StoryActTaskPopup, ManualRecordingsSnapshotState.Ready),
         ("Macro Plan", "macro-plan-add-story-mastery", false, false, MacroPlanSnapshotState.StoryMasteryTaskPopup, ManualRecordingsSnapshotState.Ready),
         ("Macro Plan", "macro-plan-add-story-infinite", false, false, MacroPlanSnapshotState.StoryInfiniteTaskPopup, ManualRecordingsSnapshotState.Ready),
+        ("Macro Plan", "macro-plan-add-utility", false, false, MacroPlanSnapshotState.UtilityTaskPopup, ManualRecordingsSnapshotState.Ready),
         ("Macro Plan", "macro-plan-share", true, false, MacroPlanSnapshotState.NestedLoops, ManualRecordingsSnapshotState.Ready),
         ("Placement Setup", "placement-setup", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Placement Setup", "placement-setup-timing", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Placement Setup", "placement-setup-timing-small", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Placement Setup", "placement-setup-match-step-editor", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Placement Setup", "placement-setup-match-step-editor-small", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Placement Setup", "placement-setup-advanced-step", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Placement Setup", "placement-setup-advanced-recording", true, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Placement Setup", "placement-setup-recording", true, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Placement Setup", "placement-setup-small-controls", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Placement Setup", "placement-setup-small-steps", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
@@ -121,9 +128,12 @@ internal static class UiSnapshotRenderer
                     root.Measure(size);
                     root.Arrange(new Rect(size));
                     root.UpdateLayout();
-                    PrepareCompactPlacementSnapshot(
+                    PlacementSnapshotPreparer.Prepare(
                         root,
                         file);
+                    await Dispatcher.Yield(
+                        DispatcherPriority.Render);
+                    root.UpdateLayout();
                     if (string.Equals(
                             file,
                             "placement-setup",
@@ -259,65 +269,6 @@ internal static class UiSnapshotRenderer
             file.Contains(
                 "both-rails-collapsed",
                 StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static void PrepareCompactPlacementSnapshot(
-        FrameworkElement root,
-        string file)
-    {
-        if (!file.Contains(
-                "placement-setup",
-                StringComparison.OrdinalIgnoreCase) ||
-            (!(file.Contains(
-                   "-small",
-                   StringComparison.OrdinalIgnoreCase) ||
-               file.Contains(
-                   "-medium",
-                   StringComparison.OrdinalIgnoreCase) ||
-               file.Contains(
-                   "-collapsed",
-                   StringComparison.OrdinalIgnoreCase)) &&
-             !string.Equals(
-                 file,
-                 "placement-setup-timing",
-                 StringComparison.OrdinalIgnoreCase)))
-        {
-            return;
-        }
-
-        PlacementFastEditorView? editor =
-            FindVisualChild<PlacementFastEditorView>(
-                root);
-        if (editor is null)
-        {
-            throw new InvalidOperationException(
-                "The Placement Setup snapshot did not contain its editor.");
-        }
-        if (string.Equals(
-                file,
-                "placement-setup-timing",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            editor.SetSnapshotSettings(
-                placementIntervalMilliseconds: 900,
-                placementAttempts: 4,
-                defaultAfterStartDelayMilliseconds: 30_000,
-                impossibilityThresholdMinutes: 0,
-                recordingMode: false);
-            root.UpdateLayout();
-            return;
-        }
-        if (file.Contains(
-                "recording",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            editor.ClearSnapshotSettings();
-        }
-        editor.SetCompactSnapshotViewport(
-            file.Contains(
-                "steps",
-                StringComparison.OrdinalIgnoreCase));
-        root.UpdateLayout();
     }
 
     private static void PrepareDashboardSnapshot(

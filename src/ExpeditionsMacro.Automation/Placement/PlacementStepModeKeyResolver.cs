@@ -6,35 +6,51 @@ internal sealed record PlacementStepModeKeys(
     int QuickPlacement,
     char CancelPlacement,
     char Targeting,
-    char AutoUpgrade);
+    char AutoUpgrade,
+    char Upgrade);
 
 internal sealed class PlacementStepModeKeyResolver(
     Func<char> targetingKey,
     Func<char> autoUpgradeKey,
-    Func<int> quickPlacementKey)
+    Func<int> quickPlacementKey,
+    Func<char> upgradeKey)
 {
     public PlacementStepModeKeys Resolve(
         IReadOnlyList<PlacementStep> steps,
         char cancelPlacementKey)
     {
-        int quickPlacement =
-            quickPlacementKey();
-        if (!KeyboardKey.IsSupportedQuickPlacementKey(
-                quickPlacement))
+        bool placesUnits = steps.Any(step =>
+            step.Kind == MatchStepKind.Placement);
+        int quickPlacement = default;
+        char normalizedCancel = default;
+        if (placesUnits)
         {
-            throw new InvalidDataException(
-                "Scroll down to Controls on the Dashboard, then set Quick Placement key to the same physical key assigned in Anime Expeditions.");
-        }
-        if (!char.IsAsciiLetter(
-                cancelPlacementKey))
-        {
-            throw new InvalidDataException(
-                "Scroll down to Controls on the Dashboard, then set Toggle Cancel Unit Placement key to the same letter assigned in Anime Expeditions.");
+            quickPlacement = quickPlacementKey();
+            if (!KeyboardKey.IsSupportedQuickPlacementKey(
+                    quickPlacement))
+            {
+                throw new InvalidDataException(
+                    "Scroll down to Controls on the Dashboard, then set Quick Placement key to the same physical key assigned in Anime Expeditions.");
+            }
+            if (!char.IsAsciiLetter(
+                    cancelPlacementKey))
+            {
+                throw new InvalidDataException(
+                    "Scroll down to Controls on the Dashboard, then set Toggle Cancel Unit Placement key to the same letter assigned in Anime Expeditions.");
+            }
+            normalizedCancel =
+                char.ToUpperInvariant(
+                    cancelPlacementKey);
         }
 
         char targeting = default;
         if (steps.Any(step =>
-                (int)step.TargetingPriority > 0))
+                (step.Kind ==
+                     MatchStepKind.Placement &&
+                 (int)step.TargetingPriority > 0) ||
+                (step.Kind ==
+                     MatchStepKind.ReconfigureUnit &&
+                 step.ChangeTargetingPriority)))
         {
             targeting = targetingKey();
             if (!char.IsAsciiLetter(targeting))
@@ -48,8 +64,14 @@ internal sealed class PlacementStepModeKeyResolver(
 
         char autoUpgrade = default;
         if (steps.Any(step =>
-                step.AutoUpgradePriority !=
-                    UnitAutoUpgradePriority.Off))
+                (step.Kind ==
+                     MatchStepKind.Placement &&
+                 step.AutoUpgradePriority !=
+                     UnitAutoUpgradePriority.Off) ||
+                (step.Kind ==
+                     MatchStepKind.ReconfigureUnit &&
+                 step.AutoUpgradeAction !=
+                     MatchAutoUpgradeAction.NoChange)))
         {
             autoUpgrade = autoUpgradeKey();
             if (!char.IsAsciiLetter(autoUpgrade))
@@ -61,11 +83,26 @@ internal sealed class PlacementStepModeKeyResolver(
                 char.ToUpperInvariant(autoUpgrade);
         }
 
+        char upgrade = default;
+        if (steps.Any(step =>
+                step.Kind ==
+                    MatchStepKind.UpgradeUnit))
+        {
+            upgrade = upgradeKey();
+            if (!char.IsAsciiLetter(upgrade))
+            {
+                throw new InvalidDataException(
+                    "Scroll down to Controls on the Dashboard and set Upgrade Unit key to the same A-Z letter assigned in Anime Expeditions.");
+            }
+            upgrade =
+                char.ToUpperInvariant(upgrade);
+        }
+
         return new PlacementStepModeKeys(
             quickPlacement,
-            char.ToUpperInvariant(
-                cancelPlacementKey),
+            normalizedCancel,
             targeting,
-            autoUpgrade);
+            autoUpgrade,
+            upgrade);
     }
 }

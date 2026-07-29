@@ -63,6 +63,13 @@ public static class PlacementAuthoringRules
             IReadOnlyList<PlacementStep> steps)
     {
         ArgumentNullException.ThrowIfNull(steps);
+        if (steps.Any(step =>
+                step.Kind ==
+                MatchStepKind.StartGame))
+        {
+            return PlacementTimelinePolicy
+                .NormalizeSteps(steps);
+        }
         return steps
             .Select(
                 (step, index) =>
@@ -142,17 +149,24 @@ public static class PlacementAuthoringRules
     public static void ValidateMinimumSpacing(
         IReadOnlyList<PlacementStep> steps)
     {
-        for (int first = 0; first < steps.Count; first++)
+        PlacementStep[] placements =
+            steps.Where(step =>
+                    step.Kind ==
+                    MatchStepKind.Placement)
+                .ToArray();
+        for (int first = 0;
+             first < placements.Length;
+             first++)
         {
             for (int second = first + 1;
-                 second < steps.Count;
+                 second < placements.Length;
                  second++)
             {
                 if (AreSeparated(
-                    steps[first].X,
-                    steps[first].Y,
-                    steps[second].X,
-                    steps[second].Y))
+                    placements[first].X,
+                    placements[first].Y,
+                    placements[second].X,
+                    placements[second].Y))
                 {
                     continue;
                 }
@@ -161,6 +175,14 @@ public static class PlacementAuthoringRules
                     $"Fast no align placements must be at least {MinimumPlacementSpacingPixels} client pixels apart.");
             }
         }
+    }
+
+    public static void ValidateMatchStepReferences(
+        IReadOnlyList<PlacementStep> steps)
+    {
+        PlacementReferencePolicy.Validate(
+            PlacementTimelinePolicy.NormalizeSteps(
+                steps));
     }
 
     public static bool IsCoveredByStartDialog(
@@ -174,14 +196,27 @@ public static class PlacementAuthoringRules
     public static void ValidateBeforeStartSafety(
         IReadOnlyList<PlacementStep> steps)
     {
-        PlacementStep? covered = steps.FirstOrDefault(
-            step =>
-                step.Phase == PlacementPhase.BeforeStart &&
-                IsCoveredByStartDialog(step.X, step.Y));
+        PlacementStep? covered = steps
+            .Select((step, index) =>
+                new
+                {
+                    Step = step,
+                    Index = index,
+                })
+            .Where(item =>
+                item.Step.HasCoordinate &&
+                PlacementTimelinePolicy.IsBeforeStart(
+                    steps,
+                    item.Index))
+            .Select(item => item.Step)
+            .FirstOrDefault(step =>
+                IsCoveredByStartDialog(
+                    step.X,
+                    step.Y));
         if (covered is not null)
         {
             throw new InvalidDataException(
-                $"Before-start placement ({covered.X}, {covered.Y}) is covered by the Start Game dialog. Move it outside the centered dialog or mark it After Start.");
+                $"Match step ({covered.X}, {covered.Y}) is covered by the Start Game dialog. Move that step below Start Game or choose a different coordinate.");
         }
     }
 }

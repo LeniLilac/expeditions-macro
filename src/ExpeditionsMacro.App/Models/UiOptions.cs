@@ -12,15 +12,26 @@ public sealed class MacroTaskRow
     public required MacroTaskProgress Progress { get; init; }
 
     public string Name => string.IsNullOrWhiteSpace(Definition.Name) ? Definition.PresetId : Definition.Name;
-    public string Type => Definition.Kind.ToString();
+    public string Type => Definition.Kind ==
+            MacroTaskKind.Utility
+        ? "Utilities"
+        : Definition.Kind.ToString();
     public string LoopLabel =>
         $"#{Definition.Priority}  {Type} · {Name}";
-    public string Target => Definition.IsRecurring
+    public string Target => Definition.Kind ==
+            MacroTaskKind.Utility
+        ? $"Every {Definition.RefuelIntervalMinutes} min"
+        : Definition.IsRecurring
         ? "Every reset"
         : Definition.CompleteOnRuntimeDefeat
             ? $"{Definition.TargetRuntimeMinutes / 60d:0.#} h, then defeat"
             : $"{Definition.TargetVictories} victories";
-    public string Status => Progress.Completed
+    public string Status => Definition.Kind ==
+            MacroTaskKind.Utility
+        ? Progress.NextEligibleAtUtc is DateTimeOffset utilityNext
+            ? $"Due {utilityNext.LocalDateTime:t}"
+            : "Ready"
+        : Progress.Completed
         ? "Complete"
         : Definition.IsRecurring && Progress.NextEligibleAtUtc is DateTimeOffset next
             ? $"Available {next.LocalDateTime:t}"

@@ -1,3 +1,4 @@
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
@@ -16,13 +17,16 @@ internal sealed class ResourceRefuelScreenWaiter
 
     private readonly IRobloxAutomation _automation;
     private readonly Func<TimeSpan, CancellationToken, Task> _delay;
+    private readonly Func<DateTimeOffset> _utcNow;
 
     internal ResourceRefuelScreenWaiter(
         IRobloxAutomation automation,
-        Func<TimeSpan, CancellationToken, Task> delay)
+        Func<TimeSpan, CancellationToken, Task> delay,
+        Func<DateTimeOffset> utcNow)
     {
         _automation = automation;
         _delay = delay;
+        _utcNow = utcNow;
     }
 
     internal async Task EnsureCanonicalClientAsync(
@@ -64,6 +68,51 @@ internal sealed class ResourceRefuelScreenWaiter
             timeout,
             "Roblox did not reach a stable lobby with Areas closed before resource refuel.",
             cancellationToken).ConfigureAwait(false);
+    }
+
+    internal Task<bool> TryWaitForLobbyAsync(
+        RobloxWindow window,
+        IDetectorPack detector,
+        TimeSpan timeout,
+        CancellationToken cancellationToken) =>
+        WaitForStableAsync(
+            window,
+            frame =>
+                string.Equals(
+                    detector.RecoveryState(frame),
+                    "lobby",
+                    StringComparison.OrdinalIgnoreCase) &&
+                AreasScreenDetector.Detect(frame).State ==
+                    AreasScreenState.None,
+            timeout,
+            failureMessage: null,
+            cancellationToken);
+
+    internal async Task<ChallengeScreenMatch>
+        WaitForPlaySurfaceAsync(
+        RobloxWindow window,
+        Func<ChallengeScreenState, bool> accept,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        ChallengeScreenMatch? matched = null;
+        await WaitForStableAsync(
+            window,
+            frame =>
+            {
+                ChallengeScreenMatch candidate =
+                    ChallengeScreenDetector.Detect(frame);
+                if (!accept(candidate.State))
+                {
+                    return false;
+                }
+                matched = candidate;
+                return true;
+            },
+            timeout,
+            "The shared Play interface did not reach a state that can return to the Lobby.",
+            cancellationToken).ConfigureAwait(false);
+        return matched!;
     }
 
     internal async Task<AreasScreenMatch> WaitForAreasAsync(
@@ -111,6 +160,30 @@ internal sealed class ResourceRefuelScreenWaiter
             "The resource station did not reach its expected state.",
             cancellationToken).ConfigureAwait(false);
         return matched!;
+    }
+
+    internal async Task<ResourceStationScreenMatch?>
+        TryWaitForStationAsync(
+        RobloxWindow window,
+        ResourceStationScreenState state,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        ResourceStationScreenMatch? matched = null;
+        bool found = await WaitForStableAsync(
+            window,
+            frame =>
+            {
+                ResourceStationScreenMatch candidate =
+                    ResourceStationScreenDetector.Detect(frame);
+                if (candidate.State != state) return false;
+                matched = candidate;
+                return true;
+            },
+            timeout,
+            failureMessage: null,
+            cancellationToken).ConfigureAwait(false);
+        return found ? matched : null;
     }
 
     internal async Task<ImageFrame?> WaitForPlayAsync(
@@ -184,6 +257,42 @@ internal sealed class ResourceRefuelScreenWaiter
             cancellationToken).ConfigureAwait(false);
     }
 
+    internal Task ClickConfirmAsync(
+        RobloxWindow window,
+        ResourceStationScreenMatch match,
+        CancellationToken cancellationToken)
+    {
+        if (match.ConfirmActionX is not int x ||
+            match.ConfirmActionY is not int y)
+        {
+            throw new InvalidOperationException(
+                $"{match.State} did not expose a verified confirm action.");
+        }
+        return ClickAsync(
+            window,
+            x,
+            y,
+            cancellationToken);
+    }
+
+    internal Task ClickDismissAsync(
+        RobloxWindow window,
+        ResourceStationScreenMatch match,
+        CancellationToken cancellationToken)
+    {
+        if (match.DismissActionX is not int x ||
+            match.DismissActionY is not int y)
+        {
+            throw new InvalidOperationException(
+                $"{match.State} did not expose a verified dismiss action.");
+        }
+        return ClickAsync(
+            window,
+            x,
+            y,
+            cancellationToken);
+    }
+
     internal async Task ClickAsync(
         RobloxWindow window,
         int x,
@@ -219,23 +328,24 @@ internal sealed class ResourceRefuelScreenWaiter
         CancellationToken cancellationToken,
         ImageFrame? initialFrame = null)
     {
-        int maximumPolls = Math.Max(
-            1,
-            (int)Math.Ceiling(
-                timeout.TotalMilliseconds /
-                PollDelay.TotalMilliseconds));
         int stable = 0;
+        ObservationWaitBudget budget = new(
+            timeout,
+            StableDetections,
+            _utcNow);
         if (initialFrame is not null)
         {
             stable = accept(initialFrame) ? 1 : 0;
+            budget.MarkObserved();
         }
-        for (int poll = 0; poll < maximumPolls; poll++)
+        while (budget.ShouldObserve(
+                   confirmationPending: stable == 1))
         {
             cancellationToken.ThrowIfCancellationRequested();
             ImageFrame frame = Capture(window);
             stable = accept(frame) ? stable + 1 : 0;
+            budget.MarkObserved();
             if (stable >= StableDetections) return true;
-            if (poll + 1 >= maximumPolls) break;
             await _delay(
                 PollDelay,
                 cancellationToken).ConfigureAwait(false);

@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using ExpeditionsMacro.App.Models;
+using ExpeditionsMacro.Core.Models;
 
 namespace ExpeditionsMacro.App.Controls;
 
@@ -21,14 +23,10 @@ public partial class PlacementFastEditorView : UserControl
         InitializeComponent();
         FastRouteControls.UnitChanged +=
             FastRouteControls_UnitChanged;
-        FastRouteControls.PhaseChanged +=
-            FastRouteControls_PhaseChanged;
         FastRouteControls.RecordingChanged +=
             FastRouteControls_RecordingChanged;
         FastPlaybackModeSelector.SelectionChanged +=
             FastPlaybackModeSelector_SelectionChanged;
-        FastTimingEditor.ApplyRequested +=
-            FastTimingEditor_ApplyRequested;
     }
 
     public event RoutedEventHandler? PrepareRequested;
@@ -39,7 +37,6 @@ public partial class PlacementFastEditorView : UserControl
     public event RoutedEventHandler? MoveStepUpRequested;
     public event RoutedEventHandler? MoveStepDownRequested;
     public event RoutedEventHandler? UnitChanged;
-    public event RoutedEventHandler? PhaseChanged;
     public event SelectionChangedEventHandler?
         ManualRecordingChanged;
     public event EventHandler<
@@ -51,17 +48,12 @@ public partial class PlacementFastEditorView : UserControl
     public event MouseButtonEventHandler? MarkerSelected;
     public event MouseButtonEventHandler? MarkerRemoved;
     public event EventHandler? TimingSettingsOpening;
-    public event EventHandler<PlacementTimingApplyEventArgs>?
-        TimingSettingsApplied;
+    public event EventHandler<
+        PlacementStepEditorOpeningEventArgs>?
+        StepSettingsOpening;
 
     internal ComboBox FastTeamCombo =>
         FastRouteControls.TeamSelector;
-
-    internal RadioButton FastBeforeStartButton =>
-        FastRouteControls.BeforeStartSelector;
-
-    internal RadioButton FastAfterStartButton =>
-        FastRouteControls.AfterStartSelector;
 
     internal RadioButton FastUnit1Button =>
         FastRouteControls.Unit1Selector;
@@ -115,7 +107,7 @@ public partial class PlacementFastEditorView : UserControl
         FastStepsHeadingText.Text =
             enabled
                 ? "Manual playback"
-                : "Placement steps";
+                : "Match steps";
         FastPlacementCountText.Visibility =
             enabled
                 ? Visibility.Collapsed
@@ -132,11 +124,7 @@ public partial class PlacementFastEditorView : UserControl
             enabled
                 ? Visibility.Collapsed
                 : Visibility.Visible;
-        FastMoveUpButton.Visibility =
-            authoringVisibility;
-        FastMoveDownButton.Visibility =
-            authoringVisibility;
-        FastRemoveButton.Visibility =
+        FastAddStepButton.Visibility =
             authoringVisibility;
     }
 
@@ -147,46 +135,6 @@ public partial class PlacementFastEditorView : UserControl
             .SetInteractionEnabled(enabled);
         FastRouteControls.SetInteractionEnabled(enabled);
     }
-
-    public void SetTimingSettings(
-        int placementIntervalMilliseconds,
-        int placementAttempts,
-        int defaultAfterStartDelayMilliseconds,
-        int impossibilityThresholdMinutes,
-        bool recordingMode) =>
-        FastTimingEditor.SetValues(
-            placementIntervalMilliseconds,
-            placementAttempts,
-            defaultAfterStartDelayMilliseconds,
-            impossibilityThresholdMinutes,
-            recordingMode);
-
-    public void ShowTimingError(string message) =>
-        FastTimingEditor.ShowError(message);
-
-    public void CloseTimingSettings() =>
-        FastTimingPopup.IsOpen = false;
-
-    internal void SetSnapshotSettings(
-        int placementIntervalMilliseconds,
-        int placementAttempts,
-        int defaultAfterStartDelayMilliseconds,
-        int impossibilityThresholdMinutes,
-        bool recordingMode)
-    {
-        SnapshotTimingEditor.SetValues(
-            placementIntervalMilliseconds,
-            placementAttempts,
-            defaultAfterStartDelayMilliseconds,
-            impossibilityThresholdMinutes,
-            recordingMode);
-        SnapshotSettingsOverlay.Visibility =
-            Visibility.Visible;
-    }
-
-    internal void ClearSnapshotSettings() =>
-        SnapshotSettingsOverlay.Visibility =
-            Visibility.Collapsed;
 
     public void SetStepsInteractionEnabled(bool enabled)
     {
@@ -202,6 +150,8 @@ public partial class PlacementFastEditorView : UserControl
         {
             FastStopButton.Focus();
         }
+        FastAddStepButton.IsEnabled = enabled;
+        FastTimingButton.IsEnabled = enabled;
     }
 
     private void FastPrepare_Click(
@@ -243,36 +193,20 @@ public partial class PlacementFastEditorView : UserControl
         object sender,
         RoutedEventArgs e)
     {
-        FastTimingPopup.IsOpen = true;
         TimingSettingsOpening?.Invoke(
             this,
             EventArgs.Empty);
     }
-
-    private void FastTimingEditor_ApplyRequested(
-        object? sender,
-        PlacementTimingApplyEventArgs e) =>
-        TimingSettingsApplied?.Invoke(this, e);
 
     private void FastUnitButton_Checked(
         object sender,
         RoutedEventArgs e) =>
         UnitChanged?.Invoke(sender, e);
 
-    private void FastPhaseButton_Checked(
-        object sender,
-        RoutedEventArgs e) =>
-        PhaseChanged?.Invoke(sender, e);
-
     private void FastRouteControls_UnitChanged(
         object sender,
         RoutedEventArgs e) =>
         FastUnitButton_Checked(sender, e);
-
-    private void FastRouteControls_PhaseChanged(
-        object sender,
-        RoutedEventArgs e) =>
-        FastPhaseButton_Checked(sender, e);
 
     private void FastRouteControls_RecordingChanged(
         object sender,
@@ -332,6 +266,17 @@ public partial class PlacementFastEditorView : UserControl
         object sender,
         MouseWheelEventArgs e)
     {
+        if (FastWorkspaceScrollViewer.VerticalOffset > 0)
+        {
+            FastWorkspaceScrollViewer
+                .ScrollToVerticalOffset(
+                    FastWorkspaceScrollViewer
+                        .VerticalOffset -
+                    e.Delta);
+            e.Handled = true;
+            return;
+        }
+
         Point viewportPoint =
             e.GetPosition(PlacementScrollViewer);
         Point imagePoint =

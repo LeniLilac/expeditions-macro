@@ -44,7 +44,8 @@ public sealed partial class ExpeditionMacroRunner
         StableStateTracker<string> recoveryTracker = new(ExpeditionRunPolicy.RecoveryStableDetections(preset));
         InactivityKeepAlive keepAlive = new();
         List<PlacementStep> retryableSteps =
-            [.. initialRetryableSteps];
+            [.. SelectRetryablePlacementSteps(
+                initialRetryableSteps)];
         int nextAfterStartStep = 0;
         string? currentNode = null;
         int bosses = 0;
@@ -121,7 +122,7 @@ public sealed partial class ExpeditionMacroRunner
                 report(
                     "Placement",
                     5,
-                    $"Placing {dueAfterStart.Count} unit(s) at " +
+                    $"Running {dueAfterStart.Count} match step(s) at " +
                     $"{matchRuntime.Elapsed.TotalSeconds:F1}s " +
                     "after Start.",
                     null,
@@ -136,7 +137,8 @@ public sealed partial class ExpeditionMacroRunner
                     stepSent: null,
                     cancellationToken).ConfigureAwait(false);
                 retryableSteps.AddRange(
-                    dueAfterStart);
+                    SelectRetryablePlacementSteps(
+                        dueAfterStart));
                 nextAfterStartStep +=
                     dueAfterStart.Count;
             }

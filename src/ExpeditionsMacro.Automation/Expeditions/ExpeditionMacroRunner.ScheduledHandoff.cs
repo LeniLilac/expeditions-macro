@@ -1,4 +1,5 @@
 using ExpeditionsMacro.Automation.Navigation;
+using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Automation.Scheduling;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
@@ -13,6 +14,7 @@ public sealed partial class ExpeditionMacroRunner
         IDetectorPack detector,
         RunTerminal terminal,
         ExpeditionPreset preset,
+        PlacementModel placement,
         char playMenuKey,
         RepeatedRoutePreparationState preparation,
         TimeSpan runtime,
@@ -56,9 +58,15 @@ public sealed partial class ExpeditionMacroRunner
                     terminal.Frame,
                     cancellationToken).ConfigureAwait(false);
                 preparation.MarkRepeatStageRequested();
-                await Task.Delay(
-                    4500,
-                    cancellationToken).ConfigureAwait(false);
+                if (ManualPlaybackStartPolicy
+                    .RequiresPrestart(
+                        placement,
+                        arrivedFromRepeatStage: true))
+                {
+                    await Task.Delay(
+                        4500,
+                        cancellationToken).ConfigureAwait(false);
+                }
                 return true;
             case ScheduledTaskContinuation.ReturnToLobby:
                 report(

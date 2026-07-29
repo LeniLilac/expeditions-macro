@@ -58,6 +58,127 @@ public sealed class MacroSchedulerTests
     }
 
     [Fact]
+    public void UtilityRunsImmediatelyThenHandsOffUntilItsInterval()
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        DateTimeOffset nextRefuel = now.AddMinutes(30);
+        MacroTaskDefinition utility =
+            Task(
+                "refuel",
+                MacroTaskKind.Utility,
+                priority: 1);
+        MacroTaskDefinition story =
+            Task(
+                "story",
+                MacroTaskKind.Story,
+                priority: 2);
+        MacroPlan plan = Plan(utility, story);
+
+        Assert.Equal(
+            utility,
+            MacroScheduler.SelectNext(plan, now));
+        MacroTaskProgress cooldown =
+            MacroScheduler.Advance(
+                utility,
+                plan.ProgressFor(utility.Id),
+                new ScheduledTaskResult(
+                    0,
+                    0,
+                    TimeSpan.FromSeconds(20),
+                    nextRefuel),
+                now);
+        MacroPlan waiting = plan with
+        {
+            Progress =
+            [
+                cooldown,
+                plan.ProgressFor(story.Id),
+            ],
+        };
+
+        Assert.False(cooldown.Completed);
+        Assert.Equal(
+            story,
+            MacroScheduler.SelectNext(
+                waiting,
+                now.AddMinutes(1)));
+        Assert.Equal(
+            utility,
+            MacroScheduler.SelectNext(
+                waiting,
+                nextRefuel));
+    }
+
+    [Fact]
+    public async Task UtilityCooldown_IsPersistedBeforeTheNextTaskRuns()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            MacroPlanRepository repository = new(
+                new AppPaths(root));
+            MacroScheduler scheduler = new(repository);
+            MacroTaskDefinition utility = Task(
+                "refuel",
+                MacroTaskKind.Utility,
+                1);
+            MacroTaskDefinition story = Task(
+                "story",
+                MacroTaskKind.Story,
+                2);
+            MacroPlan plan = Plan(utility, story);
+            DateTimeOffset nextEligible =
+                DateTimeOffset.UtcNow.AddMinutes(45);
+            using CancellationTokenSource stopped = new();
+
+            await Assert.ThrowsAnyAsync<
+                OperationCanceledException>(
+                () => scheduler.RunAsync(
+                    plan,
+                    async (task, _, token) =>
+                    {
+                        if (task.Kind ==
+                            MacroTaskKind.Utility)
+                        {
+                            return new ScheduledTaskResult(
+                                0,
+                                0,
+                                TimeSpan.FromSeconds(10),
+                                nextEligible);
+                        }
+
+                        MacroPlan saved =
+                            Assert.IsType<MacroPlan>(
+                                await repository.LoadAsync(
+                                    plan.Id,
+                                    token));
+                        Assert.Equal(
+                            nextEligible,
+                            saved.ProgressFor(utility.Id)
+                                .NextEligibleAtUtc);
+                        stopped.Cancel();
+                        token.ThrowIfCancellationRequested();
+                        return new ScheduledTaskResult(
+                            0,
+                            0,
+                            TimeSpan.Zero);
+                    },
+                    cancellationToken: stopped.Token));
+
+            MacroPlan reloaded = Assert.IsType<MacroPlan>(
+                await repository.LoadAsync(plan.Id));
+            Assert.Equal(
+                nextEligible,
+                reloaded.ProgressFor(utility.Id)
+                    .NextEligibleAtUtc);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Fact]
     public void LegacyDisabledTask_DeserializesAsActiveAndIsOmittedFromNewJson()
     {
         MacroTaskDefinition task =
@@ -165,6 +286,7 @@ public sealed class MacroSchedulerTests
     [InlineData(MacroTaskKind.Raid, true)]
     [InlineData(MacroTaskKind.Event, true)]
     [InlineData(MacroTaskKind.Challenge, false)]
+    [InlineData(MacroTaskKind.Utility, false)]
     public void RepeatStage_RequiresTheSameFiniteRoute(MacroTaskKind kind, bool expected)
     {
         MacroTaskDefinition current = Task("current", kind, 1) with { PresetId = "same-route" };
@@ -267,6 +389,43 @@ public sealed class MacroSchedulerTests
         Assert.Equal(
             ScheduledTaskContinuation.ReturnToLobby,
             continuation);
+    }
+
+    [Theory]
+    [InlineData(MacroTaskKind.Expedition)]
+    [InlineData(MacroTaskKind.Story)]
+    [InlineData(MacroTaskKind.Raid)]
+    [InlineData(MacroTaskKind.Event)]
+    [InlineData(MacroTaskKind.Challenge)]
+    public async Task RouteIntoUtility_RequiresLobby(
+        MacroTaskKind currentKind)
+    {
+        MacroTaskDefinition current =
+            Task("current", currentKind, 1);
+        MacroTaskDefinition utility =
+            Task(
+                "utility",
+                MacroTaskKind.Utility,
+                2);
+        ScheduledTaskResult result =
+            currentKind == MacroTaskKind.Challenge
+                ? new ScheduledTaskResult(
+                    0,
+                    0,
+                    TimeSpan.Zero,
+                    DateTimeOffset.UtcNow.AddMinutes(30),
+                    Skipped: true)
+                : new ScheduledTaskResult(
+                    1,
+                    0,
+                    TimeSpan.FromMinutes(3));
+
+        Assert.Equal(
+            ScheduledTaskContinuation.ReturnToLobby,
+            await ObserveContinuationAsync(
+                current,
+                utility,
+                result));
     }
 
     [Fact]
@@ -411,7 +570,9 @@ public sealed class MacroSchedulerTests
     {
         Id = id,
         Kind = kind,
-        PresetId = $"{id}-preset",
+        PresetId = kind == MacroTaskKind.Utility
+            ? string.Empty
+            : $"{id}-preset",
         Name = id,
         Priority = priority,
     };

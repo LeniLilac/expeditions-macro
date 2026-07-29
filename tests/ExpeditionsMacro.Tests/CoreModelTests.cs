@@ -497,6 +497,44 @@ public sealed class CoreModelTests
     }
 
     [Fact]
+    public void UtilityTask_ValidatesRefuelRouteAndInterval()
+    {
+        MacroTaskDefinition task = new()
+        {
+            Id = "utility-refuel",
+            Kind = MacroTaskKind.Utility,
+            Name = "Gold Mine + Resource Drill",
+            RefuelTarget = ResourceRefuelTarget.Both,
+            RefuelIntervalMinutes = 45,
+        };
+
+        task.Validate();
+        Assert.True(task.IsRecurring);
+        Assert.False(task.UsesPlacementSetup);
+        Assert.Throws<InvalidDataException>(
+            () => (task with
+            {
+                RefuelTarget =
+                    ResourceRefuelTarget.None,
+            }).Validate());
+        Assert.Throws<InvalidDataException>(
+            () => (task with
+            {
+                RefuelIntervalMinutes = 0,
+            }).Validate());
+        Assert.Throws<InvalidDataException>(
+            () => (task with
+            {
+                PlacementTarget = new PlacementTarget
+                {
+                    Mode =
+                        PlacementTargetMode.Expedition,
+                    MapNumber = 1,
+                },
+            }).Validate());
+    }
+
+    [Fact]
     public void ModelId_IsReadableStableAndNameSensitive()
     {
         string first = ModelId.FromName("Expedition Map 1");

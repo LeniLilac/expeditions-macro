@@ -1,4 +1,5 @@
 using ExpeditionsMacro.Automation.Navigation;
+using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Automation.Scheduling;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Imaging;
@@ -15,6 +16,7 @@ public sealed partial class StageMacroRunner
         StageMode mode,
         TerminalObservation terminal,
         RepeatedRoutePreparationState preparation,
+        PlacementModel? placement,
         IDetectorPack detector,
         char playMenuKey,
         bool autoRecover,
@@ -94,13 +96,19 @@ public sealed partial class StageMacroRunner
                     repeat.Value.Y,
                     cancellationToken).ConfigureAwait(false);
                 preparation.MarkRepeatStageRequested();
-                await WaitForStateAsync(
-                    window,
-                    StageScreenState.Prestart,
-                    TimeSpan.FromSeconds(45),
-                    detector,
-                    stableDetections,
-                    cancellationToken).ConfigureAwait(false);
+                if (ManualPlaybackStartPolicy
+                    .RequiresPrestart(
+                        placement,
+                        arrivedFromRepeatStage: true))
+                {
+                    await WaitForStateAsync(
+                        window,
+                        StageScreenState.Prestart,
+                        TimeSpan.FromSeconds(45),
+                        detector,
+                        stableDetections,
+                        cancellationToken).ConfigureAwait(false);
+                }
                 return true;
             case ScheduledTaskContinuation.ReturnToLobby:
                 report(

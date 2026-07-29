@@ -401,7 +401,7 @@ public sealed class FastNoAlignPresetShareTests
             setup.ImpossibilityThresholdMinutes);
         Assert.Null(setup.ManualInputRecordingId);
         Assert.NotNull(setup.Target);
-        Assert.Equal(2, setup.Steps.Count);
+        Assert.Equal(4, setup.Steps.Count);
         PlacementStep before = setup.Steps[0];
         Assert.Equal(2, before.UnitKey);
         Assert.Equal(101, before.X);
@@ -417,7 +417,17 @@ public sealed class FastNoAlignPresetShareTests
         Assert.Equal(
             UnitAutoUpgradePriority.Off,
             before.AutoUpgradePriority);
-        PlacementStep after = setup.Steps[1];
+        Assert.Equal(
+            MatchStepKind.StartGame,
+            setup.Steps[1].Kind);
+        Assert.Equal(
+            MatchStepKind.Delay,
+            setup.Steps[2].Kind);
+        Assert.Equal(
+            45_678,
+            setup.Steps[2]
+                .DelayDurationMilliseconds);
+        PlacementStep after = setup.Steps[3];
         Assert.Equal(4, after.UnitKey);
         Assert.Equal(607, after.X);
         Assert.Equal(463, after.Y);
@@ -425,7 +435,7 @@ public sealed class FastNoAlignPresetShareTests
             PlacementPhase.AfterStart,
             after.Phase);
         Assert.Equal(
-            45_678,
+            0,
             after.DelayAfterStartMilliseconds);
         Assert.Equal(
             UnitAutoUpgradePriority.Priority6,

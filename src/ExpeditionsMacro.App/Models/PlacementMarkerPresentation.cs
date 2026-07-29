@@ -34,21 +34,22 @@ public sealed record PlacementMarkerPresentation
 
     public double LabelHeight { get; init; }
 
-    public double LabelCenterY { get; init; }
+    public double ConnectorBendX { get; init; }
+
+    public double ConnectorBendY { get; init; }
 
     public double ConnectorEndX { get; init; }
+
+    public double ConnectorEndY { get; init; }
 
     public static PlacementMarkerPresentation Create(
         int anchorX,
         int anchorY,
-        ScreenRegion label)
+        PlacementMarkerLabelPlacement placement)
     {
-        int labelCenterY =
-            label.Y + label.Height / 2;
-        int connectorEndX =
-            label.Right <= anchorX
-                ? label.Right
-                : label.X;
+        ScreenRegion label = placement.LabelBounds;
+        PlacementMarkerConnector connector =
+            placement.Connector;
         int canvasLeft =
             Math.Min(anchorX - PointRadius, label.X) -
             StrokePadding;
@@ -78,9 +79,14 @@ public sealed record PlacementMarkerPresentation
             LabelTop = label.Y - canvasTop,
             LabelWidth = label.Width,
             LabelHeight = label.Height,
-            LabelCenterY = labelCenterY - canvasTop,
+            ConnectorBendX =
+                connector.BendX - canvasLeft,
+            ConnectorBendY =
+                connector.BendY - canvasTop,
             ConnectorEndX =
-                connectorEndX - canvasLeft,
+                connector.EndX - canvasLeft,
+            ConnectorEndY =
+                connector.EndY - canvasTop,
         };
     }
 }

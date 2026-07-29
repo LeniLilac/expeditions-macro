@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using ExpeditionsMacro.App.Controls;
 using ExpeditionsMacro.App.Models;
@@ -14,14 +15,42 @@ public partial class PlacementModelsPage
 
     private bool RemoveSelectedPlacementStep()
     {
-        if (ActiveStepsSelector.SelectedItem is
-            PlacementStepRow row)
+        if (ActiveStepsSelector.SelectedItem is not
+                PlacementStepRow row)
         {
-            _steps.Remove(row);
-            return true;
+            return false;
+        }
+        if (!row.CanRemove)
+        {
+            FastStatusText.Text =
+                "Start Game is required and cannot be removed.";
+            return false;
         }
 
-        return false;
+        List<PlacementStep> prospective =
+            _steps.Where(candidate =>
+                    !ReferenceEquals(candidate, row))
+                .Select(candidate =>
+                    candidate.ToModel())
+                .ToList();
+        try
+        {
+            ValidateTimeline(prospective);
+        }
+        catch (Exception error) when (
+            error is InvalidDataException or
+            InvalidOperationException)
+        {
+            FastStatusText.Text = error.Message;
+            return false;
+        }
+
+        _steps.Remove(row);
+        NormalizeTimelineRows();
+        FastStatusText.Text =
+            $"{row.StepTypeLabel} removed.";
+        SchedulePlacementAutoSave();
+        return true;
     }
 
     private void MoveUp_Click(
@@ -34,20 +63,6 @@ public partial class PlacementModelsPage
         RoutedEventArgs e) =>
         MoveSelected(1);
 
-    private void InsertStepInPhaseOrder(
-        PlacementStepRow row)
-    {
-        int index =
-            row.Phase ==
-                PlacementPhase.BeforeStart
-                ? _steps.TakeWhile(step =>
-                    step.Phase ==
-                        PlacementPhase.BeforeStart)
-                    .Count()
-                : _steps.Count;
-        _steps.Insert(index, row);
-    }
-
     private void FastStepReorderRequested(
         object? sender,
         PlacementStepReorderEventArgs e)
@@ -57,149 +72,79 @@ public partial class PlacementModelsPage
             return;
         }
 
-        if (MoveStepWithinPhase(
-                e.Source,
-                e.Target,
-                e.InsertAfter))
+        int current = _steps.IndexOf(e.Source);
+        int target = _steps.IndexOf(e.Target);
+        if (current < 0 || target < 0)
         {
-            FastStatusText.Text =
-                "Placement order changed.";
+            return;
         }
-    }
-
-    private bool NormalizeChangedStepPhase(
-        PlacementStepRow row)
-    {
-        int sourceIndex = _steps.IndexOf(row);
-        if (sourceIndex < 0 ||
-            !Enum.IsDefined(row.Phase))
+        if (e.InsertAfter)
         {
-            return false;
+            target++;
         }
-        if (row.Phase ==
-                PlacementPhase.BeforeStart &&
-            PlacementAuthoringRules
-                .IsCoveredByStartDialog(
-                    row.X,
-                    row.Y))
+        if (current < target)
         {
-            _normalizingPlacementStepPhase = true;
-            try
-            {
-                row.Phase =
-                    PlacementPhase.AfterStart;
-            }
-            finally
-            {
-                _normalizingPlacementStepPhase = false;
-            }
-            FastStatusText.Text =
-                "That point is covered by the Start Game dialog. Move it outside the dialog or keep it After Start.";
-            return false;
+            target--;
         }
-
-        PlacementStep[] original =
-            _steps.Select(step => step.ToModel())
-                .ToArray();
-        original[sourceIndex] =
-            original[sourceIndex] with
-            {
-                Phase =
-                    row.Phase ==
-                        PlacementPhase.BeforeStart
-                        ? PlacementPhase.AfterStart
-                        : PlacementPhase.BeforeStart,
-            };
-        PlacementPhaseChange change =
-            PlacementAuthoringRules
-                .ChangePhaseForAuthoring(
-                    original,
-                    sourceIndex,
-                    row.Phase);
-        if (!change.Changed)
-        {
-            return false;
-        }
-
-        if (change.ChangedIndex != sourceIndex)
-        {
-            using (SuspendPlacementAutoSave())
-            {
-                _steps.Move(
-                    sourceIndex,
-                    change.ChangedIndex);
-            }
-        }
-        UpdateFastPlacementCount();
-        ActiveStepsSelector.SelectedItem = row;
-        FastStepsList.ScrollIntoView(row);
-        FastStatusText.Text =
-            $"Unit {row.UnitKey} moved to {row.PhaseLabel}.";
-        return true;
-    }
-
-    private bool MoveStepWithinPhase(
-        PlacementStepRow source,
-        PlacementStepRow target,
-        bool insertAfter)
-    {
-        if (source.Phase != target.Phase)
-        {
-            return false;
-        }
-
-        int current = _steps.IndexOf(source);
-        int targetIndex =
-            _steps.IndexOf(target);
-        if (current < 0 || targetIndex < 0)
-        {
-            return false;
-        }
-
-        if (insertAfter)
-        {
-            targetIndex++;
-        }
-        if (current < targetIndex)
-        {
-            targetIndex--;
-        }
-        if (current == targetIndex)
-        {
-            return false;
-        }
-
-        _steps.Move(current, targetIndex);
-        FastStepsList.SelectedItem = source;
-        FastStepsList.ScrollIntoView(source);
-        return true;
+        MoveStepTo(e.Source, target);
     }
 
     private void MoveSelected(int offset)
     {
         if (ActiveStepsSelector.SelectedItem is not
-            PlacementStepRow row)
+                PlacementStepRow row)
         {
             return;
         }
 
         int current = _steps.IndexOf(row);
-        int target = current + offset;
-        if (target < 0 || target >= _steps.Count)
+        MoveStepTo(row, current + offset);
+    }
+
+    private bool MoveStepTo(
+        PlacementStepRow row,
+        int target)
+    {
+        int current = _steps.IndexOf(row);
+        if (current < 0 ||
+            target < 0 ||
+            target >= _steps.Count ||
+            current == target)
         {
-            return;
-        }
-        if (_steps[target].Phase != row.Phase)
-        {
-            FastStatusText.Text =
-                "Before Start steps always stay above After Start steps.";
-            return;
+            return false;
         }
 
-        _steps.Move(current, target);
+        List<PlacementStepRow> ordered =
+            [.. _steps];
+        ordered.RemoveAt(current);
+        ordered.Insert(target, row);
+        try
+        {
+            ValidateTimeline(
+                ordered.Select(step =>
+                        step.ToModel())
+                    .ToArray());
+        }
+        catch (Exception error) when (
+            error is InvalidDataException or
+            InvalidOperationException)
+        {
+            FastStatusText.Text = error.Message;
+            return false;
+        }
+
+        using (SuspendPlacementAutoSave())
+        {
+            _steps.Move(current, target);
+            NormalizeTimelineRows();
+        }
         ActiveStepsSelector.SelectedItem = row;
         FastStepsList.ScrollIntoView(row);
         FastStatusText.Text =
-            "Placement order changed.";
+            row.IsStartGame
+                ? "Start Game boundary moved."
+                : "Match-step order changed.";
+        SchedulePlacementAutoSave();
+        return true;
     }
 }

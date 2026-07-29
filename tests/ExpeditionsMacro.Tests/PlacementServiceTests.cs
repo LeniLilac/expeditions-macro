@@ -49,7 +49,9 @@ public sealed class PlacementServiceTests
                 new FakeCaptureService(automation),
                 new PlacementModelRepository(
                     new AppPaths(root)),
-                () => 'T');
+                targetingKey: () => 'T',
+                matchStartPlayback:
+                    new PlacementMatchStartPlaybackStub());
             PlacementModel model = new()
             {
                 Id = "playback",
@@ -138,7 +140,9 @@ public sealed class PlacementServiceTests
                 new FakeCaptureService(automation),
                 new PlacementModelRepository(
                     new AppPaths(root)),
-                () => 'T');
+                targetingKey: () => 'T',
+                matchStartPlayback:
+                    new PlacementMatchStartPlaybackStub());
             PlacementModel model = ModelWithSteps(
                 new PlacementStep
                 {
@@ -197,7 +201,9 @@ public sealed class PlacementServiceTests
                 new FakeCaptureService(automation),
                 new PlacementModelRepository(
                     new AppPaths(root)),
-                () => 'T');
+                targetingKey: () => 'T',
+                matchStartPlayback:
+                    new PlacementMatchStartPlaybackStub());
 
             await service.PlayAsync(
                 ModelWithSteps(
@@ -246,8 +252,10 @@ public sealed class PlacementServiceTests
                 new FakeCaptureService(automation),
                 new PlacementModelRepository(
                     new AppPaths(root)),
-                () => 'T',
-                () => 'Y');
+                targetingKey: () => 'T',
+                autoUpgradeKey: () => 'Y',
+                matchStartPlayback:
+                    new PlacementMatchStartPlaybackStub());
 
             await service.PlayAsync(
                 ModelWithSteps(
@@ -299,8 +307,10 @@ public sealed class PlacementServiceTests
                 new FakeCaptureService(automation),
                 new PlacementModelRepository(
                     new AppPaths(root)),
-                () => 'T',
-                () => 'Y');
+                targetingKey: () => 'T',
+                autoUpgradeKey: () => 'Y',
+                matchStartPlayback:
+                    new PlacementMatchStartPlaybackStub());
 
             await Assert.ThrowsAnyAsync<
                 OperationCanceledException>(
@@ -348,7 +358,9 @@ public sealed class PlacementServiceTests
                 new FakeCaptureService(automation),
                 new PlacementModelRepository(
                     new AppPaths(root)),
-                () => 'T');
+                targetingKey: () => 'T',
+                matchStartPlayback:
+                    new PlacementMatchStartPlaybackStub());
             PlacementModel model = ModelWithSteps(
                 new PlacementStep
                 {
@@ -408,7 +420,9 @@ public sealed class PlacementServiceTests
                 new FakeCaptureService(automation),
                 new PlacementModelRepository(
                     new AppPaths(root)),
-                () => 'T');
+                targetingKey: () => 'T',
+                matchStartPlayback:
+                    new PlacementMatchStartPlaybackStub());
 
             await service.PlayAsync(
                 ModelWithSteps(
@@ -455,7 +469,9 @@ public sealed class PlacementServiceTests
                 new FakeCaptureService(automation),
                 new PlacementModelRepository(
                     new AppPaths(root)),
-                () => 'T');
+                targetingKey: () => 'T',
+                matchStartPlayback:
+                    new PlacementMatchStartPlaybackStub());
             PlacementModel model = ModelWithSteps(
                 new PlacementStep
                 {
@@ -545,6 +561,7 @@ public sealed class PlacementServiceTests
         private readonly IReadOnlyList<ImageFrame> _captures;
         private readonly ImageFrame _dismissedCapture;
         private int _captureIndex;
+        private int _captureCount;
         private int _idleClickCount;
         private bool _panelDismissed;
         private int _dismissedCaptureDelayCount;
@@ -575,6 +592,10 @@ public sealed class PlacementServiceTests
         public DateTimeOffset? ClickedAt { get; private set; }
 
         public List<DateTimeOffset> ClickTimes { get; } = [];
+
+        public int CaptureCount => _captureCount;
+
+        public Action? CaptureCompleted { get; init; }
 
         public int IdleClicksBeforeDismissal { get; init; } = 1;
 
@@ -609,6 +630,8 @@ public sealed class PlacementServiceTests
 
         public ImageFrame CaptureClient(RobloxWindow window)
         {
+            _captureCount++;
+            CaptureCompleted?.Invoke();
             if (_panelDismissed)
             {
                 if (_dismissedCaptureDelayCount++ >=

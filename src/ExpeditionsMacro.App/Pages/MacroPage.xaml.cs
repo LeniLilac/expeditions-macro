@@ -30,6 +30,20 @@ public partial class MacroPage : UserControl, IAppPage
     private readonly ObservableCollection<MacroPlan> _plans = [];
     private readonly ObservableCollection<PlacementSetupRoute>
         _visibleRoutes = [];
+    private static readonly IReadOnlyList<
+        NamedChoice<ResourceRefuelTarget>>
+        UtilityRoutes =
+        [
+            new(
+                ResourceRefuelTarget.GoldMine,
+                "Gold Mine refuel"),
+            new(
+                ResourceRefuelTarget.ResourceDrill,
+                "Resource Drill refuel"),
+            new(
+                ResourceRefuelTarget.Both,
+                "Gold Mine + Resource Drill"),
+        ];
     private readonly DispatcherTimer _runtimeTimer;
     private DateTimeOffset? _runStarted;
     private string? _editingTaskId;
@@ -392,7 +406,10 @@ public partial class MacroPage : UserControl, IAppPage
         left.RunStatChallenge == right.RunStatChallenge &&
         left.RunSpriteChallenge == right.RunSpriteChallenge &&
         left.ExtractAtCheckpoint == right.ExtractAtCheckpoint &&
-        left.BossesBeforeExtract == right.BossesBeforeExtract;
+        left.BossesBeforeExtract == right.BossesBeforeExtract &&
+        left.RefuelTarget == right.RefuelTarget &&
+        left.RefuelIntervalMinutes ==
+            right.RefuelIntervalMinutes;
 
     private static int ParsePositiveInt(TextBox field, string label) =>
         int.TryParse(field.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) && value > 0
@@ -406,6 +423,7 @@ public partial class MacroPage : UserControl, IAppPage
         MacroTaskKind.Story => "Story",
         MacroTaskKind.Raid => "Raid",
         MacroTaskKind.Event => "Event",
+        MacroTaskKind.Utility => "Utilities",
         _ => kind.ToString(),
     };
 

@@ -1,4 +1,5 @@
 using ExpeditionsMacro.Automation.Navigation;
+using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Automation.Scheduling;
 using ExpeditionsMacro.Automation.Stages;
 using ExpeditionsMacro.Core.Abstractions;
@@ -16,6 +17,7 @@ public sealed partial class EventMacroRunner
         RobloxWindow window,
         EventTerminalObservation terminal,
         RepeatedRoutePreparationState preparation,
+        PlacementModel placement,
         IDetectorPack detector,
         char playMenuKey,
         int stableDetections,
@@ -96,12 +98,18 @@ public sealed partial class EventMacroRunner
                     repeatAction.Value.Y,
                     cancellationToken).ConfigureAwait(false);
                 preparation.MarkRepeatStageRequested();
-                await WaitForStateAsync(
-                    window,
-                    EventScreenState.Prestart,
-                    TimeSpan.FromSeconds(45),
-                    detector,
-                    cancellationToken).ConfigureAwait(false);
+                if (ManualPlaybackStartPolicy
+                    .RequiresPrestart(
+                        placement,
+                        arrivedFromRepeatStage: true))
+                {
+                    await WaitForStateAsync(
+                        window,
+                        EventScreenState.Prestart,
+                        TimeSpan.FromSeconds(45),
+                        detector,
+                        cancellationToken).ConfigureAwait(false);
+                }
                 return true;
             case ScheduledTaskContinuation.ReturnToLobby:
                 report(

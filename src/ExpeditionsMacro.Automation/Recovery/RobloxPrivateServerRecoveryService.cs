@@ -1,3 +1,4 @@
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
@@ -175,6 +176,12 @@ public sealed class RobloxPrivateServerRecoveryService
                         RestartReadinessTimeout,
                         DiscoveryPollInterval,
                         cancellationToken).ConfigureAwait(false);
+                    await new RobloxChatPanelNormalizer(
+                            _automation)
+                        .EnsureClosedAsync(
+                            window,
+                            cancellationToken)
+                        .ConfigureAwait(false);
                 }
                 progress?.Report(new MacroProgress(
                     "Recovery",

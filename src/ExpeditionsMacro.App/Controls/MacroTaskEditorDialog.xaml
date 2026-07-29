@@ -2,7 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:icons="clr-namespace:ExpeditionsMacro.App.Controls"
-             Width="560"
+             Width="640"
              MaxHeight="720">
     <Border Margin="24"
             Padding="18"
@@ -53,7 +53,7 @@
                               DisplayMemberPath="Name" />
                     <UniformGrid x:Name="TaskKindButtonGrid"
                                  Margin="0,7,0,0"
-                                 Columns="5">
+                                 Columns="6">
                         <RadioButton x:Name="ChallengeTaskKindButton"
                                      GroupName="TaskKind"
                                      Margin="0,0,6,0"
@@ -80,10 +80,16 @@
                                      Content="Raid" />
                         <RadioButton x:Name="EventTaskKindButton"
                                      GroupName="TaskKind"
-                                     Margin="0"
+                                     Margin="0,0,6,0"
                                      Style="{StaticResource PlacementChoiceButton}"
                                      Tag="Event"
                                      Content="Event" />
+                        <RadioButton x:Name="UtilityTaskKindButton"
+                                     GroupName="TaskKind"
+                                     Margin="0"
+                                     Style="{StaticResource PlacementChoiceButton}"
+                                     Tag="Utility"
+                                     Content="Utilities" />
                     </UniformGrid>
 
                     <Border Margin="0,10,0,0"

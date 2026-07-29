@@ -4,6 +4,19 @@ namespace ExpeditionsMacro.Core.Models;
 
 public sealed record PlacementStep
 {
+    public const int MaximumDelayDurationMilliseconds =
+        3_600_000;
+
+    public const int MaximumUpgradeCount = 100;
+
+    public MatchStepKind Kind { get; init; }
+
+    public string PlacementId { get; init; } =
+        string.Empty;
+
+    public string TargetPlacementId { get; init; } =
+        string.Empty;
+
     public required int UnitKey { get; init; }
 
     public required int X { get; init; }
@@ -27,12 +40,36 @@ public sealed record PlacementStep
         init;
     } = UnitAutoUpgradePriority.Off;
 
+    public bool ChangeTargetingPriority { get; init; }
+
+    public MatchAutoUpgradeAction AutoUpgradeAction
+    {
+        get;
+        init;
+    }
+
+    public int DelayDurationMilliseconds { get; init; }
+
+    public int UpgradeCount { get; init; }
+
+    [JsonIgnore]
+    public bool HasCoordinate =>
+        Kind == MatchStepKind.Placement;
+
+    [JsonIgnore]
+    public bool HasPlacementReference =>
+        Kind is MatchStepKind.ReconfigureUnit or
+            MatchStepKind.UpgradeUnit;
+
     public void Validate(int clientWidth, int clientHeight)
     {
-        if (UnitKey is < 0 or > 9) throw new InvalidDataException("Unit key must be 0 through 9.");
-        if (X < 0 || Y < 0 || X >= clientWidth || Y >= clientHeight) throw new InvalidDataException("Placement coordinate falls outside the Roblox client.");
         if (DelayAfterMilliseconds < 0) throw new InvalidDataException("Placement delay cannot be negative.");
         if (DelayAfterStartMilliseconds < 0) throw new InvalidDataException("After-start placement delay cannot be negative.");
+        if (!Enum.IsDefined(Kind))
+        {
+            throw new InvalidDataException(
+                "Match step type is invalid.");
+        }
         if (!Enum.IsDefined(Phase)) throw new InvalidDataException("Placement phase is invalid.");
         if (!Enum.IsDefined(TargetingPriority))
         {
@@ -43,6 +80,157 @@ public sealed record PlacementStep
         {
             throw new InvalidDataException(
                 "Auto Upgrade priority is invalid.");
+        }
+        if (!Enum.IsDefined(AutoUpgradeAction))
+        {
+            throw new InvalidDataException(
+                "Match-step Auto Upgrade action is invalid.");
+        }
+
+        if (HasCoordinate ||
+            HasPlacementReference)
+        {
+            if (UnitKey is < 0 or > 9)
+            {
+                throw new InvalidDataException(
+                    "Unit key must be 0 through 9.");
+            }
+        }
+        if (HasCoordinate)
+        {
+            if (X < 0 || Y < 0 ||
+                X >= clientWidth ||
+                Y >= clientHeight)
+            {
+                throw new InvalidDataException(
+                    "Match-step coordinate falls outside the Roblox client.");
+            }
+        }
+
+        switch (Kind)
+        {
+            case MatchStepKind.Placement:
+                RequirePlacementIdentity();
+                RequireUnusedActionFields();
+                break;
+            case MatchStepKind.ReconfigureUnit:
+                RequirePlacementReference();
+                if (!ChangeTargetingPriority &&
+                    AutoUpgradeAction ==
+                        MatchAutoUpgradeAction.NoChange)
+                {
+                    throw new InvalidDataException(
+                        "A reconfigure step must change targeting, Auto Upgrade, or both.");
+                }
+                if (DelayDurationMilliseconds != 0 ||
+                    UpgradeCount != 0)
+                {
+                    throw new InvalidDataException(
+                        "A reconfigure step contains settings for another action.");
+                }
+                break;
+            case MatchStepKind.Delay:
+                RequireNoPlacementIdentity();
+                if (DelayDurationMilliseconds is < 1 or
+                    > MaximumDelayDurationMilliseconds)
+                {
+                    throw new InvalidDataException(
+                        $"Delay steps must wait 1 through {MaximumDelayDurationMilliseconds} ms.");
+                }
+                if (UpgradeCount != 0 ||
+                    ChangeTargetingPriority ||
+                    AutoUpgradeAction !=
+                        MatchAutoUpgradeAction.NoChange)
+                {
+                    throw new InvalidDataException(
+                        "A delay step contains settings for another action.");
+                }
+                break;
+            case MatchStepKind.UpgradeUnit:
+                RequirePlacementReference();
+                if (UpgradeCount is < 1 or
+                    > MaximumUpgradeCount)
+                {
+                    throw new InvalidDataException(
+                        $"Upgrade steps must press Upgrade Unit 1 through {MaximumUpgradeCount} times.");
+                }
+                if (DelayDurationMilliseconds != 0 ||
+                    ChangeTargetingPriority ||
+                    AutoUpgradeAction !=
+                        MatchAutoUpgradeAction.NoChange)
+                {
+                    throw new InvalidDataException(
+                        "An upgrade step contains settings for another action.");
+                }
+                break;
+            case MatchStepKind.StartGame:
+                RequireNoPlacementIdentity();
+                if (UnitKey != 0 ||
+                    X != 0 ||
+                    Y != 0 ||
+                    DelayAfterMilliseconds != 0 ||
+                    DelayAfterStartMilliseconds != 0 ||
+                    DelayDurationMilliseconds != 0 ||
+                    UpgradeCount != 0 ||
+                    ChangeTargetingPriority ||
+                    AutoUpgradeAction !=
+                        MatchAutoUpgradeAction.NoChange)
+                {
+                    throw new InvalidDataException(
+                        "The Start Game step cannot contain unit-action settings.");
+                }
+                break;
+            default:
+                throw new InvalidDataException(
+                    "Match step type is invalid.");
+        }
+    }
+
+    private void RequireUnusedActionFields()
+    {
+        if (DelayDurationMilliseconds != 0 ||
+            UpgradeCount != 0 ||
+            ChangeTargetingPriority ||
+            AutoUpgradeAction !=
+                MatchAutoUpgradeAction.NoChange)
+        {
+            throw new InvalidDataException(
+                "A placement step contains settings for another action.");
+        }
+    }
+
+    private void RequirePlacementIdentity()
+    {
+        if (!PlacementReferencePolicy.IsValidId(
+                PlacementId) ||
+            !string.IsNullOrEmpty(
+                TargetPlacementId))
+        {
+            throw new InvalidDataException(
+                "A placement step has an invalid internal identity.");
+        }
+    }
+
+    private void RequirePlacementReference()
+    {
+        if (!string.IsNullOrEmpty(PlacementId) ||
+            !PlacementReferencePolicy.IsValidId(
+                TargetPlacementId) ||
+            X != 0 ||
+            Y != 0)
+        {
+            throw new InvalidDataException(
+                "A unit action has an invalid placement reference.");
+        }
+    }
+
+    private void RequireNoPlacementIdentity()
+    {
+        if (!string.IsNullOrEmpty(PlacementId) ||
+            !string.IsNullOrEmpty(TargetPlacementId))
+        {
+            throw new InvalidDataException(
+                "This match step cannot reference a placement.");
         }
     }
 }
@@ -90,6 +278,12 @@ public sealed record PlacementModel
     public int PlacementAttempts { get; init; } =
         DefaultPlacementAttempts;
 
+    public PlacementAdvancedSettings AdvancedSettings
+    {
+        get;
+        init;
+    } = new();
+
     public string? ManualInputRecordingId { get; init; }
 
     public int ImpossibilityThresholdMinutes { get; init; }
@@ -130,6 +324,12 @@ public sealed record PlacementModel
             throw new InvalidDataException(
                 $"Placement attempts must be 1 through {MaximumPlacementAttempts}.");
         }
+        if (AdvancedSettings is null)
+        {
+            throw new InvalidDataException(
+                "Placement advanced settings are missing.");
+        }
+        AdvancedSettings.Validate();
         if (ImpossibilityThresholdMinutes is < 0 or
             > MaximumImpossibilityThresholdMinutes)
         {
@@ -161,11 +361,23 @@ public sealed record PlacementModel
             if (Target is null) throw new InvalidDataException("Choose the map and act for this Fast no align placement model.");
             Target.Validate();
         }
-        foreach (PlacementStep step in Steps) step.Validate(ClientWidth, ClientHeight);
+        IReadOnlyList<PlacementStep> normalizedSteps =
+            PlacementTimelinePolicy.NormalizeSteps(Steps);
+        foreach (PlacementStep step in normalizedSteps)
+        {
+            step.Validate(ClientWidth, ClientHeight);
+        }
+        PlacementTimelinePolicy.ValidateStructure(
+            normalizedSteps);
         if (CameraPreparationMode == CameraPreparationMode.FastNoAlign)
         {
-            PlacementAuthoringRules.ValidateMinimumSpacing(Steps);
-            PlacementAuthoringRules.ValidateBeforeStartSafety(Steps);
+            PlacementAuthoringRules.ValidateMinimumSpacing(
+                normalizedSteps);
+            PlacementAuthoringRules.ValidateBeforeStartSafety(
+                normalizedSteps);
+            PlacementAuthoringRules
+                .ValidateMatchStepReferences(
+                    normalizedSteps);
         }
     }
 

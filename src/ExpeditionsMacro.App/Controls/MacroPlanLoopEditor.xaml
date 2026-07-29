@@ -41,10 +41,14 @@
                                     <Border x:Name="BlockCard"
                                             Grid.Row="1"
                                             Padding="8,5"
+                                            AllowDrop="True"
                                             Background="{DynamicResource RaisedBrush}"
                                             BorderBrush="{DynamicResource BorderBrush}"
                                             BorderThickness="1"
-                                            CornerRadius="5">
+                                            CornerRadius="5"
+                                            Drop="BlockCard_Drop"
+                                            DragLeave="BlockCard_DragLeave"
+                                            DragOver="BlockCard_DragOver">
                                         <StackPanel>
                                             <ContentPresenter ContentSource="Header" />
                                             <Border x:Name="ChildrenConnector"

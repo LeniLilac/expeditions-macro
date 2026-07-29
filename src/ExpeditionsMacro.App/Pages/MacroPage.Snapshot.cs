@@ -14,6 +14,7 @@ internal enum MacroPlanSnapshotState
     StoryActTaskPopup,
     StoryMasteryTaskPopup,
     StoryInfiniteTaskPopup,
+    UtilityTaskPopup,
     LoopSettingsPopup,
 }
 
@@ -151,11 +152,36 @@ public partial class MacroPage
         }
         else if (state ==
                  MacroPlanSnapshotState
+                     .UtilityTaskPopup)
+        {
+            OpenUtilityTaskEditorForSnapshot();
+        }
+        else if (state ==
+                 MacroPlanSnapshotState
                      .LoopSettingsPopup)
         {
             LoopEditor.OpenLoopSettingsForSnapshot(
                 LoopEditor.LoopBlocks[1]);
         }
+    }
+
+    private void OpenUtilityTaskEditorForSnapshot()
+    {
+        OpenTaskEditor(
+            LoopEditor.LoopBlocks[1]);
+        TaskKindCombo.SelectedItem =
+            TaskKindCombo.Items
+                .Cast<NamedChoice<MacroTaskKind>>()
+                .First(choice =>
+                    choice.Value ==
+                    MacroTaskKind.Utility);
+        RefreshVisibleRoutes();
+        TaskRouteCombo.SelectedItem =
+            UtilityRoutes.Single(choice =>
+                choice.Value ==
+                ResourceRefuelTarget.Both);
+        TaskTargetText.Text = "45";
+        UpdateTaskTargetEditor();
     }
 
     private void OpenStoryTaskEditorForSnapshot(

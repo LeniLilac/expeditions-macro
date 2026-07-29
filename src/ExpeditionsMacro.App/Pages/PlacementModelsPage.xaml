@@ -137,5 +137,31 @@
         <icons:PlacementFastEditorView x:Name="FastEditorPanel"
                                        Grid.Column="1"
                                        Margin="24,20,28,24" />
+        <Grid x:Name="MatchSettingsOverlay"
+              Grid.ColumnSpan="2"
+              Panel.ZIndex="30"
+              Background="{DynamicResource ModalScrimBrush}"
+              FocusManager.IsFocusScope="True"
+              KeyboardNavigation.TabNavigation="Cycle"
+              PreviewKeyDown="MatchSettingsOverlay_PreviewKeyDown"
+              Visibility="Collapsed">
+            <icons:PlacementTimingPopover x:Name="MatchSettingsDialog"
+                                          Margin="24"
+                                          HorizontalAlignment="Stretch"
+                                           VerticalAlignment="Center" />
+        </Grid>
+        <Grid x:Name="MatchStepEditorOverlay"
+              Grid.ColumnSpan="2"
+              Panel.ZIndex="31"
+              Background="{DynamicResource ModalScrimBrush}"
+              FocusManager.IsFocusScope="True"
+              KeyboardNavigation.TabNavigation="Cycle"
+              PreviewKeyDown="MatchStepEditorOverlay_PreviewKeyDown"
+              Visibility="Collapsed">
+            <icons:PlacementStepEditorPopover x:Name="MatchStepEditorDialog"
+                                               Margin="24"
+                                               HorizontalAlignment="Stretch"
+                                               VerticalAlignment="Center" />
+        </Grid>
     </Grid>
 </UserControl>

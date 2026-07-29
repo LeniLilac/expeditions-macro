@@ -17,6 +17,7 @@ public partial class MacroPage
         string webhook,
         string discordUserId,
         char playMenuKey,
+        char? areasMenuKey,
         char? unitMenuKey,
         char cancelPlacementKey,
         MacroRunTotals macroTotals,
@@ -80,6 +81,12 @@ public partial class MacroPage
                 unitMenuKey,
                 cancelPlacementKey,
                 macroTotals,
+                progress,
+                cancellationToken),
+            MacroTaskKind.Utility => ExecuteUtilityAsync(
+                task,
+                playMenuKey,
+                areasMenuKey,
                 progress,
                 cancellationToken),
             _ => throw new ArgumentOutOfRangeException(

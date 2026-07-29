@@ -25,6 +25,12 @@ public sealed partial class StageMacroRunner
         char cancelPlacementKey,
         CancellationToken cancellationToken)
     {
+        await new RobloxChatPanelNormalizer(_automation)
+            .EnsureClosedAsync(
+                window,
+                cancellationToken)
+            .ConfigureAwait(false);
+        _placements.BeginMatch();
         PlacementMatchExecutionPlan execution =
             PlacementExecutionPlan.ForMatch(
                 models.Placement);
@@ -48,8 +54,15 @@ public sealed partial class StageMacroRunner
                 .ConfigureAwait(false);
         }
 
-        StableScreenAction<StageScreenMatch>? liveStart =
-            await StableScreenActionWaiter.WaitAsync(
+        bool requireStartAction =
+            !execution.ManualPlayback ||
+            ManualPlaybackStartPolicy.RequiresPrestart(
+                models.Placement);
+        StableScreenAction<StageScreenMatch>? liveStart = null;
+        if (requireStartAction)
+        {
+            liveStart =
+                await StableScreenActionWaiter.WaitAsync(
                     StageScreenState.Prestart,
                     stableDetections,
                     () => StageScreenDetector.Detect(
@@ -68,10 +81,11 @@ public sealed partial class StageMacroRunner
                                 raid!.PollMilliseconds)),
                     cancellationToken)
                 .ConfigureAwait(false);
-        if (liveStart is null)
-        {
-            throw new RobloxUiUnavailableException(
-                $"The {Label(mode)} Start Game button disappeared before it could be clicked.");
+            if (liveStart is null)
+            {
+                throw new RobloxUiUnavailableException(
+                    $"The {Label(mode)} Start Game button disappeared before it could be clicked.");
+            }
         }
 
         Stopwatch runtime;
@@ -83,6 +97,17 @@ public sealed partial class StageMacroRunner
                 throw new InvalidOperationException(
                     "Manual input playback is unavailable.");
             }
+            await ManualPlaybackStartPolicy
+                .WaitBeforePlaybackAsync(
+                    models.Placement!,
+                    message => report(
+                        "Recording playback",
+                        50,
+                        message,
+                        null,
+                        null),
+                    cancellationToken)
+                .ConfigureAwait(false);
             runtime =
                 await ManualInputMatchPlayback.PlayAsync(
                     _manualInputs,
@@ -98,7 +123,7 @@ public sealed partial class StageMacroRunner
             runtime = Stopwatch.StartNew();
             await ClickAsync(
                     window,
-                    liveStart.Value.X,
+                    liveStart!.Value.X,
                     liveStart.Value.Y,
                     cancellationToken)
                 .ConfigureAwait(false);

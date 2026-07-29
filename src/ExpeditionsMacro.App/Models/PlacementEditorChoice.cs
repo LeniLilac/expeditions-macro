@@ -35,10 +35,14 @@ public sealed class PlacementSetupRow(
     public string Name => Route.Name;
 
     public string Status => Model is not null
-        ? $"{Model.Steps.Count} placement{(Model.Steps.Count == 1 ? string.Empty : "s")} · {(Model.TeamSlot == 0 ? "Team unchanged" : $"Team {Model.TeamSlot}")}"
+        ? $"{PlacementCount} placement{(PlacementCount == 1 ? string.Empty : "s")} · {(Model.TeamSlot == 0 ? "Team unchanged" : $"Team {Model.TeamSlot}")}"
         : InheritedFrom is not null
             ? $"Uses {InheritedFrom}"
             : "Not configured";
+
+    private int PlacementCount =>
+        Model?.Steps.Count(step =>
+            step.Kind == MatchStepKind.Placement) ?? 0;
 
     public void UpdateModel(
         PlacementModel? model,

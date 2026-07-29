@@ -41,6 +41,14 @@ public sealed class PlacementMarkerLabelLayoutTests
                     placement.LabelBounds.X)
                 .Distinct()
                 .Count() >= 3);
+        Assert.True(
+            placements.Select(placement =>
+                    placement.LabelBounds.Y)
+                .Distinct()
+                .Count() >= 3);
+        AssertConnectorsAvoidOtherLabels(
+            requests,
+            placements);
     }
 
     [Fact]
@@ -79,6 +87,9 @@ public sealed class PlacementMarkerLabelLayoutTests
                     placement.LabelBounds.Height);
             });
         AssertPairwiseSeparated(placements);
+        AssertConnectorsAvoidOtherLabels(
+            requests,
+            placements);
     }
 
     [Fact]
@@ -140,6 +151,55 @@ public sealed class PlacementMarkerLabelLayoutTests
             request.AnchorY - 11,
             23,
             23);
+
+    private static void AssertConnectorsAvoidOtherLabels(
+        IReadOnlyList<PlacementMarkerLabelRequest>
+            requests,
+        IReadOnlyList<PlacementMarkerLabelPlacement>
+            placements)
+    {
+        IReadOnlyDictionary<int, PlacementMarkerLabelRequest>
+            byKey = requests.ToDictionary(
+                request => request.Key);
+        foreach (PlacementMarkerLabelPlacement placement in
+                 placements)
+        {
+            PlacementMarkerLabelRequest request =
+                byKey[placement.Key];
+            ScreenRegion[] segments =
+            [
+                Segment(
+                    request.AnchorX,
+                    request.AnchorY,
+                    placement.Connector.BendX,
+                    placement.Connector.BendY),
+                Segment(
+                    placement.Connector.BendX,
+                    placement.Connector.BendY,
+                    placement.Connector.EndX,
+                    placement.Connector.EndY),
+            ];
+            Assert.DoesNotContain(
+                placements,
+                other =>
+                    other.Key != placement.Key &&
+                    segments.Any(segment =>
+                        Intersects(
+                            segment,
+                            other.LabelBounds)));
+        }
+    }
+
+    private static ScreenRegion Segment(
+        int startX,
+        int startY,
+        int endX,
+        int endY) =>
+        new(
+            Math.Min(startX, endX) - 2,
+            Math.Min(startY, endY) - 2,
+            Math.Abs(startX - endX) + 5,
+            Math.Abs(startY - endY) + 5);
 
     private static ScreenRegion Expand(
         ScreenRegion region,

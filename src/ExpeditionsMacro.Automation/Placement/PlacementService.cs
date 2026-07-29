@@ -13,6 +13,8 @@ public sealed class PlacementService
     private readonly PlacementModelRepository _models;
     private readonly PlacementStepModePlayback
         _stepModePlayback;
+    private readonly IPlacementMatchStartPlayback?
+        _matchStartPlayback;
 
     public PlacementService(
         IRobloxAutomation automation,
@@ -20,18 +22,24 @@ public sealed class PlacementService
         PlacementModelRepository models,
         Func<char>? targetingKey = null,
         Func<char>? autoUpgradeKey = null,
-        Func<int>? quickPlacementKey = null)
+        Func<int>? quickPlacementKey = null,
+        Func<char>? upgradeKey = null,
+        IPlacementMatchStartPlayback?
+            matchStartPlayback = null)
     {
         _automation = automation;
         _capture = capture;
         _models = models;
+        _matchStartPlayback =
+            matchStartPlayback;
         _stepModePlayback =
             new PlacementStepModePlayback(
                 automation,
                 targetingKey ?? (() => 'T'),
                 autoUpgradeKey ?? (() => 'Y'),
                 quickPlacementKey ??
-                    (() => KeyboardKey.LeftShift));
+                    (() => KeyboardKey.LeftShift),
+                upgradeKey ?? (() => 'U'));
     }
 
     public async Task<PlacementModel> RecordAsync(
@@ -114,12 +122,17 @@ public sealed class PlacementService
         };
         // The global macro hotkey ends a recording by cancelling the
         // observation token. Persist completed captures independently.
+        model = PlacementTimelinePolicy.Normalize(
+            model);
         await _models.SaveAsync(
                 model,
                 CancellationToken.None)
             .ConfigureAwait(false);
         return model;
     }
+
+    public void BeginMatch() =>
+        _stepModePlayback.BeginMatch();
 
     public async Task PlayAsync(
         PlacementModel model,
@@ -133,21 +146,75 @@ public sealed class PlacementService
         Action<string>? status = null,
         CancellationToken cancellationToken = default)
     {
+        model = PlacementTimelinePolicy.Normalize(
+            model);
         model.Validate();
+        if (_matchStartPlayback is null)
+        {
+            throw new InvalidOperationException(
+                "Placement match playback requires a verified Start Game action owner.");
+        }
         RobloxWindow window =
             _automation.FindWindow() ??
             throw new RobloxSessionUnavailableException(
                 "No visible Roblox window was found.");
+        BeginMatch();
+        IReadOnlyList<PlacementStep> timeline =
+            PlacementTimelinePolicy.NormalizeSteps(
+                model.Steps);
+        int startIndex =
+            PlacementTimelinePolicy.StartGameIndex(
+                timeline);
+        PlacementStep[] beforeStart =
+            timeline.Take(startIndex).ToArray();
+        PlacementStep[] afterStart =
+            timeline.Skip(startIndex + 1)
+                .ToArray();
+        int actionCount =
+            beforeStart.Length +
+            afterStart.Length;
         await PlayStepsAsync(
                 window,
                 model,
-                model.Steps,
+                beforeStart,
                 useDefaultInterval,
                 defaultIntervalMilliseconds,
                 keyHoldMilliseconds,
                 afterKeyMilliseconds,
                 cancelPlacementKey,
-                stepSent,
+                stepSent is null
+                    ? null
+                    : (index, _, step) =>
+                        stepSent(
+                            index,
+                            actionCount,
+                            step),
+                status,
+                cancellationToken)
+            .ConfigureAwait(false);
+        status?.Invoke(
+            "Starting the match from the verified Start Game screen.");
+        await _matchStartPlayback.StartAsync(
+                window,
+                cancellationToken)
+            .ConfigureAwait(false);
+        await PlayStepsAsync(
+                window,
+                model,
+                afterStart,
+                useDefaultInterval,
+                defaultIntervalMilliseconds,
+                keyHoldMilliseconds,
+                afterKeyMilliseconds,
+                cancelPlacementKey,
+                stepSent is null
+                    ? null
+                    : (index, _, step) =>
+                        stepSent(
+                            beforeStart.Length +
+                            index,
+                            actionCount,
+                            step),
                 status,
                 cancellationToken)
             .ConfigureAwait(false);

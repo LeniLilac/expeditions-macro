@@ -16,27 +16,6 @@
                           AutomationProperties.Name="Team"
                           DisplayMemberPath="Name" />
             </StackPanel>
-            <StackPanel x:Name="PhasePanel"
-                        Margin="0,0,18,8">
-                <TextBlock Style="{StaticResource FieldLabel}"
-                           Text="Placement phase" />
-                <StackPanel Margin="0,7,0,0"
-                            Orientation="Horizontal">
-                    <RadioButton x:Name="BeforeStartButton"
-                                 GroupName="PlacementPhase"
-                                 Style="{StaticResource PlacementChoiceButton}"
-                                 Content="Before Start"
-                                 Tag="BeforeStart"
-                                 IsChecked="True"
-                                 Checked="PhaseButton_Checked" />
-                    <RadioButton x:Name="AfterStartButton"
-                                 GroupName="PlacementPhase"
-                                 Style="{StaticResource PlacementChoiceButton}"
-                                 Content="After Start"
-                                 Tag="AfterStart"
-                                 Checked="PhaseButton_Checked" />
-                </StackPanel>
-            </StackPanel>
             <StackPanel x:Name="UnitPanel"
                         Margin="0,0,0,8">
                 <TextBlock Style="{StaticResource FieldLabel}"

@@ -100,7 +100,7 @@
                            Margin="0,5,0,0"
                            Style="{StaticResource Caption}"
                            TextWrapping="Wrap"
-                           Text="Required only by the experimental resource-refuel Debug tools." />
+                           Text="Required by refuel Utilities and the resource-refuel Debug tool." />
             </StackPanel>
             <StackPanel HorizontalAlignment="Right"
                         VerticalAlignment="Center"
@@ -166,7 +166,7 @@
                            Margin="0,5,0,0"
                            Style="{StaticResource Caption}"
                            TextWrapping="Wrap"
-                           Text="Required before starting a plan that uses Step Mode placement steps." />
+                           Text="Required before starting a plan whose Match Steps contain placement actions." />
             </StackPanel>
             <StackPanel HorizontalAlignment="Right"
                         VerticalAlignment="Center"

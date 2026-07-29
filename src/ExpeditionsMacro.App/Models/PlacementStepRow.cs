@@ -6,19 +6,26 @@ namespace ExpeditionsMacro.App.Models;
 
 public sealed class PlacementStepRow : INotifyPropertyChanged
 {
+    public static IReadOnlyList<
+        PlacementEditorChoice<MatchStepKind>>
+        Kinds
+    { get; } =
+    [
+        new(MatchStepKind.Placement, "Place unit"),
+        new(
+            MatchStepKind.ReconfigureUnit,
+            "Reconfigure unit"),
+        new(MatchStepKind.Delay, "Delay"),
+        new(MatchStepKind.UpgradeUnit, "Upgrade unit"),
+    ];
+
+    public static IReadOnlyList<int> UnitSlots
+    { get; } = Enumerable.Range(1, 6).ToArray();
+
     public static IReadOnlyList<UnitTargetingPriority>
         TargetingPriorities
     { get; } =
         Enum.GetValues<UnitTargetingPriority>();
-
-    public static IReadOnlyList<
-        PlacementEditorChoice<PlacementPhase>>
-        Phases
-    { get; } =
-    [
-        new(PlacementPhase.BeforeStart, "Before Start"),
-        new(PlacementPhase.AfterStart, "After Start"),
-    ];
 
     public static IReadOnlyList<
         PlacementEditorChoice<UnitAutoUpgradePriority>>
@@ -34,11 +41,50 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         new(UnitAutoUpgradePriority.Priority6, "Priority 6"),
     ];
 
+    public static IReadOnlyList<
+        PlacementEditorChoice<MatchAutoUpgradeAction>>
+        AutoUpgradeActions
+    { get; } =
+    [
+        new(
+            MatchAutoUpgradeAction.NoChange,
+            "No change"),
+        new(
+            MatchAutoUpgradeAction.Disable,
+            "Disable"),
+        new(
+            MatchAutoUpgradeAction.Priority1,
+            "Enable · Priority 1"),
+        new(
+            MatchAutoUpgradeAction.Priority2,
+            "Enable · Priority 2"),
+        new(
+            MatchAutoUpgradeAction.Priority3,
+            "Enable · Priority 3"),
+        new(
+            MatchAutoUpgradeAction.Priority4,
+            "Enable · Priority 4"),
+        new(
+            MatchAutoUpgradeAction.Priority5,
+            "Enable · Priority 5"),
+        new(
+            MatchAutoUpgradeAction.Priority6,
+            "Enable · Priority 6"),
+    ];
+
     private int _unitKey;
     private int _x;
     private int _y;
+    private string _placementId = string.Empty;
+    private string _targetPlacementId = string.Empty;
+    private string _displayUnitId = string.Empty;
+    private MatchStepKind _kind;
     private int _delayAfterMilliseconds;
     private int _delayAfterStartMilliseconds;
+    private int _delayDurationMilliseconds;
+    private int _upgradeCount;
+    private bool _changeTargetingPriority;
+    private MatchAutoUpgradeAction _autoUpgradeAction;
     private PlacementPhase _phase;
     private UnitTargetingPriority _targetingPriority;
     private UnitAutoUpgradePriority
@@ -57,10 +103,62 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         {
             if (!Set(ref _unitKey, value)) return;
             Raise(nameof(MarkerLabel));
+            RaiseStepLabels();
         }
     }
-    public int X { get => _x; set => Set(ref _x, value); }
-    public int Y { get => _y; set => Set(ref _y, value); }
+
+    public string PlacementId
+    {
+        get => _placementId;
+        set => Set(
+            ref _placementId,
+            value ?? string.Empty);
+    }
+
+    public string TargetPlacementId
+    {
+        get => _targetPlacementId;
+        set => Set(
+            ref _targetPlacementId,
+            value ?? string.Empty);
+    }
+    public int X
+    {
+        get => _x;
+        set
+        {
+            if (!Set(ref _x, value)) return;
+            Raise(nameof(CoordinateLabel));
+        }
+    }
+    public int Y
+    {
+        get => _y;
+        set
+        {
+            if (!Set(ref _y, value)) return;
+            Raise(nameof(CoordinateLabel));
+        }
+    }
+    public MatchStepKind Kind
+    {
+        get => _kind;
+        set
+        {
+            if (!Enum.IsDefined(value))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(value));
+            }
+            if (!Set(ref _kind, value)) return;
+            Raise(nameof(HasCoordinate));
+            Raise(nameof(IsStartGame));
+            Raise(nameof(CanEdit));
+            Raise(nameof(CanRemove));
+            Raise(nameof(MarkerLabel));
+            RaiseStepLabels();
+        }
+    }
     public int DelayAfterMilliseconds { get => _delayAfterMilliseconds; set => Set(ref _delayAfterMilliseconds, value); }
     public int DelayAfterStartMilliseconds
     {
@@ -68,19 +166,8 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         set
         {
             if (!Set(ref _delayAfterStartMilliseconds, value)) return;
-            Raise(nameof(AfterStartDelayLabel));
-            Raise(nameof(DelayAfterStartSeconds));
+            Raise(nameof(ScheduleLabel));
         }
-    }
-    public double DelayAfterStartSeconds
-    {
-        get => DelayAfterStartMilliseconds / 1000d;
-        set => DelayAfterStartMilliseconds =
-            Math.Max(
-                0,
-                (int)Math.Round(
-                    value * 1000,
-                    MidpointRounding.AwayFromZero));
     }
     public PlacementPhase Phase
     {
@@ -94,9 +181,7 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
             }
             if (!Set(ref _phase, value)) return;
             Raise(nameof(MarkerLabel));
-            Raise(nameof(PhaseLabel));
-            Raise(nameof(PhaseShortLabel));
-            Raise(nameof(AfterStartDelayLabel));
+            Raise(nameof(ScheduleLabel));
         }
     }
 
@@ -107,6 +192,7 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         {
             if (!Set(ref _targetingPriority, value)) return;
             Raise(nameof(TargetingPriorityLabel));
+            Raise(nameof(ActionSummaryLabel));
         }
     }
 
@@ -116,27 +202,155 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         get => _autoUpgradePriority;
         set => Set(
             ref _autoUpgradePriority,
-            value);
+            value,
+            propertyChanged: () =>
+            {
+                Raise(nameof(AutoUpgradePriorityLabel));
+                Raise(nameof(ActionSummaryLabel));
+            });
     }
 
-    public string PhaseLabel =>
-        Phase == PlacementPhase.BeforeStart
-            ? "Before Start"
-            : "After Start";
+    public bool ChangeTargetingPriority
+    {
+        get => _changeTargetingPriority;
+        set
+        {
+            if (!Set(
+                    ref _changeTargetingPriority,
+                    value))
+            {
+                return;
+            }
+            Raise(nameof(ActionSummaryLabel));
+        }
+    }
+
+    public MatchAutoUpgradeAction AutoUpgradeAction
+    {
+        get => _autoUpgradeAction;
+        set
+        {
+            if (!Set(ref _autoUpgradeAction, value))
+            {
+                return;
+            }
+            Raise(nameof(ActionSummaryLabel));
+        }
+    }
+
+    public int DelayDurationMilliseconds
+    {
+        get => _delayDurationMilliseconds;
+        set
+        {
+            if (!Set(
+                    ref _delayDurationMilliseconds,
+                    value))
+            {
+                return;
+            }
+            Raise(nameof(ActionSummaryLabel));
+        }
+    }
+
+    public int UpgradeCount
+    {
+        get => _upgradeCount;
+        set
+        {
+            if (!Set(ref _upgradeCount, value)) return;
+            Raise(nameof(ActionSummaryLabel));
+        }
+    }
 
     public string MarkerLabel =>
-        UnitKey.ToString();
-
-    public string PhaseShortLabel =>
-        Phase == PlacementPhase.BeforeStart ? "B" : "A";
-
-    public string AfterStartDelayLabel =>
-        Phase == PlacementPhase.BeforeStart
-            ? "Before Start"
-            : $"{DelayAfterStartMilliseconds / 1000d:0.###}s after Start";
+        Kind switch
+        {
+            MatchStepKind.StartGame =>
+                string.Empty,
+            _ => DisplayUnitId,
+        };
 
     public string TargetingPriorityLabel =>
         TargetingPriority.ToString();
+
+    public string AutoUpgradePriorityLabel =>
+        AutoUpgradePriority ==
+            UnitAutoUpgradePriority.Off
+                ? "Off"
+                : $"Priority {(int)AutoUpgradePriority}";
+
+    public bool HasCoordinate =>
+        Kind == MatchStepKind.Placement;
+
+    public bool HasPlacementReference =>
+        Kind is MatchStepKind.ReconfigureUnit or
+            MatchStepKind.UpgradeUnit;
+
+    public bool IsStartGame =>
+        Kind == MatchStepKind.StartGame;
+
+    public bool CanEdit => !IsStartGame;
+
+    public bool CanRemove => !IsStartGame;
+
+    public string StepTypeLabel =>
+        Kind switch
+        {
+            MatchStepKind.Placement => "Place unit",
+            MatchStepKind.ReconfigureUnit =>
+                "Reconfigure unit",
+            MatchStepKind.Delay => "Wait",
+            MatchStepKind.UpgradeUnit =>
+                "Upgrade unit",
+            MatchStepKind.StartGame =>
+                "Start Game",
+            _ => Kind.ToString(),
+        };
+
+    public string StepTitle =>
+        Kind switch
+        {
+            MatchStepKind.Delay => "Delay",
+            MatchStepKind.StartGame => "Start Game",
+            _ => $"{StepTypeLabel} {DisplayUnitId}",
+        };
+
+    public string CoordinateLabel =>
+        IsStartGame
+            ? string.Empty
+            : HasCoordinate
+                ? $"{X}, {Y}"
+                : HasPlacementReference
+                    ? $"Placed unit {DisplayUnitId}"
+                    : "Timed action";
+
+    public string ScheduleLabel =>
+        IsStartGame
+            ? string.Empty
+            : ActionSummaryLabel;
+
+    public string ActionSummaryLabel =>
+        Kind switch
+        {
+            MatchStepKind.Placement =>
+                $"Target {TargetingPriorityLabel} · Auto {AutoUpgradePriorityLabel}",
+            MatchStepKind.ReconfigureUnit =>
+                ReconfigureSummary(),
+            MatchStepKind.Delay =>
+                $"Wait {DelayDurationMilliseconds:N0} ms",
+            MatchStepKind.UpgradeUnit =>
+                $"Press Upgrade Unit {UpgradeCount}×",
+            MatchStepKind.StartGame =>
+                string.Empty,
+            _ => string.Empty,
+        };
+
+    public string DisplayUnitId =>
+        string.IsNullOrWhiteSpace(
+            _displayUnitId)
+            ? UnitKey.ToString()
+            : _displayUnitId;
 
     public PlacementMarkerPresentation MarkerLayout =>
         _markerLayout;
@@ -154,8 +368,27 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         Raise(nameof(MarkerLayout));
     }
 
+    public void SetDisplayUnitId(string value)
+    {
+        value ??= string.Empty;
+        if (!Set(
+                ref _displayUnitId,
+                value,
+                name: nameof(DisplayUnitId)))
+        {
+            return;
+        }
+        Raise(nameof(MarkerLabel));
+        Raise(nameof(StepTitle));
+        Raise(nameof(CoordinateLabel));
+    }
+
     public PlacementStep ToModel() => new()
     {
+        Kind = Kind,
+        PlacementId = PlacementId,
+        TargetPlacementId =
+            TargetPlacementId,
         UnitKey = UnitKey,
         X = X,
         Y = Y,
@@ -166,10 +399,21 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         TargetingPriority = TargetingPriority,
         AutoUpgradePriority =
             AutoUpgradePriority,
+        ChangeTargetingPriority =
+            ChangeTargetingPriority,
+        AutoUpgradeAction =
+            AutoUpgradeAction,
+        DelayDurationMilliseconds =
+            DelayDurationMilliseconds,
+        UpgradeCount = UpgradeCount,
     };
 
     public static PlacementStepRow FromModel(PlacementStep step) => new()
     {
+        Kind = step.Kind,
+        PlacementId = step.PlacementId,
+        TargetPlacementId =
+            step.TargetPlacementId,
         UnitKey = step.UnitKey,
         X = step.X,
         Y = step.Y,
@@ -180,17 +424,54 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         TargetingPriority = step.TargetingPriority,
         AutoUpgradePriority =
             step.AutoUpgradePriority,
+        ChangeTargetingPriority =
+            step.ChangeTargetingPriority,
+        AutoUpgradeAction =
+            step.AutoUpgradeAction,
+        DelayDurationMilliseconds =
+            step.DelayDurationMilliseconds,
+        UpgradeCount = step.UpgradeCount,
     };
 
     private bool Set<T>(
         ref T field,
         T value,
+        Action? propertyChanged = null,
         [CallerMemberName] string? name = null)
     {
         if (EqualityComparer<T>.Default.Equals(field, value)) return false;
         field = value;
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        propertyChanged?.Invoke();
         return true;
+    }
+
+    private string ReconfigureSummary()
+    {
+        List<string> changes = [];
+        if (ChangeTargetingPriority)
+        {
+            changes.Add(
+                $"Target {TargetingPriorityLabel}");
+        }
+        if (AutoUpgradeAction !=
+            MatchAutoUpgradeAction.NoChange)
+        {
+            changes.Add(
+                AutoUpgradeAction ==
+                    MatchAutoUpgradeAction.Disable
+                        ? "Disable Auto Upgrade"
+                        : $"Auto Priority {(int)AutoUpgradeAction - 1}");
+        }
+        return string.Join(" · ", changes);
+    }
+
+    private void RaiseStepLabels()
+    {
+        Raise(nameof(StepTypeLabel));
+        Raise(nameof(StepTitle));
+        Raise(nameof(CoordinateLabel));
+        Raise(nameof(ActionSummaryLabel));
     }
 
     private void Raise(string name) =>

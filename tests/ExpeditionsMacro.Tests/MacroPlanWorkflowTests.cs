@@ -24,8 +24,17 @@ public sealed class MacroPlanWorkflowTests
             Kind = MacroTaskKind.Expedition,
             PresetId = "legacy-preset",
         };
+        MacroTaskDefinition utility = new()
+        {
+            Id = "utility-task",
+            Kind = MacroTaskKind.Utility,
+            Name = "Gold Mine refuel",
+        };
 
         Assert.True(Plan(fast).UsesPlacementSetupWorkflow);
+        Assert.True(
+            Plan(fast, utility)
+                .UsesPlacementSetupWorkflow);
         Assert.False(Plan(legacy).UsesPlacementSetupWorkflow);
         Assert.False(
             Plan(fast, legacy)

@@ -20,14 +20,12 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
     internal static readonly TimeSpan InitialPrestartTimeout = TimeSpan.FromSeconds(35);
     internal static readonly TimeSpan TeleportingPrestartTimeout = TimeSpan.FromMinutes(3);
     internal const int SchedulerHandoffMaximumAttempts = 3;
-
     private readonly IRobloxAutomation _automation;
     private readonly FastNoAlignPreparationSession _fastNoAlign;
     private readonly PlacementService _placements;
     private readonly TeamSelectionService _teams;
     private readonly IDiscordNotifier _discord;
     private readonly ManualInputRouteService? _manualInputs;
-
     public ChallengeMacroRunner(
         IRobloxAutomation automation,
         PlacementService placements,
@@ -338,29 +336,27 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
         await ClickAsync(window, preview.ActionX!.Value, preview.ActionY!.Value, cancellationToken).ConfigureAwait(false);
         bool attemptNotified = false;
         bool teamLoaded = profile.TeamSlot == 0;
+        bool skipRepeatedPrestart = false;
         while (true)
         {
-            ImageFrame prestart = await WaitForPrestartAfterPreviewAsync(window, preset, detector, report, cancellationToken).ConfigureAwait(false);
-            if (!teamLoaded)
-            {
-                await _teams.SelectAsync(window, profile.TeamSlot, unitMenuKey!.Value, progress: null, cancellationToken).ConfigureAwait(false);
-                teamLoaded = true;
-                prestart = await WaitForScreenAsync(
-                    window,
-                    preset,
-                    detector,
-                    ChallengeScreenState.Prestart,
-                    TimeSpan.FromSeconds(10),
-                    report,
-                    cancellationToken).ConfigureAwait(false);
-            }
-            report("Camera preparation", 20, $"Preparing {Label(map)} for {Label(type)}.", "prestart", null);
-            await PrepareCameraAsync(
-                window,
-                preset,
-                report,
-                log,
-                cancellationToken).ConfigureAwait(false);
+            bool skipThisPrestart =
+                skipRepeatedPrestart;
+            skipRepeatedPrestart = false;
+            (ImageFrame prestart, teamLoaded) =
+                await PrepareSelectedChallengeAttemptAsync(
+                        window,
+                        preset,
+                        detector,
+                        type,
+                        map,
+                        profile,
+                        teamLoaded,
+                        skipThisPrestart,
+                        unitMenuKey,
+                        report,
+                        log,
+                        cancellationToken)
+                    .ConfigureAwait(false);
             (Stopwatch matchRuntime,
                 IReadOnlyList<PlacementStep>
                     configuredAfterStart) =
@@ -449,7 +445,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
                 retry++;
                 retriesChanged(1);
                 report("Retry", 0, $"Retrying after defeat ({retry}/{preset.DefeatRetries}).", "defeat", terminal.Confidence);
-                await RetryDefeatAsync(window, preset, detector, terminal.Frame, report, cancellationToken).ConfigureAwait(false);
+                skipRepeatedPrestart = await RetryDefeatAsync(window, preset, detector, terminal.Frame, models.Placement, report, cancellationToken).ConfigureAwait(false);
                 continue;
             }
 

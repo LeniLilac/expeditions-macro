@@ -366,6 +366,13 @@ public sealed record AppSettings
             settings.AutoUpgradeUnitKey,
             "Auto Upgrade Unit");
 
+    public static char ParseUpgradeUnitKey(
+        AppSettings settings) =>
+        ParseUnitActionKey(
+            settings,
+            settings.UpgradeUnitKey,
+            "Upgrade Unit");
+
     public static int ParseQuickPlacementKey(
         AppSettings settings) =>
         AppControlKeyPolicy

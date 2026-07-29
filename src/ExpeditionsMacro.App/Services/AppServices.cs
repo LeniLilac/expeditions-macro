@@ -128,7 +128,11 @@ public sealed class AppServices : IDisposable
             () => AppSettings
                 .ParseAutoUpgradeUnitKey(Settings),
             () => AppSettings
-                .ParseQuickPlacementKey(Settings));
+                .ParseQuickPlacementKey(Settings),
+            () => AppSettings
+                .ParseUpgradeUnitKey(Settings),
+            new PlacementMatchStartPlayback(
+                Automation));
         ManualRecorder =
             new WindowsManualInputRecorder(Automation);
         WindowsManualInputPlayback manualPlayback =

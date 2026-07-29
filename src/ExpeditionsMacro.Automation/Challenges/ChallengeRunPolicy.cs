@@ -28,13 +28,46 @@ public static class ChallengeRunPolicy
         ScreenRegion dialogOcclusion)
     {
         ArgumentNullException.ThrowIfNull(steps);
-        List<PlacementStep> beforeStart = [];
-        List<PlacementStep> afterStart = [];
-        foreach (PlacementStep step in steps)
+        int firstCovered = -1;
+        for (int index = 0;
+             index < steps.Count;
+             index++)
         {
-            (dialogOcclusion.Contains(step.X, step.Y) ? afterStart : beforeStart).Add(step);
+            PlacementStep step = steps[index];
+            PlacementStep? coordinateOwner =
+                step.Kind switch
+                {
+                    MatchStepKind.Placement => step,
+                    MatchStepKind.ReconfigureUnit or
+                        MatchStepKind.UpgradeUnit =>
+                        PlacementReferencePolicy.ResolveTarget(
+                            steps,
+                            step),
+                    _ => null,
+                };
+            if (coordinateOwner is not null &&
+                dialogOcclusion.Contains(
+                    coordinateOwner.X,
+                    coordinateOwner.Y))
+            {
+                firstCovered = index;
+                break;
+            }
         }
-        return new ChallengePlacementPartition(beforeStart, afterStart);
+
+        if (firstCovered < 0)
+        {
+            return new ChallengePlacementPartition(
+                steps.ToArray(),
+                []);
+        }
+
+        // The prestart timeline is author ordered. Once a coordinate action is
+        // hidden by Start Game, defer its complete suffix so a Delay or a
+        // dependent unit action cannot leap ahead of the placement it owns.
+        return new ChallengePlacementPartition(
+            steps.Take(firstCovered).ToArray(),
+            steps.Skip(firstCovered).ToArray());
     }
 
     public static DateTimeOffset ResetEpoch(DateTimeOffset now)

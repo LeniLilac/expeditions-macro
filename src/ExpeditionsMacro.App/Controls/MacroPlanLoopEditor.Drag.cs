@@ -1,7 +1,5 @@
-using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using ExpeditionsMacro.App.Models;
@@ -15,10 +13,10 @@ public partial class MacroPlanLoopEditor
     private MacroPlanBlockNode? _dragCandidate;
     private DependencyObject? _dragSource;
     private Point _dragStart;
-    private Border? _activeSiblingZone;
-    private SiblingBoundary? _activeSiblingBoundary;
-    private AdornerLayer? _siblingInsertionLayer;
-    private SiblingInsertionAdorner? _siblingInsertionAdorner;
+    private readonly MacroPlanSiblingInsertionIndicator
+        _siblingInsertionIndicator = new();
+    private readonly MacroPlanDragAutoScroller
+        _dragAutoScroller = new();
 
     private void DragHandle_MouseLeftButtonDown(
         object sender,
@@ -247,6 +245,7 @@ public partial class MacroPlanLoopEditor
                 position,
                 "After",
                 StringComparison.Ordinal));
+        _dragAutoScroller.ScrollNearEdge(this, e);
         e.Effects = DragDropEffects.Move;
         e.Handled = true;
     }
@@ -256,13 +255,76 @@ public partial class MacroPlanLoopEditor
         DragEventArgs e)
     {
         if (sender is Border zone &&
-            ReferenceEquals(
-                _activeSiblingZone,
-                zone) &&
+            _siblingInsertionIndicator.IsActive(zone) &&
             !zone.IsMouseOver)
         {
             ClearSiblingInsertionIndicator();
         }
+    }
+
+    private void BlockCard_DragOver(
+        object sender,
+        DragEventArgs e)
+    {
+        if (sender is not Border card ||
+            card.DataContext is not
+                MacroPlanBlockNode target ||
+            !e.Data.GetDataPresent(BlockDataFormat))
+        {
+            e.Effects = DragDropEffects.None;
+            ClearSiblingInsertionIndicator();
+            e.Handled = true;
+            return;
+        }
+
+        bool after =
+            e.GetPosition(card).Y >=
+            card.ActualHeight / 2;
+        ShowSiblingInsertionIndicator(
+            card,
+            target,
+            after);
+        _dragAutoScroller.ScrollNearEdge(this, e);
+        e.Effects = DragDropEffects.Move;
+        e.Handled = true;
+    }
+
+    private void BlockCard_DragLeave(
+        object sender,
+        DragEventArgs e)
+    {
+        SiblingZone_DragLeave(sender, e);
+    }
+
+    private void BlockCard_Drop(
+        object sender,
+        DragEventArgs e)
+    {
+        ClearSiblingInsertionIndicator();
+        if (!TryReadDrag(
+                e,
+                out MacroPlanBlockNode dragged) ||
+            sender is not Border card ||
+            card.DataContext is not
+                MacroPlanBlockNode target)
+        {
+            e.Effects = DragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
+
+        bool after =
+            e.GetPosition(card).Y >=
+            card.ActualHeight / 2;
+        CompleteMove(
+            MacroPlanStructureMove.TryMoveBeside(
+                RootBlocks,
+                dragged,
+                target,
+                after,
+                out string error),
+            error,
+            e);
     }
 
     private void SiblingZone_Drop(
@@ -355,8 +417,12 @@ public partial class MacroPlanLoopEditor
         CompleteChange();
     }
 
-    private static void MarkDrag(DragEventArgs e)
+    private void MarkDrag(DragEventArgs e)
     {
+        if (e.Data.GetDataPresent(BlockDataFormat))
+        {
+            _dragAutoScroller.ScrollNearEdge(this, e);
+        }
         e.Effects = e.Data.GetDataPresent(
                 BlockDataFormat)
             ? DragDropEffects.Move
@@ -375,126 +441,19 @@ public partial class MacroPlanLoopEditor
     }
 
     private void ShowSiblingInsertionIndicator(
-        Border zone,
+        FrameworkElement zone,
         MacroPlanBlockNode target,
         bool after)
-    {
-        if (!MacroPlanStructureMove.TryFindOwner(
-                RootBlocks,
-                target,
-                out ObservableCollection<
-                    MacroPlanBlockNode>? owner,
-                out _))
-        {
-            ClearSiblingInsertionIndicator();
-            return;
-        }
-        int targetIndex = owner.IndexOf(target);
-        if (targetIndex < 0)
-        {
-            ClearSiblingInsertionIndicator();
-            return;
-        }
-        int boundaryIndex =
-            targetIndex + (after ? 1 : 0);
-        SiblingBoundary boundary = new(
-            owner,
-            boundaryIndex);
-        if (_activeSiblingBoundary is not null &&
-            ReferenceEquals(
-                _activeSiblingBoundary.Owner,
-                boundary.Owner) &&
-            _activeSiblingBoundary.Index ==
-                boundary.Index)
-        {
-            _activeSiblingZone = zone;
-            return;
-        }
-        ClearSiblingInsertionIndicator();
-        AdornerLayer? layer =
-            AdornerLayer.GetAdornerLayer(
-                StructureTree);
-        if (layer is null)
-        {
-            return;
-        }
-        bool hasSiblingAcrossBoundary =
-            boundaryIndex > 0 &&
-            boundaryIndex < owner.Count;
-        double localY = hasSiblingAcrossBoundary
-            ? after
-                ? zone.ActualHeight
-                : 0
-            : zone.ActualHeight / 2;
-        Point origin = zone.TranslatePoint(
-            new Point(0, localY),
-            StructureTree);
-        Brush brush =
+        => _siblingInsertionIndicator.Show(
+            RootBlocks,
+            StructureTree,
+            zone,
+            target,
+            after,
             TryFindResource("AccentBrush")
                 as Brush ??
-            Brushes.SlateBlue;
-        _siblingInsertionLayer = layer;
-        _siblingInsertionAdorner =
-            new SiblingInsertionAdorner(
-                StructureTree,
-                origin.X,
-                origin.Y,
-                zone.ActualWidth,
-                brush);
-        layer.Add(_siblingInsertionAdorner);
-        _activeSiblingZone = zone;
-        _activeSiblingBoundary = boundary;
-    }
+            Brushes.SlateBlue);
 
     private void ClearSiblingInsertionIndicator()
-    {
-        if (_siblingInsertionLayer is not null &&
-            _siblingInsertionAdorner is not null)
-        {
-            _siblingInsertionLayer.Remove(
-                _siblingInsertionAdorner);
-        }
-        _activeSiblingZone = null;
-        _activeSiblingBoundary = null;
-        _siblingInsertionLayer = null;
-        _siblingInsertionAdorner = null;
-    }
-
-    private sealed record SiblingBoundary(
-        ObservableCollection<MacroPlanBlockNode> Owner,
-        int Index);
-
-    private sealed class SiblingInsertionAdorner :
-        Adorner
-    {
-        private readonly double _lineX;
-        private readonly double _lineY;
-        private readonly double _lineWidth;
-        private readonly Pen _pen;
-
-        public SiblingInsertionAdorner(
-            UIElement adornedElement,
-            double lineX,
-            double lineY,
-            double lineWidth,
-            Brush brush)
-            : base(adornedElement)
-        {
-            _lineX = lineX;
-            _lineY = lineY;
-            _lineWidth = lineWidth;
-            IsHitTestVisible = false;
-            _pen = new Pen(brush, 2);
-            _pen.Freeze();
-        }
-
-        protected override void OnRender(
-            DrawingContext drawingContext) =>
-            drawingContext.DrawLine(
-                _pen,
-                new Point(_lineX, _lineY),
-                new Point(
-                    _lineX + _lineWidth,
-                    _lineY));
-    }
+        => _siblingInsertionIndicator.Clear();
 }

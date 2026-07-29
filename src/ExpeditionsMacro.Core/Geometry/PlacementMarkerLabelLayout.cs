@@ -36,7 +36,14 @@ public readonly record struct PlacementMarkerLabelRequest
 
 public readonly record struct PlacementMarkerLabelPlacement(
     int Key,
-    ScreenRegion LabelBounds);
+    ScreenRegion LabelBounds,
+    PlacementMarkerConnector Connector);
+
+public readonly record struct PlacementMarkerConnector(
+    int BendX,
+    int BendY,
+    int EndX,
+    int EndY);
 
 public static class PlacementMarkerLabelLayout
 {
@@ -44,6 +51,7 @@ public static class PlacementMarkerLabelLayout
     private const int LabelGap = 4;
     private const int PointRadius = 7;
     private const int PreferredHorizontalLanes = 4;
+    private const int ConnectorClearance = 2;
 
     public static IReadOnlyList<PlacementMarkerLabelPlacement>
         Arrange(
@@ -70,46 +78,65 @@ public static class PlacementMarkerLabelLayout
             new(items.Length);
         List<ScreenRegion> occupiedLabels =
             new(items.Length);
+        List<ScreenRegion> occupiedConnectors =
+            new(items.Length * 2);
 
         foreach (PlacementMarkerLabelRequest item in
                  items.OrderBy(value => value.AnchorY)
                      .ThenBy(value => value.AnchorX)
                      .ThenBy(value => value.Key))
         {
-            ScreenRegion[] candidates =
+            CandidateRoute[] candidates =
                 Candidates(
                         item,
                         surfaceWidth,
                         surfaceHeight)
                     .Distinct()
+                    .SelectMany(
+                        label => ConnectorRoutes(
+                            item,
+                            label).Select(
+                                connector =>
+                                    new CandidateRoute(
+                                        label,
+                                        connector)))
                     .ToArray();
-            ScreenRegion selected =
+            CandidateRoute selected =
                 candidates.FirstOrDefault(
                     candidate =>
                         !HasCollision(
+                            item,
                             candidate,
                             pointExclusions,
-                            occupiedLabels));
-            if (selected.Width == 0)
+                            occupiedLabels,
+                            occupiedConnectors));
+            if (selected.Label.Width == 0)
             {
                 selected = candidates
                     .OrderBy(candidate =>
                         CollisionArea(
+                            item,
                             candidate,
                             pointExclusions,
-                            occupiedLabels))
+                            occupiedLabels,
+                            occupiedConnectors))
                     .ThenBy(candidate =>
                         DistanceFromPreferred(
                             item,
-                            candidate))
+                            candidate.Label))
                     .First();
             }
 
             placements.Add(
                 new PlacementMarkerLabelPlacement(
                     item.Key,
-                    selected));
-            occupiedLabels.Add(selected);
+                    selected.Label,
+                    selected.Connector));
+            occupiedLabels.Add(selected.Label);
+            occupiedConnectors.AddRange(
+                ConnectorRegions(
+                    item,
+                    selected.Connector));
         }
 
         return placements;
@@ -247,26 +274,126 @@ public static class PlacementMarkerLabelLayout
     }
 
     private static bool HasCollision(
-        ScreenRegion candidate,
+        PlacementMarkerLabelRequest request,
+        CandidateRoute candidate,
         IReadOnlyCollection<ScreenRegion> pointExclusions,
-        IReadOnlyCollection<ScreenRegion> occupiedLabels) =>
+        IReadOnlyCollection<ScreenRegion> occupiedLabels,
+        IReadOnlyCollection<ScreenRegion> occupiedConnectors) =>
         pointExclusions.Any(region =>
-            Intersects(candidate, region)) ||
+            Intersects(candidate.Label, region)) ||
         occupiedLabels.Any(region =>
             Intersects(
-                candidate,
-                Expand(region, LabelGap)));
+                candidate.Label,
+                Expand(region, LabelGap))) ||
+        occupiedConnectors.Any(region =>
+            Intersects(
+                candidate.Label,
+                Expand(region, LabelGap))) ||
+        ConnectorRegions(request, candidate.Connector)
+            .Any(segment =>
+                pointExclusions
+                    .Where(region =>
+                        region != PointExclusion(request))
+                    .Any(region =>
+                        Intersects(segment, region)) ||
+                occupiedLabels.Any(region =>
+                    Intersects(segment, region)) ||
+                occupiedConnectors.Any(region =>
+                    Intersects(segment, region)));
 
     private static long CollisionArea(
-        ScreenRegion candidate,
+        PlacementMarkerLabelRequest request,
+        CandidateRoute candidate,
         IReadOnlyCollection<ScreenRegion> pointExclusions,
-        IReadOnlyCollection<ScreenRegion> occupiedLabels) =>
+        IReadOnlyCollection<ScreenRegion> occupiedLabels,
+        IReadOnlyCollection<ScreenRegion> occupiedConnectors) =>
         pointExclusions.Sum(region =>
-            OverlapArea(candidate, region)) +
+            OverlapArea(candidate.Label, region)) +
         occupiedLabels.Sum(region =>
             OverlapArea(
-                candidate,
-                Expand(region, LabelGap)));
+                candidate.Label,
+                Expand(region, LabelGap))) +
+        occupiedConnectors.Sum(region =>
+            OverlapArea(
+                candidate.Label,
+                Expand(region, LabelGap))) +
+        ConnectorRegions(request, candidate.Connector)
+            .Sum(segment =>
+                pointExclusions
+                    .Where(region =>
+                        region != PointExclusion(request))
+                    .Sum(region =>
+                        OverlapArea(segment, region)) +
+                occupiedLabels.Sum(region =>
+                    OverlapArea(segment, region)) +
+                occupiedConnectors.Sum(region =>
+                    OverlapArea(segment, region)));
+
+    private static IEnumerable<PlacementMarkerConnector>
+        ConnectorRoutes(
+            PlacementMarkerLabelRequest request,
+            ScreenRegion label)
+    {
+        int centerX = label.X + label.Width / 2;
+        int centerY = label.Y + label.Height / 2;
+        int sideX =
+            label.Right <= request.AnchorX
+                ? label.Right
+                : label.X;
+        int verticalEdgeY =
+            label.Bottom <= request.AnchorY
+                ? label.Bottom
+                : label.Y;
+
+        yield return new PlacementMarkerConnector(
+            request.AnchorX,
+            centerY,
+            sideX,
+            centerY);
+        yield return new PlacementMarkerConnector(
+            centerX,
+            request.AnchorY,
+            centerX,
+            verticalEdgeY);
+    }
+
+    private static IEnumerable<ScreenRegion>
+        ConnectorRegions(
+            PlacementMarkerLabelRequest request,
+            PlacementMarkerConnector connector)
+    {
+        yield return SegmentRegion(
+            request.AnchorX,
+            request.AnchorY,
+            connector.BendX,
+            connector.BendY);
+        yield return SegmentRegion(
+            connector.BendX,
+            connector.BendY,
+            connector.EndX,
+            connector.EndY);
+    }
+
+    private static ScreenRegion SegmentRegion(
+        int startX,
+        int startY,
+        int endX,
+        int endY)
+    {
+        int left = Math.Min(startX, endX) -
+            ConnectorClearance;
+        int top = Math.Min(startY, endY) -
+            ConnectorClearance;
+        int right = Math.Max(startX, endX) +
+            ConnectorClearance + 1;
+        int bottom = Math.Max(startY, endY) +
+            ConnectorClearance + 1;
+        return new ScreenRegion(
+            left,
+            top,
+            right - left,
+            bottom - top);
+    }
 
     private static long DistanceFromPreferred(
         PlacementMarkerLabelRequest request,
@@ -313,4 +440,8 @@ public static class PlacementMarkerLabelLayout
             Math.Max(first.Y, second.Y));
         return (long)width * height;
     }
+
+    private readonly record struct CandidateRoute(
+        ScreenRegion Label,
+        PlacementMarkerConnector Connector);
 }
