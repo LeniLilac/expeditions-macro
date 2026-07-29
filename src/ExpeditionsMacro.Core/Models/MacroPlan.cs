@@ -9,6 +9,7 @@ public enum MacroTaskKind
     Story,
     Raid,
     Event,
+    Utility,
 }
 
 public sealed record MacroTaskDefinition
@@ -43,9 +44,15 @@ public sealed record MacroTaskDefinition
     public bool RunSpriteChallenge { get; init; } = true;
     public bool ExtractAtCheckpoint { get; init; } = true;
     public int BossesBeforeExtract { get; init; } = 1;
+    public ResourceRefuelTarget RefuelTarget { get; init; } =
+        ResourceRefuelTarget.GoldMine;
+    public int RefuelIntervalMinutes { get; init; } = 60;
 
-    public bool IsRecurring => Kind == MacroTaskKind.Challenge;
+    public bool IsRecurring =>
+        Kind is MacroTaskKind.Challenge or
+            MacroTaskKind.Utility;
     public bool UsesPlacementSetup =>
+        Kind != MacroTaskKind.Utility &&
         string.IsNullOrWhiteSpace(PresetId);
 
     public void Validate()
@@ -59,6 +66,27 @@ public sealed record MacroTaskDefinition
         if (DefeatRetries is < 0 or > 20) throw new InvalidDataException("Defeat retries must be 0 through 20.");
         if (Difficulty is < 1 or > 3) throw new InvalidDataException("Difficulty must be 1 through 3.");
         if (BossesBeforeExtract is < 0 or > 99) throw new InvalidDataException("Boss nodes before extraction must be 0 through 99.");
+        if (Kind == MacroTaskKind.Utility)
+        {
+            if (!string.IsNullOrWhiteSpace(PresetId) ||
+                PlacementTarget is not null)
+            {
+                throw new InvalidDataException(
+                    "Utility tasks do not use presets or placement routes.");
+            }
+            if (RefuelTarget == ResourceRefuelTarget.None ||
+                (RefuelTarget & ~ResourceRefuelTarget.Both) != 0)
+            {
+                throw new InvalidDataException(
+                    "Choose Gold Mine refuel, Resource Drill refuel, or both.");
+            }
+            if (RefuelIntervalMinutes is < 1 or > 10080)
+            {
+                throw new InvalidDataException(
+                    "Utility interval must be 1 minute through 7 days.");
+            }
+            return;
+        }
         if (!UsesPlacementSetup)
         {
             ValidateId(PresetId, "preset");
@@ -161,7 +189,9 @@ public sealed record MacroPlan
     public DateTimeOffset UpdatedAt { get; init; } = DateTimeOffset.UtcNow;
 
     public bool UsesPlacementSetupWorkflow =>
-        Tasks.All(task => task.UsesPlacementSetup);
+        Tasks.All(task =>
+            task.Kind == MacroTaskKind.Utility ||
+            task.UsesPlacementSetup);
 
     public void Validate()
     {

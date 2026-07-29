@@ -16,7 +16,11 @@ public sealed record ResourceStationScreenMatch(
     ResourceStationScreenState State,
     double Confidence,
     int? ActionX = null,
-    int? ActionY = null);
+    int? ActionY = null,
+    int? ConfirmActionX = null,
+    int? ConfirmActionY = null,
+    int? DismissActionX = null,
+    int? DismissActionY = null);
 
 public static class ResourceStationScreenDetector
 {
@@ -30,6 +34,12 @@ public static class ResourceStationScreenDetector
         new(335, 410, 145, 48);
     private static readonly ScreenRegion ClaimRewards =
         new(505, 405, 140, 55);
+    private static readonly ScreenRegion RewardsPanel =
+        new(505, 245, 140, 160);
+    private static readonly ScreenRegion BuildingStatsBar =
+        new(365, 222, 270, 20);
+    private static readonly ScreenRegion AddFuelButtonCore =
+        new(342, 415, 128, 30);
     private static readonly ScreenRegion Dialog =
         new(265, 245, 280, 120);
     private static readonly ScreenRegion DialogConfirm =
@@ -61,30 +71,55 @@ public static class ResourceStationScreenDetector
                 image,
                 ClaimRewards,
                 RefuelVisionMetrics.IsGreen);
+        double rewardsPanelDark =
+            RefuelVisionMetrics.ColorFraction(
+                image,
+                RewardsPanel,
+                RefuelVisionMetrics.IsDark);
+        double buildingStatsLine =
+            RefuelVisionMetrics.BestHorizontalLineFraction(
+                image,
+                BuildingStatsBar,
+                IsStationStatBar);
+        double addFuelLine =
+            RefuelVisionMetrics.BestHorizontalLineFraction(
+                image,
+                AddFuelButtonCore,
+                RefuelVisionMetrics.IsOrange);
         double common =
             panelDark < 0.52 ||
             close < 0.02 ||
             addFuel < 0.08 ||
-            claim < 0.10
+            rewardsPanelDark < 0.85 ||
+            buildingStatsLine < 0.75 ||
+            addFuelLine < 0.75
                 ? 0
                 : Math.Clamp(
-                    0.52 +
-                    0.14 * RefuelVisionMetrics.Ramp(
+                    0.40 +
+                    0.10 * RefuelVisionMetrics.Ramp(
                         panelDark,
                         0.52,
                         0.82) +
-                    0.10 * RefuelVisionMetrics.Ramp(
+                    0.08 * RefuelVisionMetrics.Ramp(
                         close,
                         0.02,
                         0.14) +
-                    0.12 * RefuelVisionMetrics.Ramp(
+                    0.10 * RefuelVisionMetrics.Ramp(
                         addFuel,
                         0.08,
                         0.42) +
-                    0.12 * RefuelVisionMetrics.Ramp(
-                        claim,
-                        0.10,
-                        0.48),
+                    0.10 * RefuelVisionMetrics.Ramp(
+                        rewardsPanelDark,
+                        0.85,
+                        0.99) +
+                    0.11 * RefuelVisionMetrics.Ramp(
+                        buildingStatsLine,
+                        0.75,
+                        0.98) +
+                    0.11 * RefuelVisionMetrics.Ramp(
+                        addFuelLine,
+                        0.75,
+                        0.99),
                     0,
                     1);
 
@@ -108,7 +143,8 @@ public static class ResourceStationScreenDetector
             close < 0.008 ||
             dialogDark < 0.55 ||
             confirm < 0.12 ||
-            title < 0.025
+            title < 0.025 ||
+            buildingStatsLine < 0.75
                 ? 0
                 : Math.Clamp(
                     0.38 +
@@ -154,19 +190,27 @@ public static class ResourceStationScreenDetector
                     ResourceStationScreenState.AddFuelDialog,
                     dialog,
                     ActionX: 516,
-                    ActionY: 312)
+                    ActionY: 312,
+                    ConfirmActionX: 337,
+                    ConfirmActionY: 345,
+                    DismissActionX: 470,
+                    DismissActionY: 345)
                 : goldScore >= 0.74
                     ? new ResourceStationScreenMatch(
                         ResourceStationScreenState.GoldMine,
                         goldScore,
                         ActionX: 406,
-                        ActionY: 438)
+                        ActionY: 438,
+                        DismissActionX: 636,
+                        DismissActionY: 170)
                     : drillScore >= 0.74
                         ? new ResourceStationScreenMatch(
                             ResourceStationScreenState.ResourceDrill,
                             drillScore,
                             ActionX: 406,
-                            ActionY: 429)
+                            ActionY: 429,
+                            DismissActionX: 636,
+                            DismissActionY: 170)
                         : new ResourceStationScreenMatch(
                             ResourceStationScreenState.None,
                             0);
@@ -178,21 +222,23 @@ public static class ResourceStationScreenDetector
             {
                 Common = common,
                 Dialog = dialog,
+                RewardsPanelDark = rewardsPanelDark,
+                ClaimAvailable = claim,
+                BuildingStatsLine = buildingStatsLine,
+                AddFuelLine = addFuelLine,
                 Gold = gold,
                 Blue = blue,
                 GoldScore = goldScore,
                 DrillScore = drillScore,
                 match.ActionX,
                 match.ActionY,
+                match.ConfirmActionX,
+                match.ConfirmActionY,
+                match.DismissActionX,
+                match.DismissActionY,
             });
         return match;
     }
-
-    public static (int X, int Y) MaxFuelAction() =>
-        (516, 312);
-
-    public static (int X, int Y) ConfirmFuelAction() =>
-        (337, 345);
 
     private static double StationScore(
         double common,
@@ -207,4 +253,15 @@ public static class ResourceStationScreenDetector
                     0.14),
                 0,
                 1);
+
+    private static bool IsStationStatBar(
+        byte red,
+        byte green,
+        byte blue)
+    {
+        int maximum = Math.Max(red, Math.Max(green, blue));
+        int minimum = Math.Min(red, Math.Min(green, blue));
+        return maximum >= 100 &&
+            maximum - minimum >= 30;
+    }
 }

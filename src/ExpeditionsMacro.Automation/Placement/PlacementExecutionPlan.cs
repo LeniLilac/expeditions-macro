@@ -30,30 +30,45 @@ public static class PlacementExecutionPlan
         PlacementModel? placement)
     {
         if (placement is null) return [];
-        return placement.Steps
-            .Where(step =>
-                step.Phase == PlacementPhase.BeforeStart)
-            .ToArray();
+        IReadOnlyList<PlacementStep> timeline =
+            PlacementTimelinePolicy.NormalizeSteps(
+                placement.Steps);
+        int start =
+            PlacementTimelinePolicy.StartGameIndex(
+                timeline);
+        return timeline.Take(start).ToArray();
     }
 
     public static IReadOnlyList<PlacementStep> AfterStart(
         PlacementModel? placement)
     {
-        return placement?.Steps
-            .Select((step, index) =>
-                new
-                {
-                    Step = step,
-                    Index = index,
-                })
-            .Where(step =>
-                step.Step.Phase ==
-                PlacementPhase.AfterStart)
-            .OrderBy(step =>
-                step.Step.DelayAfterStartMilliseconds)
-            .ThenBy(step => step.Index)
-            .Select(step => step.Step)
-            .ToArray() ?? [];
+        if (placement is null) return [];
+        IReadOnlyList<PlacementStep> timeline =
+            PlacementTimelinePolicy.NormalizeSteps(
+                placement.Steps);
+        int start =
+            PlacementTimelinePolicy.StartGameIndex(
+                timeline);
+        int elapsedMilliseconds = 0;
+        List<PlacementStep> scheduled = [];
+        foreach (PlacementStep step in
+                 timeline.Skip(start + 1))
+        {
+            if (step.Kind == MatchStepKind.Delay)
+            {
+                elapsedMilliseconds = checked(
+                    elapsedMilliseconds +
+                    step.DelayDurationMilliseconds);
+                continue;
+            }
+            scheduled.Add(step with
+            {
+                Phase = PlacementPhase.AfterStart,
+                DelayAfterStartMilliseconds =
+                    elapsedMilliseconds,
+            });
+        }
+        return scheduled;
     }
 
     public static bool IsAfterStartDue(

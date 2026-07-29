@@ -20,18 +20,10 @@ public partial class PlacementRouteControls : UserControl
 
     public event RoutedEventHandler? UnitChanged;
 
-    public event RoutedEventHandler? PhaseChanged;
-
     public event SelectionChangedEventHandler?
         RecordingChanged;
 
     internal ComboBox TeamSelector => TeamCombo;
-
-    internal RadioButton BeforeStartSelector =>
-        BeforeStartButton;
-
-    internal RadioButton AfterStartSelector =>
-        AfterStartButton;
 
     internal RadioButton Unit1Selector => Unit1Button;
 
@@ -60,12 +52,10 @@ public partial class PlacementRouteControls : UserControl
             recordings)
     {
         _recordingFeatureEnabled = featureEnabled;
-        PhasePanel.Visibility =
+        UnitPanel.Visibility =
             enabled
                 ? Visibility.Collapsed
                 : Visibility.Visible;
-        UnitPanel.Visibility =
-            PhasePanel.Visibility;
         RecordingPanel.Visibility =
             enabled
                 ? Visibility.Visible
@@ -114,11 +104,6 @@ public partial class PlacementRouteControls : UserControl
         object sender,
         RoutedEventArgs e) =>
         UnitChanged?.Invoke(sender, e);
-
-    private void PhaseButton_Checked(
-        object sender,
-        RoutedEventArgs e) =>
-        PhaseChanged?.Invoke(sender, e);
 
     private void RecordingCombo_SelectionChanged(
         object sender,

@@ -4,6 +4,36 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.41] - 2026-07-29
+
+### Added
+
+- Macro Plan now includes a **Utilities** task category with Gold Mine refuel, Resource Drill refuel, and combined routes. Each task runs immediately when first eligible, then repeats after its configured one-minute-through-seven-day interval without blocking lower-priority work while it waits.
+- Placement Setup now authors one ordered **Match Steps** timeline with Place Unit, Reconfigure Unit, Delay, and Upgrade Unit actions around one required **Start Game** step.
+- Placement Setup advanced mode now exposes bounded action timing and state-proof controls for Step Mode plus optional prestart verification and a configured post-Repeat-Stage delay for Recording Mode.
+
+### Changed
+
+- Scheduled refuel Utilities reuse the calibrated Resource refuel settings, require the configured Toggle Areas Menu key, and enter and leave through verified Lobby/Play states. Plans and share codes persist the selected refuel route and interval without including account-level key bindings or route calibration settings.
+- The Before Start / After Start phase selector and marker badges are removed. Actions above Start Game execute before its verified click and actions below execute afterward; Start Game may be reordered but cannot be added, edited, duplicated, or removed. Legacy phase offsets migrate to an equivalent ordered timeline with explicit Delay actions.
+- Lobby and match preparation now distinguish the fixed open/closed Roblox chat indicators and close a verified open panel before Settings, placement, or recording input. The detector ignores the optional microphone/headset slot and never clicks from unknown evidence.
+- Match Steps now grow with the Placement Setup page, use compact color-coded action blocks and modal editors, and reference repeated placements through stable IDs such as `6a`, `6b`, and `6c`. Only placement actions appear on the map.
+- Placement-map labels now move both horizontally and vertically to avoid one another, placement points, and connector text; wheel zoom is reserved for the map only while the outer page is already at its top boundary.
+- Macro Plan drag-and-drop now follows the nearest card-half insertion boundary, auto-scrolls near the viewport edges, and no longer requires hovering over a narrow gap.
+
+### Fixed
+
+- Advanced manual-recording Repeat Stage handoffs now apply the configured prestart policy consistently across Challenge, Expedition, Story/Raid, and Event routes. Challenge retries no longer add a fixed 3.5-second transition wait on top of a delay-only advanced setup.
+- Challenge placement handoff now defers the complete action suffix beginning at the first Start-dialog-obscured coordinate, so Delay, Reconfigure, and Upgrade actions cannot run ahead of their placement owner.
+- Placement Setup **Test playback** now runs actions on both sides of a freshly verified Start Game click instead of testing the two action groups without their real lifecycle boundary.
+- Unit targeting and Auto Upgrade state now reset once per match, while Expedition retry queues contain placement actions only.
+- Selected-unit proof waits retain their strict consecutive-frame and click-attempt requirements while allowing slow capture devices to finish observations inside one bounded hard deadline.
+- Resource refuel now recognizes Gold Mine and Resource Drill in both fuel-present and missing-fuel states, revalidates the live Max and Confirm actions, and performs at most two verified cleanup actions before failing closed.
+
+### Tests
+
+- Passed 1,328 application and detector tests, 5 Deep Debug Viewer tests, and all 86 dark/light UI snapshot states.
+
 ## [1.3.0-beta.40] - 2026-07-28
 
 ### Fixed
@@ -1111,7 +1141,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.40...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.41...HEAD
+[1.3.0-beta.41]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.40...v1.3.0-beta.41
 [1.3.0-beta.40]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.39...v1.3.0-beta.40
 [1.3.0-beta.39]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.38...v1.3.0-beta.39
 [1.3.0-beta.38]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.37...v1.3.0-beta.38

@@ -1,3 +1,4 @@
+using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
@@ -82,11 +83,12 @@ public sealed partial class ChallengeMacroRunner
             cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task RetryDefeatAsync(
+    private async Task<bool> RetryDefeatAsync(
         RobloxWindow window,
         ChallengePreset preset,
         IDetectorPack detector,
         ImageFrame initialFrame,
+        PlacementModel? placement,
         Action<
             string,
             int,
@@ -111,9 +113,36 @@ public sealed partial class ChallengeMacroRunner
             retry.ActionX!.Value,
             retry.ActionY!.Value,
             cancellationToken).ConfigureAwait(false);
-        await Task.Delay(
+        await WaitAfterRepeatStageAsync(
+                placement,
+                cancellationToken)
+            .ConfigureAwait(false);
+        return !ManualPlaybackStartPolicy
+            .RequiresPrestart(
+                placement,
+                arrivedFromRepeatStage: true);
+    }
+
+    internal static Task WaitAfterRepeatStageAsync(
+        PlacementModel? placement,
+        CancellationToken cancellationToken,
+        Func<int, CancellationToken, Task>?
+            delayAsync = null)
+    {
+        if (!ManualPlaybackStartPolicy
+                .RequiresPrestart(
+                    placement,
+                    arrivedFromRepeatStage: true))
+        {
+            return Task.CompletedTask;
+        }
+        Func<int, CancellationToken, Task> wait =
+            delayAsync ??
+            ((delay, token) =>
+                Task.Delay(delay, token));
+        return wait(
             3500,
-            cancellationToken).ConfigureAwait(false);
+            cancellationToken);
     }
 
     private async Task<ChallengeScreenMatch>

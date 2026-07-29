@@ -31,7 +31,27 @@ public sealed class ResourceRefuelDetectorTests
         406,
         438)]
     [InlineData(
+        "GoldMine_MissingFuel_01.png",
+        ResourceStationScreenState.GoldMine,
+        406,
+        438)]
+    [InlineData(
+        "GoldMine_FuelPresent_01.png",
+        ResourceStationScreenState.GoldMine,
+        406,
+        438)]
+    [InlineData(
         "ResourceDrill_01.png",
+        ResourceStationScreenState.ResourceDrill,
+        406,
+        429)]
+    [InlineData(
+        "ResourceDrill_MissingFuel_01.png",
+        ResourceStationScreenState.ResourceDrill,
+        406,
+        429)]
+    [InlineData(
+        "ResourceDrill_FuelPresent_01.png",
         ResourceStationScreenState.ResourceDrill,
         406,
         429)]
@@ -61,6 +81,27 @@ public sealed class ResourceRefuelDetectorTests
     }
 
     [Theory]
+    [InlineData("GoldMine_AddFuel_01.png")]
+    [InlineData("ResourceDrill_AddFuel_01.png")]
+    public void AddFuelDialog_ExposesVerifiedMaxConfirmAndDismissActions(
+        string file)
+    {
+        ResourceStationScreenMatch match =
+            ResourceStationScreenDetector.Detect(
+                Load(file));
+
+        Assert.Equal(
+            ResourceStationScreenState.AddFuelDialog,
+            match.State);
+        Assert.Equal(516, match.ActionX);
+        Assert.Equal(312, match.ActionY);
+        Assert.Equal(337, match.ConfirmActionX);
+        Assert.Equal(345, match.ConfirmActionY);
+        Assert.Equal(470, match.DismissActionX);
+        Assert.Equal(345, match.DismissActionY);
+    }
+
+    [Theory]
     [InlineData("Lobby_UI", "Lobby_UI_001.png")]
     [InlineData("Play_UI", "Play_UI_001.png")]
     [InlineData(
@@ -81,6 +122,47 @@ public sealed class ResourceRefuelDetectorTests
         Assert.Equal(
             ResourceStationScreenState.None,
             ResourceStationScreenDetector.Detect(image).State);
+    }
+
+    [Fact]
+    public void ChallengeListCorpus_DoesNotLookLikeAResourceStation()
+    {
+        string directory = Path.Combine(
+            TestPaths.ChallengeDatasets,
+            "ChallengeList");
+
+        foreach (string file in Directory.EnumerateFiles(
+                     directory,
+                     "*.png",
+                     SearchOption.TopDirectoryOnly))
+        {
+            ResourceStationScreenMatch match =
+                ResourceStationScreenDetector.Detect(
+                    ImageCodec.Load(file));
+
+            Assert.True(
+                match.State == ResourceStationScreenState.None,
+                $"{Path.GetFileName(file)} classified as " +
+                $"{match.State} ({match.Confidence:F3}).");
+        }
+    }
+
+    [Theory]
+    [InlineData("TeamEquipmentConfirm_Compact_01.png")]
+    [InlineData("TeamLoadConfirm_01.png")]
+    [InlineData("TeamLoadConfirm_Bottom_Team7_01.png")]
+    public void TeamConfirmationDialogs_DoNotLookLikeAddFuel(
+        string file)
+    {
+        ResourceStationScreenMatch match =
+            ResourceStationScreenDetector.Detect(
+                ImageCodec.Load(Path.Combine(
+                    TestPaths.StageDatasets,
+                    file)));
+
+        Assert.Equal(
+            ResourceStationScreenState.None,
+            match.State);
     }
 
     [Fact]

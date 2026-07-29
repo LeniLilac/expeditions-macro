@@ -174,7 +174,9 @@ public sealed class PlacementSafetyRulesTests
                 new PlacementServiceTests
                     .FakeCaptureService(automation),
                 new PlacementModelRepository(
-                    new AppPaths(root)));
+                    new AppPaths(root)),
+                matchStartPlayback:
+                    new PlacementMatchStartPlaybackStub());
             await service.PlayAsync(
                 model,
                 useDefaultInterval: true,

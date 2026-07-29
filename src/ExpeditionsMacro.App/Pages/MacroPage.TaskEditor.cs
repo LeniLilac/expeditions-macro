@@ -80,13 +80,22 @@ public partial class MacroPage
     private MacroTaskDefinition BuildPlacementSetupTask()
     {
         MacroTaskKind kind = SelectedTaskKind();
+        bool utility = kind == MacroTaskKind.Utility;
         PlacementSetupRoute? route =
-            kind == MacroTaskKind.Challenge
+            kind is MacroTaskKind.Challenge or
+                MacroTaskKind.Utility
                 ? null
                 : TaskRouteCombo.SelectedItem as
                     PlacementSetupRoute
                     ?? throw new InvalidOperationException(
                         "Choose a map and act.");
+        NamedChoice<ResourceRefuelTarget>?
+            utilityRoute = utility
+                ? TaskRouteCombo.SelectedItem as
+                    NamedChoice<ResourceRefuelTarget>
+                    ?? throw new InvalidOperationException(
+                        "Choose a refuel route.")
+                : null;
         bool runtimeTarget =
             route?.Target.Mode ==
                 PlacementTargetMode.Story &&
@@ -96,10 +105,14 @@ public partial class MacroPage
             ? 1
             : ParsePositiveInt(
                 TaskTargetText,
-                runtimeTarget
+                utility
+                    ? "Interval minutes"
+                    : runtimeTarget
                     ? "Runtime minutes"
                     : "Victory target");
-        int retries = kind == MacroTaskKind.Expedition
+        int retries = kind is
+                MacroTaskKind.Expedition or
+                MacroTaskKind.Utility
             ? 0
             : ParseWholeNumber(
                 TaskDefeatRetriesText,
@@ -118,9 +131,14 @@ public partial class MacroPage
                 NamedChoice<int> choice
                 ? choice.Value
                 : 1;
-        string name = kind == MacroTaskKind.Challenge
-            ? "Challenge rotation"
-            : route!.Name;
+        string name = kind switch
+        {
+            MacroTaskKind.Challenge =>
+                "Challenge rotation",
+            MacroTaskKind.Utility =>
+                utilityRoute!.Name,
+            _ => route!.Name,
+        };
         MacroTaskDefinition definition =
             StoryHardModePolicy.Normalize(
                 new MacroTaskDefinition
@@ -150,6 +168,11 @@ public partial class MacroPage
                     ExtractAtCheckpoint =
                         TaskExtractCheck.IsChecked == true,
                     BossesBeforeExtract = bosses,
+                    RefuelTarget =
+                        utilityRoute?.Value ??
+                        ResourceRefuelTarget.GoldMine,
+                    RefuelIntervalMinutes =
+                        utility ? target : 60,
                 });
         definition.Validate();
         return definition;
@@ -157,7 +180,9 @@ public partial class MacroPage
 
     private void BeginTaskEdit(MacroTaskRow row)
     {
-        if (!row.Definition.UsesPlacementSetup)
+        if (row.Definition.Kind !=
+                MacroTaskKind.Utility &&
+            !row.Definition.UsesPlacementSetup)
         {
             ShowPlanBlocksStatus(
                 "This legacy preset task is read-only. Remove it and add a Placement Setup route to replace it.");
@@ -175,7 +200,13 @@ public partial class MacroPage
         RefreshVisibleRoutes();
         ApplyPlacementSetupTask(row.Definition);
         TaskTargetText.Text =
-            row.Definition.CompleteOnRuntimeDefeat
+            row.Definition.Kind ==
+                MacroTaskKind.Utility
+                ? row.Definition
+                    .RefuelIntervalMinutes
+                    .ToString(
+                        CultureInfo.InvariantCulture)
+                : row.Definition.CompleteOnRuntimeDefeat
                 ? row.Definition
                     .TargetRuntimeMinutes
                     .ToString(
@@ -194,7 +225,14 @@ public partial class MacroPage
     private void ApplyPlacementSetupTask(
         MacroTaskDefinition definition)
     {
-        if (definition.PlacementTarget is not null)
+        if (definition.Kind == MacroTaskKind.Utility)
+        {
+            TaskRouteCombo.SelectedItem =
+                UtilityRoutes.First(choice =>
+                    choice.Value ==
+                    definition.RefuelTarget);
+        }
+        else if (definition.PlacementTarget is not null)
         {
             TaskRouteCombo.SelectedItem =
                 _visibleRoutes.FirstOrDefault(
@@ -229,10 +267,28 @@ public partial class MacroPage
 
     private void RefreshVisibleRoutes()
     {
+        ResourceRefuelTarget? selectedUtility =
+            (TaskRouteCombo.SelectedItem as
+                NamedChoice<ResourceRefuelTarget>)?.Value;
         PlacementSetupRoute? selected =
             TaskRouteCombo.SelectedItem as
                 PlacementSetupRoute;
         MacroTaskKind kind = SelectedTaskKind();
+        if (kind == MacroTaskKind.Utility)
+        {
+            TaskRouteCombo.ItemsSource =
+                UtilityRoutes;
+            TaskRouteCombo.SelectedItem =
+                UtilityRoutes.FirstOrDefault(
+                    choice =>
+                        choice.Value ==
+                        selectedUtility) ??
+                UtilityRoutes[0];
+            HideTaskEditorError();
+            return;
+        }
+
+        TaskRouteCombo.ItemsSource = _visibleRoutes;
         PlacementTargetMode? mode = kind switch
         {
             MacroTaskKind.Expedition =>
@@ -288,6 +344,8 @@ public partial class MacroPage
         MacroTaskKind kind = SelectedTaskKind();
         bool challenge =
             kind == MacroTaskKind.Challenge;
+        bool utility =
+            kind == MacroTaskKind.Utility;
         bool expedition =
             kind == MacroTaskKind.Expedition;
         bool story =
@@ -331,7 +389,9 @@ public partial class MacroPage
                 ? Visibility.Collapsed
                 : Visibility.Visible;
         FastTaskOptionsPanel.Visibility =
-            Visibility.Visible;
+            utility
+                ? Visibility.Collapsed
+                : Visibility.Visible;
         TaskDefeatRetriesPanel.Visibility =
             retries
                 ? Visibility.Visible
@@ -357,7 +417,9 @@ public partial class MacroPage
                 : Visibility.Collapsed;
         TaskTargetLabel.Text = challenge
             ? "Schedule"
-            : runtime
+            : utility
+                ? "Interval, min"
+                : runtime
                 ? "Runtime, min"
                 : "Victories";
         TaskTargetLabel.Visibility =
@@ -370,6 +432,13 @@ public partial class MacroPage
         if (challenge)
         {
             TaskTargetText.Text = "Every reset";
+        }
+        else if (utility &&
+                 !int.TryParse(
+                     TaskTargetText.Text,
+                     out _))
+        {
+            TaskTargetText.Text = "60";
         }
         else if (runtime &&
                  !int.TryParse(

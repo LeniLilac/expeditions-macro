@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
@@ -22,6 +23,12 @@ public sealed partial class ExpeditionMacroRunner
         char cancelPlacementKey,
         CancellationToken cancellationToken)
     {
+        await new RobloxChatPanelNormalizer(_automation)
+            .EnsureClosedAsync(
+                window,
+                cancellationToken)
+            .ConfigureAwait(false);
+        _placements.BeginMatch();
         PlacementMatchExecutionPlan execution =
             PlacementExecutionPlan.ForMatch(
                 placement);
@@ -76,7 +83,9 @@ public sealed partial class ExpeditionMacroRunner
             "Starting the Expedition node.",
             null,
             null);
-        if (execution.ManualPlayback)
+        if (execution.ManualPlayback &&
+            ManualPlaybackStartPolicy.RequiresPrestart(
+                placement))
         {
             _ = await WaitForStableActionAsync(
                     "start",
@@ -108,6 +117,17 @@ public sealed partial class ExpeditionMacroRunner
                 throw new InvalidOperationException(
                     "Manual input playback is unavailable.");
             }
+            await ManualPlaybackStartPolicy
+                .WaitBeforePlaybackAsync(
+                    placement,
+                    message => report(
+                        "Recording playback",
+                        0,
+                        message,
+                        null,
+                        null),
+                    cancellationToken)
+                .ConfigureAwait(false);
             runtime =
                 await ManualInputMatchPlayback.PlayAsync(
                     _manualInputs,

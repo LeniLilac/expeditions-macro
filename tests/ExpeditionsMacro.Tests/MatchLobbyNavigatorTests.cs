@@ -180,11 +180,11 @@ public sealed class MatchLobbyNavigatorTests
         {
             _door = door;
             _confirmation = confirmation;
-            LobbyFrame = new ImageFrame(
-                808,
-                611,
-                PixelFormat.Rgb24,
-                new byte[808 * 611 * 3]);
+            LobbyFrame = ImageCodec.Load(
+                Path.Combine(
+                    TestPaths
+                        .NavigationVariantDatasets,
+                    "ChatClosed.png"));
         }
 
         public RobloxWindow Window { get; } =

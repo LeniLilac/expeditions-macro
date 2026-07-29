@@ -145,7 +145,7 @@ public partial class SettingsKeyBindingsPanel
                     : services.Settings.AreasMenuKey;
             }
             AreasStatusText.Text = empty
-                ? "Required only by the experimental resource-refuel Debug tools."
+                ? "Required by refuel Utilities and the resource-refuel Debug tool."
                 : error.Message;
             AreasDiagnostic = empty
                 ? "Not set"
@@ -196,7 +196,7 @@ public partial class SettingsKeyBindingsPanel
             }
             CancelPlacementStatusText.Text =
                 empty
-                    ? "Required only when a placement setup uses placement steps."
+                    ? "Required only when Match Steps contain placement actions."
                     : error.Message;
             CancelPlacementDiagnostic =
                 empty
@@ -219,7 +219,7 @@ public partial class SettingsKeyBindingsPanel
                     "Not set";
             }
             QuickPlacementStatusText.Text =
-                "Required before starting a plan that uses Step Mode placement steps.";
+                "Required before starting a plan whose Match Steps contain placement actions.";
             QuickPlacementDiagnostic = "Not set";
             return;
         }

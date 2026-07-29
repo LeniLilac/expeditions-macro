@@ -10,8 +10,8 @@
                          Style="{StaticResource PlacementChoiceButton}"
                          Content="Recording Mode"
                          AutomationProperties.Name="Recording Mode"
-                         AutomationProperties.HelpText="Replay a saved manual recording instead of ordinary placement steps."
-                         ToolTip="Replay a saved manual recording instead of ordinary placement steps."
+                         AutomationProperties.HelpText="Replay a saved manual recording instead of the Match Steps timeline."
+                         ToolTip="Replay a saved manual recording instead of the Match Steps timeline."
                          ToolTipService.ShowOnDisabled="True"
                          Checked="ModeButton_Checked" />
             <RadioButton x:Name="StepModeButton"
@@ -20,8 +20,8 @@
                          Style="{StaticResource PlacementChoiceButton}"
                          Content="Step Mode"
                          AutomationProperties.Name="Step Mode"
-                         AutomationProperties.HelpText="Use the ordinary placement steps saved for this route."
-                         ToolTip="Use the ordinary placement steps saved for this route."
+                         AutomationProperties.HelpText="Use the Match Steps timeline saved for this route."
+                         ToolTip="Use the Match Steps timeline saved for this route."
                          IsChecked="True"
                          Checked="ModeButton_Checked" />
         </UniformGrid>

@@ -5,6 +5,7 @@ using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
+using ExpeditionsMacro.Vision.Challenges;
 using ExpeditionsMacro.Vision.Infrastructure;
 
 namespace ExpeditionsMacro.Tests;
@@ -49,6 +50,64 @@ public sealed class ResourceRefuelServiceTests
         AssertNoCaptureDuringBlindRoutes(automation.Events);
     }
 
+    [Theory]
+    [InlineData(
+        ResourceRefuelTarget.GoldMine,
+        "GoldMine_01.png")]
+    [InlineData(
+        ResourceRefuelTarget.GoldMine,
+        "GoldMine_MissingFuel_01.png")]
+    [InlineData(
+        ResourceRefuelTarget.GoldMine,
+        "GoldMine_FuelPresent_01.png")]
+    [InlineData(
+        ResourceRefuelTarget.ResourceDrill,
+        "ResourceDrill_01.png")]
+    [InlineData(
+        ResourceRefuelTarget.ResourceDrill,
+        "ResourceDrill_MissingFuel_01.png")]
+    [InlineData(
+        ResourceRefuelTarget.ResourceDrill,
+        "ResourceDrill_FuelPresent_01.png")]
+    public async Task StationFuelAndRewardVariants_CompleteTheWorkflow(
+        ResourceRefuelTarget target,
+        string stationFixture)
+    {
+        RefuelAutomation automation =
+            target == ResourceRefuelTarget.GoldMine
+                ? new(goldStationFixture: stationFixture)
+                : new(drillStationFixture: stationFixture);
+        ResourceRefuelService service = CreateService(
+            automation,
+            new FakeRecovery(automation));
+
+        ResourceRefuelResult result = await service.RunAsync(
+            Request(
+                ResourceRefuelStart.CurrentLobby,
+                target) with
+            {
+                OpenPlayWhenComplete = false,
+            },
+            new LobbyDetectorPack());
+
+        Assert.Equal(target, result.CompletedTargets);
+        Assert.Equal(1, automation.MaxClicks);
+        Assert.Equal(1, automation.ConfirmClicks);
+        int max = Find(
+            automation.Events,
+            "click:516,312",
+            0);
+        int confirm = Find(
+            automation.Events,
+            "click:337,345",
+            max + 1);
+        Assert.Contains(
+            "capture",
+            automation.Events
+                .Skip(max + 1)
+                .Take(confirm - max - 1));
+    }
+
     [Fact]
     public async Task RestartStart_RestartsBeforeNavigating()
     {
@@ -81,6 +140,54 @@ public sealed class ResourceRefuelServiceTests
     }
 
     [Fact]
+    public async Task ScheduledNavigation_ClosesPlayAndReturnsToLobby()
+    {
+        RefuelAutomation automation =
+            new(FakeScreen.Play);
+        FakeRecovery recovery = new(automation);
+        ResourceRefuelService service = CreateService(
+            automation,
+            recovery);
+
+        await service.RunAsync(
+            Request(
+                ResourceRefuelStart.SharedNavigation,
+                ResourceRefuelTarget.GoldMine) with
+            {
+                ReturnToLobbyWhenComplete = true,
+            },
+            new LobbyDetectorPack());
+
+        Assert.Equal(3, automation.PlayPresses);
+        Assert.Equal(
+            FakeScreen.Lobby,
+            automation.CurrentScreen);
+    }
+
+    [Fact]
+    public async Task ScheduledNavigation_ClosesChallengeSelectorBeforeLobby()
+    {
+        RefuelAutomation automation =
+            new(FakeScreen.ChallengeList);
+        FakeRecovery recovery = new(automation);
+        ResourceRefuelService service = CreateService(
+            automation,
+            recovery);
+
+        await service.RunAsync(
+            Request(
+                ResourceRefuelStart.SharedNavigation,
+                ResourceRefuelTarget.GoldMine) with
+            {
+                OpenPlayWhenComplete = false,
+            },
+            new LobbyDetectorPack());
+
+        Assert.Equal(1, automation.ChallengeCloseClicks);
+        Assert.Equal(1, automation.PlayPresses);
+    }
+
+    [Fact]
     public async Task FailedInteraction_ReturnsToHubBeforeRetry()
     {
         RefuelAutomation automation = new()
@@ -104,6 +211,58 @@ public sealed class ResourceRefuelServiceTests
         Assert.Equal(2, automation.AreasPresses);
         Assert.Equal(2, automation.InteractionPresses);
         Assert.Equal(1, automation.MaxClicks);
+        Assert.Equal(1, automation.ConfirmClicks);
+    }
+
+    [Fact]
+    public async Task SlowStationLoadBeyondSoftTimeout_KeepsTheSameAttempt()
+    {
+        RefuelAutomation automation = new()
+        {
+            StationRevealAfterCaptures = 30,
+        };
+        ResourceRefuelService service = CreateService(
+            automation,
+            new FakeRecovery(automation));
+
+        await service.RunAsync(
+            Request(
+                ResourceRefuelStart.CurrentLobby,
+                ResourceRefuelTarget.GoldMine) with
+            {
+                OpenPlayWhenComplete = false,
+            },
+            new LobbyDetectorPack());
+
+        Assert.Equal(1, automation.AreasPresses);
+        Assert.Equal(1, automation.InteractionPresses);
+        Assert.Equal(1, automation.ConfirmClicks);
+    }
+
+    [Fact]
+    public async Task FailedMaxAction_DismissesDialogAndStationBeforeRetry()
+    {
+        RefuelAutomation automation = new()
+        {
+            FailedMaxAttempts = 1,
+        };
+        ResourceRefuelService service = CreateService(
+            automation,
+            new FakeRecovery(automation));
+
+        await service.RunAsync(
+            Request(
+                ResourceRefuelStart.CurrentLobby,
+                ResourceRefuelTarget.GoldMine) with
+            {
+                OpenPlayWhenComplete = false,
+            },
+            new LobbyDetectorPack());
+
+        Assert.Equal(2, automation.AreasPresses);
+        Assert.Equal(2, automation.InteractionPresses);
+        Assert.Equal(1, automation.DialogCancelClicks);
+        Assert.Equal(1, automation.StationCloseClicks);
         Assert.Equal(1, automation.ConfirmClicks);
     }
 
@@ -134,15 +293,21 @@ public sealed class ResourceRefuelServiceTests
 
     private static ResourceRefuelService CreateService(
         RefuelAutomation automation,
-        FakeRecovery recovery) =>
-        new(
+        FakeRecovery recovery)
+    {
+        DateTimeOffset now =
+            new(2026, 7, 29, 12, 0, 0, TimeSpan.Zero);
+        return new ResourceRefuelService(
             automation,
             recovery,
-            static (_, token) =>
+            (duration, token) =>
             {
                 token.ThrowIfCancellationRequested();
+                now += duration;
                 return Task.CompletedTask;
-            });
+            },
+            () => now);
+    }
 
     private static ResourceRefuelRequest Request(
         ResourceRefuelStart start,
@@ -205,17 +370,33 @@ public sealed class ResourceRefuelServiceTests
         ResourceDrill,
         AddFuel,
         Play,
+        ChallengeList,
     }
 
     private sealed class RefuelAutomation : IRobloxAutomation
     {
         private readonly RobloxWindow _window =
             new(42, "Roblox", 84, "RobloxPlayerBeta");
-        private readonly Dictionary<FakeScreen, ImageFrame> _frames =
-            LoadFrames();
-        private FakeScreen _screen = FakeScreen.Lobby;
+        private readonly Dictionary<FakeScreen, ImageFrame> _frames;
+        private FakeScreen _screen;
         private int _routeKeys;
         private FakeScreen _stationBeforeDialog;
+        private FakeScreen? _pendingStation;
+        private int _pendingStationCaptures;
+
+        public RefuelAutomation(
+            FakeScreen initialScreen =
+                FakeScreen.Lobby,
+            string goldStationFixture =
+                "GoldMine_01.png",
+            string drillStationFixture =
+                "ResourceDrill_01.png")
+        {
+            _screen = initialScreen;
+            _frames = LoadFrames(
+                goldStationFixture,
+                drillStationFixture);
+        }
 
         public ClientBounds ClientBounds { get; set; } =
             new(0, 0, 808, 611);
@@ -223,6 +404,10 @@ public sealed class ResourceRefuelServiceTests
         public (int Width, int Height)? ResizeRequest { get; private set; }
 
         public int FailedInteractionAttempts { get; init; }
+
+        public int FailedMaxAttempts { get; init; }
+
+        public int StationRevealAfterCaptures { get; init; }
 
         public bool CancelOnHeldKey { get; init; }
 
@@ -237,6 +422,14 @@ public sealed class ResourceRefuelServiceTests
         public int MaxClicks { get; private set; }
 
         public int ConfirmClicks { get; private set; }
+
+        public int DialogCancelClicks { get; private set; }
+
+        public int StationCloseClicks { get; private set; }
+
+        public int ChallengeCloseClicks { get; private set; }
+
+        public FakeScreen CurrentScreen => _screen;
 
         public List<(char Key, int Milliseconds)> HeldKeys { get; } = [];
 
@@ -287,6 +480,16 @@ public sealed class ResourceRefuelServiceTests
         public ImageFrame CaptureClient(RobloxWindow window)
         {
             Events.Add("capture");
+            if (_pendingStation is FakeScreen station)
+            {
+                _pendingStationCaptures++;
+                if (_pendingStationCaptures >=
+                    StationRevealAfterCaptures)
+                {
+                    _screen = station;
+                    _pendingStation = null;
+                }
+            }
             return _frames[_screen].Clone();
         }
 
@@ -318,9 +521,17 @@ public sealed class ResourceRefuelServiceTests
                 _screen = FakeScreen.Hub;
                 _routeKeys = 0;
             }
+            else if ((_screen is
+                          FakeScreen.GoldMine or
+                          FakeScreen.ResourceDrill) &&
+                     (x, y) == (636, 170))
+            {
+                StationCloseClicks++;
+                _screen = FakeScreen.Lobby;
+            }
             else if (_screen is
-                     FakeScreen.GoldMine or
-                     FakeScreen.ResourceDrill)
+                         FakeScreen.GoldMine or
+                         FakeScreen.ResourceDrill)
             {
                 _stationBeforeDialog = _screen;
                 _screen = FakeScreen.AddFuel;
@@ -329,12 +540,29 @@ public sealed class ResourceRefuelServiceTests
                      (x, y) == (516, 312))
             {
                 MaxClicks++;
+                if (MaxClicks <= FailedMaxAttempts)
+                {
+                    throw new InvalidOperationException(
+                        "Simulated Max action failure.");
+                }
             }
             else if (_screen == FakeScreen.AddFuel &&
                      (x, y) == (337, 345))
             {
                 ConfirmClicks++;
                 _screen = _stationBeforeDialog;
+            }
+            else if (_screen == FakeScreen.AddFuel &&
+                     (x, y) == (470, 345))
+            {
+                DialogCancelClicks++;
+                _screen = _stationBeforeDialog;
+            }
+            else if (_screen ==
+                     FakeScreen.ChallengeList)
+            {
+                ChallengeCloseClicks++;
+                _screen = FakeScreen.Play;
             }
             return Task.CompletedTask;
         }
@@ -390,15 +618,26 @@ public sealed class ResourceRefuelServiceTests
                 InteractionPresses++;
                 if (InteractionPresses > FailedInteractionAttempts)
                 {
-                    _screen = _routeKeys == 4
+                    FakeScreen station = _routeKeys == 4
                         ? FakeScreen.ResourceDrill
                         : FakeScreen.GoldMine;
+                    if (StationRevealAfterCaptures > 0)
+                    {
+                        _pendingStation = station;
+                        _pendingStationCaptures = 0;
+                    }
+                    else
+                    {
+                        _screen = station;
+                    }
                 }
             }
             else if (key == 'P')
             {
                 PlayPresses++;
-                _screen = FakeScreen.Play;
+                _screen = _screen == FakeScreen.Play
+                    ? FakeScreen.Lobby
+                    : FakeScreen.Play;
             }
             return Task.CompletedTask;
         }
@@ -429,7 +668,9 @@ public sealed class ResourceRefuelServiceTests
 
         public void ReturnToLobby() => _screen = FakeScreen.Lobby;
 
-        private static Dictionary<FakeScreen, ImageFrame> LoadFrames() =>
+        private static Dictionary<FakeScreen, ImageFrame> LoadFrames(
+            string goldStationFixture,
+            string drillStationFixture) =>
             new()
             {
                 [FakeScreen.Lobby] = ImageCodec.Load(Path.Combine(
@@ -444,15 +685,20 @@ public sealed class ResourceRefuelServiceTests
                     "Lobby_UI",
                     "Lobby_UI_001.png")),
                 [FakeScreen.GoldMine] =
-                    LoadRefuel("GoldMine_01.png"),
+                    LoadRefuel(goldStationFixture),
                 [FakeScreen.ResourceDrill] =
-                    LoadRefuel("ResourceDrill_01.png"),
+                    LoadRefuel(drillStationFixture),
                 [FakeScreen.AddFuel] =
                     LoadRefuel("GoldMine_AddFuel_01.png"),
                 [FakeScreen.Play] = ImageCodec.Load(Path.Combine(
                     TestPaths.Datasets,
                     "Play_UI",
                     "Play_UI_001.png")),
+                [FakeScreen.ChallengeList] =
+                    ImageCodec.Load(Path.Combine(
+                        TestPaths.ChallengeDatasets,
+                        "ChallengeList",
+                        "ChallengeList_01.png")),
             };
 
         private static ImageFrame LoadRefuel(string file) =>
@@ -498,7 +744,10 @@ public sealed class ResourceRefuelServiceTests
             null;
 
         public string? RecoveryState(ImageFrame clientImage) =>
-            AreasScreenDetectorForTest(clientImage)
+            AreasScreenDetectorForTest(clientImage) ||
+            ChallengeScreenDetector
+                .Detect(clientImage).State !=
+                ChallengeScreenState.None
                 ? "unknown"
                 : "lobby";
 

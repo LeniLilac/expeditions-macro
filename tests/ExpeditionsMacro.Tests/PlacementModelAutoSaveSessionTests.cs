@@ -274,7 +274,9 @@ public sealed class PlacementModelAutoSaveSessionTests
                 savedRecording
                     .ManualInputRecordingId);
             Assert.Equal(
-                stepMode.Steps,
+                PlacementTimelinePolicy
+                    .Normalize(stepMode)
+                    .Steps,
                 savedRecording.Steps);
 
             session.ScheduleSave(stepMode);
@@ -286,7 +288,9 @@ public sealed class PlacementModelAutoSaveSessionTests
             Assert.Null(
                 savedSteps.ManualInputRecordingId);
             Assert.Equal(
-                stepMode.Steps,
+                PlacementTimelinePolicy
+                    .Normalize(stepMode)
+                    .Steps,
                 savedSteps.Steps);
             Assert.Equal(
                 stepMode.TeamSlot,

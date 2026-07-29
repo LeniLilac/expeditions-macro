@@ -218,6 +218,145 @@ public sealed class PlacementPlaybackAttemptTests
                 action => action == "letter:Y"));
     }
 
+    [Fact]
+    public async Task ReconfigureStep_ReopensUnitAndDisablesAutoUpgrade()
+    {
+        AttemptAutomation automation = new();
+        PlacementStep placement = Step(3, 320) with
+        {
+            AutoUpgradePriority =
+                UnitAutoUpgradePriority.Priority2,
+        };
+        PlacementStep reconfigure = placement with
+        {
+            Kind = MatchStepKind.ReconfigureUnit,
+            PlacementId = string.Empty,
+            TargetPlacementId =
+                placement.PlacementId,
+            X = 0,
+            Y = 0,
+            AutoUpgradePriority =
+                UnitAutoUpgradePriority.Off,
+            ChangeTargetingPriority = true,
+            TargetingPriority =
+                UnitTargetingPriority.Last,
+            AutoUpgradeAction =
+                MatchAutoUpgradeAction.Disable,
+        };
+
+        await PlayStepsAsync(
+            automation,
+            [placement, reconfigure]);
+
+        Assert.Equal(
+            2,
+            automation.Actions.Count(action =>
+                action == "verify:320,280"));
+        Assert.Equal(
+            1,
+            automation.Actions.Count(action =>
+                action == "letter:T"));
+        Assert.Contains(
+            $"held:{(int)'Y'}:down",
+            automation.Actions);
+        Assert.Contains(
+            $"held:{(int)'Y'}:up",
+            automation.Actions);
+    }
+
+    [Fact]
+    public async Task UpgradeStep_PressesUpgradeConfiguredNumberOfTimes()
+    {
+        AttemptAutomation automation = new();
+        PlacementStep placement = Step(2, 340);
+        PlacementStep upgrade = placement with
+        {
+            Kind = MatchStepKind.UpgradeUnit,
+            PlacementId = string.Empty,
+            TargetPlacementId =
+                placement.PlacementId,
+            X = 0,
+            Y = 0,
+            UpgradeCount = 3,
+            AutoUpgradePriority =
+                UnitAutoUpgradePriority.Off,
+        };
+
+        await PlayStepsAsync(
+            automation,
+            [placement, upgrade]);
+
+        Assert.Equal(
+            3,
+            automation.Actions.Count(action =>
+                action == "letter:U"));
+        Assert.Equal(
+            2,
+            automation.Actions.Count(action =>
+                action == "verify:340,280"));
+    }
+
+    [Fact]
+    public async Task DelayStep_WaitsWithoutRequiringPlacementKeys()
+    {
+        AttemptAutomation automation = new();
+        List<PlacementStep> sent = [];
+        PlacementStep delay = new()
+        {
+            Kind = MatchStepKind.Delay,
+            UnitKey = 1,
+            X = 0,
+            Y = 0,
+            DelayAfterMilliseconds = 0,
+            DelayDurationMilliseconds = 1,
+        };
+
+        await PlayStepsAsync(
+            automation,
+            [delay],
+            stepSent: (_, _, step) =>
+                sent.Add(step),
+            cancelPlacementKey: default);
+
+        Assert.Empty(automation.Actions);
+        Assert.Equal(delay, Assert.Single(sent));
+    }
+
+    [Fact]
+    public async Task AdvancedMode_CanSkipProofAndOverrideBurstDuration()
+    {
+        AttemptAutomation automation = new();
+        automation.NeverVisibleCoordinates.Add(
+            (360, 280));
+        PlacementAdvancedSettings advanced = new()
+        {
+            Enabled = true,
+            UnitSelectionDelayMilliseconds = 0,
+            PlacementBurstDurationMilliseconds = 17,
+            VerifySelectedUnitPanelBeforeActions = false,
+        };
+
+        await PlayStepsAsync(
+            automation,
+            [
+                Step(
+                    4,
+                    360,
+                    UnitTargetingPriority.Last),
+            ],
+            advancedSettings: advanced);
+
+        Assert.Contains(
+            "burst:360,280:3:17",
+            automation.Actions);
+        Assert.Contains(
+            "letter:T",
+            automation.Actions);
+        Assert.True(
+            automation.Actions.IndexOf("letter:T") <
+            automation.Actions.IndexOf("capture"));
+    }
+
     private static PlacementStep Step(
         int unit,
         int x,
@@ -227,6 +366,9 @@ public sealed class PlacementPlaybackAttemptTests
             UnitAutoUpgradePriority.Off) =>
         new()
         {
+            Kind = MatchStepKind.Placement,
+            PlacementId =
+                $"unit-{unit}-{x}",
             UnitKey = unit,
             X = x,
             Y = 280,
@@ -241,6 +383,9 @@ public sealed class PlacementPlaybackAttemptTests
         Action<string>? status = null,
         Action<int, int, PlacementStep>? stepSent = null,
         int placementAttempts = 1,
+        PlacementAdvancedSettings? advancedSettings =
+            null,
+        char cancelPlacementKey = 'Z',
         CancellationToken cancellationToken = default)
     {
         string root =
@@ -262,6 +407,8 @@ public sealed class PlacementPlaybackAttemptTests
                     CameraPreparationMode.CameraModel,
                 PlacementAttempts =
                     placementAttempts,
+                AdvancedSettings =
+                    advancedSettings ?? new(),
                 Steps = steps,
                 CreatedAt = DateTimeOffset.UtcNow,
             };
@@ -274,7 +421,7 @@ public sealed class PlacementPlaybackAttemptTests
                 defaultIntervalMilliseconds: 0,
                 keyHoldMilliseconds: 0,
                 afterKeyMilliseconds: 0,
-                cancelPlacementKey: 'Z',
+                cancelPlacementKey,
                 stepSent,
                 status,
                 cancellationToken);

@@ -1,5 +1,6 @@
 using ExpeditionsMacro.App.Models;
 using ExpeditionsMacro.Core.Geometry;
+using ExpeditionsMacro.Core.Models;
 
 namespace ExpeditionsMacro.App.Pages;
 
@@ -10,33 +11,82 @@ public partial class PlacementModelsPage
 
     private void UpdatePlacementMarkerLayout()
     {
-        PlacementMarkerLabelRequest[] requests =
-            _steps.Select(
-                    (row, index) =>
-                        new PlacementMarkerLabelRequest(
-                            index,
-                            row.X,
-                            row.Y,
-                            MarkerLabelWidth(row),
-                            MarkerLabelHeight))
-                .ToArray();
-        IReadOnlyDictionary<int, ScreenRegion> labels =
-            PlacementMarkerLabelLayout
-                .Arrange(requests)
-                .ToDictionary(
-                    placement => placement.Key,
-                    placement =>
-                        placement.LabelBounds);
+        IReadOnlyList<PlacementStep> steps =
+            PlacementTimelinePolicy.NormalizeSteps(
+                _steps.Select(row => row.ToModel())
+                    .ToArray());
+        IReadOnlyDictionary<string, string> labels =
+            PlacementReferencePolicy
+                .BuildDisplayLabels(steps);
         for (int index = 0;
              index < _steps.Count;
              index++)
         {
             PlacementStepRow row = _steps[index];
+            PlacementStep step = steps[index];
+            string placementId =
+                row.Kind == MatchStepKind.Placement
+                    ? step.PlacementId
+                    : row.HasPlacementReference
+                        ? step.TargetPlacementId
+                        : string.Empty;
+            row.SetDisplayUnitId(
+                labels.GetValueOrDefault(
+                    placementId,
+                    string.Empty));
+        }
+
+        _placementMarkers.Clear();
+        foreach (PlacementStepRow row in
+                 _steps.Where(row =>
+                     row.Kind ==
+                     MatchStepKind.Placement))
+        {
+            _placementMarkers.Add(row);
+        }
+
+        PlacementMarkerLabelRequest[] requests =
+            _steps.Select(
+                    (row, index) =>
+                        new
+                        {
+                            Row = row,
+                            Index = index,
+                        })
+                .Where(item =>
+                    item.Row.HasCoordinate)
+                .Select(item =>
+                        new PlacementMarkerLabelRequest(
+                            item.Index,
+                            item.Row.X,
+                            item.Row.Y,
+                            MarkerLabelWidth(item.Row),
+                            MarkerLabelHeight))
+                .ToArray();
+        IReadOnlyDictionary<
+            int,
+            PlacementMarkerLabelPlacement> placements =
+            PlacementMarkerLabelLayout
+                .Arrange(requests)
+                .ToDictionary(
+                    placement => placement.Key,
+                    placement => placement);
+        for (int index = 0;
+             index < _steps.Count;
+             index++)
+        {
+            PlacementStepRow row = _steps[index];
+            if (!row.HasCoordinate)
+            {
+                row.SetMarkerLayout(
+                    PlacementMarkerPresentation.Empty);
+                continue;
+            }
             row.SetMarkerLayout(
                 PlacementMarkerPresentation.Create(
                     row.X,
                     row.Y,
-                    labels[index]));
+                    placements[index]));
         }
     }
 
@@ -44,8 +94,7 @@ public partial class PlacementModelsPage
         PlacementStepRow row)
     {
         int estimatedTextWidth =
-            row.MarkerLabel.Length * 8 +
-            row.PhaseShortLabel.Length * 7;
+            row.MarkerLabel.Length * 8;
         return Math.Max(
             MinimumMarkerLabelWidth,
             estimatedTextWidth + 26);

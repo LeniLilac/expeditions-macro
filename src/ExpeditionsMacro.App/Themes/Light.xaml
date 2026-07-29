@@ -15,6 +15,8 @@
     <Color x:Key="SuccessColor">#247A55</Color>
     <Color x:Key="WarningColor">#926A1A</Color>
     <Color x:Key="ErrorColor">#B13E48</Color>
+    <Color x:Key="MatchStepReconfigureColor">#2F7887</Color>
+    <Color x:Key="MatchStepUpgradeColor">#7650B4</Color>
     <SolidColorBrush x:Key="CanvasBrush" Color="{StaticResource CanvasColor}" />
     <SolidColorBrush x:Key="SidebarBrush" Color="{StaticResource SidebarColor}" />
     <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}" />
@@ -30,4 +32,10 @@
     <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}" />
     <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}" />
     <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ErrorColor}" />
+    <SolidColorBrush x:Key="ModalScrimBrush" Color="#99000000" />
+    <SolidColorBrush x:Key="MatchStepPlacementBrush" Color="{StaticResource AccentColor}" />
+    <SolidColorBrush x:Key="MatchStepReconfigureBrush" Color="{StaticResource MatchStepReconfigureColor}" />
+    <SolidColorBrush x:Key="MatchStepStartBrush" Color="{StaticResource SuccessColor}" />
+    <SolidColorBrush x:Key="MatchStepDelayBrush" Color="{StaticResource WarningColor}" />
+    <SolidColorBrush x:Key="MatchStepUpgradeBrush" Color="{StaticResource MatchStepUpgradeColor}" />
 </ResourceDictionary>

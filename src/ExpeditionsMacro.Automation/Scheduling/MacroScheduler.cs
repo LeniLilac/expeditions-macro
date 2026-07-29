@@ -108,7 +108,9 @@ public sealed class MacroScheduler
                         DateTimeOffset.UtcNow);
                 if (!CanRepeatStage(activeTask, following, result))
                 {
-                    return following?.Kind == MacroTaskKind.Event
+                    return following?.Kind is
+                            MacroTaskKind.Event or
+                            MacroTaskKind.Utility
                         ? ScheduledTaskContinuation.ReturnToLobby
                         : ScheduledTaskContinuation.Handoff;
                 }
@@ -176,7 +178,8 @@ public sealed class MacroScheduler
             before.TargetRuntimeBaselineSeconds;
         bool completed = task.Kind switch
         {
-            MacroTaskKind.Challenge => false,
+            MacroTaskKind.Challenge or
+                MacroTaskKind.Utility => false,
             MacroTaskKind.Story when task.CompleteOnRuntimeDefeat =>
                 result.Defeats > 0 &&
                 targetRuntime >=

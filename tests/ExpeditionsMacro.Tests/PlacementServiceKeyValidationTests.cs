@@ -196,7 +196,9 @@ public sealed class PlacementServiceKeyValidationTests
                     new AppPaths(root)),
                 targetingKey: () => 'T',
                 autoUpgradeKey: () => 'Y',
-                quickPlacementKey: () => 0);
+                quickPlacementKey: () => 0,
+                matchStartPlayback:
+                    new PlacementMatchStartPlaybackStub());
 
             InvalidDataException error =
                 await Assert.ThrowsAsync<
@@ -240,8 +242,10 @@ public sealed class PlacementServiceKeyValidationTests
                 .FakeCaptureService(automation),
             new PlacementModelRepository(
                 new AppPaths(root)),
-            () => targetingKey,
-            () => autoUpgradeKey);
+            targetingKey: () => targetingKey,
+            autoUpgradeKey: () => autoUpgradeKey,
+            matchStartPlayback:
+                new PlacementMatchStartPlaybackStub());
 
     private static PlacementModel Model(
         UnitTargetingPriority targeting,

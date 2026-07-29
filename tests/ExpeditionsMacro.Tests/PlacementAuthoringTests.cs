@@ -227,9 +227,15 @@ public sealed class PlacementAuthoringTests
     public void ExecutionPlan_SplitsFastPlacementPhases()
     {
         PlacementStep before =
-            Step(PlacementPhase.BeforeStart, 1);
+            Step(PlacementPhase.BeforeStart, 1) with
+            {
+                PlacementId = "before",
+            };
         PlacementStep after =
-            Step(PlacementPhase.AfterStart, 2);
+            Step(PlacementPhase.AfterStart, 2) with
+            {
+                PlacementId = "after",
+            };
         PlacementModel fast = Placement(
             CameraPreparationMode.FastNoAlign,
             new PlacementTarget
@@ -279,16 +285,19 @@ public sealed class PlacementAuthoringTests
         PlacementStep late =
             Step(PlacementPhase.AfterStart, 1) with
             {
+                PlacementId = "late",
                 DelayAfterStartMilliseconds = 9000,
             };
         PlacementStep early =
             Step(PlacementPhase.AfterStart, 2) with
             {
+                PlacementId = "early",
                 DelayAfterStartMilliseconds = 2000,
             };
         PlacementStep sameTime =
             Step(PlacementPhase.AfterStart, 3) with
             {
+                PlacementId = "same-time",
                 DelayAfterStartMilliseconds = 2000,
             };
         PlacementModel model = Placement(

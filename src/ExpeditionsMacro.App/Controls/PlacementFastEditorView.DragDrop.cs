@@ -124,7 +124,6 @@ public partial class PlacementFastEditorView
                 out PlacementStepRow? dragged) ||
             !TryFindDropTarget(
                 e.GetPosition(FastStepsList),
-                dragged.Phase,
                 out PlacementStepRow? target,
                 out ListBoxItem? container,
                 out bool insertAfter))
@@ -165,7 +164,6 @@ public partial class PlacementFastEditorView
                     out PlacementStepRow? dragged) ||
                 !TryFindDropTarget(
                     e.GetPosition(FastStepsList),
-                    dragged.Phase,
                     out PlacementStepRow? target,
                     out _,
                     out bool insertAfter))
@@ -193,7 +191,6 @@ public partial class PlacementFastEditorView
 
     private bool TryFindDropTarget(
         Point position,
-        PlacementPhase phase,
         [NotNullWhen(true)]
         out PlacementStepRow? target,
         [NotNullWhen(true)]
@@ -219,36 +216,29 @@ public partial class PlacementFastEditorView
                 FastStepsList).Y >
             container.ActualHeight / 2;
 
-        if (target?.Phase == phase &&
+        if (target is not null &&
             container is not null)
         {
             return true;
         }
 
-        IReadOnlyList<PlacementStepRow> phaseRows =
+        IReadOnlyList<PlacementStepRow> rows =
             FastStepsList.Items
                 .OfType<PlacementStepRow>()
-                .Where(row => row.Phase == phase)
                 .ToArray();
-        if (phaseRows.Count == 0)
+        if (rows.Count == 0)
         {
             target = null;
             container = null;
             return false;
         }
 
-        bool clampToStart =
-            phase == PlacementPhase.AfterStart &&
-            target?.Phase ==
-                PlacementPhase.BeforeStart;
-        target = clampToStart
-            ? phaseRows[0]
-            : phaseRows[^1];
+        target = rows[^1];
         container =
             FastStepsList.ItemContainerGenerator
                 .ContainerFromItem(target)
                 as ListBoxItem;
-        insertAfter = !clampToStart;
+        insertAfter = true;
         return container is not null;
     }
 
@@ -262,19 +252,21 @@ public partial class PlacementFastEditorView
             return;
         }
 
-        ScrollViewer? viewer =
-            FindVisualChild<ScrollViewer>(
-                FastStepsList);
-        if (viewer is null) return;
+        ScrollViewer viewer =
+            FastWorkspaceScrollViewer;
+        Point viewportPosition =
+            FastStepsList.TranslatePoint(
+                position,
+                viewer);
 
-        if (position.Y < edge)
+        if (viewportPosition.Y < edge)
         {
             viewer.LineUp();
             _lastStepAutoScroll = now;
         }
         else if (
-            position.Y >
-                FastStepsList.ActualHeight - edge)
+            viewportPosition.Y >
+                viewer.ViewportHeight - edge)
         {
             viewer.LineDown();
             _lastStepAutoScroll = now;

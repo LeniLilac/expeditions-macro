@@ -10,6 +10,51 @@ namespace ExpeditionsMacro.Tests;
 public sealed class FastNoAlignShareTests
 {
     [Fact]
+    public async Task UtilityTask_RoundTripsWithoutPlacementSetup()
+    {
+        string root =
+            TestPaths.NewTemporaryDirectory();
+        try
+        {
+            MacroPlan plan = Plan(
+                new MacroTaskDefinition
+                {
+                    Id = "refuel-task",
+                    Kind = MacroTaskKind.Utility,
+                    Name =
+                        "Gold Mine + Resource Drill",
+                    RefuelTarget =
+                        ResourceRefuelTarget.Both,
+                    RefuelIntervalMinutes = 45,
+                });
+            FastNoAlignShareService service =
+                Service(root);
+
+            FastNoAlignShareBundle bundle =
+                service.Read(
+                    await service.ExportAsync(plan));
+
+            MacroTaskDefinition shared =
+                Assert.Single(bundle.Plan.Tasks);
+            Assert.Equal(
+                MacroTaskKind.Utility,
+                shared.Kind);
+            Assert.Equal(
+                ResourceRefuelTarget.Both,
+                shared.RefuelTarget);
+            Assert.Equal(
+                45,
+                shared.RefuelIntervalMinutes);
+            Assert.Empty(bundle.PlacementSetups);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(
+                root);
+        }
+    }
+
+    [Fact]
     public async Task ExportImport_RoundTripsPlanSetupsAndTeamsWithoutProgress()
     {
         string sourceRoot =
@@ -141,15 +186,21 @@ public sealed class FastNoAlignShareTests
                 UnitTargetingPriority.Strongest,
                 Assert.Single(
                     Assert.Single(
-                        bundle.PlacementSetups)
-                        .Steps)
+                            bundle.PlacementSetups)
+                        .Steps,
+                    step =>
+                            step.Kind ==
+                            MatchStepKind.Placement)
                     .TargetingPriority);
             Assert.Equal(
                 UnitAutoUpgradePriority.Priority4,
                 Assert.Single(
                     Assert.Single(
-                        bundle.PlacementSetups)
-                        .Steps)
+                            bundle.PlacementSetups)
+                        .Steps,
+                    step =>
+                            step.Kind ==
+                            MatchStepKind.Placement)
                     .AutoUpgradePriority);
 
             FastNoAlignShareService importer =
@@ -188,11 +239,19 @@ public sealed class FastNoAlignShareTests
                     .DefaultAfterStartDelayMilliseconds);
             Assert.Equal(
                 UnitTargetingPriority.Strongest,
-                Assert.Single(importedSetup.Steps)
+                Assert.Single(
+                    importedSetup.Steps,
+                    step =>
+                        step.Kind ==
+                        MatchStepKind.Placement)
                     .TargetingPriority);
             Assert.Equal(
                 UnitAutoUpgradePriority.Priority4,
-                Assert.Single(importedSetup.Steps)
+                Assert.Single(
+                    importedSetup.Steps,
+                    step =>
+                        step.Kind ==
+                        MatchStepKind.Placement)
                     .AutoUpgradePriority);
             Assert.Equal(
                 PlacementSetupCatalog.IdFor(target),

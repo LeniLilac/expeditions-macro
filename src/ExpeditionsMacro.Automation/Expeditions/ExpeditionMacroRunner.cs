@@ -146,23 +146,32 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                 PublishSummary();
                 try
                 {
-                    Report("Waiting", 0, "Waiting for the Expedition prestart screen.");
-                    bool prestartReady = await WaitForStateAsync(
-                        window,
-                        detector,
-                        "start",
-                        preset,
-                        Report,
-                        Write,
-                        stopAfterCurrentRunUtc,
-                        cancellationToken).ConfigureAwait(false);
-                    if (!prestartReady)
-                    {
-                        Write("Challenge reset reached while waiting for the next Expedition run. Returning to Challenges.", MacroEventLevel.Success);
-                        return;
-                    }
                     bool arrivedFromRepeatStage =
-                        preparation.ConfirmRepeatStagePrestart();
+                        preparation
+                            .ConfirmRepeatStagePrestart();
+                    bool requirePrestart =
+                        ManualPlaybackStartPolicy
+                            .RequiresPrestart(
+                                placementModel,
+                                arrivedFromRepeatStage);
+                    if (requirePrestart)
+                    {
+                        Report("Waiting", 0, "Waiting for the Expedition prestart screen.");
+                        bool prestartReady = await WaitForStateAsync(
+                            window,
+                            detector,
+                            "start",
+                            preset,
+                            Report,
+                            Write,
+                            stopAfterCurrentRunUtc,
+                            cancellationToken).ConfigureAwait(false);
+                        if (!prestartReady)
+                        {
+                            Write("Challenge reset reached while waiting for the next Expedition run. Returning to Challenges.", MacroEventLevel.Success);
+                            return;
+                        }
+                    }
                     await PrepareMatchAsync(
                         window,
                         preset,
@@ -233,6 +242,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                                 detector,
                                 terminal,
                                 preset,
+                                placementModel,
                                 playMenuKey,
                                 preparation,
                                 started.Runtime.Elapsed,
@@ -271,7 +281,13 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                     else Report("Completed", 100, "Defeat recognized. Repeating the stage.");
                     await ClickActionAsync(window, detector, terminal.State, cancellationToken).ConfigureAwait(false);
                     preparation.MarkRepeatStageRequested();
-                    await Task.Delay(4500, cancellationToken).ConfigureAwait(false);
+                    if (ManualPlaybackStartPolicy
+                        .RequiresPrestart(
+                            placementModel,
+                            arrivedFromRepeatStage: true))
+                    {
+                        await Task.Delay(4500, cancellationToken).ConfigureAwait(false);
+                    }
                 }
                 catch (RecoveryNeededException recovery)
                 {

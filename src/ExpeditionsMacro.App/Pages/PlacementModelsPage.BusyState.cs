@@ -23,15 +23,13 @@ public partial class PlacementModelsPage
         FastUnit4Button.IsEnabled = !busy;
         FastUnit5Button.IsEnabled = !busy;
         FastUnit6Button.IsEnabled = !busy;
-        FastBeforeStartButton.IsEnabled = !busy;
-        FastAfterStartButton.IsEnabled = !busy;
         PlacementCanvas.IsEnabled = !busy;
         FastEditorPanel.SetStepsInteractionEnabled(
             !busy);
         FastTimingButton.IsEnabled = !busy;
         if (busy)
         {
-            FastEditorPanel.CloseTimingSettings();
+            CloseMatchSettingsDialog();
         }
     }
 }

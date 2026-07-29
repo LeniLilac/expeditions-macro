@@ -12,7 +12,7 @@ public partial class PlacementModelsPage
                 _fastManualRecordingId))
         {
             throw new InvalidOperationException(
-                "Add at least one placement.");
+                "Add at least one match step.");
         }
 
         const CameraPreparationMode mode =
@@ -51,6 +51,8 @@ public partial class PlacementModelsPage
                 _fastPlacementIntervalMilliseconds,
             PlacementAttempts =
                 _fastPlacementAttempts,
+            AdvancedSettings =
+                _fastAdvancedSettings,
             DefaultAfterStartDelayMilliseconds =
                 _fastDefaultAfterStartDelayMilliseconds,
             ManualInputRecordingId =
@@ -58,8 +60,8 @@ public partial class PlacementModelsPage
             ImpossibilityThresholdMinutes =
                 _fastImpossibilityThresholdMinutes,
             Steps =
-                PlacementAuthoringRules
-                    .OrderForAuthoring(
+                PlacementTimelinePolicy
+                    .NormalizeSteps(
                         _steps
                             .Select(row =>
                                 row.ToModel())

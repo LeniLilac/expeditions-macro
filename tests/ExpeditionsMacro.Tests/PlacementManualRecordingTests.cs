@@ -102,10 +102,14 @@ public sealed class PlacementManualRecordingTests
     public void ClearingRecordingAssignmentRestoresPreservedSteps()
     {
         PlacementStep before =
-            Step(PlacementPhase.BeforeStart);
+            Step(PlacementPhase.BeforeStart) with
+            {
+                PlacementId = "before",
+            };
         PlacementStep after =
             Step(PlacementPhase.AfterStart) with
             {
+                PlacementId = "after",
                 X = 140,
             };
         PlacementModel recordingMode =

@@ -27,6 +27,8 @@ public partial class MacroPage
         TaskEditorDialog.RaidTaskKindButton;
     private RadioButton EventTaskKindButton =>
         TaskEditorDialog.EventTaskKindButton;
+    private RadioButton UtilityTaskKindButton =>
+        TaskEditorDialog.UtilityTaskKindButton;
     private ColumnDefinition TaskSelectionColumn =>
         TaskEditorDialog.TaskSelectionColumn;
     private ColumnDefinition TaskSelectionGapColumn =>
@@ -90,6 +92,7 @@ public partial class MacroPage
                      StoryTaskKindButton,
                      RaidTaskKindButton,
                      EventTaskKindButton,
+                     UtilityTaskKindButton,
                  })
         {
             button.Checked +=
@@ -124,6 +127,15 @@ public partial class MacroPage
                 .Cast<NamedChoice<MacroTaskKind>>()
                 .FirstOrDefault(choice =>
                     choice.Value == kind);
+        if (kind == MacroTaskKind.Utility &&
+            _editingTaskId is null &&
+            (TaskTargetText.Text == "1" ||
+             !int.TryParse(
+                 TaskTargetText.Text,
+                 out _)))
+        {
+            TaskTargetText.Text = "60";
+        }
     }
 
     private void OpenTaskEditor(
@@ -186,6 +198,12 @@ public partial class MacroPage
                 .Any(choice =>
                     choice.Value ==
                     MacroTaskKind.Event);
+        bool supportsUtility =
+            TaskKindCombo.Items
+                .Cast<NamedChoice<MacroTaskKind>>()
+                .Any(choice =>
+                    choice.Value ==
+                    MacroTaskKind.Utility);
         _syncingTaskKindButtons = true;
         try
         {
@@ -203,10 +221,18 @@ public partial class MacroPage
                 supportsEvent
                     ? Visibility.Visible
                     : Visibility.Collapsed;
+            UtilityTaskKindButton.Visibility =
+                supportsUtility
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
             TaskKindButtonGrid.Columns =
-                supportsEvent ? 5 : 4;
+                4 +
+                (supportsEvent ? 1 : 0) +
+                (supportsUtility ? 1 : 0);
             EventTaskKindButton.IsChecked =
                 selected == MacroTaskKind.Event;
+            UtilityTaskKindButton.IsChecked =
+                selected == MacroTaskKind.Utility;
         }
         finally
         {

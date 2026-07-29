@@ -20,7 +20,15 @@ public sealed partial class ExpeditionMacroRunner
         char cancelPlacementKey,
         CancellationToken cancellationToken)
     {
-        HashSet<int> keys = eligibleSteps
+        PlacementStep[] placementSteps =
+            SelectRetryablePlacementSteps(
+                eligibleSteps);
+        if (placementSteps.Length == 0)
+        {
+            return;
+        }
+
+        HashSet<int> keys = placementSteps
             .Select(step => step.UnitKey)
             .ToHashSet();
         IReadOnlyList<int> remaining =
@@ -39,9 +47,10 @@ public sealed partial class ExpeditionMacroRunner
             MacroEventLevel.Warning,
             null,
             null);
-        PlacementStep[] steps = eligibleSteps
-            .Where(step => remaining.Contains(step.UnitKey))
-            .ToArray();
+        PlacementStep[] steps =
+            SelectRetryablePlacementSteps(
+                placementSteps,
+                remaining.ToHashSet());
         await PlaceStepsAsync(
             window,
             placement,
@@ -51,6 +60,23 @@ public sealed partial class ExpeditionMacroRunner
             cancelPlacementKey,
             stepSent: null,
             cancellationToken).ConfigureAwait(false);
+    }
+
+    internal static PlacementStep[]
+        SelectRetryablePlacementSteps(
+        IReadOnlyList<PlacementStep> steps,
+        IReadOnlySet<int>? remainingUnitKeys = null)
+    {
+        ArgumentNullException.ThrowIfNull(steps);
+        return
+        [
+            .. steps.Where(step =>
+                step.Kind ==
+                    MatchStepKind.Placement &&
+                (remainingUnitKeys is null ||
+                 remainingUnitKeys.Contains(
+                     step.UnitKey))),
+        ];
     }
 
     private Task PlaceStepsAsync(

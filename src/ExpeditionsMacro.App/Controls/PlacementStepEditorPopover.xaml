@@ -1,0 +1,194 @@
+<UserControl x:Class="ExpeditionsMacro.App.Controls.PlacementStepEditorPopover"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:icons="clr-namespace:ExpeditionsMacro.App.Controls"
+             xmlns:models="clr-namespace:ExpeditionsMacro.App.Models"
+             MinWidth="340"
+             MaxWidth="640"
+             MaxHeight="720"
+             AutomationProperties.Name="Match step editor dialog"
+             FontFamily="{StaticResource UiFont}"
+             Foreground="{DynamicResource TextBrush}">
+    <Border Padding="18"
+            Background="{DynamicResource SurfaceBrush}"
+            BorderBrush="{DynamicResource BorderBrush}"
+            BorderThickness="1"
+            CornerRadius="7">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Grid>
+                <TextBlock x:Name="EditorTitleText"
+                           VerticalAlignment="Center"
+                           Style="{StaticResource SectionTitle}"
+                           Text="Match step" />
+                <Button Width="32"
+                        MinWidth="32"
+                        Height="32"
+                        HorizontalAlignment="Right"
+                        Style="{StaticResource IconButton}"
+                        icons:Lucide.Icon="X"
+                        AutomationProperties.Name="Close match step editor"
+                        ToolTip="Close"
+                        Click="Cancel_Click" />
+            </Grid>
+
+            <ScrollViewer Grid.Row="1"
+                          Margin="0,14,0,0"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock x:Name="StepIdentityText"
+                               Style="{StaticResource Caption}"
+                               Text="Saved automatically with this placement setup." />
+
+                    <TextBlock Margin="0,16,0,0"
+                               Style="{StaticResource FieldLabel}"
+                               Text="Action" />
+                    <ComboBox x:Name="KindCombo"
+                              Margin="0,6,0,0"
+                              AutomationProperties.Name="Match step action"
+                              DisplayMemberPath="Label"
+                              ItemsSource="{x:Static models:PlacementStepRow.Kinds}"
+                              SelectedValuePath="Value"
+                              SelectionChanged="KindCombo_SelectionChanged" />
+
+                    <Grid x:Name="PlacementCoordinatePanel"
+                          Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="82" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource FieldLabel}"
+                                       Text="Unit" />
+                            <ComboBox x:Name="UnitCombo"
+                                      Margin="0,6,8,0"
+                                      AutomationProperties.Name="Unit slot"
+                                      ItemsSource="{x:Static models:PlacementStepRow.UnitSlots}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Style="{StaticResource FieldLabel}"
+                                       Text="Coordinate X" />
+                            <TextBox x:Name="CoordinateXText"
+                                     Margin="0,6,8,0"
+                                     AutomationProperties.Name="Placement coordinate X" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Style="{StaticResource FieldLabel}"
+                                       Text="Coordinate Y" />
+                            <TextBox x:Name="CoordinateYText"
+                                     Margin="0,6,0,0"
+                                     AutomationProperties.Name="Placement coordinate Y" />
+                        </StackPanel>
+                    </Grid>
+
+                    <StackPanel x:Name="PlacementReferencePanel"
+                                Margin="0,14,0,0"
+                                Visibility="Collapsed">
+                        <TextBlock Style="{StaticResource FieldLabel}"
+                                   Text="Placed unit" />
+                        <ComboBox x:Name="PlacementReferenceCombo"
+                                  Margin="0,6,0,0"
+                                  AutomationProperties.Name="Placed unit"
+                                  DisplayMemberPath="Label"
+                                  SelectedValuePath="Value" />
+                        <TextBlock Margin="0,5,0,0"
+                                   Style="{StaticResource Caption}"
+                                   Text="Uses this placement's current coordinate, even after the placement moves."
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <StackPanel x:Name="PlacementFields">
+                        <TextBlock Margin="0,14,0,0"
+                                   Style="{StaticResource FieldLabel}"
+                                   Text="Targeting priority" />
+                        <ComboBox x:Name="PlacementTargetingCombo"
+                                  Margin="0,6,0,0"
+                                  AutomationProperties.Name="Placement targeting priority"
+                                  ItemsSource="{x:Static models:PlacementStepRow.TargetingPriorities}" />
+                        <TextBlock Margin="0,14,0,0"
+                                   Style="{StaticResource FieldLabel}"
+                                   Text="Auto upgrade priority" />
+                        <ComboBox x:Name="PlacementAutoUpgradeCombo"
+                                  Margin="0,6,0,0"
+                                  AutomationProperties.Name="Placement auto upgrade priority"
+                                  DisplayMemberPath="Label"
+                                  ItemsSource="{x:Static models:PlacementStepRow.AutoUpgradePriorities}"
+                                  SelectedValuePath="Value" />
+                    </StackPanel>
+
+                    <StackPanel x:Name="ReconfigureFields"
+                                Visibility="Collapsed">
+                        <CheckBox x:Name="ChangeTargetingCheck"
+                                  Margin="0,14,0,0"
+                                  AutomationProperties.Name="Change targeting priority"
+                                  Content="Change targeting priority" />
+                        <ComboBox x:Name="ReconfigureTargetingCombo"
+                                  Margin="0,6,0,0"
+                                  AutomationProperties.Name="New targeting priority"
+                                  IsEnabled="{Binding IsChecked, ElementName=ChangeTargetingCheck}"
+                                  ItemsSource="{x:Static models:PlacementStepRow.TargetingPriorities}" />
+                        <TextBlock Margin="0,14,0,0"
+                                   Style="{StaticResource FieldLabel}"
+                                   Text="Auto Upgrade action" />
+                        <ComboBox x:Name="AutoUpgradeActionCombo"
+                                  Margin="0,6,0,0"
+                                  AutomationProperties.Name="Auto Upgrade action"
+                                  DisplayMemberPath="Label"
+                                  ItemsSource="{x:Static models:PlacementStepRow.AutoUpgradeActions}"
+                                  SelectedValuePath="Value" />
+                        <TextBlock Margin="0,5,0,0"
+                                   Style="{StaticResource Caption}"
+                                   Text="Disable holds Auto Upgrade Unit for 1,500 ms. Enabling normalizes Off, then applies the selected priority."
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <StackPanel x:Name="DelayFields"
+                                Visibility="Collapsed">
+                        <TextBlock Margin="0,14,0,0"
+                                   Style="{StaticResource FieldLabel}"
+                                   Text="Wait, ms" />
+                        <TextBox x:Name="DelayDurationText"
+                                 Margin="0,6,0,0"
+                                 AutomationProperties.Name="Wait duration in milliseconds" />
+                    </StackPanel>
+
+                    <StackPanel x:Name="UpgradeFields"
+                                Visibility="Collapsed">
+                        <TextBlock Margin="0,14,0,0"
+                                   Style="{StaticResource FieldLabel}"
+                                   Text="Upgrade Unit presses" />
+                        <TextBox x:Name="UpgradeCountText"
+                                 Margin="0,6,0,0"
+                                 AutomationProperties.Name="Number of Upgrade Unit key presses" />
+                    </StackPanel>
+
+                    <TextBlock x:Name="StepErrorText"
+                               Margin="0,10,0,0"
+                               AutomationProperties.LiveSetting="Polite"
+                               Foreground="{DynamicResource ErrorBrush}"
+                               TextWrapping="Wrap"
+                               Visibility="Collapsed" />
+                </StackPanel>
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="2"
+                        Margin="0,16,0,0"
+                        HorizontalAlignment="Right"
+                        Orientation="Horizontal">
+                <Button Content="Cancel"
+                        Click="Cancel_Click" />
+                <Button Margin="8,0,0,0"
+                        Style="{StaticResource PrimaryButton}"
+                        Content="Apply"
+                        Click="Apply_Click" />
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

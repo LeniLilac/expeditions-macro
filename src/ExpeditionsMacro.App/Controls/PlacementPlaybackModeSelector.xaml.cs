@@ -84,7 +84,7 @@ public partial class PlacementPlaybackModeSelector :
                 : !_hasAvailableRecording &&
                   !recordingMode
                     ? "Create a recording on the Recordings page before choosing Recording Mode."
-                    : "Replay a saved manual recording instead of ordinary placement steps.";
+                    : "Replay a saved manual recording instead of the Match Steps timeline.";
         RecordingModeButton.ToolTip =
             recordingGuidance;
         AutomationProperties.SetHelpText(

@@ -20,6 +20,10 @@ public sealed class PlacementModelRepository
             try
             {
                 PlacementModel? model = await JsonFileStore.ReadAsync<PlacementModel>(file, cancellationToken).ConfigureAwait(false);
+                model = model is null
+                    ? null
+                    : PlacementTimelinePolicy
+                        .Normalize(model);
                 model?.Validate();
                 if (model is not null) models.Add(model);
             }
@@ -36,6 +40,9 @@ public sealed class PlacementModelRepository
     {
         string path = Path.Combine(_paths.PlacementModels, ValidateId(id), "placement.json");
         PlacementModel? model = await JsonFileStore.ReadAsync<PlacementModel>(path, cancellationToken).ConfigureAwait(false);
+        model = model is null
+            ? null
+            : PlacementTimelinePolicy.Normalize(model);
         model?.Validate();
         return model;
     }
@@ -60,6 +67,7 @@ public sealed class PlacementModelRepository
 
     public async Task SaveAsync(PlacementModel model, CancellationToken cancellationToken = default)
     {
+        model = PlacementTimelinePolicy.Normalize(model);
         model.Validate();
         string path = Path.Combine(_paths.PlacementModels, ValidateId(model.Id), "placement.json");
         await JsonFileStore.WriteAtomicAsync(path, model, cancellationToken).ConfigureAwait(false);

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
@@ -11,6 +12,79 @@ namespace ExpeditionsMacro.Automation.Challenges;
 
 public sealed partial class ChallengeMacroRunner
 {
+    private async Task<(ImageFrame Prestart,
+        bool TeamLoaded)>
+        PrepareSelectedChallengeAttemptAsync(
+        RobloxWindow window,
+        ChallengePreset preset,
+        IDetectorPack detector,
+        ChallengeType type,
+        ChallengeMapId map,
+        ChallengeMapProfile profile,
+        bool teamLoaded,
+        bool skipRepeatedPrestart,
+        char? unitMenuKey,
+        Action<string, int, string, string?, double?> report,
+        Action<string, MacroEventLevel, string?, double?> log,
+        CancellationToken cancellationToken)
+    {
+        ImageFrame prestart =
+            skipRepeatedPrestart
+                ? CaptureClient(window, detector)
+                : await WaitForPrestartAfterPreviewAsync(
+                        window,
+                        preset,
+                        detector,
+                        report,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+        if (!teamLoaded)
+        {
+            await _teams.SelectAsync(
+                    window,
+                    profile.TeamSlot,
+                    unitMenuKey!.Value,
+                    progress: null,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            teamLoaded = true;
+            prestart = await WaitForScreenAsync(
+                    window,
+                    preset,
+                    detector,
+                    ChallengeScreenState.Prestart,
+                    TimeSpan.FromSeconds(10),
+                    report,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        if (!skipRepeatedPrestart)
+        {
+            report(
+                "Camera preparation",
+                20,
+                $"Preparing {Label(map)} for {Label(type)}.",
+                "prestart",
+                null);
+            await PrepareCameraAsync(
+                    window,
+                    preset,
+                    report,
+                    log,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        else
+        {
+            log(
+                "Advanced Recording Mode reused the preserved Challenge camera and skipped repeated Start-screen verification.",
+                MacroEventLevel.Information,
+                "recording_repeat_delay",
+                null);
+        }
+        return (prestart, teamLoaded);
+    }
+
     private async Task ClickAvailableStageAsync(
         RobloxWindow window,
         ChallengePreset preset,
@@ -68,6 +142,12 @@ public sealed partial class ChallengeMacroRunner
         char cancelPlacementKey,
         CancellationToken cancellationToken)
     {
+        await new RobloxChatPanelNormalizer(_automation)
+            .EnsureClosedAsync(
+                window,
+                cancellationToken)
+            .ConfigureAwait(false);
+        _placements.BeginMatch();
         PlacementMatchExecutionPlan execution =
             PlacementExecutionPlan.ForMatch(
                 models.Placement);
@@ -84,8 +164,15 @@ public sealed partial class ChallengeMacroRunner
                     cancellationToken)
                 .ConfigureAwait(false);
 
-        (int X, int Y)? start =
-            await LocateActionAfterParkingAsync(
+        bool requireStartAction =
+            !execution.ManualPlayback ||
+            ManualPlaybackStartPolicy.RequiresPrestart(
+                models.Placement);
+        (int X, int Y)? start = null;
+        if (requireStartAction)
+        {
+            start =
+                await LocateActionAfterParkingAsync(
                     token =>
                         _automation.ParkCursorAsync(
                             window,
@@ -102,10 +189,11 @@ public sealed partial class ChallengeMacroRunner
                     cancellationToken,
                     softTimeout: TimeSpan.FromSeconds(5))
                 .ConfigureAwait(false);
-        if (start is null)
-        {
-            throw new RobloxUiUnavailableException(
-                "The Challenge Start Game button disappeared before it could be clicked.");
+            if (start is null)
+            {
+                throw new RobloxUiUnavailableException(
+                    "The Challenge Start Game button disappeared before it could be clicked.");
+            }
         }
 
         Stopwatch runtime;
@@ -117,6 +205,17 @@ public sealed partial class ChallengeMacroRunner
                 throw new InvalidOperationException(
                     "Manual input playback is unavailable.");
             }
+            await ManualPlaybackStartPolicy
+                .WaitBeforePlaybackAsync(
+                    models.Placement!,
+                    message => report(
+                        "Recording playback",
+                        50,
+                        message,
+                        null,
+                        null),
+                    cancellationToken)
+                .ConfigureAwait(false);
             runtime =
                 await ManualInputMatchPlayback.PlayAsync(
                     _manualInputs,
@@ -140,9 +239,9 @@ public sealed partial class ChallengeMacroRunner
         runtime = Stopwatch.StartNew();
         attemptStarted();
         await ClickAsync(
-                window,
-                start.Value.X,
-                start.Value.Y,
+            window,
+            start!.Value.X,
+            start.Value.Y,
                 cancellationToken)
             .ConfigureAwait(false);
         if (partition is

@@ -126,7 +126,7 @@ internal static class AfkChamberDetector
         double height = Plateau(component.Height, 18, 25, 40, 48);
         double horizontal = Plateau(Math.Abs(component.CenterX - expectedCenterX), 0, 0, 28, 62);
         // UI scaling is centered in the Roblox client, so bottom controls move
-        // upward as they shrink even when the client itself remains 808 Ã— 611.
+        // upward as they shrink even when the client itself remains 808 by 611.
         double vertical = Plateau(Math.Abs(component.CenterY - 584), 0, 0, 18, 52);
         double fillScore = Plateau(fill, 0.24, 0.35, 0.82, 0.98);
         if (width == 0 || height == 0 || horizontal == 0 || vertical == 0 || fillScore == 0) return 0;

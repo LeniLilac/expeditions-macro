@@ -8,41 +8,27 @@
                TargetType="{x:Type Shape}">
             <Setter Property="Stroke"
                     Value="{DynamicResource AccentBrush}" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding Phase}"
-                             Value="AfterStart">
-                    <Setter Property="Stroke"
-                            Value="{DynamicResource WarningBrush}" />
-                </DataTrigger>
-            </Style.Triggers>
         </Style>
         <Style x:Key="MarkerLabel"
                TargetType="Border">
             <Setter Property="BorderBrush"
                     Value="{DynamicResource AccentBrush}" />
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding Phase}"
-                             Value="AfterStart">
-                    <Setter Property="BorderBrush"
-                            Value="{DynamicResource WarningBrush}" />
-                </DataTrigger>
-            </Style.Triggers>
         </Style>
     </UserControl.Resources>
 
     <Canvas Width="{Binding MarkerLayout.CanvasWidth}"
             Height="{Binding MarkerLayout.CanvasHeight}">
         <Line X1="{Binding MarkerLayout.AnchorX}"
-              X2="{Binding MarkerLayout.AnchorX}"
+              X2="{Binding MarkerLayout.ConnectorBendX}"
               Y1="{Binding MarkerLayout.AnchorY}"
-              Y2="{Binding MarkerLayout.LabelCenterY}"
+              Y2="{Binding MarkerLayout.ConnectorBendY}"
               IsHitTestVisible="False"
               StrokeThickness="3"
               Style="{StaticResource MarkerStroke}" />
-        <Line X1="{Binding MarkerLayout.AnchorX}"
+        <Line X1="{Binding MarkerLayout.ConnectorBendX}"
               X2="{Binding MarkerLayout.ConnectorEndX}"
-              Y1="{Binding MarkerLayout.LabelCenterY}"
-              Y2="{Binding MarkerLayout.LabelCenterY}"
+              Y1="{Binding MarkerLayout.ConnectorBendY}"
+              Y2="{Binding MarkerLayout.ConnectorEndY}"
               IsHitTestVisible="False"
               StrokeThickness="3"
               Style="{StaticResource MarkerStroke}" />
@@ -67,10 +53,6 @@
                         Orientation="Horizontal">
                 <TextBlock FontWeight="Bold"
                            Text="{Binding MarkerLabel}" />
-                <TextBlock Margin="4,0,0,0"
-                           FontSize="9"
-                           Foreground="{DynamicResource MutedBrush}"
-                           Text="{Binding PhaseShortLabel}" />
             </StackPanel>
         </Border>
     </Canvas>

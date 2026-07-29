@@ -8,7 +8,7 @@ Challenge mode automates the three regular Anime Expeditions Challenges that res
 - Tries only the enabled Challenge types and skips an entry when **Select Stage** is unavailable.
 - Recognizes the selected map, prepares its deterministic Fast pose, and loads the matching Placement Setup.
 - Recognizes Roblox's stage-teleport transition and allows up to three minutes for slow server loading; ordinary missing transitions still fail on the shorter navigation deadline.
-- Runs every unobstructed before-start step, starts the match, then immediately runs the same setup's rows that were covered by the Start Game dialog. Later After Start rows keep their individual configured delays.
+- Runs each Match Step above the setup's required Start Game boundary, clicks the verified Start action, then runs the ordered actions below it. Explicit Delay actions control any later work.
 - While Victory or Defeat is still visible, presses the configured Anime Expeditions **Toggle Play Menu** key, verifies that navigation opened, and returns through **Change Gamemode**. An ignored key press is retried up to three times. This avoids the small Play control and any hotbar overlap. Defeat retries are configurable and default to zero.
 - Clears per-entry attempts at every global half-hour reset. A no-retry defeat can therefore be attempted again when a new Challenge appears.
 - When scheduled, closes the Challenge selector, verifies the shared game-mode selector, and returns so the Macro scheduler can choose the next highest-priority eligible task.

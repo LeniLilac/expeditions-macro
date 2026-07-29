@@ -30,9 +30,9 @@ public partial class PlacementModelsPage
         FastTeamCombo.SelectedIndex = 2;
         ResetFastTimingDefaults();
         ResetFastRecordingSettings();
-        FastEditorPanel.ClearSnapshotSettings();
+        ClearSnapshotMatchSettings();
         _steps.Clear();
-        InsertStepInPhaseOrder(new PlacementStepRow
+        _steps.Add(new PlacementStepRow
         {
             UnitKey = 1,
             X = 390,
@@ -44,7 +44,7 @@ public partial class PlacementModelsPage
                 PlacementAuthoringRules
                     .DefaultStepDelayMilliseconds,
         });
-        InsertStepInPhaseOrder(new PlacementStepRow
+        _steps.Add(new PlacementStepRow
         {
             UnitKey = 2,
             X = 445,
@@ -59,7 +59,7 @@ public partial class PlacementModelsPage
                 PlacementAuthoringRules
                     .DefaultStepDelayMilliseconds,
         });
-        InsertStepInPhaseOrder(new PlacementStepRow
+        _steps.Add(new PlacementStepRow
         {
             UnitKey = 3,
             X = 505,
@@ -69,7 +69,50 @@ public partial class PlacementModelsPage
                 PlacementAuthoringRules
                     .DefaultStepDelayMilliseconds,
         });
-        FastAfterStartButton.IsChecked = true;
+        _steps.Add(new PlacementStepRow
+        {
+            Kind = MatchStepKind.ReconfigureUnit,
+            UnitKey = 1,
+            X = 390,
+            Y = 352,
+            Phase = PlacementPhase.BeforeStart,
+            ChangeTargetingPriority = true,
+            TargetingPriority =
+                UnitTargetingPriority.Strongest,
+            AutoUpgradeAction =
+                MatchAutoUpgradeAction.Priority2,
+            DelayAfterMilliseconds =
+                PlacementAuthoringRules
+                    .DefaultStepDelayMilliseconds,
+        });
+        _steps.Add(new PlacementStepRow
+        {
+            Kind = MatchStepKind.Delay,
+            UnitKey = 1,
+            Phase = PlacementPhase.BeforeStart,
+            DelayDurationMilliseconds = 1200,
+        });
+        _steps.Add(new PlacementStepRow
+        {
+            Kind = MatchStepKind.UpgradeUnit,
+            UnitKey = 2,
+            X = 445,
+            Y = 394,
+            Phase = PlacementPhase.AfterStart,
+            DelayAfterStartMilliseconds =
+                PlacementAuthoringRules
+                    .DefaultAfterStartDelayMilliseconds,
+            UpgradeCount = 3,
+            DelayAfterMilliseconds =
+                PlacementAuthoringRules
+                    .DefaultStepDelayMilliseconds,
+        });
+        _steps.Insert(
+            4,
+            PlacementStepRow.FromModel(
+                PlacementTimelinePolicy
+                    .CreateStartGameStep()));
+        NormalizeTimelineRows();
         FastStepsList.SelectedIndex = 1;
         FastStatusText.Text = string.Empty;
         UpdateFastPlacementCount();
@@ -87,12 +130,13 @@ public partial class PlacementModelsPage
                 18;
             _fastManualRecordingId =
                 recordingId;
-            FastEditorPanel.SetSnapshotSettings(
+            SetSnapshotMatchSettings(
                 _fastPlacementIntervalMilliseconds,
                 _fastPlacementAttempts,
                 _fastDefaultAfterStartDelayMilliseconds,
                 _fastImpossibilityThresholdMinutes,
-                recordingMode: true);
+                recordingMode: true,
+                _fastAdvancedSettings);
         }
         UpdateFastManualRecordingEditor(
             featureEnabledOverride: true);

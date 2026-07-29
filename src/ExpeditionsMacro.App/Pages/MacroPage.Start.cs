@@ -30,6 +30,7 @@ public partial class MacroPage
 
         MacroPlan plan;
         char playMenuKey;
+        char? areasMenuKey = null;
         char? unitMenuKey = null;
         char cancelPlacementKey = default;
         string webhook = CurrentWebhook();
@@ -54,6 +55,18 @@ public partial class MacroPage
                     _services.Settings.PlayMenuKey,
                     _services.Settings
                         .MacroHotkeyVirtualKey);
+            if (plan.Tasks.Any(task =>
+                    task.Kind ==
+                    MacroTaskKind.Utility))
+            {
+                areasMenuKey =
+                    AppSettings.ParseAreasMenuKey(
+                        _services.Settings.AreasMenuKey,
+                        _services.Settings
+                            .MacroHotkeyVirtualKey,
+                        _services.Settings.PlayMenuKey,
+                        _services.Settings.UnitMenuKey);
+            }
             if (!string.IsNullOrWhiteSpace(
                     _services.Settings.UnitMenuKey))
             {
@@ -122,6 +135,7 @@ public partial class MacroPage
                     webhook,
                     discordUserId,
                     playMenuKey,
+                    areasMenuKey,
                     unitMenuKey,
                     cancelPlacementKey,
                     privateServerRecovery.RecoveryTarget,

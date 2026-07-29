@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Windows;
+using System.Windows.Input;
 using ExpeditionsMacro.App.Controls;
 using ExpeditionsMacro.App.Models;
 using ExpeditionsMacro.Core.Models;
@@ -9,9 +11,6 @@ public partial class PlacementModelsPage
 {
     private const int MaximumPlacementIntervalMilliseconds =
         60_000;
-    private const double MaximumAfterStartDelaySeconds =
-        3_600;
-
     private void ResetFastTimingDefaults()
     {
         _fastPlacementIntervalMilliseconds =
@@ -22,18 +21,24 @@ public partial class PlacementModelsPage
         _fastDefaultAfterStartDelayMilliseconds =
             PlacementAuthoringRules
                 .DefaultAfterStartDelayMilliseconds;
+        _fastAdvancedSettings = new();
     }
 
     private void FastTimingSettingsOpening(
         object? sender,
-        EventArgs e) =>
-        FastEditorPanel.SetTimingSettings(
+        EventArgs e)
+    {
+        MatchSettingsOverlay.Visibility =
+            Visibility.Visible;
+        MatchSettingsDialog.SetValues(
             _fastPlacementIntervalMilliseconds,
             _fastPlacementAttempts,
             _fastDefaultAfterStartDelayMilliseconds,
             _fastImpossibilityThresholdMinutes,
             !string.IsNullOrWhiteSpace(
-                _fastManualRecordingId));
+                _fastManualRecordingId),
+            _fastAdvancedSettings);
+    }
 
     private void FastTimingSettingsApplied(
         object? sender,
@@ -48,22 +53,8 @@ public partial class PlacementModelsPage
             interval >
                 MaximumPlacementIntervalMilliseconds)
         {
-            FastEditorPanel.ShowTimingError(
+            MatchSettingsDialog.ShowError(
                 $"Enter a placement interval from 0 to {MaximumPlacementIntervalMilliseconds:N0} ms.");
-            return;
-        }
-
-        if (!double.TryParse(
-                e.DefaultAfterStartDelayText,
-                NumberStyles.Number,
-                CultureInfo.CurrentCulture,
-                out double afterStartSeconds) ||
-            afterStartSeconds < 0 ||
-            afterStartSeconds >
-                MaximumAfterStartDelaySeconds)
-        {
-            FastEditorPanel.ShowTimingError(
-                $"Enter a default After Start delay from 0 to {MaximumAfterStartDelaySeconds:N0} seconds.");
             return;
         }
 
@@ -75,7 +66,7 @@ public partial class PlacementModelsPage
             placementAttempts is < 1 or
             > PlacementModel.MaximumPlacementAttempts)
         {
-            FastEditorPanel.ShowTimingError(
+            MatchSettingsDialog.ShowError(
                 $"Enter placement attempts from 1 to {PlacementModel.MaximumPlacementAttempts}.");
             return;
         }
@@ -89,40 +80,154 @@ public partial class PlacementModelsPage
             > PlacementModel
                 .MaximumImpossibilityThresholdMinutes)
         {
-            FastEditorPanel.ShowTimingError(
+            MatchSettingsDialog.ShowError(
                 $"Enter an impossibility threshold from 0 to {PlacementModel.MaximumImpossibilityThresholdMinutes} minutes.");
             return;
         }
-        int previousDefault =
-            _fastDefaultAfterStartDelayMilliseconds;
-        int afterStartMilliseconds =
-            (int)Math.Round(
-                afterStartSeconds * 1000,
-                MidpointRounding.AwayFromZero);
+        PlacementAdvancedSettings advanced;
+        try
+        {
+            advanced =
+                BuildAdvancedSettings(e.Advanced);
+        }
+        catch (FormatException error)
+        {
+            MatchSettingsDialog.ShowError(
+                error.Message);
+            return;
+        }
         using (SuspendPlacementAutoSave())
         {
             foreach (PlacementStepRow step in _steps)
             {
-                step.DelayAfterMilliseconds = interval;
-                if (step.Phase ==
-                        PlacementPhase.AfterStart &&
-                    step.DelayAfterStartMilliseconds ==
-                        previousDefault)
+                if (!step.IsStartGame)
                 {
-                    step.DelayAfterStartMilliseconds =
-                        afterStartMilliseconds;
+                    step.DelayAfterMilliseconds =
+                        interval;
                 }
             }
 
             _fastPlacementIntervalMilliseconds = interval;
             _fastPlacementAttempts =
                 placementAttempts;
-            _fastDefaultAfterStartDelayMilliseconds =
-                afterStartMilliseconds;
             _fastImpossibilityThresholdMinutes =
                 impossibilityThreshold;
+            _fastAdvancedSettings = advanced;
         }
-        FastEditorPanel.CloseTimingSettings();
+        CloseMatchSettingsDialog();
         SchedulePlacementAutoSave();
+    }
+
+    private void MatchSettingsDialog_CancelRequested(
+        object? sender,
+        EventArgs e) =>
+        CloseMatchSettingsDialog();
+
+    private void MatchSettingsOverlay_PreviewKeyDown(
+        object sender,
+        KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape)
+        {
+            return;
+        }
+        CloseMatchSettingsDialog();
+        e.Handled = true;
+    }
+
+    private void CloseMatchSettingsDialog()
+    {
+        MatchSettingsOverlay.Visibility =
+            Visibility.Collapsed;
+        FastTimingButton.Focus();
+    }
+
+    internal void SetSnapshotMatchSettings(
+        int placementIntervalMilliseconds,
+        int placementAttempts,
+        int defaultAfterStartDelayMilliseconds,
+        int impossibilityThresholdMinutes,
+        bool recordingMode,
+        PlacementAdvancedSettings advanced)
+    {
+        MatchSettingsOverlay.Visibility =
+            Visibility.Visible;
+        MatchSettingsDialog.SetValues(
+            placementIntervalMilliseconds,
+            placementAttempts,
+            defaultAfterStartDelayMilliseconds,
+            impossibilityThresholdMinutes,
+            recordingMode,
+            advanced);
+    }
+
+    internal void ClearSnapshotMatchSettings()
+    {
+        MatchSettingsOverlay.Visibility =
+            Visibility.Collapsed;
+        MatchStepEditorOverlay.Visibility =
+            Visibility.Collapsed;
+    }
+
+    internal void ScrollSnapshotAdvancedSettingsIntoView() =>
+        MatchSettingsDialog
+            .ScrollAdvancedSettingsIntoView();
+
+    private static PlacementAdvancedSettings
+        BuildAdvancedSettings(
+            PlacementAdvancedEditorValues values)
+    {
+        PlacementAdvancedSettings settings = new()
+        {
+            Enabled = values.Enabled,
+            UnitSelectionDelayMilliseconds =
+                ParseInteger(
+                    values.UnitSelectionDelayText,
+                    0,
+                    PlacementAdvancedSettings
+                        .MaximumActionDelayMilliseconds,
+                    "Unit selection delay"),
+            PlacementBurstDurationMilliseconds =
+                ParseInteger(
+                    values.PlacementBurstDurationText,
+                    0,
+                    PlacementAdvancedSettings
+                        .MaximumActionDelayMilliseconds,
+                    "Placement click burst"),
+            BeforeSelectionClickMilliseconds =
+                ParseInteger(
+                    values.BeforeSelectionClickText,
+                    0,
+                    PlacementAdvancedSettings
+                        .MaximumActionDelayMilliseconds,
+                    "Before-selection delay"),
+            BeforeSelectedUnitProofMilliseconds =
+                ParseInteger(
+                    values.BeforeSelectedUnitProofText,
+                    0,
+                    PlacementAdvancedSettings
+                        .MaximumActionDelayMilliseconds,
+                    "Selected-unit check delay"),
+            ActionKeyIntervalMilliseconds =
+                ParseInteger(
+                    values.ActionKeyIntervalText,
+                    0,
+                    PlacementAdvancedSettings
+                        .MaximumActionDelayMilliseconds,
+                    "Action key interval"),
+            VerifySelectedUnitPanelBeforeActions =
+                values.VerifySelectedUnitPanel,
+            VerifyPrestartBeforeManualPlayback =
+                values.VerifyPrestart,
+            ManualPlaybackStartDelayMilliseconds =
+                ParseInteger(
+                    values.ManualPlaybackStartDelayText,
+                    0,
+                    PlacementAdvancedSettings
+                        .MaximumPlaybackStartDelayMilliseconds,
+                    "Playback start delay"),
+        };
+        settings.Validate();
+        return settings;
     }
 }

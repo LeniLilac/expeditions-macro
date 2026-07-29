@@ -1,7 +1,6 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using ExpeditionsMacro.App.Models;
 using ExpeditionsMacro.App.Services;
 using ExpeditionsMacro.Automation.Diagnostics;
@@ -36,21 +35,6 @@ public partial class PlacementModelsPage
         {
             _selectedFastUnit = unit;
         }
-    }
-
-    private void FastPhaseButton_Checked(
-        object sender,
-        RoutedEventArgs e)
-    {
-        if (sender is not RadioButton button ||
-            !Enum.TryParse(
-                button.Tag?.ToString(),
-                ignoreCase: false,
-                out PlacementPhase phase))
-        {
-            return;
-        }
-        _selectedFastPhase = phase;
     }
 
     private void ApplyDefaultFastTarget()
@@ -207,7 +191,7 @@ public partial class PlacementModelsPage
             UpdateFastPositionButtonVisibility(
                 target);
             FastDetailText.Text =
-                $"{TargetLabel(target)} · B before Start · A after Start";
+                $"{TargetLabel(target)} · Ordered Match Steps";
         }
         catch (Exception error)
         {
@@ -314,106 +298,6 @@ public partial class PlacementModelsPage
         };
     }
 
-    private void PlacementCanvas_MouseLeftButtonDown(
-        object sender,
-        MouseButtonEventArgs e)
-    {
-        if (PlacementScreenshot.Source is null)
-        {
-            return;
-        }
-        Point point = e.GetPosition(PlacementCanvas);
-        int x = Math.Clamp((int)Math.Round(point.X), 0, 807);
-        int y = Math.Clamp((int)Math.Round(point.Y), 0, 610);
-        string? placementError =
-            PlacementSafetyRules.IsInsideFixedCentralHotbar(x, y)
-                ? "That point is inside the fixed center unit hotbar. Choose a map point outside the bottom hotbar."
-                : CurrentFastTarget().Mode == PlacementTargetMode.Expedition &&
-                    _steps.Any(step =>
-                        step.UnitKey == _selectedFastUnit)
-                    ? $"Expedition setups allow one placement for Unit {_selectedFastUnit} across Before Start and After Start. Remove its existing point before adding another."
-                    : _selectedFastPhase == PlacementPhase.BeforeStart &&
-                        PlacementAuthoringRules
-                            .IsCoveredByStartDialog(x, y)
-                        ? "That point is covered by the Start Game dialog. Move it outside the dialog or choose After Start."
-                        : null;
-        if (placementError is not null)
-        {
-            FastStatusText.Text = placementError;
-            e.Handled = true;
-            return;
-        }
-        PlacementStepRow? nearby =
-            _steps.FirstOrDefault(
-                step =>
-                    !PlacementAuthoringRules.AreSeparated(
-                        x,
-                        y,
-                        step.X,
-                        step.Y));
-        if (nearby is not null)
-        {
-            FastStatusText.Text =
-                $"Choose a point at least {PlacementAuthoringRules.MinimumPlacementSpacingPixels} pixels from the existing placement at ({nearby.X}, {nearby.Y}).";
-            e.Handled = true;
-            return;
-        }
-        PlacementStepRow row = new()
-        {
-            UnitKey = _selectedFastUnit,
-            X = x,
-            Y = y,
-            Phase = _selectedFastPhase,
-            DelayAfterMilliseconds =
-                _fastPlacementIntervalMilliseconds,
-            DelayAfterStartMilliseconds =
-                _selectedFastPhase ==
-                    PlacementPhase.AfterStart
-                    ? _fastDefaultAfterStartDelayMilliseconds
-                    : 0,
-        };
-        InsertStepInPhaseOrder(row);
-        FastStepsList.SelectedItem = row;
-        FastStepsList.ScrollIntoView(row);
-        FastStatusText.Text =
-            $"Added Unit {_selectedFastUnit} at ({x}, {y}) {PhaseLabel(_selectedFastPhase)}.";
-        e.Handled = true;
-    }
-
-    private void PlacementMarker_MouseLeftButtonDown(
-        object sender,
-        MouseButtonEventArgs e)
-    {
-        if (sender is FrameworkElement
-            {
-                DataContext:
-                        PlacementStepRow row,
-            })
-        {
-            FastStepsList.SelectedItem = row;
-            FastStepsList.ScrollIntoView(row);
-            e.Handled = true;
-        }
-    }
-
-    private void PlacementMarker_MouseRightButtonDown(
-        object sender,
-        MouseButtonEventArgs e)
-    {
-        if (_services.Coordinator.IsBusy ||
-            sender is not FrameworkElement
-            {
-                DataContext:
-                    PlacementStepRow row,
-            })
-        {
-            return;
-        }
-        _steps.Remove(row);
-        FastStatusText.Text = "Placement removed.";
-        e.Handled = true;
-    }
-
     private void FastPrepare_Click(
         object sender,
         RoutedEventArgs e)
@@ -452,16 +336,6 @@ public partial class PlacementModelsPage
         UpdateBusyState();
     }
 
-    private void UpdateFastPlacementCount()
-    {
-        int before = _steps.Count(
-            step => step.Phase ==
-                PlacementPhase.BeforeStart);
-        int after = _steps.Count - before;
-        FastPlacementCountText.Text =
-            $"{before} before · {after} after";
-    }
-
     private static string TargetLabel(
         PlacementTarget target) =>
         target.Mode switch
@@ -492,9 +366,4 @@ public partial class PlacementModelsPage
             ? "Angle 2"
             : "Angle 1";
 
-    private static string PhaseLabel(
-        PlacementPhase phase) =>
-        phase == PlacementPhase.BeforeStart
-            ? "before Start"
-            : "after Start";
 }

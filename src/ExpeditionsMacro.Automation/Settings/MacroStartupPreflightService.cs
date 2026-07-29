@@ -1,4 +1,5 @@
 using ExpeditionsMacro.Automation.Camera;
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Runtime;
@@ -15,6 +16,7 @@ public sealed partial class MacroStartupPreflightService
     private readonly GameSettingsNormalizer _normalizer;
     private readonly UiScaleNormalizer _uiScale;
     private readonly SettingsPanelNavigator _settingsPanel;
+    private readonly RobloxChatPanelNormalizer _chatPanel;
     private readonly Func<DateTimeOffset> _utcNow;
     private readonly Func<
         TimeSpan,
@@ -64,6 +66,10 @@ public sealed partial class MacroStartupPreflightService
             ValidateWindow,
             utcNow,
             delay);
+        _chatPanel = new RobloxChatPanelNormalizer(
+            automation,
+            utcNow,
+            delay);
     }
 
     public async Task<GameSettingsNormalizationResult>
@@ -79,6 +85,9 @@ public sealed partial class MacroStartupPreflightService
                 "Preparing Roblox for the UI Scale check.",
                 progress,
                 cancellationToken).ConfigureAwait(false);
+        await _chatPanel.EnsureClosedAsync(
+            window,
+            cancellationToken).ConfigureAwait(false);
         await _prepareCamera(
             window,
             cancellationToken).ConfigureAwait(false);
@@ -110,6 +119,9 @@ public sealed partial class MacroStartupPreflightService
                 "Waiting for a stable lobby before checking game settings.",
                 progress,
                 cancellationToken).ConfigureAwait(false);
+        await _chatPanel.EnsureClosedAsync(
+            window,
+            cancellationToken).ConfigureAwait(false);
         await _prepareCamera(
             window,
             cancellationToken).ConfigureAwait(false);
@@ -177,6 +189,9 @@ public sealed partial class MacroStartupPreflightService
                     normalizeGameSettings),
                 progress,
                 cancellationToken).ConfigureAwait(false);
+        await _chatPanel.EnsureClosedAsync(
+            window,
+            cancellationToken).ConfigureAwait(false);
         if (!normalizeUiScale &&
             !normalizeGameSettings)
         {

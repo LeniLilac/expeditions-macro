@@ -11,6 +11,14 @@ public partial class PlacementModelsPage
         object sender,
         KeyEventArgs e)
     {
+        if (MatchStepEditorOverlay.Visibility ==
+                Visibility.Visible ||
+            MatchSettingsOverlay.Visibility ==
+                Visibility.Visible)
+        {
+            return;
+        }
+
         if (Keyboard.Modifiers != ModifierKeys.None ||
             Keyboard.FocusedElement is TextBoxBase or
                 PasswordBox or ComboBox)

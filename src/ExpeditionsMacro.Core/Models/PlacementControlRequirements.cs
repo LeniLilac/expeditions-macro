@@ -73,7 +73,8 @@ public static class PlacementControlRequirements
         PlacementModel model)
     {
         ArgumentNullException.ThrowIfNull(model);
-        return model.Steps.Count > 0 &&
+        return model.Steps.Any(step =>
+                step.Kind == MatchStepKind.Placement) &&
             string.IsNullOrWhiteSpace(
                 model.ManualInputRecordingId);
     }

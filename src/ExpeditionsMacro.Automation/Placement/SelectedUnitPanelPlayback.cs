@@ -1,3 +1,4 @@
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Runtime;
@@ -6,50 +7,39 @@ using ExpeditionsMacro.Vision.Placement;
 namespace ExpeditionsMacro.Automation.Placement;
 
 internal sealed class SelectedUnitPanelPlayback(
-    IRobloxAutomation automation)
+    IRobloxAutomation automation,
+    Func<DateTimeOffset>? utcNow = null,
+    Func<TimeSpan, CancellationToken, Task>? delay = null)
 {
     private const int PollMilliseconds = 100;
     private const int VisibleTimeoutMilliseconds = 800;
+    private const int HiddenTimeoutMilliseconds =
+        (DismissSamples - 1) *
+        PollMilliseconds;
     private const int RequiredStableFrames = 2;
     private const int DismissAttempts = 8;
     private const int DismissSamples = 4;
     private const int IdleCursorInsetPixels = 24;
+    private readonly Func<DateTimeOffset> _utcNow =
+        utcNow ?? (() => DateTimeOffset.UtcNow);
+    private readonly Func<
+        TimeSpan,
+        CancellationToken,
+        Task> _delay =
+        delay ?? ((duration, token) =>
+            Task.Delay(duration, token));
 
     public async Task<bool> WaitForVisibleAsync(
         RobloxWindow window,
-        CancellationToken cancellationToken)
-    {
-        int stable = 0;
-        int samples = Math.Max(
-            RequiredStableFrames,
-            1 +
-            VisibleTimeoutMilliseconds /
-            PollMilliseconds);
-        for (int sample = 0;
-             sample < samples ||
-             stable > 0;
-             sample++)
-        {
-            EnsureFocus(window);
-            ImageFrame frame =
-                automation.CaptureClient(window);
-            SelectedUnitPanelMatch match =
-                SelectedUnitPanelDetector.Detect(frame);
-            stable = match.Visible ? stable + 1 : 0;
-            if (stable >= RequiredStableFrames)
-            {
-                return true;
-            }
-            if (sample + 1 < samples ||
-                stable > 0)
-            {
-                await Task.Delay(
-                    PollMilliseconds,
-                    cancellationToken).ConfigureAwait(false);
-            }
-        }
-        return false;
-    }
+        CancellationToken cancellationToken) =>
+        await WaitForStateAsync(
+                window,
+                static match => match.Visible,
+                expectedVisible: true,
+                TimeSpan.FromMilliseconds(
+                    VisibleTimeoutMilliseconds),
+                cancellationToken)
+            .ConfigureAwait(false);
 
     public async Task DismissAsync(
         RobloxWindow window,
@@ -105,41 +95,86 @@ internal sealed class SelectedUnitPanelPlayback(
 
     private async Task<bool> WaitForHiddenAsync(
         RobloxWindow window,
+        CancellationToken cancellationToken) =>
+        await WaitForStateAsync(
+                window,
+                static match => match.PanelVisible,
+                expectedVisible: false,
+                TimeSpan.FromMilliseconds(
+                    HiddenTimeoutMilliseconds),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+    private async Task<bool> WaitForStateAsync(
+        RobloxWindow window,
+        Func<SelectedUnitPanelMatch, bool>
+            isVisible,
+        bool expectedVisible,
+        TimeSpan timeout,
         CancellationToken cancellationToken)
     {
         int stable = 0;
-        for (int sample = 0;
-             sample < DismissSamples ||
-             stable > 0;
-             sample++)
+        int observations = 0;
+        DateTimeOffset softDeadline =
+            _utcNow() + timeout;
+        ObservationWaitBudget budget = new(
+            timeout,
+            RequiredStableFrames,
+            _utcNow);
+        while (budget.ShouldObserve(
+                   confirmationPending: stable > 0) &&
+               (_utcNow() <= softDeadline ||
+                observations <
+                    RequiredStableFrames ||
+                stable > 0))
         {
+            cancellationToken
+                .ThrowIfCancellationRequested();
             EnsureFocus(window);
-            stable = IsVisible(window)
-                ? 0
-                : stable + 1;
+            bool observedVisible =
+                IsVisible(window, isVisible);
+            stable = observedVisible ==
+                expectedVisible
+                    ? stable + 1
+                    : 0;
+            observations++;
+            budget.MarkObserved();
             if (stable >= RequiredStableFrames)
             {
                 return true;
             }
-            if (sample + 1 < DismissSamples ||
-                stable > 0)
+            if (_utcNow() >= softDeadline &&
+                observations >=
+                    RequiredStableFrames &&
+                stable == 0)
             {
-                await Task.Delay(
-                    PollMilliseconds,
-                    cancellationToken).ConfigureAwait(false);
+                break;
             }
+            if (!budget.ShouldObserve(
+                    confirmationPending: stable > 0))
+            {
+                break;
+            }
+            await _delay(
+                    TimeSpan.FromMilliseconds(
+                        PollMilliseconds),
+                    cancellationToken)
+                .ConfigureAwait(false);
         }
         return false;
     }
 
     private bool IsVisible(
-        RobloxWindow window)
+        RobloxWindow window,
+        Func<SelectedUnitPanelMatch, bool>
+            isVisible)
     {
         ImageFrame frame =
             automation.CaptureClient(window);
-        return SelectedUnitPanelDetector
-            .Detect(frame)
-            .PanelVisible;
+        SelectedUnitPanelMatch match =
+            SelectedUnitPanelDetector
+                .Detect(frame);
+        return isVisible(match);
     }
 
     private void EnsureFocus(

@@ -15,34 +15,6 @@ namespace ExpeditionsMacro.Tests;
 public sealed class ChallengeMacroRunnerTests
 {
     [Fact]
-    public void PrestartPlacements_HiddenByTheStartDialogAreDeferredInOriginalOrder()
-    {
-        ScreenRegion dialog = new(314, 94, 180, 104);
-        PlacementStep[] steps =
-        [
-            Step(354, 129),
-            Step(300, 137),
-            Step(384, 184),
-            Step(363, 246),
-            Step(485, 182),
-            Step(578, 190),
-        ];
-
-        ChallengePlacementPartition partition = ChallengeRunPolicy.PartitionPrestartPlacements(steps, dialog);
-
-        Assert.Equal([(300, 137), (363, 246), (578, 190)], partition.BeforeStart.Select(step => (step.X, step.Y)));
-        Assert.Equal([(354, 129), (384, 184), (485, 182)], partition.AfterStart.Select(step => (step.X, step.Y)));
-
-        static PlacementStep Step(int x, int y) => new()
-        {
-            UnitKey = 1,
-            X = x,
-            Y = y,
-            DelayAfterMilliseconds = 900,
-        };
-    }
-
-    [Fact]
     public async Task MapRecognition_ParksCursorBeforeDiscardingHighlightedSelectorFrame()
     {
         bool parked = false;

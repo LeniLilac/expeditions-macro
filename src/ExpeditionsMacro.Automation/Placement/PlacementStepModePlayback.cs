@@ -1,37 +1,35 @@
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Models;
-using ExpeditionsMacro.Core.Runtime;
 
 namespace ExpeditionsMacro.Automation.Placement;
 
 internal sealed class PlacementStepModePlayback
 {
-    private const int PlacementBurstClicks = 3;
-    private const int PlacementBurstDurationMilliseconds = 50;
-    private const int UnitActionTapIntervalMilliseconds = 100;
-
-    private readonly IRobloxAutomation _automation;
-    private readonly SelectedUnitPanelPlayback
-        _selectedUnitPanel;
-    private readonly PlacementStepModeKeyResolver
-        _keyResolver;
+    private readonly PlacementBatchPlayback _batch;
+    private readonly PlacementUnitActionPlayback _unitActions;
+    private readonly PlacementStepModeKeyResolver _keyResolver;
 
     public PlacementStepModePlayback(
         IRobloxAutomation automation,
         Func<char> targetingKey,
         Func<char> autoUpgradeKey,
-        Func<int> quickPlacementKey)
+        Func<int> quickPlacementKey,
+        Func<char> upgradeKey)
     {
-        _automation = automation;
-        _selectedUnitPanel =
-            new SelectedUnitPanelPlayback(automation);
+        _batch = new PlacementBatchPlayback(automation);
+        _unitActions =
+            new PlacementUnitActionPlayback(automation);
         _keyResolver =
             new PlacementStepModeKeyResolver(
                 targetingKey,
                 autoUpgradeKey,
-                quickPlacementKey);
+                quickPlacementKey,
+                upgradeKey);
     }
+
+    public void BeginMatch() =>
+        _unitActions.BeginMatch();
 
     public async Task PlayAsync(
         RobloxWindow window,
@@ -54,26 +52,86 @@ internal sealed class PlacementStepModePlayback
             return;
         }
 
-        PlayableStep[] playableSteps =
+        MatchStepPlaybackItem[] playable =
             CollectPlayableSteps(
                 model,
                 steps,
                 status);
-        if (playableSteps.Length == 0)
+        if (playable.Length == 0)
         {
             return;
         }
 
         PlacementStepModeKeys keys =
             _keyResolver.Resolve(
-                playableSteps
-                    .Select(step => step.Step)
+                playable.Select(item => item.Step)
                     .ToArray(),
                 cancelPlacementKey);
-        await PlaceBatchAsync(
+        int next = 0;
+        while (next < playable.Length)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (playable[next].Step.Kind ==
+                MatchStepKind.Placement)
+            {
+                MatchStepPlaybackItem[] group =
+                    playable.Skip(next)
+                        .TakeWhile(item =>
+                            item.Step.Kind ==
+                            MatchStepKind.Placement)
+                        .ToArray();
+                await PlayPlacementGroupAsync(
+                        window,
+                        model,
+                        steps.Count,
+                        group,
+                        keys,
+                        useDefaultInterval,
+                        defaultIntervalMilliseconds,
+                        keyHoldMilliseconds,
+                        afterKeyMilliseconds,
+                        stepSent,
+                        status,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                next += group.Length;
+                continue;
+            }
+
+            await PlayActionStepAsync(
+                    window,
+                    model,
+                    steps.Count,
+                    playable[next],
+                    keys,
+                    useDefaultInterval,
+                    defaultIntervalMilliseconds,
+                    stepSent,
+                    status,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            next++;
+        }
+    }
+
+    private async Task PlayPlacementGroupAsync(
+        RobloxWindow window,
+        PlacementModel model,
+        int stepCount,
+        IReadOnlyList<MatchStepPlaybackItem> group,
+        PlacementStepModeKeys keys,
+        bool useDefaultInterval,
+        int defaultIntervalMilliseconds,
+        int keyHoldMilliseconds,
+        int afterKeyMilliseconds,
+        Action<int, int, PlacementStep>? stepSent,
+        Action<string>? status,
+        CancellationToken cancellationToken)
+    {
+        await _batch.PlaceAsync(
                 window,
                 model,
-                playableSteps,
+                group,
                 keys,
                 keyHoldMilliseconds,
                 afterKeyMilliseconds,
@@ -83,15 +141,14 @@ internal sealed class PlacementStepModePlayback
                 cancellationToken)
             .ConfigureAwait(false);
 
-        foreach (PlayableStep playable in playableSteps)
+        foreach (MatchStepPlaybackItem playable in group)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             bool selected =
-                await TrySelectPlacedUnitAsync(
+                await _unitActions.TrySelectAsync(
                         window,
                         model,
                         playable,
-                        steps.Count,
+                        stepCount,
                         status,
                         cancellationToken)
                     .ConfigureAwait(false);
@@ -100,7 +157,7 @@ internal sealed class PlacementStepModePlayback
                  attempt <= model.PlacementAttempts;
                  attempt++)
             {
-                await PlaceBatchAsync(
+                await _batch.PlaceAsync(
                         window,
                         model,
                         [playable],
@@ -113,267 +170,159 @@ internal sealed class PlacementStepModePlayback
                         cancellationToken)
                     .ConfigureAwait(false);
                 selected =
-                    await TrySelectPlacedUnitAsync(
+                    await _unitActions.TrySelectAsync(
                             window,
                             model,
                             playable,
-                            steps.Count,
+                            stepCount,
                             status,
                             cancellationToken)
                         .ConfigureAwait(false);
             }
-
             if (!selected)
             {
                 status?.Invoke(
-                    $"Step {playable.SourceIndex + 1}/{steps.Count}: skipped Unit {playable.Step.UnitKey} at ({playable.Step.X}, {playable.Step.Y}) after {model.PlacementAttempts} placement attempt(s) because selected-unit proof never appeared.");
+                    $"Step {playable.SourceIndex + 1}/{stepCount}: skipped Unit {playable.UnitKey} at ({playable.X}, {playable.Y}) after {model.PlacementAttempts} placement attempt(s) because selected-unit proof never appeared.");
                 continue;
             }
 
-            await ConfigureSelectedUnitAsync(
+            await _unitActions.ApplyPlacementAsync(
                     window,
                     model,
                     playable,
-                    steps.Count,
+                    stepCount,
                     keys,
                     status,
                     cancellationToken)
                 .ConfigureAwait(false);
             stepSent?.Invoke(
                 playable.SourceIndex + 1,
-                steps.Count,
+                stepCount,
                 playable.Step);
-            int delay =
-                useDefaultInterval
-                    ? defaultIntervalMilliseconds
-                    : playable.Step
-                        .DelayAfterMilliseconds;
-            status?.Invoke(
-                $"Step {playable.SourceIndex + 1}/{steps.Count}: waiting {delay} ms before checking the next unit.");
-            await Task.Delay(
-                    delay,
+            await WaitDefaultIntervalAsync(
+                    playable,
+                    useDefaultInterval,
+                    defaultIntervalMilliseconds,
+                    status,
                     cancellationToken)
                 .ConfigureAwait(false);
         }
     }
 
-    private async Task PlaceBatchAsync(
+    private async Task PlayActionStepAsync(
         RobloxWindow window,
         PlacementModel model,
-        IReadOnlyList<PlayableStep> steps,
-        PlacementStepModeKeys keys,
-        int keyHoldMilliseconds,
-        int afterKeyMilliseconds,
-        int attempt,
-        int totalAttempts,
-        Action<string>? status,
-        CancellationToken cancellationToken)
-    {
-        await EnsureSizeAsync(
-                window,
-                model.ClientWidth,
-                model.ClientHeight,
-                cancellationToken)
-            .ConfigureAwait(false);
-        EnsureFocus(window);
-        status?.Invoke(
-            $"Placement attempt {attempt}/{totalAttempts}: canceling any existing placement selection before the {steps.Count}-unit batch.");
-        await _automation.TapLetterKeyAsync(
-                window,
-                keys.CancelPlacement,
-                cancellationToken)
-            .ConfigureAwait(false);
-
-        await _automation.RunWithKeyHeldAsync(
-                window,
-                keys.QuickPlacement,
-                async heldToken =>
-                {
-                    int? selectedUnit = null;
-                    foreach (PlayableStep playable in steps)
-                    {
-                        await EnsureSizeAsync(
-                                window,
-                                model.ClientWidth,
-                                model.ClientHeight,
-                                heldToken)
-                            .ConfigureAwait(false);
-                        EnsureFocus(window);
-                        PlacementStep step =
-                            playable.Step;
-                        if (selectedUnit !=
-                            step.UnitKey)
-                        {
-                            status?.Invoke(
-                                $"Step {playable.SourceIndex + 1}: selecting Unit {step.UnitKey} for placement attempt {attempt}/{totalAttempts}.");
-                            await _automation
-                                .TapUnitKeyAsync(
-                                    window,
-                                    step.UnitKey,
-                                    keyHoldMilliseconds,
-                                    heldToken)
-                                .ConfigureAwait(false);
-                            selectedUnit = step.UnitKey;
-                            if (afterKeyMilliseconds > 0)
-                            {
-                                await Task.Delay(
-                                        afterKeyMilliseconds,
-                                        heldToken)
-                                    .ConfigureAwait(false);
-                            }
-                        }
-                        else
-                        {
-                            status?.Invoke(
-                                $"Step {playable.SourceIndex + 1}: reusing Unit {step.UnitKey}, which Quick Placement kept selected.");
-                        }
-
-                        EnsureFocus(window);
-                        status?.Invoke(
-                            $"Step {playable.SourceIndex + 1}: clicking ({step.X}, {step.Y}) {PlacementBurstClicks} times over {PlacementBurstDurationMilliseconds} ms.");
-                        await _automation
-                            .ClickClientBurstRetainingCursorAsync(
-                                window,
-                                step.X,
-                                step.Y,
-                                PlacementBurstClicks,
-                                PlacementBurstDurationMilliseconds,
-                                heldToken)
-                            .ConfigureAwait(false);
-                    }
-                    return true;
-                },
-                cancellationToken)
-            .ConfigureAwait(false);
-
-        EnsureFocus(window);
-        status?.Invoke(
-            $"Placement attempt {attempt}/{totalAttempts}: Quick Placement released; canceling placement mode before selected-unit checks.");
-        await _automation.TapLetterKeyAsync(
-                window,
-                keys.CancelPlacement,
-                cancellationToken)
-            .ConfigureAwait(false);
-    }
-
-    private async Task<bool> TrySelectPlacedUnitAsync(
-        RobloxWindow window,
-        PlacementModel model,
-        PlayableStep playable,
         int stepCount,
+        MatchStepPlaybackItem playable,
+        PlacementStepModeKeys keys,
+        bool useDefaultInterval,
+        int defaultIntervalMilliseconds,
+        Action<int, int, PlacementStep>? stepSent,
         Action<string>? status,
         CancellationToken cancellationToken)
     {
-        await EnsureSizeAsync(
-                window,
-                model.ClientWidth,
-                model.ClientHeight,
-                cancellationToken)
-            .ConfigureAwait(false);
-        EnsureFocus(window);
         PlacementStep step = playable.Step;
-        status?.Invoke(
-            $"Step {playable.SourceIndex + 1}/{stepCount}: clicking placed Unit {step.UnitKey} at ({step.X}, {step.Y}) for selected-unit proof.");
-        await _automation.ClickClientRetainingCursorAsync(
-                window,
-                step.X,
-                step.Y,
-                cancellationToken)
-            .ConfigureAwait(false);
-        await _automation.ParkCursorAsync(
-                window,
-                cancellationToken)
-            .ConfigureAwait(false);
+        if (step.Kind == MatchStepKind.Delay)
+        {
+            status?.Invoke(
+                $"Step {playable.SourceIndex + 1}/{stepCount}: waiting {step.DelayDurationMilliseconds} ms.");
+            await Task.Delay(
+                    step.DelayDurationMilliseconds,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            stepSent?.Invoke(
+                playable.SourceIndex + 1,
+                stepCount,
+                step);
+            return;
+        }
+
         bool selected =
-            await _selectedUnitPanel.WaitForVisibleAsync(
+            await _unitActions.TrySelectAsync(
                     window,
+                    model,
+                    playable,
+                    stepCount,
+                    status,
                     cancellationToken)
                 .ConfigureAwait(false);
         if (!selected)
         {
             status?.Invoke(
-                $"Step {playable.SourceIndex + 1}/{stepCount}: selected-unit proof did not appear.");
+                $"Step {playable.SourceIndex + 1}/{stepCount}: skipped {step.Kind} because selected-unit proof never appeared.");
+            return;
         }
-        return selected;
+
+        switch (step.Kind)
+        {
+            case MatchStepKind.ReconfigureUnit:
+                await _unitActions.ApplyReconfigureAsync(
+                        window,
+                        model,
+                        playable,
+                        stepCount,
+                        keys,
+                        status,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                break;
+            case MatchStepKind.UpgradeUnit:
+                await _unitActions.ApplyUpgradeAsync(
+                        window,
+                        model,
+                        playable,
+                        stepCount,
+                        keys,
+                        status,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                break;
+            default:
+                throw new InvalidDataException(
+                    "The match step action is invalid.");
+        }
+
+        stepSent?.Invoke(
+            playable.SourceIndex + 1,
+            stepCount,
+            step);
+        await WaitDefaultIntervalAsync(
+                playable,
+                useDefaultInterval,
+                defaultIntervalMilliseconds,
+                status,
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
-    private async Task ConfigureSelectedUnitAsync(
-        RobloxWindow window,
-        PlacementModel model,
-        PlayableStep playable,
-        int stepCount,
-        PlacementStepModeKeys keys,
+    private static async Task WaitDefaultIntervalAsync(
+        MatchStepPlaybackItem playable,
+        bool useDefaultInterval,
+        int defaultIntervalMilliseconds,
         Action<string>? status,
         CancellationToken cancellationToken)
     {
-        PlacementStep step = playable.Step;
-        int targetingTaps =
-            (int)step.TargetingPriority;
+        int delay =
+            useDefaultInterval
+                ? defaultIntervalMilliseconds
+                : playable.Step
+                    .DelayAfterMilliseconds;
         status?.Invoke(
-            $"Step {playable.SourceIndex + 1}/{stepCount}: selected unit confirmed; applying {step.TargetingPriority} targeting ({targetingTaps} key taps).");
-        await TapActionKeyAsync(
-                window,
-                keys.Targeting,
-                targetingTaps,
-                cancellationToken)
-            .ConfigureAwait(false);
-
-        int autoUpgradeTaps =
-            (int)step.AutoUpgradePriority;
-        if (autoUpgradeTaps > 0)
-        {
-            status?.Invoke(
-                $"Step {playable.SourceIndex + 1}/{stepCount}: applying Auto Upgrade {FormatAutoUpgradePriority(step.AutoUpgradePriority)} ({autoUpgradeTaps} key taps).");
-            await TapActionKeyAsync(
-                    window,
-                    keys.AutoUpgrade,
-                    autoUpgradeTaps,
-                    cancellationToken)
-                .ConfigureAwait(false);
-        }
-
-        status?.Invoke(
-            $"Step {playable.SourceIndex + 1}/{stepCount}: closing the selected-unit panel before the next check.");
-        await _selectedUnitPanel.DismissAsync(
-                window,
-                model.ClientWidth,
-                model.ClientHeight,
-                cancellationToken)
+            $"Step {playable.SourceIndex + 1}: waiting {delay} ms before the next match step.");
+        await Task.Delay(delay, cancellationToken)
             .ConfigureAwait(false);
     }
 
-    private async Task TapActionKeyAsync(
-        RobloxWindow window,
-        char key,
-        int tapCount,
-        CancellationToken cancellationToken)
+    private static MatchStepPlaybackItem[]
+        CollectPlayableSteps(
+            PlacementModel model,
+            IReadOnlyList<PlacementStep> steps,
+            Action<string>? status)
     {
-        for (int tap = 0; tap < tapCount; tap++)
-        {
-            EnsureFocus(window);
-            await _automation.TapLetterKeyAsync(
-                    window,
-                    key,
-                    cancellationToken)
-                .ConfigureAwait(false);
-            cancellationToken
-                .ThrowIfCancellationRequested();
-            if (tap + 1 < tapCount)
-            {
-                await Task.Delay(
-                        UnitActionTapIntervalMilliseconds,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-            }
-        }
-    }
-
-    private static PlayableStep[] CollectPlayableSteps(
-        PlacementModel model,
-        IReadOnlyList<PlacementStep> steps,
-        Action<string>? status)
-    {
-        List<PlayableStep> playable = [];
+        List<MatchStepPlaybackItem> playable = [];
+        IReadOnlyList<PlacementStep> timeline =
+            PlacementTimelinePolicy.NormalizeSteps(
+                model.Steps);
         for (int index = 0; index < steps.Count; index++)
         {
             PlacementStep step = steps[index];
@@ -385,9 +334,15 @@ internal sealed class PlacementStepModePlayback
             if (skipReason is null)
             {
                 playable.Add(
-                    new PlayableStep(
+                    new MatchStepPlaybackItem(
                         index,
-                        step));
+                        step,
+                        step.HasPlacementReference
+                            ? PlacementReferencePolicy
+                                .ResolveTarget(
+                                    timeline,
+                                    step)
+                            : null));
             }
             else
             {
@@ -413,57 +368,4 @@ internal sealed class PlacementStepModePlayback
                 nameof(afterKeyMilliseconds));
         }
     }
-
-    private async Task EnsureSizeAsync(
-        RobloxWindow window,
-        int width,
-        int height,
-        CancellationToken cancellationToken)
-    {
-        ClientBounds bounds =
-            _automation.GetClientBounds(window);
-        if (bounds.Width != width ||
-            bounds.Height != height)
-        {
-            await _automation.ResizeClientAsync(
-                    window,
-                    width,
-                    height,
-                    cancellationToken)
-                .ConfigureAwait(false);
-            await Task.Delay(
-                    250,
-                    cancellationToken)
-                .ConfigureAwait(false);
-        }
-        ClientBounds actual =
-            _automation.GetClientBounds(window);
-        if (actual.Width != width ||
-            actual.Height != height)
-        {
-            throw new RobloxSessionUnavailableException(
-                "Roblox did not accept the placement model's client size.");
-        }
-    }
-
-    private void EnsureFocus(
-        RobloxWindow window)
-    {
-        if (!_automation.Focus(window))
-        {
-            throw new RobloxSessionUnavailableException(
-                "Windows could not focus Roblox.");
-        }
-    }
-
-    private static string FormatAutoUpgradePriority(
-        UnitAutoUpgradePriority priority) =>
-        priority == UnitAutoUpgradePriority.Off
-            ? "Off"
-            : $"Priority {(int)priority}";
-
-    private sealed record PlayableStep(
-        int SourceIndex,
-        PlacementStep Step);
-
 }

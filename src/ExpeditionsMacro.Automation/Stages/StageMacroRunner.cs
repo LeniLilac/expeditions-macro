@@ -228,6 +228,7 @@ public sealed partial class StageMacroRunner
                             mode,
                             terminal,
                             preparation,
+                            models.Placement,
                             detector,
                             playMenuKey,
                             autoRecover,

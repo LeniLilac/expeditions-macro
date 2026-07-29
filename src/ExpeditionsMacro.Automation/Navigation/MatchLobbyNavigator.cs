@@ -60,6 +60,14 @@ public sealed class MatchLobbyNavigator
             cancellationToken,
             _utcNow,
             _delay).ConfigureAwait(false);
+        await new RobloxChatPanelNormalizer(
+                _automation,
+                _utcNow,
+                _delay)
+            .EnsureClosedAsync(
+                window,
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private async Task<LobbyExitConfirmationMatch>

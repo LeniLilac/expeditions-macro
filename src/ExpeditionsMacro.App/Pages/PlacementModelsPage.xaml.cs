@@ -21,11 +21,11 @@ public partial class PlacementModelsPage :
         _setupRoots = [];
     private readonly ObservableCollection<PlacementStepRow>
         _steps = [];
+    private readonly ObservableCollection<PlacementStepRow>
+        _placementMarkers = [];
     private PlacementModel? _selectedModel;
     private PlacementTarget? _selectedSetupTarget;
     private int _selectedFastUnit = 1;
-    private PlacementPhase _selectedFastPhase =
-        PlacementPhase.BeforeStart;
     private int _fastPlacementIntervalMilliseconds =
         PlacementAuthoringRules
             .DefaultStepDelayMilliseconds;
@@ -34,6 +34,8 @@ public partial class PlacementModelsPage :
     private int _fastDefaultAfterStartDelayMilliseconds =
         PlacementAuthoringRules
             .DefaultAfterStartDelayMilliseconds;
+    private PlacementAdvancedSettings
+        _fastAdvancedSettings = new();
 
     public PlacementModelsPage(AppServices services)
     {
@@ -46,7 +48,8 @@ public partial class PlacementModelsPage :
         WireFastEditorEvents();
         FastSetupList.ItemsSource = _setupNodes;
         FastStepsList.ItemsSource = _steps;
-        PlacementMarkers.ItemsSource = _steps;
+        PlacementMarkers.ItemsSource =
+            _placementMarkers;
         InitializeFastEditor();
         FastTeamCombo.ItemsSource = Enumerable
             .Range(0, 9)
@@ -117,14 +120,16 @@ public partial class PlacementModelsPage :
             model.PlacementAttempts;
         _fastDefaultAfterStartDelayMilliseconds =
             model.DefaultAfterStartDelayMilliseconds;
+        _fastAdvancedSettings =
+            model.AdvancedSettings;
         _fastImpossibilityThresholdMinutes =
             model.ImpossibilityThresholdMinutes;
         _fastManualRecordingId =
             model.ManualInputRecordingId;
         _steps.Clear();
         foreach (PlacementStep step in
-                 PlacementAuthoringRules
-                     .OrderForAuthoring(model.Steps))
+                 PlacementTimelinePolicy
+                     .NormalizeSteps(model.Steps))
         {
             _steps.Add(
                 PlacementStepRow.FromModel(step));
@@ -147,7 +152,7 @@ public partial class PlacementModelsPage :
         UpdateFastManualRecordingEditor();
         FastStatusText.Text = string.Empty;
         FastDetailText.Text =
-            $"{model.Steps.Count} placements";
+            $"{model.Steps.Count(step => step.Kind != MatchStepKind.StartGame)} match actions";
         UpdateFastPlacementCount();
     }
 
@@ -157,7 +162,10 @@ public partial class PlacementModelsPage :
             SuspendPlacementAutoSave();
         ResetFastTimingDefaults();
         ResetFastRecordingSettings();
-        FastBeforeStartButton.IsChecked = true;
+        _steps.Add(
+            PlacementStepRow.FromModel(
+                PlacementTimelinePolicy
+                    .CreateStartGameStep()));
         FastUnit1Button.IsChecked = true;
         if (_selectedSetupTarget is not null)
         {

@@ -10,6 +10,7 @@ public enum ResourceRefuelStart
 {
     CurrentLobby,
     RestartPrivateServer,
+    SharedNavigation,
 }
 
 public sealed record ResourceRefuelRequest
@@ -27,6 +28,8 @@ public sealed record ResourceRefuelRequest
     public RobloxPrivateServerLaunchTarget? RestartTarget { get; init; }
 
     public bool OpenPlayWhenComplete { get; init; } = true;
+
+    public bool ReturnToLobbyWhenComplete { get; init; }
 }
 
 public sealed record ResourceRefuelResult(
@@ -45,14 +48,16 @@ public sealed class ResourceRefuelService
         : this(
             automation,
             recovery,
-            static (delay, token) => Task.Delay(delay, token))
+            static (delay, token) => Task.Delay(delay, token),
+            static () => DateTimeOffset.UtcNow)
     {
     }
 
     internal ResourceRefuelService(
         IRobloxAutomation automation,
         IRobloxRuntimeRecoveryService recovery,
-        Func<TimeSpan, CancellationToken, Task> delay)
+        Func<TimeSpan, CancellationToken, Task> delay,
+        Func<DateTimeOffset>? utcNow = null)
     {
         ArgumentNullException.ThrowIfNull(automation);
         ArgumentNullException.ThrowIfNull(recovery);
@@ -61,7 +66,9 @@ public sealed class ResourceRefuelService
         _recovery = recovery;
         _navigator = new ResourceRefuelNavigator(
             automation,
-            delay);
+            delay,
+            utcNow ??
+                (() => DateTimeOffset.UtcNow));
     }
 
     public async Task<ResourceRefuelResult> RunAsync(
@@ -117,6 +124,14 @@ public sealed class ResourceRefuelService
                 window,
                 request.PlayMenuKey,
                 cancellationToken).ConfigureAwait(false);
+            if (request.ReturnToLobbyWhenComplete)
+            {
+                await _navigator.ClosePlayToLobbyAsync(
+                    window,
+                    detector,
+                    request.PlayMenuKey,
+                    cancellationToken).ConfigureAwait(false);
+            }
         }
 
         DateTimeOffset completedAt = DateTimeOffset.UtcNow;
@@ -159,11 +174,25 @@ public sealed class ResourceRefuelService
             ResourceRefuelStart.RestartPrivateServer
                 ? TimeSpan.FromMinutes(2)
                 : TimeSpan.FromSeconds(5);
-        await _navigator.PrepareLobbyAsync(
-            window,
-            detector,
-            timeout,
-            cancellationToken).ConfigureAwait(false);
+        if (request.Start ==
+            ResourceRefuelStart.SharedNavigation)
+        {
+            await _navigator
+                .PrepareScheduledLobbyAsync(
+                    window,
+                    detector,
+                    request.PlayMenuKey,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        else
+        {
+            await _navigator.PrepareLobbyAsync(
+                window,
+                detector,
+                timeout,
+                cancellationToken).ConfigureAwait(false);
+        }
         report(
             "Lobby ready. Opening Areas.",
             "resource_refuel_lobby",
@@ -196,6 +225,12 @@ public sealed class ResourceRefuelService
         {
             throw new InvalidDataException(
                 "A configured private-server link is required for the restart start state.");
+        }
+        if (request.ReturnToLobbyWhenComplete &&
+            !request.OpenPlayWhenComplete)
+        {
+            throw new InvalidDataException(
+                "Returning to the Lobby after refuel requires opening Play first.");
         }
     }
 

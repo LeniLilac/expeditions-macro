@@ -42,14 +42,16 @@ public static class PlacementSafetyRules
     {
         ArgumentNullException.ThrowIfNull(model);
         ArgumentNullException.ThrowIfNull(step);
-        if (IsInsideFixedCentralHotbar(step.X, step.Y))
+        if (step.HasCoordinate &&
+            IsInsideFixedCentralHotbar(step.X, step.Y))
         {
             return
                 $"placement ({step.X}, {step.Y}) is inside the fixed center unit hotbar. Remove it in Placement Setup and choose a map point outside the bottom hotbar.";
         }
 
         if (model.Target?.Mode !=
-            PlacementTargetMode.Expedition)
+                PlacementTargetMode.Expedition ||
+            step.Kind != MatchStepKind.Placement)
         {
             return null;
         }
@@ -58,8 +60,10 @@ public static class PlacementSafetyRules
         return stepIndex > 0 &&
             model.Steps.Take(stepIndex).Any(
                 candidate =>
+                    candidate.Kind ==
+                        MatchStepKind.Placement &&
                     candidate.UnitKey == step.UnitKey)
-            ? $"Expedition Unit {step.UnitKey} already has an earlier placement across Before Start and After Start. Remove this duplicate in Placement Setup."
+            ? $"Expedition Unit {step.UnitKey} already has an earlier placement in this Match Steps timeline. Remove this duplicate in Placement Setup."
             : null;
     }
 

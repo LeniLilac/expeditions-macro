@@ -1,82 +1,199 @@
 <UserControl x:Class="ExpeditionsMacro.App.Controls.PlacementTimingPopover"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             Width="340"
-             MaxHeight="620"
+             xmlns:icons="clr-namespace:ExpeditionsMacro.App.Controls"
+             MinWidth="340"
+             MaxWidth="640"
+             MaxHeight="720"
+             AutomationProperties.Name="Match settings dialog"
              FontFamily="{StaticResource UiFont}"
              Foreground="{DynamicResource TextBrush}">
-    <Border Padding="16"
-            Background="{DynamicResource RaisedBrush}"
+    <Border Padding="18"
+            Background="{DynamicResource SurfaceBrush}"
             BorderBrush="{DynamicResource BorderBrush}"
             BorderThickness="1"
-            CornerRadius="6">
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                      VerticalScrollBarVisibility="Auto">
-        <StackPanel>
-            <TextBlock Style="{StaticResource SectionTitle}"
-                       Text="Placement settings" />
-            <TextBlock Margin="0,4,0,0"
-                       Style="{StaticResource Caption}"
-                       Text="Saved with this placement setup." />
+            CornerRadius="7">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
-            <StackPanel x:Name="PlacementTimingFieldsPanel">
-                <TextBlock Margin="0,16,0,0"
-                           Style="{StaticResource FieldLabel}"
-                           Text="Between unit checks, ms" />
-                <TextBox x:Name="PlacementIntervalText"
-                         Margin="0,6,0,0"
-                         AutomationProperties.Name="Delay between unit checks in milliseconds" />
-                <TextBlock Margin="0,5,0,0"
-                           Style="{StaticResource Caption}"
-                           Text="Waits after a verified unit before checking the next row. Updates every step in this setup."
-                           TextWrapping="Wrap" />
+            <Grid>
+                <TextBlock VerticalAlignment="Center"
+                           Style="{StaticResource SectionTitle}"
+                           Text="Match settings" />
+                <Button Width="32"
+                        MinWidth="32"
+                        Height="32"
+                        HorizontalAlignment="Right"
+                        Style="{StaticResource IconButton}"
+                        icons:Lucide.Icon="X"
+                        AutomationProperties.Name="Close match settings"
+                        ToolTip="Close"
+                        Click="Cancel_Click" />
+            </Grid>
 
-                <TextBlock Margin="0,14,0,0"
-                           Style="{StaticResource FieldLabel}"
-                           Text="Placement attempts" />
-                <TextBox x:Name="PlacementAttemptsText"
-                         Margin="0,6,0,0"
-                         AutomationProperties.Name="Placement attempts per unit" />
-                <TextBlock Margin="0,5,0,0"
-                           Style="{StaticResource Caption}"
-                           Text="1 uses the initial fast batch only. Higher values re-place only a row whose selected-unit check failed."
-                           TextWrapping="Wrap" />
+            <ScrollViewer x:Name="TimingScrollViewer"
+                          Grid.Row="1"
+                          Margin="0,14,0,0"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource Caption}"
+                               Text="Saved automatically with this placement setup." />
 
-                <TextBlock Margin="0,14,0,0"
-                           Style="{StaticResource FieldLabel}"
-                           Text="Default After Start delay, s" />
-                <TextBox x:Name="DefaultAfterStartDelayText"
-                         Margin="0,6,0,0"
-                         AutomationProperties.Name="Default After Start delay in seconds" />
-                <TextBlock Margin="0,5,0,0"
-                           Style="{StaticResource Caption}"
-                           Text="Used for new steps. Existing custom delays stay unchanged."
-                           TextWrapping="Wrap" />
+                    <StackPanel x:Name="PlacementTimingFieldsPanel">
+                        <TextBlock Margin="0,16,0,0"
+                                   Style="{StaticResource FieldLabel}"
+                                   Text="Between unit checks, ms" />
+                        <TextBox x:Name="PlacementIntervalText"
+                                 Margin="0,6,0,0"
+                                 AutomationProperties.Name="Delay between unit checks in milliseconds" />
+                        <TextBlock Margin="0,5,0,0"
+                                   Style="{StaticResource Caption}"
+                                   Text="Waits after a verified unit before checking the next row. Updates every step in this setup."
+                                   TextWrapping="Wrap" />
+
+                        <TextBlock Margin="0,14,0,0"
+                                   Style="{StaticResource FieldLabel}"
+                                   Text="Placement attempts" />
+                        <TextBox x:Name="PlacementAttemptsText"
+                                 Margin="0,6,0,0"
+                                 AutomationProperties.Name="Placement attempts per unit" />
+                        <TextBlock Margin="0,5,0,0"
+                                   Style="{StaticResource Caption}"
+                                   Text="1 uses the initial fast batch only. Higher values re-place only a row whose selected-unit check failed."
+                                   TextWrapping="Wrap" />
+
+                    </StackPanel>
+
+                    <TextBlock Margin="0,14,0,0"
+                               Style="{StaticResource FieldLabel}"
+                               Text="Impossibility threshold, min" />
+                    <TextBox x:Name="ImpossibilityThresholdText"
+                             Margin="0,6,0,0"
+                             AutomationProperties.Name="Impossibility threshold in minutes" />
+                    <TextBlock Margin="0,5,0,0"
+                               Style="{StaticResource Caption}"
+                               Text="0 uses the route default. Recovery starts if Victory or Defeat is not seen by this time."
+                               TextWrapping="Wrap" />
+
+                    <Border x:Name="AdvancedModePanel"
+                            Margin="0,16,0,0"
+                            Padding="12"
+                            Background="{DynamicResource RaisedBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="5">
+                        <StackPanel>
+                            <CheckBox x:Name="AdvancedModeCheck"
+                                      FontWeight="SemiBold"
+                                      Content="Advanced mode"
+                                      Checked="AdvancedModeCheck_Changed"
+                                      Unchecked="AdvancedModeCheck_Changed" />
+                            <TextBlock Margin="0,5,0,0"
+                                       Style="{StaticResource Caption}"
+                                       Text="Overrides action timing and state checks for this setup. Leave off for the tested defaults."
+                                       TextWrapping="Wrap" />
+
+                            <StackPanel x:Name="AdvancedFieldsPanel"
+                                        Visibility="Collapsed">
+                                <StackPanel x:Name="AdvancedStepFieldsPanel">
+                                    <TextBlock Margin="0,14,0,0"
+                                               FontWeight="SemiBold"
+                                               Text="Step Mode actions" />
+
+                                    <TextBlock Margin="0,12,0,0"
+                                               Style="{StaticResource FieldLabel}"
+                                               Text="After unit selection, ms" />
+                                    <TextBox x:Name="UnitSelectionDelayText"
+                                             Margin="0,6,0,0"
+                                             AutomationProperties.Name="Delay after unit selection in milliseconds" />
+
+                                    <TextBlock Margin="0,12,0,0"
+                                               Style="{StaticResource FieldLabel}"
+                                               Text="Placement click burst, ms" />
+                                    <TextBox x:Name="PlacementBurstDurationText"
+                                             Margin="0,6,0,0"
+                                             AutomationProperties.Name="Placement click burst duration in milliseconds" />
+
+                                    <TextBlock Margin="0,12,0,0"
+                                               Style="{StaticResource FieldLabel}"
+                                               Text="Before selecting placed unit, ms" />
+                                    <TextBox x:Name="BeforeSelectionClickText"
+                                             Margin="0,6,0,0"
+                                             AutomationProperties.Name="Delay before selecting the placed unit in milliseconds" />
+
+                                    <TextBlock Margin="0,12,0,0"
+                                               Style="{StaticResource FieldLabel}"
+                                               Text="Before selected-unit check, ms" />
+                                    <TextBox x:Name="BeforeSelectedUnitProofText"
+                                             Margin="0,6,0,0"
+                                             AutomationProperties.Name="Delay before selected unit check in milliseconds" />
+
+                                    <TextBlock Margin="0,12,0,0"
+                                               Style="{StaticResource FieldLabel}"
+                                               Text="Between action key presses, ms" />
+                                    <TextBox x:Name="ActionKeyIntervalText"
+                                             Margin="0,6,0,0"
+                                             AutomationProperties.Name="Delay between action key presses in milliseconds" />
+
+                                    <CheckBox x:Name="VerifySelectedUnitPanelCheck"
+                                              Margin="0,14,0,0"
+                                              Content="Require selected-unit UI before unit actions" />
+                                    <TextBlock Margin="24,4,0,0"
+                                               Style="{StaticResource Caption}"
+                                               Text="When off, targeting, Auto Upgrade, and Upgrade Unit inputs are sent after the coordinate click without visual proof."
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <StackPanel x:Name="AdvancedRecordingFieldsPanel"
+                                            Visibility="Collapsed">
+                                    <TextBlock Margin="0,14,0,0"
+                                               FontWeight="SemiBold"
+                                               Text="Recording Mode start" />
+                                    <CheckBox x:Name="VerifyPrestartCheck"
+                                              Margin="0,12,0,0"
+                                              Content="Require the Start screen before playback" />
+                                    <TextBlock Margin="24,4,0,0"
+                                               Style="{StaticResource Caption}"
+                                               Text="When off, terminal detection and Repeat Stage remain verified, then playback begins after the delay below."
+                                               TextWrapping="Wrap" />
+                                    <TextBlock Margin="0,12,0,0"
+                                               Style="{StaticResource FieldLabel}"
+                                               Text="Playback start delay, ms" />
+                                    <TextBox x:Name="ManualPlaybackStartDelayText"
+                                             Margin="0,6,0,0"
+                                             AutomationProperties.Name="Recording playback start delay in milliseconds" />
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock x:Name="TimingErrorText"
+                               Margin="0,10,0,0"
+                               AutomationProperties.LiveSetting="Polite"
+                               Foreground="{DynamicResource ErrorBrush}"
+                               TextWrapping="Wrap"
+                               Visibility="Collapsed" />
+                </StackPanel>
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="2"
+                        Margin="0,16,0,0"
+                        HorizontalAlignment="Right"
+                        Orientation="Horizontal">
+                <Button Height="36"
+                        Content="Cancel"
+                        Click="Cancel_Click" />
+                <Button Height="36"
+                        Margin="8,0,0,0"
+                        Style="{StaticResource PrimaryButton}"
+                        Content="Apply"
+                        Click="Apply_Click" />
             </StackPanel>
-
-            <TextBlock Margin="0,14,0,0"
-                       Style="{StaticResource FieldLabel}"
-                       Text="Impossibility threshold, min" />
-            <TextBox x:Name="ImpossibilityThresholdText"
-                     Margin="0,6,0,0"
-                     AutomationProperties.Name="Impossibility threshold in minutes" />
-            <TextBlock Margin="0,5,0,0"
-                       Style="{StaticResource Caption}"
-                       Text="0 uses the route default. Recovery starts if Victory or Defeat is not seen by this time."
-                       TextWrapping="Wrap" />
-
-            <TextBlock x:Name="TimingErrorText"
-                       Margin="0,10,0,0"
-                       Foreground="{DynamicResource ErrorBrush}"
-                       TextWrapping="Wrap"
-                       Visibility="Collapsed" />
-
-            <Button Margin="0,16,0,0"
-                    HorizontalAlignment="Right"
-                    Style="{StaticResource PrimaryButton}"
-                    Content="Apply"
-                    Click="Apply_Click" />
-        </StackPanel>
-        </ScrollViewer>
+        </Grid>
     </Border>
 </UserControl>

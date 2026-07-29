@@ -167,6 +167,12 @@ public sealed partial class EventMacroRunner
                 progress,
                 cancellationToken).ConfigureAwait(false);
 
+            await new RobloxChatPanelNormalizer(_automation)
+                .EnsureClosedAsync(
+                    window,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            _placements.BeginMatch();
             PlacementMatchExecutionPlan execution =
                 PlacementExecutionPlan.ForMatch(
                     placement);
@@ -185,8 +191,16 @@ public sealed partial class EventMacroRunner
                     cancellationToken).ConfigureAwait(false);
             }
 
+            bool requireStartAction =
+                !execution.ManualPlayback ||
+                ManualPlaybackStartPolicy
+                    .RequiresPrestart(placement);
             StableScreenAction<EventScreenMatch>? liveStart =
-                await StableScreenActionWaiter.WaitAsync(
+                null;
+            if (requireStartAction)
+            {
+                liveStart =
+                    await StableScreenActionWaiter.WaitAsync(
                         EventScreenState.Prestart,
                         preset.StableDetections,
                         () => EventScreenDetector.Detect(
@@ -204,10 +218,11 @@ public sealed partial class EventMacroRunner
                                 preset.PollMilliseconds)),
                         cancellationToken)
                     .ConfigureAwait(false);
-            if (liveStart is null)
-            {
-                throw new RobloxUiUnavailableException(
-                    "The Event Start Game button disappeared before it could be clicked.");
+                if (liveStart is null)
+                {
+                    throw new RobloxUiUnavailableException(
+                        "The Event Start Game button disappeared before it could be clicked.");
+                }
             }
 
             Stopwatch matchRuntime;
@@ -219,6 +234,15 @@ public sealed partial class EventMacroRunner
                     throw new InvalidOperationException(
                         "Manual input playback is unavailable.");
                 }
+                await ManualPlaybackStartPolicy
+                    .WaitBeforePlaybackAsync(
+                        placement,
+                        message => Report(
+                            "Recording playback",
+                            50,
+                            message),
+                        cancellationToken)
+                    .ConfigureAwait(false);
                 matchRuntime =
                     await ManualInputMatchPlayback.PlayAsync(
                         _manualInputs,
@@ -234,7 +258,7 @@ public sealed partial class EventMacroRunner
                 matchRuntime = Stopwatch.StartNew();
                 await ClickAsync(
                     window,
-                    liveStart.Value.X,
+                    liveStart!.Value.X,
                     liveStart.Value.Y,
                     cancellationToken).ConfigureAwait(false);
                 await Task.Delay(
@@ -298,6 +322,7 @@ public sealed partial class EventMacroRunner
                         window,
                         terminal,
                         preparation,
+                        placement,
                         detector,
                         playMenuKey,
                         preset.StableDetections,
