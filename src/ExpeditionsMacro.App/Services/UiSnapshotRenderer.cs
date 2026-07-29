@@ -124,6 +124,16 @@ internal static class UiSnapshotRenderer
                     PrepareCompactPlacementSnapshot(
                         root,
                         file);
+                    if (string.Equals(
+                            file,
+                            "placement-setup",
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        FindVisualChild<PlacementModelsPage>(
+                                root)
+                            ?.SetDenseMarkerSnapshot();
+                        root.UpdateLayout();
+                    }
                     PrepareDashboardSnapshot(
                         root,
                         file);

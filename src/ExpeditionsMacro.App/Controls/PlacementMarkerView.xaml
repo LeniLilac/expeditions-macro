@@ -1,0 +1,77 @@
+<UserControl x:Class="ExpeditionsMacro.App.Controls.PlacementMarkerView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Focusable="False"
+             UseLayoutRounding="True">
+    <UserControl.Resources>
+        <Style x:Key="MarkerStroke"
+               TargetType="{x:Type Shape}">
+            <Setter Property="Stroke"
+                    Value="{DynamicResource AccentBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Phase}"
+                             Value="AfterStart">
+                    <Setter Property="Stroke"
+                            Value="{DynamicResource WarningBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="MarkerLabel"
+               TargetType="Border">
+            <Setter Property="BorderBrush"
+                    Value="{DynamicResource AccentBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Phase}"
+                             Value="AfterStart">
+                    <Setter Property="BorderBrush"
+                            Value="{DynamicResource WarningBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Canvas Width="{Binding MarkerLayout.CanvasWidth}"
+            Height="{Binding MarkerLayout.CanvasHeight}">
+        <Line X1="{Binding MarkerLayout.AnchorX}"
+              X2="{Binding MarkerLayout.AnchorX}"
+              Y1="{Binding MarkerLayout.AnchorY}"
+              Y2="{Binding MarkerLayout.LabelCenterY}"
+              IsHitTestVisible="False"
+              StrokeThickness="3"
+              Style="{StaticResource MarkerStroke}" />
+        <Line X1="{Binding MarkerLayout.AnchorX}"
+              X2="{Binding MarkerLayout.ConnectorEndX}"
+              Y1="{Binding MarkerLayout.LabelCenterY}"
+              Y2="{Binding MarkerLayout.LabelCenterY}"
+              IsHitTestVisible="False"
+              StrokeThickness="3"
+              Style="{StaticResource MarkerStroke}" />
+        <Ellipse Canvas.Left="{Binding MarkerLayout.PointLeft}"
+                 Canvas.Top="{Binding MarkerLayout.PointTop}"
+                 Width="14"
+                 Height="14"
+                 Fill="{DynamicResource SurfaceBrush}"
+                 StrokeThickness="4"
+                 Style="{StaticResource MarkerStroke}" />
+        <Border Canvas.Left="{Binding MarkerLayout.LabelLeft}"
+                Canvas.Top="{Binding MarkerLayout.LabelTop}"
+                Width="{Binding MarkerLayout.LabelWidth}"
+                Height="{Binding MarkerLayout.LabelHeight}"
+                Padding="8,0"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderThickness="2"
+                CornerRadius="3"
+                Style="{StaticResource MarkerLabel}">
+            <StackPanel HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                <TextBlock FontWeight="Bold"
+                           Text="{Binding MarkerLabel}" />
+                <TextBlock Margin="4,0,0,0"
+                           FontSize="9"
+                           Foreground="{DynamicResource MutedBrush}"
+                           Text="{Binding PhaseShortLabel}" />
+            </StackPanel>
+        </Border>
+    </Canvas>
+</UserControl>

@@ -44,6 +44,9 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
     private UnitAutoUpgradePriority
         _autoUpgradePriority =
             PlacementAuthoringRules.DefaultAutoUpgradePriority;
+    private PlacementMarkerPresentation
+        _markerLayout =
+            PlacementMarkerPresentation.Empty;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -134,6 +137,22 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
 
     public string TargetingPriorityLabel =>
         TargetingPriority.ToString();
+
+    public PlacementMarkerPresentation MarkerLayout =>
+        _markerLayout;
+
+    public void SetMarkerLayout(
+        PlacementMarkerPresentation layout)
+    {
+        ArgumentNullException.ThrowIfNull(layout);
+        if (_markerLayout == layout)
+        {
+            return;
+        }
+
+        _markerLayout = layout;
+        Raise(nameof(MarkerLayout));
+    }
 
     public PlacementStep ToModel() => new()
     {

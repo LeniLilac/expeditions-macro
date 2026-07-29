@@ -55,6 +55,7 @@ public partial class PlacementModelsPage
             }
         }
 
+        UpdatePlacementMarkerLayout();
         UpdateFastPlacementCount();
         SchedulePlacementAutoSave();
     }
@@ -63,6 +64,19 @@ public partial class PlacementModelsPage
         object? sender,
         PropertyChangedEventArgs e)
     {
+        if (e.PropertyName ==
+            nameof(PlacementStepRow.MarkerLayout))
+        {
+            return;
+        }
+        if (e.PropertyName is
+            nameof(PlacementStepRow.X) or
+            nameof(PlacementStepRow.Y) or
+            nameof(PlacementStepRow.UnitKey) or
+            nameof(PlacementStepRow.Phase))
+        {
+            UpdatePlacementMarkerLayout();
+        }
         if (_normalizingPlacementStepPhase)
         {
             return;

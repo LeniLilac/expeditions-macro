@@ -4,6 +4,12 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.40] - 2026-07-28
+
+### Fixed
+
+- Placement-map marker labels now size for their content and automatically fan into collision-free horizontal lanes, keeping dense coordinates readable without changing saved placement points.
+
 ## [1.3.0-beta.39] - 2026-07-28
 
 ### Changed
@@ -1105,7 +1111,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.39...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.40...HEAD
+[1.3.0-beta.40]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.39...v1.3.0-beta.40
 [1.3.0-beta.39]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.38...v1.3.0-beta.39
 [1.3.0-beta.38]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.37...v1.3.0-beta.38
 [1.3.0-beta.37]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.36...v1.3.0-beta.37
