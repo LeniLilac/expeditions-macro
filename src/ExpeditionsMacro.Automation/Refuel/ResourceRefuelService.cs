@@ -114,7 +114,21 @@ public sealed class ResourceRefuelService
             completed |= target;
         }
 
-        if (request.OpenPlayWhenComplete)
+        if (request.ReturnToLobbyWhenComplete)
+        {
+            ReportNavigation(
+                "Resource refuel complete. Returning to Lobby through Areas.",
+                "resource_refuel_lobby_return",
+                MacroEventLevel.Information);
+            await _navigator.ReturnToLobbyViaAreasAsync(
+                window,
+                detector,
+                request.AreasMenuKey,
+                cancellationToken,
+                openAreasFromOwnedStation: true)
+                .ConfigureAwait(false);
+        }
+        else if (request.OpenPlayWhenComplete)
         {
             ReportNavigation(
                 "Resource refuel complete. Opening Play.",
@@ -124,14 +138,6 @@ public sealed class ResourceRefuelService
                 window,
                 request.PlayMenuKey,
                 cancellationToken).ConfigureAwait(false);
-            if (request.ReturnToLobbyWhenComplete)
-            {
-                await _navigator.ReturnToLobbyViaAreasAsync(
-                    window,
-                    detector,
-                    request.AreasMenuKey,
-                    cancellationToken).ConfigureAwait(false);
-            }
         }
 
         DateTimeOffset completedAt = DateTimeOffset.UtcNow;
@@ -225,12 +231,6 @@ public sealed class ResourceRefuelService
         {
             throw new InvalidDataException(
                 "A configured private-server link is required for the restart start state.");
-        }
-        if (request.ReturnToLobbyWhenComplete &&
-            !request.OpenPlayWhenComplete)
-        {
-            throw new InvalidDataException(
-                "Returning to the Lobby after refuel requires opening Play first.");
         }
     }
 

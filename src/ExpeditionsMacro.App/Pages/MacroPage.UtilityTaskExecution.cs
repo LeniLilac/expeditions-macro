@@ -48,7 +48,7 @@ public partial class MacroPage
                             .ResourceRefuelDebug,
                         AreasMenuKey = areasKey,
                         PlayMenuKey = playMenuKey,
-                        OpenPlayWhenComplete = true,
+                        OpenPlayWhenComplete = false,
                         ReturnToLobbyWhenComplete = true,
                     },
                     detector,

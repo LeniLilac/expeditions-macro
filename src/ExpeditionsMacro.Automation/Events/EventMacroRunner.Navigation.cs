@@ -176,11 +176,11 @@ public sealed partial class EventMacroRunner
 
         if (state.State ==
                 EventScreenState.GameModeSelector ||
-            EventPlayInterfaceCloser.DetectLayer(current) !=
-                EventPlayInterfaceLayer.Closed)
+            PlayInterfaceCloser.DetectLayer(current) !=
+                PlayInterfaceLayer.Closed)
         {
-            await EventPlayInterfaceCloser.CloseAsync(
-                () => EventPlayInterfaceCloser.DetectLayer(
+            await PlayInterfaceCloser.CloseAsync(
+                () => PlayInterfaceCloser.DetectLayer(
                     CaptureClient(window, detector)),
                 token =>
                 {

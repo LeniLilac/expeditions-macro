@@ -24,9 +24,10 @@ internal sealed class LobbyDetectorPack : IDetectorPack
     public string? RecoveryState(ImageFrame clientImage) =>
         AreasScreenDetector.Detect(clientImage).State !=
             AreasScreenState.None ||
-        ChallengeScreenDetector
-            .Detect(clientImage).State !=
-            ChallengeScreenState.None
+        ChallengeScreenDetector.Detect(clientImage).State !=
+            ChallengeScreenState.None ||
+        ResourceStationScreenDetector.Detect(clientImage).State !=
+            ResourceStationScreenState.None
             ? "unknown"
             : "lobby";
 

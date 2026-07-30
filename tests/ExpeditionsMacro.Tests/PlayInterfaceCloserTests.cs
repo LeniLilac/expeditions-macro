@@ -1,4 +1,4 @@
-using ExpeditionsMacro.Automation.Events;
+using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Automation.Recovery;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Runtime;
@@ -6,7 +6,7 @@ using ExpeditionsMacro.Vision.Infrastructure;
 
 namespace ExpeditionsMacro.Tests;
 
-public sealed class EventPlayInterfaceCloserTests
+public sealed class PlayInterfaceCloserTests
 {
     [Fact]
     public void ReviewedChallengeHandoffLayers_AreRecognized()
@@ -28,32 +28,32 @@ public sealed class EventPlayInterfaceCloserTests
                 "Prestart_FairyKingForest_01.png"));
 
         Assert.Equal(
-            EventPlayInterfaceLayer.GameModeSelector,
-            EventPlayInterfaceCloser.DetectLayer(selector));
+            PlayInterfaceLayer.GameModeSelector,
+            PlayInterfaceCloser.DetectLayer(selector));
         Assert.Equal(
-            EventPlayInterfaceLayer.PostMatchParty,
-            EventPlayInterfaceCloser.DetectLayer(party));
+            PlayInterfaceLayer.PostMatchParty,
+            PlayInterfaceCloser.DetectLayer(party));
         Assert.Equal(
-            EventPlayInterfaceLayer.Closed,
-            EventPlayInterfaceCloser.DetectLayer(prestart));
+            PlayInterfaceLayer.Closed,
+            PlayInterfaceCloser.DetectLayer(prestart));
     }
 
     [Fact]
     public async Task ChallengeSelectorHandoff_ClicksBackThroughPartyBeforeLobbyNavigation()
     {
-        var observations = new Queue<EventPlayInterfaceLayer>(
+        var observations = new Queue<PlayInterfaceLayer>(
         [
-            EventPlayInterfaceLayer.GameModeSelector,
-            EventPlayInterfaceLayer.GameModeSelector,
-            EventPlayInterfaceLayer.PostMatchParty,
-            EventPlayInterfaceLayer.PostMatchParty,
-            EventPlayInterfaceLayer.Closed,
-            EventPlayInterfaceLayer.Closed,
-            EventPlayInterfaceLayer.Closed,
+            PlayInterfaceLayer.GameModeSelector,
+            PlayInterfaceLayer.GameModeSelector,
+            PlayInterfaceLayer.PostMatchParty,
+            PlayInterfaceLayer.PostMatchParty,
+            PlayInterfaceLayer.Closed,
+            PlayInterfaceLayer.Closed,
+            PlayInterfaceLayer.Closed,
         ]);
         int clicks = 0;
 
-        await EventPlayInterfaceCloser.CloseAsync(
+        await PlayInterfaceCloser.CloseAsync(
             () => observations.Dequeue(),
             token =>
             {
@@ -74,9 +74,9 @@ public sealed class EventPlayInterfaceCloserTests
         RobloxUiUnavailableException error =
             await Assert.ThrowsAsync<
                 RobloxUiUnavailableException>(
-                () => EventPlayInterfaceCloser.CloseAsync(
+                () => PlayInterfaceCloser.CloseAsync(
                     () =>
-                        EventPlayInterfaceLayer
+                        PlayInterfaceLayer
                             .GameModeSelector,
                     token => Task.CompletedTask,
                     CancellationToken.None,

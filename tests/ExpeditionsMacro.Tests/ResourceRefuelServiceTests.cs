@@ -7,6 +7,7 @@ using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Challenges;
 using ExpeditionsMacro.Vision.Infrastructure;
+using static ExpeditionsMacro.Tests.ResourceRefuelTestAssertions;
 
 namespace ExpeditionsMacro.Tests;
 
@@ -154,12 +155,15 @@ public sealed class ResourceRefuelServiceTests
                 ResourceRefuelStart.SharedNavigation,
                 ResourceRefuelTarget.GoldMine) with
             {
+                OpenPlayWhenComplete = false,
                 ReturnToLobbyWhenComplete = true,
             },
             new LobbyDetectorPack());
 
-        Assert.Equal(1, automation.PlayPresses);
+        Assert.Equal(0, automation.PlayPresses);
+        Assert.Equal(1, automation.PlayBackClicks);
         Assert.Equal(3, automation.AreasPresses);
+        AssertPostRefuelInputIsAreas(automation.Events);
         Assert.Equal(
             FakeScreen.Lobby,
             automation.CurrentScreen);
@@ -178,12 +182,14 @@ public sealed class ResourceRefuelServiceTests
                 ResourceRefuelStart.CurrentLobby,
                 ResourceRefuelTarget.GoldMine) with
             {
+                OpenPlayWhenComplete = false,
                 ReturnToLobbyWhenComplete = true,
             },
             new LobbyDetectorPack());
 
-        Assert.Equal(1, automation.PlayPresses);
+        Assert.Equal(0, automation.PlayPresses);
         Assert.Equal(2, automation.AreasPresses);
+        AssertPostRefuelInputIsAreas(automation.Events);
         Assert.Equal(
             FakeScreen.Lobby,
             automation.CurrentScreen);
@@ -209,6 +215,7 @@ public sealed class ResourceRefuelServiceTests
             new LobbyDetectorPack());
 
         Assert.Equal(1, automation.ChallengeCloseClicks);
+        Assert.Equal(1, automation.PlayBackClicks);
         Assert.Equal(0, automation.PlayPresses);
     }
 
@@ -356,35 +363,6 @@ public sealed class ResourceRefuelServiceTests
             },
         };
 
-    private static void AssertNoCaptureDuringBlindRoutes(
-        IReadOnlyList<string> events)
-    {
-        int searchFrom = 0;
-        for (int route = 0; route < 2; route++)
-        {
-            int hub = Find(events, "click:322,264", searchFrom);
-            int interaction = Find(events, "key:E", hub + 1);
-            Assert.DoesNotContain(
-                "capture",
-                events.Skip(hub + 1).Take(
-                    interaction - hub - 1));
-            searchFrom = interaction + 1;
-        }
-    }
-
-    private static int Find(
-        IReadOnlyList<string> values,
-        string expected,
-        int start)
-    {
-        for (int index = start; index < values.Count; index++)
-        {
-            if (values[index] == expected) return index;
-        }
-        throw new Xunit.Sdk.XunitException(
-            $"Expected event '{expected}' after index {start}.");
-    }
-
     private enum FakeScreen
     {
         Lobby,
@@ -396,6 +374,7 @@ public sealed class ResourceRefuelServiceTests
         ResourceDrill,
         AddFuel,
         Play,
+        Match,
         ChallengeList,
     }
 
@@ -454,6 +433,8 @@ public sealed class ResourceRefuelServiceTests
         public int StationCloseClicks { get; private set; }
 
         public int ChallengeCloseClicks { get; private set; }
+
+        public int PlayBackClicks { get; private set; }
 
         public FakeScreen CurrentScreen => _screen;
 
@@ -605,6 +586,12 @@ public sealed class ResourceRefuelServiceTests
                 ChallengeCloseClicks++;
                 _screen = FakeScreen.Play;
             }
+            else if (_screen == FakeScreen.Play &&
+                     (x, y) == (62, 588))
+            {
+                PlayBackClicks++;
+                _screen = FakeScreen.Match;
+            }
             return Task.CompletedTask;
         }
 
@@ -652,7 +639,10 @@ public sealed class ResourceRefuelServiceTests
             if (key == 'G')
             {
                 AreasPresses++;
-                _screen = FakeScreen.AreasMenu;
+                if (_screen != FakeScreen.Play)
+                {
+                    _screen = FakeScreen.AreasMenu;
+                }
             }
             else if (key == 'E')
             {
@@ -735,6 +725,10 @@ public sealed class ResourceRefuelServiceTests
                     TestPaths.Datasets,
                     "Play_UI",
                     "Play_UI_001.png")),
+                [FakeScreen.Match] = ImageCodec.Load(Path.Combine(
+                    TestPaths.ChallengeDatasets,
+                    "Prestart_FairyKingForest",
+                    "Prestart_FairyKingForest_01.png")),
                 [FakeScreen.ChallengeList] =
                     ImageCodec.Load(Path.Combine(
                         TestPaths.ChallengeDatasets,
