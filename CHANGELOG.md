@@ -19,9 +19,15 @@ All notable changes to Expeditions Macro are documented here.
 - Bounty rerolls use a verified 200 ms cadence. The explicit insufficient-Gold banner is authoritative; bounded unchanged-Mythic and no-Mythic attempt limits remain fallback evidence.
 - Conditional Challenge Bounties wait through an ordinary Challenge cooldown but reroll after the daily Challenge limit. Insufficient Gold finishes already-active viable work and defers new rerolls until the next Macro start.
 
+### Fixed
+
+- Bounty Board entry now detects the unhovered live row, supports the Beginner's Path vertical offset, and requires a stable owner-state action instead of depending on the mouse hover highlight.
+- Infinite Bounty runs no longer fail during wave-counter initialization because the embedded 0-through-100 template payload is normalized and length-validated before recognition.
+- Bounty slot scanning stops once every Mythic retainable under the current Challenge and parking policy is already active, avoiding an unnecessary fifth-slot reroll in the zero-parking daily-limit case.
+
 ### Tests
 
-- Passed 1,430 application and detector tests, 5 Deep Debug Viewer tests, and all 88 dark/light UI snapshot states.
+- Passed 1,441 application and detector tests, 5 Deep Debug Viewer tests, and all 88 dark/light UI snapshot states.
 
 ## [1.3.0-beta.44] - 2026-07-30
 

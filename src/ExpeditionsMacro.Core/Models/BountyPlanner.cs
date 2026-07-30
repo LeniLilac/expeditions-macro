@@ -9,6 +9,28 @@ public enum BountyChallengeAvailability
 
 public static class BountyPlanner
 {
+    public static bool HasEveryRetainableBounty(
+        IReadOnlySet<int> observed,
+        int parkedNonViable,
+        int parkedLimit,
+        BountyChallengeAvailability challengeAvailability)
+    {
+        ArgumentNullException.ThrowIfNull(observed);
+        bool hasEveryViable =
+            BountyCatalog.All
+                .Where(definition =>
+                    !definition.AlwaysReroll &&
+                    !(definition.ChallengeConditional &&
+                        challengeAvailability ==
+                            BountyChallengeAvailability
+                                .DailyLimit))
+                .All(definition =>
+                    observed.Contains(
+                        definition.Number));
+        return hasEveryViable &&
+            parkedNonViable >= parkedLimit;
+    }
+
     public static bool ShouldReroll(
         int bountyNumber,
         int parkedNonViable,

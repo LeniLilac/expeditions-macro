@@ -77,7 +77,14 @@ internal sealed class BountyBoardProcessor
                     .ConfigureAwait(false);
         }
 
-        if (!noGold)
+        bool retentionTargetReached =
+            BountyPlanner.HasEveryRetainableBounty(
+                observed,
+                parked,
+                parkedLimit,
+                challengeAvailability);
+        if (!noGold &&
+            !retentionTargetReached)
         {
             await _navigator.ScrollAsync(
                 window,
@@ -103,6 +110,11 @@ internal sealed class BountyBoardProcessor
                 detector,
                 right: false,
                 cancellationToken).ConfigureAwait(false);
+        }
+        else if (retentionTargetReached)
+        {
+            log?.Invoke(
+                "Bounty slot scanning stopped because every Mythic retained by the current parking and Challenge policy is already active.");
         }
 
         IReadOnlyList<BountyActiveProgress> reconciled =

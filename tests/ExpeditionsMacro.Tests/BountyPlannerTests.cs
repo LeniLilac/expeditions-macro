@@ -4,6 +4,51 @@ namespace ExpeditionsMacro.Tests;
 
 public sealed class BountyPlannerTests
 {
+    [Fact]
+    public void DailyChallengeLimit_WithZeroParking_StopsAfterAllFourViableBounties()
+    {
+        HashSet<int> observed =
+            [2, 4, 5, 6];
+
+        Assert.True(
+            BountyPlanner.HasEveryRetainableBounty(
+                observed,
+                parkedNonViable: 0,
+                parkedLimit: 0,
+                BountyChallengeAvailability.DailyLimit));
+    }
+
+    [Theory]
+    [InlineData(BountyChallengeAvailability.Available)]
+    [InlineData(BountyChallengeAvailability.Cooldown)]
+    public void ChallengeEligiblePolicies_StillScanForConditionalBounties(
+        BountyChallengeAvailability availability)
+    {
+        HashSet<int> observed =
+            [2, 4, 5, 6];
+
+        Assert.False(
+            BountyPlanner.HasEveryRetainableBounty(
+                observed,
+                parkedNonViable: 0,
+                parkedLimit: 0,
+                availability));
+    }
+
+    [Fact]
+    public void ParkingBudget_MustBeFilledBeforeSlotScanningStops()
+    {
+        HashSet<int> observed =
+            [2, 4, 5, 6];
+
+        Assert.False(
+            BountyPlanner.HasEveryRetainableBounty(
+                observed,
+                parkedNonViable: 0,
+                parkedLimit: 1,
+                BountyChallengeAvailability.DailyLimit));
+    }
+
     [Theory]
     [InlineData(0, 0, true)]
     [InlineData(0, 1, false)]

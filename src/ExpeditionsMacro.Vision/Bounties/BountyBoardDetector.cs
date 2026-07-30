@@ -18,12 +18,19 @@ public readonly record struct BountyBoardMatch(
     double Confidence,
     IReadOnlyList<BountyCardAction> Actions,
     IReadOnlyList<BountyNumberMatch> Numbers,
-    bool NoGold);
+    bool NoGold,
+    int? EventActionX = null,
+    int? EventActionY = null)
+{
+    public (int X, int Y)? EventAction =>
+        EventActionX is int x &&
+        EventActionY is int y
+            ? (x, y)
+            : null;
+}
 
 public static class BountyBoardDetector
 {
-    private static readonly ScreenRegion EventTab =
-        new(10, 208, 168, 52);
     private static readonly ScreenRegion BoardHeader =
         new(205, 20, 125, 60);
     private static readonly ScreenRegion BoardTopRail =
@@ -71,7 +78,12 @@ public static class BountyBoardDetector
                     noGold > 0));
         }
 
-        double board = BoardScore(image);
+        BountyBoardEventEntryMatch? entry =
+            BountyBoardEventEntryDetector.Find(
+                image);
+        double board = BoardScore(
+            image,
+            entry?.Confidence ?? 0);
         if (board >= 0.76)
         {
             return Trace(
@@ -85,20 +97,19 @@ public static class BountyBoardDetector
                     noGold > 0));
         }
 
-        double entry = EventTabScore(image);
         return Trace(
-            entry >= 0.76
+            entry is BountyBoardEventEntryMatch eventEntry
                 ? new BountyBoardMatch(
                     BountyBoardState.EventCatalog,
-                    entry,
+                    eventEntry.Confidence,
                     [],
                     [],
-                    noGold > 0)
+                    noGold > 0,
+                    eventEntry.ActionX,
+                    eventEntry.ActionY)
                 : new BountyBoardMatch(
                     BountyBoardState.None,
-                    Math.Max(
-                        board,
-                        entry),
+                    board,
                     [],
                     [],
                     noGold > 0));
@@ -106,9 +117,6 @@ public static class BountyBoardDetector
 
     public static (int X, int Y)
         LobbyEventAction => (50, 410);
-
-    public static (int X, int Y)
-        BountyBoardEventAction => (92, 234);
 
     public static (int X, int Y)
         RerollCancelAction => (462, 336);
@@ -126,7 +134,8 @@ public static class BountyBoardDetector
         BoardBackAction => (55, 588);
 
     private static double BoardScore(
-        ImageFrame image)
+        ImageFrame image,
+        double eventEntry)
     {
         double headerGold =
             ColorFraction(
@@ -143,21 +152,10 @@ public static class BountyBoardDetector
                 image,
                 BoardTopRail,
                 IsBronze);
-        double tabBronze =
-            ColorFraction(
-                image,
-                EventTab,
-                IsBronze);
-        double tabNeutral =
-            ColorFraction(
-                image,
-                EventTab,
-                IsNeutral);
         if (headerGold < 0.025 ||
             headerBronze < 0.15 ||
             railBronze < 0.14 ||
-            tabBronze < 0.10 ||
-            tabNeutral < 0.025)
+            eventEntry < 0.78)
         {
             return 0;
         }
@@ -176,51 +174,9 @@ public static class BountyBoardDetector
                 0.14,
                 0.42) +
             0.06 * Ramp(
-                tabBronze,
-                0.10,
-                0.22),
-            0,
-            1);
-    }
-
-    private static double EventTabScore(
-        ImageFrame image)
-    {
-        double bronze =
-            ColorFraction(
-                image,
-                EventTab,
-                IsBronze);
-        double neutral =
-            ColorFraction(
-                image,
-                EventTab,
-                IsNeutral);
-        double dark =
-            ColorFraction(
-                image,
-                EventTab,
-                IsDark);
-        if (bronze < 0.24 ||
-            neutral < 0.025 ||
-            dark < 0.30)
-        {
-            return 0;
-        }
-        return Math.Clamp(
-            0.76 +
-            0.10 * Ramp(
-                bronze,
-                0.24,
-                0.55) +
-            0.08 * Ramp(
-                neutral,
-                0.025,
-                0.10) +
-            0.06 * Ramp(
-                dark,
-                0.30,
-                0.70),
+                eventEntry,
+                0.78,
+                0.94),
             0,
             1);
     }
@@ -393,6 +349,8 @@ public static class BountyBoardDetector
             new
             {
                 match.NoGold,
+                match.EventActionX,
+                match.EventActionY,
                 Actions = match.Actions.Select(
                     action => new
                     {

@@ -86,7 +86,6 @@ internal sealed class BountyBoardNavigator
             throw new RobloxUiUnavailableException(
                 "Bounty mode must start from a verified Lobby.");
         }
-
         (int X, int Y) events =
             BountyBoardDetector.LobbyEventAction;
         await ClickAsync(
@@ -94,16 +93,22 @@ internal sealed class BountyBoardNavigator
             events.X,
             events.Y,
             cancellationToken).ConfigureAwait(false);
-        await WaitForStateAsync(
+        BountyBoardMatch destination =
+            await WaitForStateAsync(
             window,
             detector,
             BountyBoardState.EventCatalog,
             TimeSpan.FromSeconds(15),
             cancellationToken).ConfigureAwait(false);
-
+        if (destination.State ==
+            BountyBoardState.Board)
+        {
+            return;
+        }
         (int X, int Y) board =
-            BountyBoardDetector
-                .BountyBoardEventAction;
+            destination.EventAction ??
+            throw new RobloxUiUnavailableException(
+                "The live Bounty Board event action was unavailable.");
         await ClickAsync(
             window,
             board.X,
@@ -411,6 +416,7 @@ internal sealed class BountyBoardNavigator
             minimumObservations: 2,
             _utcNow);
         int stable = 0;
+        string? candidate = null;
         BountyBoardMatch last = default;
         while (budget.ShouldObserve(stable > 0))
         {
@@ -418,9 +424,26 @@ internal sealed class BountyBoardNavigator
             last = BountyBoardDetector.Detect(
                 Capture(window, detector));
             budget.MarkObserved();
-            stable = last.State == desired
+            string? observation =
+                last.State == desired
+                    ? desired ==
+                        BountyBoardState.EventCatalog
+                        ? last.EventAction?.ToString()
+                        : desired.ToString()
+                    : desired ==
+                            BountyBoardState.EventCatalog &&
+                        last.State ==
+                            BountyBoardState.Board
+                        ? last.State.ToString()
+                        : null;
+            stable = observation is not null &&
+                string.Equals(
+                    observation,
+                    candidate,
+                    StringComparison.Ordinal)
                 ? stable + 1
-                : 0;
+                : observation is null ? 0 : 1;
+            candidate = observation;
             if (stable >= 2)
             {
                 return last;
