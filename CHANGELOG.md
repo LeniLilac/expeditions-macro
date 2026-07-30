@@ -4,6 +4,25 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.45] - 2026-07-30
+
+### Added
+
+- Macro Plan now includes a **Bounty** task mode that opens the Event Bounty Board, identifies Mythic Bounties by their number-only suffix, claims completed cards, and routes deterministic Raid, Story Infinite, and Challenge objectives.
+- Bounty tasks expose a zero-through-four non-viable parking policy. Lower values spend more Gold to find overlapping viable work sooner; higher values retain more non-viable Mythics to reduce reroll cost.
+- Bounty progress is stored locally for the one Roblox account assumed per Windows user. The UTC daily claim count resets independently while unfinished active Bounty objectives remain available for reconciliation.
+
+### Changed
+
+- The Add Task mode selector uses two rows and blocks Bounty creation until Spirit City Raid Act 1 and all five Story Infinite Placement Setups are configured.
+- Infinite Bounty objectives merge by map and run through two waves beyond the highest covered target. Exact wave recognition is backed by a bounded increasing-wave fallback before the existing in-match Lobby return.
+- Bounty rerolls use a verified 200 ms cadence. The explicit insufficient-Gold banner is authoritative; bounded unchanged-Mythic and no-Mythic attempt limits remain fallback evidence.
+- Conditional Challenge Bounties wait through an ordinary Challenge cooldown but reroll after the daily Challenge limit. Insufficient Gold finishes already-active viable work and defers new rerolls until the next Macro start.
+
+### Tests
+
+- Passed 1,430 application and detector tests, 5 Deep Debug Viewer tests, and all 88 dark/light UI snapshot states.
+
 ## [1.3.0-beta.44] - 2026-07-30
 
 ### Fixed

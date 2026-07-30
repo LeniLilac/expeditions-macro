@@ -259,6 +259,39 @@ public sealed partial class ChallengeMacroRunner
             confidence);
     }
 
+    private async Task CompleteScheduledChallengeRunAsync(
+        RobloxWindow window,
+        ChallengePreset preset,
+        IDetectorPack detector,
+        int completed,
+        Action<
+            string,
+            MacroEventLevel,
+            string?,
+            double?> log,
+        Action<
+            string,
+            int,
+            string,
+            string?,
+            double?> report,
+        CancellationToken cancellationToken)
+    {
+        await PrepareSchedulerHandoffAsync(
+                window,
+                preset,
+                detector,
+                log,
+                report,
+                cancellationToken)
+            .ConfigureAwait(false);
+        log(
+            $"Completed {completed} scheduled Challenge match(es). Returning control to the task scheduler.",
+            MacroEventLevel.Success,
+            null,
+            null);
+    }
+
     internal static async Task<double>
         CloseChallengeSelectorForHandoffAsync(
         Func<

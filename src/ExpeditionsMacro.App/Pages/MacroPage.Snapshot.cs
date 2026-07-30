@@ -15,6 +15,7 @@ internal enum MacroPlanSnapshotState
     StoryMasteryTaskPopup,
     StoryInfiniteTaskPopup,
     UtilityTaskPopup,
+    BountyTaskPopup,
     LoopSettingsPopup,
 }
 
@@ -158,6 +159,12 @@ public partial class MacroPage
         }
         else if (state ==
                  MacroPlanSnapshotState
+                     .BountyTaskPopup)
+        {
+            OpenBountyTaskEditorForSnapshot();
+        }
+        else if (state ==
+                 MacroPlanSnapshotState
                      .LoopSettingsPopup)
         {
             LoopEditor.OpenLoopSettingsForSnapshot(
@@ -181,6 +188,20 @@ public partial class MacroPage
                 choice.Value ==
                 ResourceRefuelTarget.Both);
         TaskTargetText.Text = "45";
+        UpdateTaskTargetEditor();
+    }
+
+    private void OpenBountyTaskEditorForSnapshot()
+    {
+        OpenTaskEditor(
+            LoopEditor.LoopBlocks[1]);
+        TaskKindCombo.SelectedItem =
+            TaskKindCombo.Items
+                .Cast<NamedChoice<MacroTaskKind>>()
+                .First(choice =>
+                    choice.Value ==
+                    MacroTaskKind.Bounty);
+        BountyParkedSlider.Value = 3;
         UpdateTaskTargetEditor();
     }
 

@@ -1,0 +1,244 @@
+using ExpeditionsMacro.Core.Models;
+
+namespace ExpeditionsMacro.Tests;
+
+public sealed class BountyPlannerTests
+{
+    [Theory]
+    [InlineData(0, 0, true)]
+    [InlineData(0, 1, false)]
+    [InlineData(1, 1, true)]
+    [InlineData(3, 4, false)]
+    [InlineData(4, 4, true)]
+    public void ParkingLimit_TradesRerollGoldForParkedNonViableBounties(
+        int alreadyParked,
+        int limit,
+        bool shouldReroll)
+    {
+        Assert.Equal(
+            shouldReroll,
+            BountyPlanner.ShouldReroll(
+                bountyNumber: 1,
+                alreadyParked,
+                limit,
+                BountyChallengeAvailability.Available));
+    }
+
+    [Fact]
+    public void ConditionalBounty_WaitsForOrdinaryCooldown_ButRerollsAtDailyLimit()
+    {
+        foreach (int number in new[] { 7, 9 })
+        {
+            Assert.False(
+                BountyPlanner.ShouldReroll(
+                    number,
+                    parkedNonViable: 4,
+                    parkedLimit: 0,
+                    BountyChallengeAvailability.Cooldown));
+            Assert.True(
+                BountyPlanner.ShouldReroll(
+                    number,
+                    parkedNonViable: 0,
+                    parkedLimit: 4,
+                    BountyChallengeAvailability.DailyLimit));
+        }
+    }
+
+    [Fact]
+    public void ViableBounties_NeverConsumeTheParkingBudget()
+    {
+        foreach (int number in new[] { 2, 4, 5, 6 })
+        {
+            Assert.False(
+                BountyPlanner.ShouldReroll(
+                    number,
+                    parkedNonViable: 4,
+                    parkedLimit: 0,
+                    BountyChallengeAvailability.Available));
+        }
+    }
+
+    [Fact]
+    public void RoutePlanner_MergesOverlappingRoseKingdomObjectives()
+    {
+        BountyActiveProgress[] active =
+        [
+            Active(5),
+            Active(9),
+        ];
+
+        IReadOnlyList<BountyWorkRoute> routes =
+            BountyPlanner.BuildRoutes(
+                active,
+                BountyChallengeAvailability.Available);
+
+        BountyWorkRoute infinite = Assert.Single(
+            routes,
+            route =>
+                route.Kind ==
+                BountyObjectiveKind.InfiniteWave);
+        Assert.Equal(ChallengeMapId.RoseKingdom, infinite.Map);
+        Assert.Equal(45, infinite.TargetWave);
+        Assert.Equal(new[] { 5, 9 }, infinite.CoveredBounties);
+    }
+
+    [Fact]
+    public void RoutePlanner_CompletesAllLowerWaveObjectivesOnTheSameMap()
+    {
+        BountyActiveProgress[] active =
+        [
+            Active(2),
+            Active(4),
+        ];
+
+        IReadOnlyList<BountyWorkRoute> routes =
+            BountyPlanner.BuildRoutes(
+                active,
+                BountyChallengeAvailability.Available);
+
+        Assert.Contains(
+            routes,
+            route =>
+                route.Kind ==
+                    BountyObjectiveKind.RaidActOne &&
+                route.CoveredBounties.SequenceEqual(
+                    new[] { 2, 4 }));
+        Assert.Contains(
+            routes,
+            route =>
+                route.Kind ==
+                    BountyObjectiveKind.InfiniteWave &&
+                route.Map ==
+                    ChallengeMapId.SchoolGrounds &&
+                route.TargetWave == 30 &&
+                route.CoveredBounties.SequenceEqual(
+                    new[] { 2, 4 }));
+        Assert.Contains(
+            routes,
+            route =>
+                route.Kind ==
+                    BountyObjectiveKind.InfiniteWave &&
+                route.Map ==
+                    ChallengeMapId.FairyKingForest &&
+                route.TargetWave == 30 &&
+                route.CoveredBounties.SequenceEqual(
+                    new[] { 2, 4 }));
+    }
+
+    [Fact]
+    public void CompletedRoute_UpdatesOnlyCoveredObjectives()
+    {
+        BountyActiveProgress[] active =
+        [
+            Active(5),
+            Active(9),
+        ];
+        BountyWorkRoute route = new()
+        {
+            Kind = BountyObjectiveKind.InfiniteWave,
+            Map = ChallengeMapId.RoseKingdom,
+            TargetWave = 45,
+            CoveredBounties = [5, 9],
+        };
+
+        IReadOnlyList<BountyActiveProgress> updated =
+            BountyPlanner.ApplyCompletedRoute(
+                active,
+                route);
+
+        Assert.True(
+            BountyPlanner.IsComplete(
+                updated.Single(value =>
+                    value.Number == 5)));
+        BountyActiveProgress conditional =
+            updated.Single(value =>
+                value.Number == 9);
+        Assert.Equal(
+            1,
+            conditional.ProgressFor("rk-45"));
+        Assert.Equal(
+            0,
+            conditional.ProgressFor("challenge-1"));
+        Assert.False(
+            BountyPlanner.IsComplete(conditional));
+    }
+
+    [Fact]
+    public void UtcDailyReset_ClearsClaimCountButKeepsActiveProgress()
+    {
+        DateTimeOffset previous =
+            new(2026, 7, 30, 23, 59, 0, TimeSpan.Zero);
+        BountyProgressState state = new()
+        {
+            DailyEpochUtc =
+                BountyProgressState.UtcDay(previous),
+            ClaimedToday = 8,
+            Active = [Active(6)],
+        };
+
+        BountyProgressState next = state.AdvanceDay(
+            previous.AddMinutes(2));
+
+        Assert.Equal(0, next.ClaimedToday);
+        Assert.Single(next.Active);
+        Assert.Equal(6, next.Active[0].Number);
+    }
+
+    [Fact]
+    public void RequiredRoutes_AreRaidActOneAndEveryStoryInfiniteMap()
+    {
+        Assert.Collection(
+            BountyCatalog.RequiredPlacementTargets,
+            raid =>
+            {
+                Assert.Equal(PlacementTargetMode.Raid, raid.Mode);
+                Assert.Equal(1, raid.MapNumber);
+                Assert.Equal(1, raid.ActNumber);
+            },
+            story => AssertInfinite(story, 1),
+            story => AssertInfinite(story, 2),
+            story => AssertInfinite(story, 3),
+            story => AssertInfinite(story, 4),
+            story => AssertInfinite(story, 5));
+    }
+
+    [Fact]
+    public void StoryInfiniteDependencies_CoverEveryChallengeMap()
+    {
+        ChallengeMapId[] challengeMaps =
+            Enum.GetValues<ChallengeMapId>();
+        PlacementTarget[] storyMaps =
+            BountyCatalog.RequiredPlacementTargets
+                .Where(target =>
+                    target.Mode ==
+                    PlacementTargetMode.Story)
+                .ToArray();
+
+        Assert.Equal(
+            challengeMaps.Select(map => (int)map),
+            storyMaps.Select(target =>
+                target.MapNumber));
+        Assert.All(
+            storyMaps,
+            target =>
+                Assert.Equal(
+                    StoryRunKind.Infinite,
+                    target.StoryRunKind));
+    }
+
+    private static BountyActiveProgress Active(
+        int number) =>
+        new()
+        {
+            Number = number,
+        };
+
+    private static void AssertInfinite(
+        PlacementTarget target,
+        int map)
+    {
+        Assert.Equal(PlacementTargetMode.Story, target.Mode);
+        Assert.Equal(map, target.MapNumber);
+        Assert.Equal(StoryRunKind.Infinite, target.StoryRunKind);
+    }
+}

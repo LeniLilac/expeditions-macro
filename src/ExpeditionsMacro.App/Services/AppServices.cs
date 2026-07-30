@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows.Threading;
+using ExpeditionsMacro.Automation.Bounties;
 using ExpeditionsMacro.Automation.Camera;
 using ExpeditionsMacro.Automation.Challenges;
 using ExpeditionsMacro.Automation.Diagnostics;
@@ -50,6 +51,8 @@ public sealed class AppServices : IDisposable
         StoryPresets = new StoryPresetRepository(Paths);
         RaidPresets = new RaidPresetRepository(Paths);
         MacroPlans = new MacroPlanRepository(Paths);
+        BountyStates =
+            new BountyStateRepository(Paths);
         FastNoAlignShare = new FastNoAlignShareService(
             MacroPlans,
             PlacementModels,
@@ -226,6 +229,9 @@ public sealed class AppServices : IDisposable
             _discord,
             FastNoAlign,
             ManualRoutes);
+        Bounties = new BountyMacroRunner(
+            Automation,
+            BountyStates);
         Hotkey.Pressed += (_, _) =>
         {
             DeepDebug.RecordEvent("input", "global_hotkey_pressed", new { Hotkey = Hotkey.DisplayName, CoordinatorState = Coordinator.State });
@@ -244,6 +250,7 @@ public sealed class AppServices : IDisposable
     public StoryPresetRepository StoryPresets { get; }
     public RaidPresetRepository RaidPresets { get; }
     public MacroPlanRepository MacroPlans { get; }
+    public BountyStateRepository BountyStates { get; }
     public FastNoAlignShareService FastNoAlignShare { get; }
     public PresetDeletionService PresetDeletion { get; }
     public DetectorPackRepository DetectorPacks { get; }
@@ -274,6 +281,7 @@ public sealed class AppServices : IDisposable
     public ChallengeMacroRunner Challenges { get; }
     public ExpeditionMacroRunner Expeditions { get; }
     public EventMacroRunner Events { get; }
+    public BountyMacroRunner Bounties { get; }
     public AppSettings Settings { get; private set; } = new();
 
     public event EventHandler? SettingsChanged;

@@ -12,22 +12,29 @@ public sealed class MacroTaskRow
     public required MacroTaskProgress Progress { get; init; }
 
     public string Name => string.IsNullOrWhiteSpace(Definition.Name) ? Definition.PresetId : Definition.Name;
-    public string Type => Definition.Kind ==
-            MacroTaskKind.Utility
-        ? "Utilities"
-        : Definition.Kind.ToString();
+    public string Type => Definition.Kind switch
+    {
+        MacroTaskKind.Utility => "Utilities",
+        MacroTaskKind.Bounty => "Bounty",
+        _ => Definition.Kind.ToString(),
+    };
     public string LoopLabel =>
         $"#{Definition.Priority}  {Type} · {Name}";
-    public string Target => Definition.Kind ==
-            MacroTaskKind.Utility
-        ? $"Every {Definition.RefuelIntervalMinutes} min"
-        : Definition.IsRecurring
-        ? "Every reset"
-        : Definition.CompleteOnRuntimeDefeat
-            ? $"{Definition.TargetRuntimeMinutes / 60d:0.#} h, then defeat"
-            : $"{Definition.TargetVictories} victories";
-    public string Status => Definition.Kind ==
-            MacroTaskKind.Utility
+    public string Target => Definition.Kind switch
+    {
+        MacroTaskKind.Utility =>
+            $"Every {Definition.RefuelIntervalMinutes} min",
+        MacroTaskKind.Bounty =>
+            $"Park {Definition.BountyParkedNonViableLimit} non-viable",
+        _ when Definition.IsRecurring => "Every reset",
+        _ =>
+            Definition.CompleteOnRuntimeDefeat
+                ? $"{Definition.TargetRuntimeMinutes / 60d:0.#} h, then defeat"
+                : $"{Definition.TargetVictories} victories",
+    };
+    public string Status => Definition.Kind is
+            MacroTaskKind.Utility or
+            MacroTaskKind.Bounty
         ? Progress.NextEligibleAtUtc is DateTimeOffset utilityNext
             ? $"Due {utilityNext.LocalDateTime:t}"
             : "Ready"

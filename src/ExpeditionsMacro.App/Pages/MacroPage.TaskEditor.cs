@@ -23,7 +23,7 @@ public partial class MacroPage
         SelectionChangedEventArgs e) =>
         UpdateTaskTargetEditor();
 
-    private void AddOrUpdateTask_Click(
+    private async void AddOrUpdateTask_Click(
         object sender,
         RoutedEventArgs e)
     {
@@ -31,6 +31,8 @@ public partial class MacroPage
         {
             MacroTaskDefinition definition =
                 BuildPlacementSetupTask();
+            await ValidateBountyTaskAsync(
+                definition);
             int existingIndex =
                 IndexOfTask(_editingTaskId);
             MacroTaskProgress progress =
@@ -83,7 +85,8 @@ public partial class MacroPage
         bool utility = kind == MacroTaskKind.Utility;
         PlacementSetupRoute? route =
             kind is MacroTaskKind.Challenge or
-                MacroTaskKind.Utility
+                MacroTaskKind.Utility or
+                MacroTaskKind.Bounty
                 ? null
                 : TaskRouteCombo.SelectedItem as
                     PlacementSetupRoute
@@ -101,7 +104,9 @@ public partial class MacroPage
                 PlacementTargetMode.Story &&
             route.Target.StoryRunKind ==
                 StoryRunKind.Infinite;
-        int target = kind == MacroTaskKind.Challenge
+        int target = kind is
+                MacroTaskKind.Challenge or
+                MacroTaskKind.Bounty
             ? 1
             : ParsePositiveInt(
                 TaskTargetText,
@@ -112,7 +117,8 @@ public partial class MacroPage
                     : "Victory target");
         int retries = kind is
                 MacroTaskKind.Expedition or
-                MacroTaskKind.Utility
+                MacroTaskKind.Utility or
+                MacroTaskKind.Bounty
             ? 0
             : ParseWholeNumber(
                 TaskDefeatRetriesText,
@@ -137,6 +143,8 @@ public partial class MacroPage
                 "Challenge rotation",
             MacroTaskKind.Utility =>
                 utilityRoute!.Name,
+            MacroTaskKind.Bounty =>
+                "Mythic Bounty Board",
             _ => route!.Name,
         };
         MacroTaskDefinition definition =
@@ -173,6 +181,8 @@ public partial class MacroPage
                         ResourceRefuelTarget.GoldMine,
                     RefuelIntervalMinutes =
                         utility ? target : 60,
+                    BountyParkedNonViableLimit =
+                        (int)BountyParkedSlider.Value,
                 });
         definition.Validate();
         return definition;
@@ -180,8 +190,9 @@ public partial class MacroPage
 
     private void BeginTaskEdit(MacroTaskRow row)
     {
-        if (row.Definition.Kind !=
-                MacroTaskKind.Utility &&
+        if (row.Definition.Kind is not
+                (MacroTaskKind.Utility or
+                 MacroTaskKind.Bounty) &&
             !row.Definition.UsesPlacementSetup)
         {
             ShowPlanBlocksStatus(
@@ -257,6 +268,8 @@ public partial class MacroPage
                 CultureInfo.InvariantCulture);
         TaskHardModeCheck.IsChecked =
             definition.HardMode;
+        BountyParkedSlider.Value =
+            definition.BountyParkedNonViableLimit;
         TaskDifficultyCombo.SelectedItem =
             TaskDifficultyCombo.Items
                 .Cast<NamedChoice<int>>()
@@ -274,6 +287,12 @@ public partial class MacroPage
             TaskRouteCombo.SelectedItem as
                 PlacementSetupRoute;
         MacroTaskKind kind = SelectedTaskKind();
+        if (kind == MacroTaskKind.Bounty)
+        {
+            TaskRouteCombo.ItemsSource = null;
+            HideTaskEditorError();
+            return;
+        }
         if (kind == MacroTaskKind.Utility)
         {
             TaskRouteCombo.ItemsSource =
@@ -346,6 +365,8 @@ public partial class MacroPage
             kind == MacroTaskKind.Challenge;
         bool utility =
             kind == MacroTaskKind.Utility;
+        bool bounty =
+            kind == MacroTaskKind.Bounty;
         bool expedition =
             kind == MacroTaskKind.Expedition;
         bool story =
@@ -365,33 +386,37 @@ public partial class MacroPage
 
         TaskSelectionLabel.Text = "Route";
         TaskSelectionPanel.Visibility =
-            challenge
+            challenge || bounty
                 ? Visibility.Collapsed
                 : Visibility.Visible;
         TaskSelectionGapColumn.Width =
-            challenge
+            challenge || bounty
                 ? new GridLength(0)
                 : new GridLength(16);
         TaskSelectionColumn.Width =
-            challenge
+            challenge || bounty
                 ? new GridLength(0)
                 : new GridLength(
                     1,
                     GridUnitType.Star);
         TaskTargetColumn.Width =
-            challenge
+            challenge || bounty
                 ? new GridLength(
                     1,
                     GridUnitType.Star)
                 : new GridLength(132);
         TaskRouteCombo.Visibility =
-            challenge
+            challenge || bounty
                 ? Visibility.Collapsed
                 : Visibility.Visible;
         FastTaskOptionsPanel.Visibility =
-            utility
+            utility || bounty
                 ? Visibility.Collapsed
                 : Visibility.Visible;
+        BountyTaskOptionsPanel.Visibility =
+            bounty
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         TaskDefeatRetriesPanel.Visibility =
             retries
                 ? Visibility.Visible
@@ -417,21 +442,25 @@ public partial class MacroPage
                 : Visibility.Collapsed;
         TaskTargetLabel.Text = challenge
             ? "Schedule"
+            : bounty
+                ? "Schedule"
             : utility
                 ? "Interval, min"
                 : runtime
                 ? "Runtime, min"
                 : "Victories";
         TaskTargetLabel.Visibility =
-            challenge
+            challenge || bounty
                 ? Visibility.Collapsed
                 : Visibility.Visible;
         TaskTargetText.IsEnabled =
-            !challenge &&
+            !challenge && !bounty &&
             !_services.Coordinator.IsBusy;
-        if (challenge)
+        if (challenge || bounty)
         {
-            TaskTargetText.Text = "Every reset";
+            TaskTargetText.Text = bounty
+                ? "Daily reset · UTC"
+                : "Every reset";
         }
         else if (utility &&
                  !int.TryParse(
@@ -462,19 +491,4 @@ public partial class MacroPage
         StoryHardModePolicy.SupportsHardMode(
             route.Target);
 
-    private static int ParseWholeNumber(
-        TextBox field,
-        string label,
-        int minimum,
-        int maximum) =>
-        int.TryParse(
-            field.Text.Trim(),
-            NumberStyles.Integer,
-            CultureInfo.InvariantCulture,
-            out int value) &&
-        value >= minimum &&
-        value <= maximum
-            ? value
-            : throw new InvalidDataException(
-                $"{label} must be {minimum} through {maximum}.");
 }

@@ -89,6 +89,16 @@ public partial class MacroPage
                 areasMenuKey,
                 progress,
                 cancellationToken),
+            MacroTaskKind.Bounty => ExecuteBountyAsync(
+                task,
+                webhook,
+                playMenuKey,
+                unitMenuKey,
+                cancelPlacementKey,
+                macroTotals,
+                challengeRotation,
+                progress,
+                cancellationToken),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(task),
                 task.Kind,

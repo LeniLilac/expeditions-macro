@@ -62,6 +62,10 @@ public partial class MacroPage
                 throw new InvalidOperationException(
                     "Event routes require Fast no align Placement Setup."),
             MacroTaskKind.Utility => [],
+            MacroTaskKind.Bounty =>
+                await ResolveBountyPlacementsAsync(
+                        cancellationToken)
+                    .ConfigureAwait(false),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(task),
                 task.Kind,
@@ -117,6 +121,10 @@ public partial class MacroPage
                     .Placement,
                 ],
             MacroTaskKind.Utility => [],
+            MacroTaskKind.Bounty =>
+                await ResolveBountyPlacementsAsync(
+                        cancellationToken)
+                    .ConfigureAwait(false),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(task),
                 task.Kind,
