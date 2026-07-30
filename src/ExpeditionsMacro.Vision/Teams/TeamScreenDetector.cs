@@ -72,19 +72,23 @@ public static class TeamScreenDetector
             return Trace(new TeamScreenMatch(TeamScreenState.LoadConfirm, confidence, action?.X, action?.Y));
         }
 
-        double teams = TeamsBaseScore(image);
-        if (teams >= 0.70)
+        double units = UnitsScore(image);
+        (int X, int Y)? teamsAction =
+            ActionButtonDetector.ActionFor(image, "units_teams");
+        if (units >= 0.70 && teamsAction is not null)
         {
-            return Trace(new TeamScreenMatch(TeamScreenState.Teams, teams));
+            return Trace(new TeamScreenMatch(
+                TeamScreenState.Units,
+                units,
+                teamsAction.Value.X,
+                teamsAction.Value.Y));
         }
 
-        double units = UnitsScore(image);
-        return Trace(units >= 0.70
-            ? new TeamScreenMatch(TeamScreenState.Units, units)
+        double teams = TeamsBaseScore(image);
+        return Trace(teams >= 0.70
+            ? new TeamScreenMatch(TeamScreenState.Teams, teams)
             : new TeamScreenMatch(TeamScreenState.None, Math.Max(units, teams)));
     }
-
-    public static (int X, int Y) TeamsTabAction => (305, 427);
 
     public static int ScrollThumbOffsetY(int teamSlot)
     {
