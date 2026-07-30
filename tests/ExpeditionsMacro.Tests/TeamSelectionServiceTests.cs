@@ -32,7 +32,7 @@ public sealed class TeamSelectionServiceTests
         List<string> expected =
         [
             "key:U",
-            $"click:{TeamScreenDetector.TeamsTabAction.X},{TeamScreenDetector.TeamsTabAction.Y}",
+            $"click:{automation.UnitsTeamsAction.X},{automation.UnitsTeamsAction.Y}",
         ];
         TeamScrollbarThumb initialThumb = TeamScreenDetector.FindScrollbarThumb(automation.InitialTeamFrame)!.Value;
         if (teamSlot != 1)
@@ -79,6 +79,101 @@ public sealed class TeamSelectionServiceTests
 
         Assert.Contains("808 by 611", error.Message, StringComparison.Ordinal);
         Assert.Equal(["key:U"], automation.Actions);
+    }
+
+    [Fact]
+    public async Task Select_RetriesWhenVerifiedUnitInventoryRemainsOpen()
+    {
+        FakeAutomation automation = new(
+            teamSlot: 1,
+            equipmentFixture: "TeamEquipmentConfirm_01.png",
+            ignoredTeamsTabClicks: 1);
+        TeamSelectionService service = new(automation);
+
+        await service.SelectAsync(
+            automation.Window,
+            teamSlot: 1,
+            unitMenuKey: 'u');
+
+        Assert.Equal(
+            2,
+            automation.Actions.Count(action =>
+                action ==
+                    $"click:{automation.UnitsTeamsAction.X},{automation.UnitsTeamsAction.Y}"));
+        Assert.Equal(TeamScreenState.None, automation.State);
+    }
+
+    [Fact]
+    public async Task Select_StopsAfterTwoIgnoredVerifiedTeamsActions()
+    {
+        FakeAutomation automation = new(
+            teamSlot: 1,
+            equipmentFixture: "TeamEquipmentConfirm_01.png",
+            ignoredTeamsTabClicks: 2);
+        TeamSelectionService service = new(automation);
+
+        RobloxUiUnavailableException error =
+            await Assert.ThrowsAsync<RobloxUiUnavailableException>(
+                () => service.SelectAsync(
+                    automation.Window,
+                    teamSlot: 1,
+                    unitMenuKey: 'u'));
+
+        Assert.Contains(
+            "after 2 verified click attempts",
+            error.Message,
+            StringComparison.Ordinal);
+        Assert.Equal(
+            2,
+            automation.Actions.Count(action =>
+                action ==
+                    $"click:{automation.UnitsTeamsAction.X},{automation.UnitsTeamsAction.Y}"));
+    }
+
+    [Fact]
+    public async Task Select_FieldUnitInventoryUsesItsLiveTeamsAction()
+    {
+        FakeAutomation automation = new(
+            teamSlot: 1,
+            equipmentFixture: "TeamEquipmentConfirm_01.png",
+            unitsFixture: "TeamUnits_CurrentGreenDecoys_01.png");
+        TeamSelectionService service = new(automation);
+
+        await service.SelectAsync(
+            automation.Window,
+            teamSlot: 1,
+            unitMenuKey: 'u');
+
+        Assert.Equal((305, 452), automation.UnitsTeamsAction);
+        Assert.Contains(
+            "click:305,452",
+            automation.Actions);
+        Assert.Equal(TeamScreenState.None, automation.State);
+    }
+
+    [Fact]
+    public async Task Select_SlowOwnerObservationsCompleteTheVerifiedTransition()
+    {
+        FakeAutomation automation = new(
+            teamSlot: 1,
+            equipmentFixture: "TeamEquipmentConfirm_01.png");
+        DateTimeOffset now = DateTimeOffset.UnixEpoch;
+        automation.CaptureObserved =
+            () => now += TimeSpan.FromSeconds(8);
+        TeamSelectionService service = new(
+            automation,
+            () => now,
+            static (_, _) => Task.CompletedTask);
+
+        await service.SelectAsync(
+            automation.Window,
+            teamSlot: 1,
+            unitMenuKey: 'u');
+
+        Assert.Contains(
+            $"click:{automation.UnitsTeamsAction.X},{automation.UnitsTeamsAction.Y}",
+            automation.Actions);
+        Assert.Equal(TeamScreenState.None, automation.State);
     }
 
     [Fact]
@@ -321,6 +416,7 @@ public sealed class TeamSelectionServiceTests
         private readonly Queue<ImageFrame>
             _topDragFrames;
         private Queue<ImageFrame> _pendingOpeningFrames = [];
+        private int _ignoredTeamsTabClicks;
 
         private ImageFrame _teamFrame;
 
@@ -333,7 +429,10 @@ public sealed class TeamSelectionServiceTests
             IReadOnlyList<string>?
                 settledDragFixtures = null,
             IReadOnlyList<string>?
-                topDragFixtures = null)
+                topDragFixtures = null,
+            int ignoredTeamsTabClicks = 0,
+            string unitsFixture =
+                "TeamUnits_01.png")
         {
             _teamSlot = teamSlot;
             _openingFrames = openingFixtures?.Select(Load).ToArray() ?? [];
@@ -350,10 +449,12 @@ public sealed class TeamSelectionServiceTests
             InitialTeamFrame = Load(initialTeamFixture);
             AlignedTeamFrame = Load(TeamFixture(teamSlot));
             _teamFrame = InitialTeamFrame;
+            _ignoredTeamsTabClicks =
+                ignoredTeamsTabClicks;
             _frames = new Dictionary<TeamScreenState, ImageFrame>
             {
                 [TeamScreenState.None] = Load("GameModeNegative_01.png"),
-                [TeamScreenState.Units] = Load("TeamUnits_01.png"),
+                [TeamScreenState.Units] = Load(unitsFixture),
                 [TeamScreenState.LoadConfirm] = Load(LoadConfirmFixture(teamSlot)),
                 [TeamScreenState.EquipmentConfirm] = Load(equipmentFixture),
             };
@@ -361,6 +462,9 @@ public sealed class TeamSelectionServiceTests
             EquipmentAction = (match.ActionX!.Value, match.ActionY!.Value);
             match = TeamScreenDetector.Detect(_frames[TeamScreenState.LoadConfirm]);
             LoadConfirmAction = (match.ActionX!.Value, match.ActionY!.Value);
+            match = TeamScreenDetector.Detect(_frames[TeamScreenState.Units]);
+            UnitsTeamsAction =
+                (match.ActionX!.Value, match.ActionY!.Value);
         }
 
         public RobloxWindow Window { get; } = new((nint)42, "Roblox");
@@ -376,6 +480,8 @@ public sealed class TeamSelectionServiceTests
         public (int X, int Y) EquipmentAction { get; }
 
         public (int X, int Y) LoadConfirmAction { get; }
+
+        public (int X, int Y) UnitsTeamsAction { get; }
 
         public List<string> Actions { get; } = [];
 
@@ -428,8 +534,15 @@ public sealed class TeamSelectionServiceTests
         public Task ClickClientAsync(RobloxWindow window, int x, int y, CancellationToken cancellationToken)
         {
             Actions.Add($"click:{x},{y}");
-            if (State == TeamScreenState.Units && (x, y) == TeamScreenDetector.TeamsTabAction)
+            if (State == TeamScreenState.Units &&
+                (x, y) == UnitsTeamsAction)
             {
+                if (_ignoredTeamsTabClicks > 0)
+                {
+                    _ignoredTeamsTabClicks--;
+                    return Task.CompletedTask;
+                }
+
                 _teamFrame = InitialTeamFrame;
                 _pendingOpeningFrames = new Queue<ImageFrame>(
                     _openingFrames);

@@ -8,6 +8,7 @@ public sealed class TeamScreenDetectorTests
 {
     [Theory]
     [InlineData("TeamUnits_01.png", TeamScreenState.Units)]
+    [InlineData("TeamUnits_CurrentGreenDecoys_01.png", TeamScreenState.Units)]
     [InlineData("TeamList_01.png", TeamScreenState.Teams)]
     [InlineData("TeamList_Top_BackgroundDecoy_01.png", TeamScreenState.Teams)]
     [InlineData("TeamList_Aligned_Team1_Current_01.png", TeamScreenState.Teams)]
@@ -85,7 +86,6 @@ public sealed class TeamScreenDetectorTests
     [Fact]
     public void TeamActions_UseTheReviewedClientRelativeControls()
     {
-        Assert.Equal((305, 427), TeamScreenDetector.TeamsTabAction);
         Assert.Equal(240, TeamScreenDetector.TopScrollbarCenterY);
         Assert.Equal(190, TeamScreenDetector.TopScrollbarDragLimitY);
         Assert.Equal(440, TeamScreenDetector.BottomScrollbarDragLimitY);
@@ -93,6 +93,34 @@ public sealed class TeamScreenDetectorTests
             Enumerable.Range(1, 8).Select(TeamScreenDetector.ScrollThumbOffsetY));
         Assert.Equal((345, 331), TeamScreenDetector.LoadConfirmAction);
         Assert.Equal((319, 376), TeamScreenDetector.IncludeEquipmentAction);
+    }
+
+    [Theory]
+    [InlineData("TeamUnits_01.png")]
+    [InlineData("TeamUnits_CurrentGreenDecoys_01.png")]
+    public void UnitInventory_MapsTheLiveTeamsAction(
+        string fileName)
+    {
+        TeamScreenMatch match =
+            TeamScreenDetector.Detect(Load(fileName));
+
+        Assert.Equal(TeamScreenState.Units, match.State);
+        Assert.InRange(match.ActionX!.Value, 285, 315);
+        Assert.InRange(match.ActionY!.Value, 435, 460);
+    }
+
+    [Fact]
+    public void FieldUnitInventory_DoesNotBorrowGreenTeamRows()
+    {
+        ImageFrame image =
+            Load("TeamUnits_CurrentGreenDecoys_01.png");
+
+        TeamScreenMatch match =
+            TeamScreenDetector.Detect(image);
+
+        Assert.Equal(TeamScreenState.Units, match.State);
+        Assert.Equal((305, 452), (match.ActionX, match.ActionY));
+        Assert.Null(TeamScreenDetector.FindScrollbarThumb(image));
     }
 
     [Fact]
@@ -219,6 +247,7 @@ public sealed class TeamScreenDetectorTests
 
     [Theory]
     [InlineData("TeamUnits_01.png")]
+    [InlineData("TeamUnits_CurrentGreenDecoys_01.png")]
     [InlineData("GameModeNegative_01.png")]
     public void NonTeamLists_DoNotExposeAScrollbarThumb(string fileName)
     {

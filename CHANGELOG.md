@@ -4,6 +4,16 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.44] - 2026-07-30
+
+### Fixed
+
+- Saved-team preparation now distinguishes Unit Inventory from the Unit Teams list before advancing, clicks the live detected Teams action instead of a stale coordinate, and boundedly retries when the verified Unit Inventory remains open.
+
+### Tests
+
+- Passed 1,384 application and detector tests plus 5 Deep Debug Viewer tests.
+
 ## [1.3.0-beta.43] - 2026-07-30
 
 ### Added
@@ -1174,7 +1184,9 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.42...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.44...HEAD
+[1.3.0-beta.44]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.43...v1.3.0-beta.44
+[1.3.0-beta.43]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.42...v1.3.0-beta.43
 [1.3.0-beta.42]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.41...v1.3.0-beta.42
 [1.3.0-beta.41]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.40...v1.3.0-beta.41
 [1.3.0-beta.40]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.39...v1.3.0-beta.40

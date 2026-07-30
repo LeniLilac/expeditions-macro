@@ -52,20 +52,14 @@ public sealed class TeamSelectionService
         EnsureFocus(window);
 
         progress?.Report(new Core.Runtime.MacroProgress("Team", 4, $"Opening Units to load Team {teamSlot}."));
-        EnsureFocus(window);
-        await _automation.TapLetterKeyAsync(window, char.ToUpperInvariant(unitMenuKey), cancellationToken).ConfigureAwait(false);
-        TeamScreenMatch opened = await WaitForAsync(
-            window,
-            state => state is TeamScreenState.Units or TeamScreenState.Teams,
-            TimeSpan.FromSeconds(6),
-            cancellationToken).ConfigureAwait(false);
-        if (opened.State == TeamScreenState.Units)
-        {
-            (int x, int y) = TeamScreenDetector.TeamsTabAction;
-            EnsureFocus(window);
-            await _automation.ClickClientAsync(window, x, y, cancellationToken).ConfigureAwait(false);
-            await WaitForAsync(window, state => state == TeamScreenState.Teams, TimeSpan.FromSeconds(6), cancellationToken).ConfigureAwait(false);
-        }
+        await new TeamListOpeningTransaction(
+            _automation,
+            _utcNow,
+            _delay).OpenAsync(
+                window,
+                unitMenuKey,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         progress?.Report(new Core.Runtime.MacroProgress("Team", 6, $"Loading Team {teamSlot}."));
         TeamScreenMatch loadConfirm = await OpenLoadConfirmationAsync(
