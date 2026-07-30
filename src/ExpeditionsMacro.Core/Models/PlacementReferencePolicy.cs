@@ -48,7 +48,8 @@ public static class PlacementReferencePolicy
 
             if (step.Kind is
                 MatchStepKind.ReconfigureUnit or
-                MatchStepKind.UpgradeUnit)
+                MatchStepKind.UpgradeUnit or
+                MatchStepKind.SellUnit)
             {
                 PlacementStep? target =
                     FindTarget(placements, step);
@@ -83,6 +84,8 @@ public static class PlacementReferencePolicy
         ArgumentNullException.ThrowIfNull(steps);
         Dictionary<string, PlacementStep> placements =
             new(StringComparer.Ordinal);
+        HashSet<string> soldPlacements =
+            new(StringComparer.Ordinal);
         foreach (PlacementStep step in steps)
         {
             if (step.Kind == MatchStepKind.Placement)
@@ -99,7 +102,8 @@ public static class PlacementReferencePolicy
 
             if (step.Kind is not
                 (MatchStepKind.ReconfigureUnit or
-                 MatchStepKind.UpgradeUnit))
+                 MatchStepKind.UpgradeUnit or
+                 MatchStepKind.SellUnit))
             {
                 continue;
             }
@@ -115,6 +119,17 @@ public static class PlacementReferencePolicy
             {
                 throw new InvalidDataException(
                     "A unit action does not match its referenced placement.");
+            }
+            if (soldPlacements.Contains(
+                    step.TargetPlacementId))
+            {
+                throw new InvalidDataException(
+                    "A unit action cannot target a unit after its Sell Unit step.");
+            }
+            if (step.Kind == MatchStepKind.SellUnit)
+            {
+                soldPlacements.Add(
+                    step.TargetPlacementId);
             }
         }
     }
@@ -160,7 +175,8 @@ public static class PlacementReferencePolicy
         ArgumentNullException.ThrowIfNull(action);
         if (action.Kind is not
             (MatchStepKind.ReconfigureUnit or
-             MatchStepKind.UpgradeUnit))
+             MatchStepKind.UpgradeUnit or
+             MatchStepKind.SellUnit))
         {
             throw new ArgumentException(
                 "Only unit actions reference a placement.",
@@ -175,6 +191,32 @@ public static class PlacementReferencePolicy
                        StringComparison.Ordinal)) ??
             throw new InvalidDataException(
                 "A unit action references a placement that is no longer available.");
+    }
+
+    public static IReadOnlyList<PlacementStep>
+        RemovePlacementAndReferences(
+            IReadOnlyList<PlacementStep> steps,
+            string placementId)
+    {
+        ArgumentNullException.ThrowIfNull(steps);
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            placementId);
+        return steps.Where(step =>
+                !(step.Kind ==
+                      MatchStepKind.Placement &&
+                  string.Equals(
+                      step.PlacementId,
+                      placementId,
+                      StringComparison.Ordinal)) &&
+                !(step.Kind is
+                      MatchStepKind.ReconfigureUnit or
+                      MatchStepKind.UpgradeUnit or
+                      MatchStepKind.SellUnit &&
+                  string.Equals(
+                      step.TargetPlacementId,
+                      placementId,
+                      StringComparison.Ordinal)))
+            .ToArray();
     }
 
     public static bool IsValidId(string? value) =>

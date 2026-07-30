@@ -58,7 +58,7 @@ internal sealed class ResourceRefuelNavigator
     internal async Task PrepareScheduledLobbyAsync(
         RobloxWindow window,
         IDetectorPack detector,
-        char playMenuKey,
+        char areasMenuKey,
         CancellationToken cancellationToken)
     {
         await _screens.EnsureCanonicalClientAsync(
@@ -129,28 +129,78 @@ internal sealed class ResourceRefuelNavigator
                 cancellationToken).ConfigureAwait(false);
         }
 
-        await ClosePlayToLobbyAsync(
+        await ReturnToLobbyViaAreasAsync(
             window,
             detector,
-            playMenuKey,
+            areasMenuKey,
             cancellationToken).ConfigureAwait(false);
     }
 
-    internal async Task ClosePlayToLobbyAsync(
+    internal async Task ReturnToLobbyViaAreasAsync(
         RobloxWindow window,
         IDetectorPack detector,
-        char playMenuKey,
+        char areasMenuKey,
         CancellationToken cancellationToken)
     {
-        _screens.RequireFocus(window);
-        await _automation.TapLetterKeyAsync(
+        await _screens.EnsureCanonicalClientAsync(
             window,
-            playMenuKey,
+            cancellationToken).ConfigureAwait(false);
+        if (await _screens.TryWaitForLobbyAsync(
+                window,
+                detector,
+                TimeSpan.FromSeconds(2),
+                cancellationToken).ConfigureAwait(false))
+        {
+            await EnsureChatClosedAsync(
+                window,
+                cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        AreasScreenMatch areas =
+            AreasScreenDetector.Detect(
+                _screens.Capture(window));
+        if (areas.State == AreasScreenState.None)
+        {
+            await _automation.TapLetterKeyAsync(
+                window,
+                areasMenuKey,
+                cancellationToken).ConfigureAwait(false);
+        }
+        areas = await _screens.WaitForAreasAsync(
+            window,
+            state => state != AreasScreenState.None,
+            TimeSpan.FromSeconds(6),
+            cancellationToken).ConfigureAwait(false);
+
+        if (areas.State != AreasScreenState.Lobby)
+        {
+            if (areas.LobbyTabActionX is not int tabX ||
+                areas.LobbyTabActionY is not int tabY)
+            {
+                throw new RobloxUiUnavailableException(
+                    "The Areas interface did not expose the verified Lobby category action.");
+            }
+            await _screens.ClickAsync(
+                window,
+                tabX,
+                tabY,
+                cancellationToken).ConfigureAwait(false);
+            areas = await _screens.WaitForAreasAsync(
+                window,
+                state => state == AreasScreenState.Lobby,
+                TimeSpan.FromSeconds(6),
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        await _screens.ClickAsync(
+            window,
+            areas,
             cancellationToken).ConfigureAwait(false);
         await _screens.WaitForLobbyAsync(
             window,
             detector,
-            TimeSpan.FromSeconds(8),
+            TimeSpan.FromMinutes(1),
             cancellationToken).ConfigureAwait(false);
         await EnsureChatClosedAsync(
             window,

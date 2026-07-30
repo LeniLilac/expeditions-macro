@@ -334,12 +334,16 @@ public sealed class CoreModelTests
         AppSettings settings = new()
         {
             ChangeUnitTargetingKey = "t",
+            SellUnitKey = "x",
             AutoUpgradeUnitKey = string.Empty,
         };
 
         Assert.Equal(
             'T',
             AppSettings.ParseChangeUnitTargetingKey(settings));
+        Assert.Equal(
+            'X',
+            AppSettings.ParseSellUnitKey(settings));
         Assert.Throws<InvalidDataException>(
             () => AppSettings.ParseAutoUpgradeUnitKey(
                 settings));
@@ -356,6 +360,9 @@ public sealed class CoreModelTests
         Assert.Equal(
             string.Empty,
             settings.UpgradeUnitKey);
+        Assert.Equal(
+            string.Empty,
+            settings.SellUnitKey);
         Assert.Equal(
             string.Empty,
             settings.AutoUpgradeUnitKey);
@@ -467,7 +474,7 @@ public sealed class CoreModelTests
                     new AppSettings
                     {
                         PlayMenuKey = "P",
-                        ChangeUnitTargetingKey = "P",
+                        SellUnitKey = "P",
                     },
                     requireUnitActionKeys: false));
     }

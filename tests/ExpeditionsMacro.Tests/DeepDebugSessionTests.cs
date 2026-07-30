@@ -72,6 +72,7 @@ public sealed class DeepDebugSessionTests
             AreasMenuKey = "G",
             ChangeUnitTargetingKey = "T",
             UpgradeUnitKey = "Y",
+            SellUnitKey = "S",
             AutoUpgradeUnitKey = "B",
             ToggleAutoUpgradePlacedUnitsKey = "V",
             ShiftLockVirtualKey = KeyboardKey.RightControl,
@@ -145,6 +146,11 @@ public sealed class DeepDebugSessionTests
             "Y",
             sanitized.RootElement
                 .GetProperty("upgrade_unit_key")
+                .GetString());
+        Assert.Equal(
+            "S",
+            sanitized.RootElement
+                .GetProperty("sell_unit_key")
                 .GetString());
         Assert.Equal(
             "B",

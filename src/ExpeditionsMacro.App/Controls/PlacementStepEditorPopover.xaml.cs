@@ -145,7 +145,24 @@ public partial class PlacementStepEditorPopover : UserControl
                     CultureInfo.CurrentCulture);
         UpdateKindFields();
         ShowError(string.Empty);
-        KindCombo.Focus();
+        SelectedActionButton(step.Kind).Focus();
+    }
+
+    private void ActionKindButton_Checked(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (sender is RadioButton
+            {
+                IsChecked: true,
+                Tag: string kindName,
+            } &&
+            Enum.TryParse(
+                kindName,
+                out MatchStepKind kind))
+        {
+            KindCombo.SelectedValue = kind;
+        }
     }
 
     private void KindCombo_SelectionChanged(
@@ -159,13 +176,15 @@ public partial class PlacementStepEditorPopover : UserControl
             KindCombo.SelectedValue is MatchStepKind value
                 ? value
                 : MatchStepKind.Placement;
+        SyncActionButtons(kind);
         PlacementCoordinatePanel.Visibility =
             kind == MatchStepKind.Placement
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         PlacementReferencePanel.Visibility =
             kind is MatchStepKind.ReconfigureUnit or
-                MatchStepKind.UpgradeUnit
+                MatchStepKind.UpgradeUnit or
+                MatchStepKind.SellUnit
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         PlacementFields.Visibility =
@@ -201,7 +220,8 @@ public partial class PlacementStepEditorPopover : UserControl
             kind == MatchStepKind.Placement;
         bool placementReference =
             kind is MatchStepKind.ReconfigureUnit or
-                MatchStepKind.UpgradeUnit;
+                MatchStepKind.UpgradeUnit or
+                MatchStepKind.SellUnit;
         string targetPlacementId =
             PlacementReferenceCombo.SelectedValue
                 as string ?? string.Empty;
@@ -285,4 +305,21 @@ public partial class PlacementStepEditorPopover : UserControl
         CancelRequested?.Invoke(
             this,
             EventArgs.Empty);
+
+    private void SyncActionButtons(
+        MatchStepKind kind) =>
+        SelectedActionButton(kind).IsChecked = true;
+
+    private RadioButton SelectedActionButton(
+        MatchStepKind kind) => kind switch
+        {
+            MatchStepKind.ReconfigureUnit =>
+                ReconfigureActionButton,
+            MatchStepKind.Delay => DelayActionButton,
+            MatchStepKind.UpgradeUnit =>
+                UpgradeActionButton,
+            MatchStepKind.SellUnit =>
+                SellActionButton,
+            _ => PlaceActionButton,
+        };
 }

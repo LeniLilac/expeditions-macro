@@ -195,6 +195,8 @@ public partial class SettingsPage : UserControl, IAppPage
             KeyBindingsPanel.TargetingDiagnostic;
         UpgradeUnitKeyDiagnosticText.Text =
             KeyBindingsPanel.UpgradeDiagnostic;
+        SellUnitKeyDiagnosticText.Text =
+            KeyBindingsPanel.SellDiagnostic;
         AutoUpgradeUnitKeyDiagnosticText.Text =
             KeyBindingsPanel.AutoUpgradeDiagnostic;
         ToggleAutoUpgradePlacedUnitsKeyDiagnosticText.Text =

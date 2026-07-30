@@ -50,12 +50,54 @@
                                Style="{StaticResource FieldLabel}"
                                Text="Action" />
                     <ComboBox x:Name="KindCombo"
-                              Margin="0,6,0,0"
-                              AutomationProperties.Name="Match step action"
+                              Visibility="Collapsed"
                               DisplayMemberPath="Label"
                               ItemsSource="{x:Static models:PlacementStepRow.Kinds}"
                               SelectedValuePath="Value"
                               SelectionChanged="KindCombo_SelectionChanged" />
+                    <UniformGrid Margin="0,6,0,0"
+                                 Columns="3">
+                        <RadioButton x:Name="PlaceActionButton"
+                                     Margin="0,0,6,6"
+                                     Style="{StaticResource PlacementChoiceButton}"
+                                     GroupName="MatchStepAction"
+                                     Content="Place"
+                                     Tag="Placement"
+                                     AutomationProperties.Name="Place unit action"
+                                     Checked="ActionKindButton_Checked" />
+                        <RadioButton x:Name="ReconfigureActionButton"
+                                     Margin="0,0,6,6"
+                                     Style="{StaticResource PlacementChoiceButton}"
+                                     GroupName="MatchStepAction"
+                                     Content="Reconfigure"
+                                     Tag="ReconfigureUnit"
+                                     AutomationProperties.Name="Reconfigure unit action"
+                                     Checked="ActionKindButton_Checked" />
+                        <RadioButton x:Name="DelayActionButton"
+                                     Margin="0,0,0,6"
+                                     Style="{StaticResource PlacementChoiceButton}"
+                                     GroupName="MatchStepAction"
+                                     Content="Delay"
+                                     Tag="Delay"
+                                     AutomationProperties.Name="Delay action"
+                                     Checked="ActionKindButton_Checked" />
+                        <RadioButton x:Name="UpgradeActionButton"
+                                     Margin="0,0,6,0"
+                                     Style="{StaticResource PlacementChoiceButton}"
+                                     GroupName="MatchStepAction"
+                                     Content="Upgrade"
+                                     Tag="UpgradeUnit"
+                                     AutomationProperties.Name="Upgrade unit action"
+                                     Checked="ActionKindButton_Checked" />
+                        <RadioButton x:Name="SellActionButton"
+                                     Margin="0,0,6,0"
+                                     Style="{StaticResource PlacementChoiceButton}"
+                                     GroupName="MatchStepAction"
+                                     Content="Sell"
+                                     Tag="SellUnit"
+                                     AutomationProperties.Name="Sell unit action"
+                                     Checked="ActionKindButton_Checked" />
+                    </UniformGrid>
 
                     <Grid x:Name="PlacementCoordinatePanel"
                           Margin="0,14,0,0">
@@ -145,7 +187,7 @@
                                   SelectedValuePath="Value" />
                         <TextBlock Margin="0,5,0,0"
                                    Style="{StaticResource Caption}"
-                                   Text="Disable holds Auto Upgrade Unit for 1,500 ms. Enabling normalizes Off, then applies the selected priority."
+                                   Text="Uses the placed unit's remembered state and cycles forward only as many times as needed."
                                    TextWrapping="Wrap" />
                     </StackPanel>
 

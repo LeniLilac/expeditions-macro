@@ -12,7 +12,9 @@ public sealed record PlacementAdvancedEditorValues(
     string BeforeSelectionClickText,
     string BeforeSelectedUnitProofText,
     string ActionKeyIntervalText,
-    bool VerifySelectedUnitPanel,
+    bool VerifyPlacementActionProof,
+    bool VerifyReconfigureActionProof,
+    bool VerifyUpgradeUnitReadiness,
     bool VerifyPrestart,
     string ManualPlaybackStartDelayText);
 
@@ -80,8 +82,12 @@ public partial class PlacementTimingPopover : UserControl
         ActionKeyIntervalText.Text =
             Format(
                 advanced.ActionKeyIntervalMilliseconds);
-        VerifySelectedUnitPanelCheck.IsChecked =
-            advanced.VerifySelectedUnitPanelBeforeActions;
+        VerifyPlacementActionProofCheck.IsChecked =
+            advanced.RequirePlacementActionProof;
+        VerifyReconfigureActionProofCheck.IsChecked =
+            advanced.RequireReconfigureActionProof;
+        VerifyUpgradeUnitReadinessCheck.IsChecked =
+            advanced.RequireUpgradeUnitReadiness;
         VerifyPrestartCheck.IsChecked =
             advanced.VerifyPrestartBeforeManualPlayback;
         ManualPlaybackStartDelayText.Text =
@@ -142,7 +148,11 @@ public partial class PlacementTimingPopover : UserControl
                     BeforeSelectionClickText.Text,
                     BeforeSelectedUnitProofText.Text,
                     ActionKeyIntervalText.Text,
-                    VerifySelectedUnitPanelCheck.IsChecked ==
+                    VerifyPlacementActionProofCheck.IsChecked ==
+                        true,
+                    VerifyReconfigureActionProofCheck.IsChecked ==
+                        true,
+                    VerifyUpgradeUnitReadinessCheck.IsChecked ==
                         true,
                     VerifyPrestartCheck.IsChecked == true,
                     ManualPlaybackStartDelayText.Text)));

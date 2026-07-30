@@ -134,6 +134,8 @@
                                 <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
                                 <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Upgrade Unit key" /><TextBlock x:Name="UpgradeUnitKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
                                 <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
+                                <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Sell Unit key" /><TextBlock x:Name="SellUnitKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
+                                <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
                                 <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Auto Upgrade Unit key" /><TextBlock x:Name="AutoUpgradeUnitKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>
                                 <Border BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" />
                                 <Grid Margin="12,10"><TextBlock Foreground="{DynamicResource MutedBrush}" Text="Toggle Auto Upgrade Placed Units key" /><TextBlock x:Name="ToggleAutoUpgradePlacedUnitsKeyDiagnosticText" HorizontalAlignment="Right" /></Grid>

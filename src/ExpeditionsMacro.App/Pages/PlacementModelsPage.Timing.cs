@@ -216,7 +216,11 @@ public partial class PlacementModelsPage
                         .MaximumActionDelayMilliseconds,
                     "Action key interval"),
             VerifySelectedUnitPanelBeforeActions =
-                values.VerifySelectedUnitPanel,
+                values.VerifyPlacementActionProof,
+            VerifySelectedUnitPanelBeforeReconfigureActions =
+                values.VerifyReconfigureActionProof,
+            VerifyUpgradeUnitReadiness =
+                values.VerifyUpgradeUnitReadiness,
             VerifyPrestartBeforeManualPlayback =
                 values.VerifyPrestart,
             ManualPlaybackStartDelayMilliseconds =

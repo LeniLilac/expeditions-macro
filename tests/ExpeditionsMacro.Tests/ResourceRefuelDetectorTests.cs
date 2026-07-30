@@ -9,6 +9,7 @@ public sealed class ResourceRefuelDetectorTests
     [Theory]
     [InlineData("AreasMenu_01.png", AreasScreenState.Menu, 198, 304)]
     [InlineData("AreasExpeditions_01.png", AreasScreenState.Expeditions, 322, 264)]
+    [InlineData("AreasLobby_01.png", AreasScreenState.Lobby, 318, 388)]
     public void AreasFixtures_MapTheirVerifiedNextAction(
         string file,
         AreasScreenState expected,
@@ -22,6 +23,21 @@ public sealed class ResourceRefuelDetectorTests
         Assert.InRange(match.Confidence, 0.74, 1);
         Assert.Equal(actionX, match.ActionX);
         Assert.Equal(actionY, match.ActionY);
+    }
+
+    [Theory]
+    [InlineData("AreasMenu_01.png")]
+    [InlineData("AreasExpeditions_01.png")]
+    [InlineData("AreasLobby_01.png")]
+    public void EveryOwnedAreasSurface_ExposesLobbyCategoryAction(
+        string file)
+    {
+        AreasScreenMatch match =
+            AreasScreenDetector.Detect(Load(file));
+
+        Assert.NotEqual(AreasScreenState.None, match.State);
+        Assert.Equal(198, match.LobbyTabActionX);
+        Assert.Equal(252, match.LobbyTabActionY);
     }
 
     [Theory]

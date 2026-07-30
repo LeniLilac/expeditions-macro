@@ -59,7 +59,8 @@ public sealed record PlacementStep
     [JsonIgnore]
     public bool HasPlacementReference =>
         Kind is MatchStepKind.ReconfigureUnit or
-            MatchStepKind.UpgradeUnit;
+            MatchStepKind.UpgradeUnit or
+            MatchStepKind.SellUnit;
 
     public void Validate(int clientWidth, int clientHeight)
     {
@@ -161,6 +162,18 @@ public sealed record PlacementStep
                 {
                     throw new InvalidDataException(
                         "An upgrade step contains settings for another action.");
+                }
+                break;
+            case MatchStepKind.SellUnit:
+                RequirePlacementReference();
+                if (DelayDurationMilliseconds != 0 ||
+                    UpgradeCount != 0 ||
+                    ChangeTargetingPriority ||
+                    AutoUpgradeAction !=
+                        MatchAutoUpgradeAction.NoChange)
+                {
+                    throw new InvalidDataException(
+                        "A Sell Unit step contains settings for another action.");
                 }
                 break;
             case MatchStepKind.StartGame:

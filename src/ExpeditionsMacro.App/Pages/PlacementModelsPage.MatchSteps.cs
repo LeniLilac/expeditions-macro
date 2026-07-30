@@ -36,12 +36,24 @@ public partial class PlacementModelsPage
                 : existingIndex >= 0
                     ? existingIndex
                     : _steps.Count;
+        HashSet<string> soldPlacementIds =
+            _steps.Take(
+                    Math.Max(0, insertionIndex))
+                .Where(row =>
+                    row.Kind ==
+                    MatchStepKind.SellUnit)
+                .Select(row =>
+                    row.TargetPlacementId)
+                .ToHashSet(
+                    StringComparer.Ordinal);
         PlacementStepRow[] available =
             _steps.Take(
                     Math.Max(0, insertionIndex))
                 .Where(row =>
                     row.Kind ==
-                    MatchStepKind.Placement)
+                        MatchStepKind.Placement &&
+                    !soldPlacementIds.Contains(
+                        row.PlacementId))
                 .ToArray();
         MatchStepEditorDialog
             .SetAvailablePlacements(
@@ -156,7 +168,8 @@ public partial class PlacementModelsPage
         bool placementReference =
             values.Kind is
                 MatchStepKind.ReconfigureUnit or
-                MatchStepKind.UpgradeUnit;
+                MatchStepKind.UpgradeUnit or
+                MatchStepKind.SellUnit;
         PlacementStepRow? target =
             placementReference
                 ? _steps.FirstOrDefault(row =>

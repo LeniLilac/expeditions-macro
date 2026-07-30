@@ -41,6 +41,18 @@ internal sealed class SelectedUnitPanelPlayback(
                 cancellationToken)
             .ConfigureAwait(false);
 
+    public async Task<bool> WaitForPanelVisibleAsync(
+        RobloxWindow window,
+        CancellationToken cancellationToken) =>
+        await WaitForStateAsync(
+                window,
+                static match => match.PanelVisible,
+                expectedVisible: true,
+                TimeSpan.FromMilliseconds(
+                    VisibleTimeoutMilliseconds),
+                cancellationToken)
+            .ConfigureAwait(false);
+
     public async Task DismissAsync(
         RobloxWindow window,
         int clientWidth,
@@ -92,6 +104,13 @@ internal sealed class SelectedUnitPanelPlayback(
             "The selected-unit panel remained open after " +
             $"{DismissAttempts} clicks at the safe idle point.");
     }
+
+    public Task<bool> WaitForHiddenAfterActionAsync(
+        RobloxWindow window,
+        CancellationToken cancellationToken) =>
+        WaitForHiddenAsync(
+            window,
+            cancellationToken);
 
     private async Task<bool> WaitForHiddenAsync(
         RobloxWindow window,

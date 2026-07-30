@@ -34,6 +34,9 @@ public sealed class MatchStepShareTests
                 BeforeSelectedUnitProofMilliseconds = 250,
                 ActionKeyIntervalMilliseconds = 80,
                 VerifySelectedUnitPanelBeforeActions = false,
+                VerifySelectedUnitPanelBeforeReconfigureActions =
+                    true,
+                VerifyUpgradeUnitReadiness = false,
             },
             Steps =
             [
@@ -83,6 +86,16 @@ public sealed class MatchStepShareTests
                     Phase = PlacementPhase.BeforeStart,
                     UpgradeCount = 4,
                 },
+                new PlacementStep
+                {
+                    Kind = MatchStepKind.SellUnit,
+                    TargetPlacementId = "unit-1a",
+                    UnitKey = 1,
+                    X = 0,
+                    Y = 0,
+                    DelayAfterMilliseconds = 0,
+                    Phase = PlacementPhase.BeforeStart,
+                },
             ],
             CreatedAt = DateTimeOffset.UtcNow,
         };
@@ -117,12 +130,19 @@ public sealed class MatchStepShareTests
         Assert.False(
             shared.AdvancedSettings
                 .VerifySelectedUnitPanelBeforeActions);
+        Assert.True(
+            shared.AdvancedSettings
+                .RequireReconfigureActionProof);
+        Assert.False(
+            shared.AdvancedSettings
+                .RequireUpgradeUnitReadiness);
         Assert.Equal(
             [
                 MatchStepKind.Placement,
                 MatchStepKind.ReconfigureUnit,
                 MatchStepKind.Delay,
                 MatchStepKind.UpgradeUnit,
+                MatchStepKind.SellUnit,
             ],
             shared.Steps.Select(step => step.Kind));
         Assert.Equal(

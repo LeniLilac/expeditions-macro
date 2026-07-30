@@ -117,11 +117,7 @@ public sealed class SelectedUnitPanelDetectorTests
     {
         string[] falseMatches = Directory
             .EnumerateFiles(TestPaths.StageDatasets, "*.png")
-            .Where(path =>
-                !string.Equals(
-                    Path.GetFileName(path),
-                    "SelectedUnitPanel_01.png",
-                    StringComparison.OrdinalIgnoreCase))
+            .Where(path => !IsSelectedPanelFixture(path))
             .Where(path =>
                 SelectedUnitPanelDetector.Detect(
                     ImageCodec.Load(path)).Visible)
@@ -137,11 +133,7 @@ public sealed class SelectedUnitPanelDetectorTests
     {
         string[] falseMatches = Directory
             .EnumerateFiles(TestPaths.StageDatasets, "*.png")
-            .Where(path =>
-                !string.Equals(
-                    Path.GetFileName(path),
-                    "SelectedUnitPanel_01.png",
-                    StringComparison.OrdinalIgnoreCase))
+            .Where(path => !IsSelectedPanelFixture(path))
             .Where(path =>
                 SelectedUnitPanelDetector.Detect(
                     ImageCodec.Load(path)).PanelVisible)
@@ -217,6 +209,18 @@ public sealed class SelectedUnitPanelDetectorTests
                 TestPaths.StageDatasets,
                 "SelectedUnitPanel_01.png"),
             Path.Combine(
+                TestPaths.StageDatasets,
+                "UpgradeUnitAffordable_01.png"),
+            Path.Combine(
+                TestPaths.StageDatasets,
+                "UpgradeUnitAffordable_02.png"),
+            Path.Combine(
+                TestPaths.StageDatasets,
+                "UpgradeUnitUnaffordable_01.png"),
+            Path.Combine(
+                TestPaths.StageDatasets,
+                "UpgradeUnitMaxed_01.png"),
+            Path.Combine(
                 TestPaths.ChallengeDatasets,
                 "GameplayNegative",
                 "GameplayNegative_06.png"),
@@ -225,6 +229,18 @@ public sealed class SelectedUnitPanelDetectorTests
                 "GameplayNegative",
                 "GameplayNegative_07.png"),
         };
+
+    private static bool IsSelectedPanelFixture(
+        string path)
+    {
+        string fileName = Path.GetFileName(path);
+        return fileName.Equals(
+                   "SelectedUnitPanel_01.png",
+                   StringComparison.OrdinalIgnoreCase) ||
+               fileName.StartsWith(
+                   "UpgradeUnit",
+                   StringComparison.OrdinalIgnoreCase);
+    }
 
     private static void Fill(
         byte[] pixels,

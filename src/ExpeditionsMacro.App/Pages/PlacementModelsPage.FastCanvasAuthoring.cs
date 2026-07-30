@@ -99,7 +99,6 @@ public partial class PlacementModelsPage
             NormalizeTimelineRows();
         }
         FastStepsList.SelectedItem = row;
-        FastStepsList.ScrollIntoView(row);
         FastStatusText.Text =
             $"Added Unit {_selectedFastUnit} at ({x}, {y}) {(coveredByStart ? "below" : "above")} Start Game.";
         SchedulePlacementAutoSave();
@@ -117,7 +116,6 @@ public partial class PlacementModelsPage
             })
         {
             FastStepsList.SelectedItem = row;
-            FastStepsList.ScrollIntoView(row);
             e.Handled = true;
         }
     }

@@ -126,10 +126,10 @@ public sealed class ResourceRefuelService
                 cancellationToken).ConfigureAwait(false);
             if (request.ReturnToLobbyWhenComplete)
             {
-                await _navigator.ClosePlayToLobbyAsync(
+                await _navigator.ReturnToLobbyViaAreasAsync(
                     window,
                     detector,
-                    request.PlayMenuKey,
+                    request.AreasMenuKey,
                     cancellationToken).ConfigureAwait(false);
             }
         }
@@ -181,7 +181,7 @@ public sealed class ResourceRefuelService
                 .PrepareScheduledLobbyAsync(
                     window,
                     detector,
-                    request.PlayMenuKey,
+                    request.AreasMenuKey,
                     cancellationToken)
                 .ConfigureAwait(false);
         }

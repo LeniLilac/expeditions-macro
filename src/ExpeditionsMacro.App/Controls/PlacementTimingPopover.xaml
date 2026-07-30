@@ -140,12 +140,28 @@
                                              Margin="0,6,0,0"
                                              AutomationProperties.Name="Delay between action key presses in milliseconds" />
 
-                                    <CheckBox x:Name="VerifySelectedUnitPanelCheck"
+                                    <CheckBox x:Name="VerifyPlacementActionProofCheck"
                                               Margin="0,14,0,0"
-                                              Content="Require selected-unit UI before unit actions" />
+                                              Content="Require selected-unit UI for placement actions" />
                                     <TextBlock Margin="24,4,0,0"
                                                Style="{StaticResource Caption}"
-                                               Text="When off, targeting, Auto Upgrade, and Upgrade Unit inputs are sent after the coordinate click without visual proof."
+                                               Text="When off, a placement using Target First and Auto Off moves on without clicking the placed unit. Other placement settings are applied after a coordinate click without visual proof."
+                                               TextWrapping="Wrap" />
+
+                                    <CheckBox x:Name="VerifyReconfigureActionProofCheck"
+                                              Margin="0,14,0,0"
+                                              Content="Require selected-unit UI for reconfigure actions" />
+                                    <TextBlock Margin="24,4,0,0"
+                                               Style="{StaticResource Caption}"
+                                               Text="When off, targeting and Auto Upgrade changes are sent after the placed-unit coordinate click without visual proof."
+                                               TextWrapping="Wrap" />
+
+                                    <CheckBox x:Name="VerifyUpgradeUnitReadinessCheck"
+                                              Margin="0,14,0,0"
+                                              Content="Wait until Upgrade Unit is affordable" />
+                                    <TextBlock Margin="24,4,0,0"
+                                               Style="{StaticResource Caption}"
+                                               Text="When on, Upgrade Unit waits for the verified green button. A normal gray button waits for money; the wider Maxed bar stops the remaining presses."
                                                TextWrapping="Wrap" />
                                 </StackPanel>
 

@@ -33,6 +33,8 @@ public partial class SettingsKeyBindingsPanel : UserControl
 
     public string UpgradeDiagnostic { get; private set; } = "Not set";
 
+    public string SellDiagnostic { get; private set; } = "Not set";
+
     public string AutoUpgradeDiagnostic { get; private set; } = "Not set";
 
     public string ToggleAutoUpgradePlacedUnitsDiagnostic
@@ -70,6 +72,7 @@ public partial class SettingsKeyBindingsPanel : UserControl
         UpdateQuickPlacementDisplay();
         UpdateTargetingDisplay();
         UpdateUpgradeDisplay();
+        UpdateSellDisplay();
         UpdateAutoUpgradeDisplay();
         UpdateToggleAutoUpgradePlacedUnitsDisplay();
         UpdateShiftLockDisplay();
@@ -121,6 +124,13 @@ public partial class SettingsKeyBindingsPanel : UserControl
         BeginCapture(
             BindingTarget.Upgrade,
             UpgradeButton);
+
+    private void SellButton_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        BeginCapture(
+            BindingTarget.Sell,
+            SellButton);
 
     private void AutoUpgradeUnitButton_Click(
         object sender,
@@ -189,6 +199,7 @@ public partial class SettingsKeyBindingsPanel : UserControl
             BindingTarget.CancelPlacement or
             BindingTarget.Targeting or
             BindingTarget.Upgrade or
+            BindingTarget.Sell or
             BindingTarget.AutoUpgradeUnit or
             BindingTarget.ToggleAutoUpgradePlacedUnits
                 ? "Press a letter..."
@@ -203,6 +214,7 @@ public partial class SettingsKeyBindingsPanel : UserControl
             BindingTarget.QuickPlacement => "Press the physical key assigned to Quick Placement. Escape cancels.",
             BindingTarget.Targeting => "Press the letter assigned to Change Unit Targeting. Escape cancels.",
             BindingTarget.Upgrade => "Press the letter assigned to Upgrade Unit. Escape cancels.",
+            BindingTarget.Sell => "Press the letter assigned to Sell Unit. Escape cancels.",
             BindingTarget.AutoUpgradeUnit => "Press the letter assigned to Auto Upgrade Unit. Escape cancels.",
             BindingTarget.ToggleAutoUpgradePlacedUnits => "Press the letter assigned to Toggle Auto Upgrade Placed Units. Escape cancels.",
             _ => "Press the key assigned to Toggle Shift Lock, including left/right Shift or Ctrl. Escape cancels.",
@@ -231,6 +243,7 @@ public partial class SettingsKeyBindingsPanel : UserControl
             BindingTarget.CancelPlacement or
             BindingTarget.Targeting or
             BindingTarget.Upgrade or
+            BindingTarget.Sell or
             BindingTarget.AutoUpgradeUnit or
             BindingTarget.ToggleAutoUpgradePlacedUnits)
         {
@@ -303,6 +316,10 @@ public partial class SettingsKeyBindingsPanel : UserControl
                     await ApplyUpgradeAsync(
                         (char)virtualKey);
                     break;
+                case BindingTarget.Sell:
+                    await ApplySellAsync(
+                        (char)virtualKey);
+                    break;
                 case BindingTarget.AutoUpgradeUnit:
                     await ApplyAutoUpgradeUnitAsync(
                         (char)virtualKey);
@@ -369,6 +386,9 @@ public partial class SettingsKeyBindingsPanel : UserControl
         UpgradeButton.IsEnabled = enabled &&
             _captureTarget is BindingTarget.None or
                 BindingTarget.Upgrade;
+        SellButton.IsEnabled = enabled &&
+            _captureTarget is BindingTarget.None or
+                BindingTarget.Sell;
         AutoUpgradeUnitButton.IsEnabled = enabled &&
             _captureTarget is BindingTarget.None or
                 BindingTarget.AutoUpgradeUnit;
@@ -387,6 +407,7 @@ public partial class SettingsKeyBindingsPanel : UserControl
         SetClearButtonState(ClearQuickPlacementButton, BindingTarget.QuickPlacement, clearEnabled);
         SetClearButtonState(ClearTargetingButton, BindingTarget.Targeting, clearEnabled);
         SetClearButtonState(ClearUpgradeButton, BindingTarget.Upgrade, clearEnabled);
+        SetClearButtonState(ClearSellButton, BindingTarget.Sell, clearEnabled);
         SetClearButtonState(ClearAutoUpgradeUnitButton, BindingTarget.AutoUpgradeUnit, clearEnabled);
         SetClearButtonState(ClearToggleAutoUpgradePlacedUnitsButton, BindingTarget.ToggleAutoUpgradePlacedUnits, clearEnabled);
         SetClearButtonState(ClearShiftLockButton, BindingTarget.ShiftLock, clearEnabled);
@@ -428,6 +449,9 @@ public partial class SettingsKeyBindingsPanel : UserControl
             BindingTarget.Upgrade =>
                 !string.IsNullOrWhiteSpace(
                     Services.Settings.UpgradeUnitKey),
+            BindingTarget.Sell =>
+                !string.IsNullOrWhiteSpace(
+                    Services.Settings.SellUnitKey),
             BindingTarget.AutoUpgradeUnit =>
                 !string.IsNullOrWhiteSpace(
                     Services.Settings.AutoUpgradeUnitKey),
@@ -440,61 +464,5 @@ public partial class SettingsKeyBindingsPanel : UserControl
             _ => false,
         };
 
-    private static string BindingLabel(
-        BindingTarget target) => target switch
-        {
-            BindingTarget.Play => "Toggle Play Menu",
-            BindingTarget.Unit => "Toggle Unit Inventory",
-            BindingTarget.Areas => "Toggle Areas Menu",
-            BindingTarget.CancelPlacement =>
-                "Toggle Cancel Unit Placement",
-            BindingTarget.QuickPlacement =>
-                "Quick Placement",
-            BindingTarget.Targeting => "Change Unit Targeting",
-            BindingTarget.Upgrade => "Upgrade Unit",
-            BindingTarget.AutoUpgradeUnit => "Auto Upgrade Unit",
-            BindingTarget.ToggleAutoUpgradePlacedUnits =>
-                "Toggle Auto Upgrade Placed Units",
-            BindingTarget.ShiftLock => "Toggle Shift Lock",
-            _ => throw new ArgumentOutOfRangeException(
-                nameof(target)),
-        };
-
-    private TextBlock StatusFor(BindingTarget target) => target switch
-    {
-        BindingTarget.Macro => MacroStatusText,
-        BindingTarget.Play => PlayStatusText,
-        BindingTarget.Unit => UnitStatusText,
-        BindingTarget.Areas => AreasStatusText,
-        BindingTarget.CancelPlacement =>
-            CancelPlacementStatusText,
-        BindingTarget.QuickPlacement =>
-            QuickPlacementStatusText,
-        BindingTarget.Targeting => TargetingStatusText,
-        BindingTarget.Upgrade => UpgradeStatusText,
-        BindingTarget.AutoUpgradeUnit =>
-            AutoUpgradeUnitStatusText,
-        BindingTarget.ToggleAutoUpgradePlacedUnits =>
-            ToggleAutoUpgradePlacedUnitsStatusText,
-        BindingTarget.ShiftLock => ShiftLockStatusText,
-        _ => throw new ArgumentOutOfRangeException(nameof(target)),
-    };
-
     private AppServices Services => _services ?? throw new InvalidOperationException("The key bindings panel has not been initialized.");
-
-    private enum BindingTarget
-    {
-        None,
-        Macro,
-        Play,
-        Unit,
-        Areas,
-        CancelPlacement,
-        QuickPlacement,
-        Targeting,
-        Upgrade,
-        AutoUpgradeUnit,
-        ToggleAutoUpgradePlacedUnits,
-        ShiftLock,
-    }
 }

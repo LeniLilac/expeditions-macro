@@ -291,6 +291,18 @@ public partial class PlacementFastEditorView : UserControl
         e.Handled = true;
     }
 
+    private void FastStepsList_PreviewMouseWheel(
+        object sender,
+        MouseWheelEventArgs e)
+    {
+        FastWorkspaceScrollViewer
+            .ScrollToVerticalOffset(
+                FastWorkspaceScrollViewer
+                    .VerticalOffset -
+                e.Delta);
+        e.Handled = true;
+    }
+
     private void PlacementScrollViewer_PreviewMouseDown(
         object sender,
         MouseButtonEventArgs e)

@@ -70,6 +70,11 @@ internal static class AppControlKeyPolicy
             requireUnitActionKeys);
         AddLetter(
             bindings,
+            "Sell Unit",
+            settings.SellUnitKey,
+            required: false);
+        AddLetter(
+            bindings,
             "Auto Upgrade Unit",
             settings.AutoUpgradeUnitKey,
             requireUnitActionKeys);

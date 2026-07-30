@@ -131,6 +131,8 @@ public sealed class AppServices : IDisposable
                 .ParseQuickPlacementKey(Settings),
             () => AppSettings
                 .ParseUpgradeUnitKey(Settings),
+            () => AppSettings
+                .ParseSellUnitKey(Settings),
             new PlacementMatchStartPlayback(
                 Automation));
         ManualRecorder =
