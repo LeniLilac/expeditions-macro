@@ -89,6 +89,43 @@ public sealed class ObservationWaitBudgetTests
     }
 
     [Fact]
+    public void PendingRecoveryLoadUsesTheExistingHardGrace()
+    {
+        DateTimeOffset now =
+            DateTimeOffset.Parse(
+                "2026-07-30T13:28:05Z");
+        ObservationWaitBudget budget = new(
+            TimeSpan.FromSeconds(20),
+            minimumObservations: 2,
+            () => now);
+        budget.MarkObserved();
+        budget.MarkObserved();
+        now += TimeSpan.FromSeconds(40);
+
+        Assert.False(budget.ShouldObserve());
+        Assert.True(
+            budget.ShouldObserve(
+                ExpeditionMacroRunner
+                    .IsRecoveryTransitionPending(
+                        "map_preview",
+                        hasStableCandidate: false)));
+
+        now += TimeSpan.FromSeconds(41);
+
+        Assert.False(
+            budget.ShouldObserve(
+                ExpeditionMacroRunner
+                    .IsRecoveryTransitionPending(
+                        "map_preview",
+                        hasStableCandidate: false)));
+        Assert.False(
+            ExpeditionMacroRunner
+                .IsRecoveryTransitionPending(
+                    string.Empty,
+                    hasStableCandidate: false));
+    }
+
+    [Fact]
     public async Task SlowContinueActionGetsItsSecondStableObservation()
     {
         DateTimeOffset now =

@@ -2,6 +2,7 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:icons="clr-namespace:ExpeditionsMacro.App.Controls"
+             xmlns:models="clr-namespace:ExpeditionsMacro.App.Models"
              MinWidth="340"
              MaxWidth="640"
              MaxHeight="720"
@@ -45,6 +46,39 @@
                                Text="Saved automatically with this placement setup." />
 
                     <StackPanel x:Name="PlacementTimingFieldsPanel">
+                        <TextBlock Margin="0,16,0,0"
+                                   FontWeight="SemiBold"
+                                   Text="Default placement" />
+                        <TextBlock Margin="0,5,0,0"
+                                   Style="{StaticResource Caption}"
+                                   Text="New Place actions inherit these values. Existing Match Steps stay unchanged."
+                                   TextWrapping="Wrap" />
+                        <Grid Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="12" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource FieldLabel}"
+                                           Text="Targeting priority" />
+                                <ComboBox x:Name="DefaultTargetingCombo"
+                                          Margin="0,6,0,0"
+                                          AutomationProperties.Name="Default placement targeting priority"
+                                          ItemsSource="{x:Static models:PlacementStepRow.TargetingPriorities}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Style="{StaticResource FieldLabel}"
+                                           Text="Auto Upgrade priority" />
+                                <ComboBox x:Name="DefaultAutoUpgradeCombo"
+                                          Margin="0,6,0,0"
+                                          AutomationProperties.Name="Default placement Auto Upgrade priority"
+                                          DisplayMemberPath="Label"
+                                          ItemsSource="{x:Static models:PlacementStepRow.AutoUpgradePriorities}"
+                                          SelectedValuePath="Value" />
+                            </StackPanel>
+                        </Grid>
+
                         <TextBlock Margin="0,16,0,0"
                                    Style="{StaticResource FieldLabel}"
                                    Text="Between unit checks, ms" />

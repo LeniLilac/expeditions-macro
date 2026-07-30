@@ -20,6 +20,8 @@ public sealed class PlacementAuthoringTests
         json.Remove("target");
         json.Remove("placement_interval_milliseconds");
         json.Remove("placement_attempts");
+        json.Remove("default_targeting_priority");
+        json.Remove("default_auto_upgrade_priority");
         json.Remove(
             "default_after_start_delay_milliseconds");
         json["steps"]!.AsArray()[0]!
@@ -56,6 +58,14 @@ public sealed class PlacementAuthoringTests
         Assert.Equal(
             PlacementModel.DefaultPlacementAttempts,
             legacy.PlacementAttempts);
+        Assert.Equal(
+            PlacementAuthoringRules
+                .DefaultTargetingPriority,
+            legacy.DefaultTargetingPriority);
+        Assert.Equal(
+            PlacementAuthoringRules
+                .DefaultAutoUpgradePriority,
+            legacy.DefaultAutoUpgradePriority);
         Assert.Equal(
             UnitAutoUpgradePriority.Off,
             Assert.Single(legacy.Steps)

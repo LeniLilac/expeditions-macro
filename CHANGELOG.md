@@ -4,6 +4,20 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.43] - 2026-07-30
+
+### Added
+
+- Match settings now persist one default Targeting priority and Auto Upgrade priority for newly authored Place actions. Map clicks and the Add Match Step popup inherit those values without rewriting existing Match Steps.
+
+### Fixed
+
+- Expedition recovery now keeps a verified transition pending through slow, unclassified teleport/loading frames and uses the existing bounded hard observation grace. It no longer retries the stale map-preview Start action merely because loading exceeded the soft window.
+
+### Tests
+
+- Passed 1,375 application and detector tests, 5 Deep Debug Viewer tests, and all 86 dark/light UI snapshot states.
+
 ## [1.3.0-beta.42] - 2026-07-29
 
 ### Fixed

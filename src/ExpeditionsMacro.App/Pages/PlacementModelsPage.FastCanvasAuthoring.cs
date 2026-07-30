@@ -69,9 +69,10 @@ public partial class PlacementModelsPage
                 : PlacementPhase.BeforeStart,
             DelayAfterMilliseconds =
                 _fastPlacementIntervalMilliseconds,
+            TargetingPriority =
+                _fastDefaultTargetingPriority,
             AutoUpgradePriority =
-                PlacementAuthoringRules
-                    .DefaultAutoUpgradePriority,
+                _fastDefaultAutoUpgradePriority,
         };
         int start = StartGameRowIndex();
         int insertion = coveredByStart

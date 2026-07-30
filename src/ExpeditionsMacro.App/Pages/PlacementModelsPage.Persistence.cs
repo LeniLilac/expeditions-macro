@@ -51,6 +51,10 @@ public partial class PlacementModelsPage
                 _fastPlacementIntervalMilliseconds,
             PlacementAttempts =
                 _fastPlacementAttempts,
+            DefaultTargetingPriority =
+                _fastDefaultTargetingPriority,
+            DefaultAutoUpgradePriority =
+                _fastDefaultAutoUpgradePriority,
             AdvancedSettings =
                 _fastAdvancedSettings,
             DefaultAfterStartDelayMilliseconds =

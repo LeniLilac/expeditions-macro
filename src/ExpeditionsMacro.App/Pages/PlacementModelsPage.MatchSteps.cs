@@ -74,7 +74,9 @@ public partial class PlacementModelsPage
                     ? e.SuggestedPlacement
                     : available.LastOrDefault();
             MatchStepEditorDialog.SetNewStep(
-                suggested);
+                suggested,
+                _fastDefaultTargetingPriority,
+                _fastDefaultAutoUpgradePriority);
         }
         else
         {

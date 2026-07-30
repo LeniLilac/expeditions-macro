@@ -36,6 +36,10 @@ public static class PlacementAuthoringRules
 
     public const int DefaultAfterStartDelayMilliseconds = 30_000;
 
+    public const UnitTargetingPriority
+        DefaultTargetingPriority =
+            UnitTargetingPriority.First;
+
     public const UnitAutoUpgradePriority
         DefaultAutoUpgradePriority =
             UnitAutoUpgradePriority.Priority1;

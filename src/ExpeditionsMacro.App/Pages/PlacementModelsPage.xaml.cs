@@ -31,6 +31,14 @@ public partial class PlacementModelsPage :
             .DefaultStepDelayMilliseconds;
     private int _fastPlacementAttempts =
         PlacementModel.DefaultPlacementAttempts;
+    private UnitTargetingPriority
+        _fastDefaultTargetingPriority =
+            PlacementAuthoringRules
+                .DefaultTargetingPriority;
+    private UnitAutoUpgradePriority
+        _fastDefaultAutoUpgradePriority =
+            PlacementAuthoringRules
+                .DefaultAutoUpgradePriority;
     private int _fastDefaultAfterStartDelayMilliseconds =
         PlacementAuthoringRules
             .DefaultAfterStartDelayMilliseconds;
@@ -118,6 +126,10 @@ public partial class PlacementModelsPage :
             model.PlacementIntervalMilliseconds;
         _fastPlacementAttempts =
             model.PlacementAttempts;
+        _fastDefaultTargetingPriority =
+            model.DefaultTargetingPriority;
+        _fastDefaultAutoUpgradePriority =
+            model.DefaultAutoUpgradePriority;
         _fastDefaultAfterStartDelayMilliseconds =
             model.DefaultAfterStartDelayMilliseconds;
         _fastAdvancedSettings =

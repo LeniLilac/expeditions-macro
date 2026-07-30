@@ -22,6 +22,8 @@ public sealed class PlacementTimingApplyEventArgs(
     string placementIntervalText,
     string placementAttemptsText,
     string impossibilityThresholdText,
+    UnitTargetingPriority defaultTargetingPriority,
+    UnitAutoUpgradePriority defaultAutoUpgradePriority,
     PlacementAdvancedEditorValues advanced) : EventArgs
 {
     public string PlacementIntervalText { get; } =
@@ -32,6 +34,12 @@ public sealed class PlacementTimingApplyEventArgs(
 
     public string ImpossibilityThresholdText { get; } =
         impossibilityThresholdText;
+
+    public UnitTargetingPriority DefaultTargetingPriority { get; } =
+        defaultTargetingPriority;
+
+    public UnitAutoUpgradePriority DefaultAutoUpgradePriority { get; } =
+        defaultAutoUpgradePriority;
 
     public PlacementAdvancedEditorValues Advanced { get; } =
         advanced;
@@ -52,6 +60,8 @@ public partial class PlacementTimingPopover : UserControl
     public void SetValues(
         int placementIntervalMilliseconds,
         int placementAttempts,
+        UnitTargetingPriority defaultTargetingPriority,
+        UnitAutoUpgradePriority defaultAutoUpgradePriority,
         int defaultAfterStartDelayMilliseconds,
         int impossibilityThresholdMinutes,
         bool recordingMode,
@@ -63,6 +73,10 @@ public partial class PlacementTimingPopover : UserControl
         PlacementAttemptsText.Text =
             placementAttempts.ToString(
                 CultureInfo.CurrentCulture);
+        DefaultTargetingCombo.SelectedItem =
+            defaultTargetingPriority;
+        DefaultAutoUpgradeCombo.SelectedValue =
+            defaultAutoUpgradePriority;
         ImpossibilityThresholdText.Text =
             impossibilityThresholdMinutes.ToString(
                 CultureInfo.CurrentCulture);
@@ -141,6 +155,16 @@ public partial class PlacementTimingPopover : UserControl
                 PlacementIntervalText.Text,
                 PlacementAttemptsText.Text,
                 ImpossibilityThresholdText.Text,
+                DefaultTargetingCombo.SelectedItem is
+                    UnitTargetingPriority targeting
+                    ? targeting
+                    : PlacementAuthoringRules
+                        .DefaultTargetingPriority,
+                DefaultAutoUpgradeCombo.SelectedValue is
+                    UnitAutoUpgradePriority autoUpgrade
+                    ? autoUpgrade
+                    : PlacementAuthoringRules
+                        .DefaultAutoUpgradePriority,
                 new PlacementAdvancedEditorValues(
                     AdvancedModeCheck.IsChecked == true,
                     UnitSelectionDelayText.Text,
