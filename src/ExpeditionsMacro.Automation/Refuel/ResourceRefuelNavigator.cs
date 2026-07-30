@@ -5,6 +5,7 @@ using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Challenges;
 using ExpeditionsMacro.Vision.Packs;
 using ExpeditionsMacro.Vision.Refuel;
+using ExpeditionsMacro.Vision.Stages;
 
 namespace ExpeditionsMacro.Automation.Refuel;
 
@@ -129,6 +130,16 @@ internal sealed class ResourceRefuelNavigator
                 cancellationToken).ConfigureAwait(false);
         }
 
+        (int X, int Y) back = StageScreenDetector.SelectorBackAction;
+        await PlayInterfaceCloser.CloseAsync(
+            () => PlayInterfaceCloser.DetectLayer(
+                _screens.Capture(window)),
+            token => _screens.ClickAsync(
+                window, back.X, back.Y, token),
+            cancellationToken,
+            _delay,
+            _utcNow).ConfigureAwait(false);
+
         await ReturnToLobbyViaAreasAsync(
             window,
             detector,
@@ -140,12 +151,14 @@ internal sealed class ResourceRefuelNavigator
         RobloxWindow window,
         IDetectorPack detector,
         char areasMenuKey,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool openAreasFromOwnedStation = false)
     {
         await _screens.EnsureCanonicalClientAsync(
             window,
             cancellationToken).ConfigureAwait(false);
-        if (await _screens.TryWaitForLobbyAsync(
+        if (!openAreasFromOwnedStation &&
+            await _screens.TryWaitForLobbyAsync(
                 window,
                 detector,
                 TimeSpan.FromSeconds(2),
@@ -160,7 +173,8 @@ internal sealed class ResourceRefuelNavigator
         AreasScreenMatch areas =
             AreasScreenDetector.Detect(
                 _screens.Capture(window));
-        if (areas.State == AreasScreenState.None)
+        if (openAreasFromOwnedStation ||
+            areas.State == AreasScreenState.None)
         {
             await _automation.TapLetterKeyAsync(
                 window,

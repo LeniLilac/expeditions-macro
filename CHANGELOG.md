@@ -4,6 +4,17 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.42] - 2026-07-29
+
+### Fixed
+
+- Scheduled resource-refuel Utilities no longer open Play after the final station. They press the configured Areas key directly, select the verified Lobby category and Spawn card, and prove Lobby before scheduler handoff.
+- A Utility that inherits an already-open Play surface now closes every verified Play layer through its detector-owned Back action before beginning the Areas-to-Lobby route.
+
+### Tests
+
+- Passed 1,372 application and detector tests plus 5 Deep Debug Viewer tests.
+
 ## [1.3.0-beta.41] - 2026-07-29
 
 ### Added
@@ -1149,7 +1160,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.41...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.42...HEAD
+[1.3.0-beta.42]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.41...v1.3.0-beta.42
 [1.3.0-beta.41]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.40...v1.3.0-beta.41
 [1.3.0-beta.40]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.39...v1.3.0-beta.40
 [1.3.0-beta.39]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.38...v1.3.0-beta.39

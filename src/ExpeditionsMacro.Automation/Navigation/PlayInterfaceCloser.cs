@@ -1,47 +1,46 @@
-using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Challenges;
 using ExpeditionsMacro.Vision.Events;
 
-namespace ExpeditionsMacro.Automation.Events;
+namespace ExpeditionsMacro.Automation.Navigation;
 
-internal enum EventPlayInterfaceLayer
+internal enum PlayInterfaceLayer
 {
     Closed,
     GameModeSelector,
     PostMatchParty,
 }
 
-internal static class EventPlayInterfaceCloser
+internal static class PlayInterfaceCloser
 {
     internal const int MaximumBackAttempts = 4;
 
     private static readonly TimeSpan PollInterval =
         TimeSpan.FromMilliseconds(180);
 
-    internal static EventPlayInterfaceLayer DetectLayer(
+    internal static PlayInterfaceLayer DetectLayer(
         ImageFrame frame)
     {
         if (EventScreenDetector.Detect(frame).State ==
             EventScreenState.GameModeSelector)
         {
-            return EventPlayInterfaceLayer.GameModeSelector;
+            return PlayInterfaceLayer.GameModeSelector;
         }
         ChallengeScreenState state =
             ChallengeScreenDetector.Detect(frame).State;
         return state switch
         {
             ChallengeScreenState.GameModeSelector =>
-                EventPlayInterfaceLayer.GameModeSelector,
+                PlayInterfaceLayer.GameModeSelector,
             ChallengeScreenState.PostMatchPreview =>
-                EventPlayInterfaceLayer.PostMatchParty,
-            _ => EventPlayInterfaceLayer.Closed,
+                PlayInterfaceLayer.PostMatchParty,
+            _ => PlayInterfaceLayer.Closed,
         };
     }
 
     internal static async Task CloseAsync(
-        Func<EventPlayInterfaceLayer> observe,
+        Func<PlayInterfaceLayer> observe,
         Func<CancellationToken, Task> clickBack,
         CancellationToken cancellationToken,
         Func<
@@ -55,13 +54,13 @@ internal static class EventPlayInterfaceCloser
         delay ??= static (duration, token) =>
             Task.Delay(duration, token);
 
-        EventPlayInterfaceLayer layer =
+        PlayInterfaceLayer layer =
             await ObserveStableLayerAsync(
                 observe,
                 delay,
                 cancellationToken,
                 utcNow).ConfigureAwait(false);
-        if (layer == EventPlayInterfaceLayer.Closed)
+        if (layer == PlayInterfaceLayer.Closed)
         {
             return;
         }
@@ -78,24 +77,24 @@ internal static class EventPlayInterfaceCloser
                 delay,
                 cancellationToken,
                 utcNow).ConfigureAwait(false);
-            if (layer == EventPlayInterfaceLayer.Closed)
+            if (layer == PlayInterfaceLayer.Closed)
             {
                 return;
             }
         }
 
         throw new RobloxUiUnavailableException(
-            "The Play interface remained open after its verified Back actions, so Event lobby navigation could not begin.");
+            "The Play interface remained open after its verified Back actions, so Lobby navigation could not begin.");
     }
 
-    private static async Task<EventPlayInterfaceLayer>
+    private static async Task<PlayInterfaceLayer>
         ObserveStableLayerAsync(
-        Func<EventPlayInterfaceLayer> observe,
+        Func<PlayInterfaceLayer> observe,
         Func<TimeSpan, CancellationToken, Task> delay,
         CancellationToken cancellationToken,
         Func<DateTimeOffset>? utcNow)
     {
-        EventPlayInterfaceLayer? last = null;
+        PlayInterfaceLayer? last = null;
         int stable = 0;
         int required = 0;
         ObservationWaitBudget budget = new(
@@ -108,12 +107,12 @@ internal static class EventPlayInterfaceCloser
                        stable < required))
         {
             cancellationToken.ThrowIfCancellationRequested();
-            EventPlayInterfaceLayer current = observe();
+            PlayInterfaceLayer current = observe();
             budget.MarkObserved();
             stable = current == last ? stable + 1 : 1;
             last = current;
             required =
-                current == EventPlayInterfaceLayer.Closed
+                current == PlayInterfaceLayer.Closed
                     ? 3
                     : 2;
             if (stable >= required)
@@ -126,6 +125,6 @@ internal static class EventPlayInterfaceCloser
         }
 
         throw new RobloxUiUnavailableException(
-            "The Play interface did not settle while preparing Event lobby navigation.");
+            "The Play interface did not settle while preparing Lobby navigation.");
     }
 }
