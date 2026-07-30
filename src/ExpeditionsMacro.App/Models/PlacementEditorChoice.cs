@@ -40,7 +40,7 @@ public sealed class PlacementSetupRow(
             ? $"Uses {InheritedFrom}"
             : "Not configured";
 
-    private int PlacementCount =>
+    public int PlacementCount =>
         Model?.Steps.Count(step =>
             step.Kind == MatchStepKind.Placement) ?? 0;
 
@@ -91,5 +91,24 @@ public sealed class PlacementSetupNode
 
     public List<PlacementSetupNode> Children { get; } = [];
 
-    public string Status => Row.Status;
+    public string Status
+    {
+        get
+        {
+            if (!IsGroup) return Row.Status;
+
+            int childrenWithPlacements = 0;
+
+            foreach (PlacementSetupNode child in Children)
+            {
+                if (child.Row.PlacementCount <= 0) continue;
+                childrenWithPlacements++;
+            }
+
+            if (childrenWithPlacements == 0) return "Not configured";
+            if (childrenWithPlacements == Children.Count) return "All setups configured";
+
+            return $"{childrenWithPlacements} of {Children.Count} setups configured";
+        }
+    }
 }
