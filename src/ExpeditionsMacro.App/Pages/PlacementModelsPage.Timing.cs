@@ -18,6 +18,12 @@ public partial class PlacementModelsPage
                 .DefaultStepDelayMilliseconds;
         _fastPlacementAttempts =
             PlacementModel.DefaultPlacementAttempts;
+        _fastDefaultTargetingPriority =
+            PlacementAuthoringRules
+                .DefaultTargetingPriority;
+        _fastDefaultAutoUpgradePriority =
+            PlacementAuthoringRules
+                .DefaultAutoUpgradePriority;
         _fastDefaultAfterStartDelayMilliseconds =
             PlacementAuthoringRules
                 .DefaultAfterStartDelayMilliseconds;
@@ -33,6 +39,8 @@ public partial class PlacementModelsPage
         MatchSettingsDialog.SetValues(
             _fastPlacementIntervalMilliseconds,
             _fastPlacementAttempts,
+            _fastDefaultTargetingPriority,
+            _fastDefaultAutoUpgradePriority,
             _fastDefaultAfterStartDelayMilliseconds,
             _fastImpossibilityThresholdMinutes,
             !string.IsNullOrWhiteSpace(
@@ -110,6 +118,10 @@ public partial class PlacementModelsPage
             _fastPlacementIntervalMilliseconds = interval;
             _fastPlacementAttempts =
                 placementAttempts;
+            _fastDefaultTargetingPriority =
+                e.DefaultTargetingPriority;
+            _fastDefaultAutoUpgradePriority =
+                e.DefaultAutoUpgradePriority;
             _fastImpossibilityThresholdMinutes =
                 impossibilityThreshold;
             _fastAdvancedSettings = advanced;
@@ -145,6 +157,8 @@ public partial class PlacementModelsPage
     internal void SetSnapshotMatchSettings(
         int placementIntervalMilliseconds,
         int placementAttempts,
+        UnitTargetingPriority defaultTargetingPriority,
+        UnitAutoUpgradePriority defaultAutoUpgradePriority,
         int defaultAfterStartDelayMilliseconds,
         int impossibilityThresholdMinutes,
         bool recordingMode,
@@ -155,6 +169,8 @@ public partial class PlacementModelsPage
         MatchSettingsDialog.SetValues(
             placementIntervalMilliseconds,
             placementAttempts,
+            defaultTargetingPriority,
+            defaultAutoUpgradePriority,
             defaultAfterStartDelayMilliseconds,
             impossibilityThresholdMinutes,
             recordingMode,

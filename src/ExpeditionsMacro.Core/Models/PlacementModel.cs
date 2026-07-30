@@ -291,6 +291,18 @@ public sealed record PlacementModel
     public int PlacementAttempts { get; init; } =
         DefaultPlacementAttempts;
 
+    public UnitTargetingPriority DefaultTargetingPriority
+    {
+        get;
+        init;
+    } = PlacementAuthoringRules.DefaultTargetingPriority;
+
+    public UnitAutoUpgradePriority DefaultAutoUpgradePriority
+    {
+        get;
+        init;
+    } = PlacementAuthoringRules.DefaultAutoUpgradePriority;
+
     public PlacementAdvancedSettings AdvancedSettings
     {
         get;
@@ -336,6 +348,16 @@ public sealed record PlacementModel
         {
             throw new InvalidDataException(
                 $"Placement attempts must be 1 through {MaximumPlacementAttempts}.");
+        }
+        if (!Enum.IsDefined(DefaultTargetingPriority))
+        {
+            throw new InvalidDataException(
+                "Default targeting priority is invalid.");
+        }
+        if (!Enum.IsDefined(DefaultAutoUpgradePriority))
+        {
+            throw new InvalidDataException(
+                "Default Auto Upgrade priority is invalid.");
         }
         if (AdvancedSettings is null)
         {

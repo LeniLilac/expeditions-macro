@@ -66,7 +66,10 @@ public partial class PlacementStepEditorPopover : UserControl
         SetValues(step);
     }
 
-    public void SetNewStep(PlacementStepRow? source)
+    public void SetNewStep(
+        PlacementStepRow? source,
+        UnitTargetingPriority defaultTargeting,
+        UnitAutoUpgradePriority defaultAutoUpgrade)
     {
         _step = null;
         EditorTitleText.Text = "Add match step";
@@ -97,6 +100,10 @@ public partial class PlacementStepEditorPopover : UserControl
                     UpgradeCount = 1,
                 };
         SetValues(defaults);
+        PlacementTargetingCombo.SelectedItem =
+            defaultTargeting;
+        PlacementAutoUpgradeCombo.SelectedValue =
+            defaultAutoUpgrade;
     }
 
     public void ShowError(string message)

@@ -25,6 +25,10 @@ public sealed class MatchStepShareTests
                 CameraPreparationMode.FastNoAlign,
             Target = target,
             TeamSlot = 3,
+            DefaultTargetingPriority =
+                UnitTargetingPriority.Boss,
+            DefaultAutoUpgradePriority =
+                UnitAutoUpgradePriority.Priority5,
             AdvancedSettings = new PlacementAdvancedSettings
             {
                 Enabled = true,
@@ -126,6 +130,12 @@ public sealed class MatchStepShareTests
         PlacementModel shared =
             Assert.Single(decoded.PlacementSetups);
 
+        Assert.Equal(
+            UnitTargetingPriority.Boss,
+            shared.DefaultTargetingPriority);
+        Assert.Equal(
+            UnitAutoUpgradePriority.Priority5,
+            shared.DefaultAutoUpgradePriority);
         Assert.True(shared.AdvancedSettings.Enabled);
         Assert.False(
             shared.AdvancedSettings

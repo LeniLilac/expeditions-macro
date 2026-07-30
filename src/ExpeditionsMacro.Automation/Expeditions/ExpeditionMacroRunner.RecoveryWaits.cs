@@ -224,7 +224,9 @@ public sealed partial class ExpeditionMacroRunner
                 StringComparison.OrdinalIgnoreCase);
         bool captureErrorReported = false;
         while (budget.ShouldObserve(
-                   tracker.HasPendingCandidate))
+                   IsRecoveryTransitionPending(
+                       excluded,
+                       tracker.HasPendingCandidate)))
         {
             cancellationToken.ThrowIfCancellationRequested();
             try
@@ -295,6 +297,12 @@ public sealed partial class ExpeditionMacroRunner
         }
         return null;
     }
+
+    internal static bool IsRecoveryTransitionPending(
+        string excludedState,
+        bool hasStableCandidate) =>
+        !string.IsNullOrWhiteSpace(excludedState) ||
+        hasStableCandidate;
 
     private async Task<string?> ProbeStableRecoveryStateAsync(
         RobloxWindow window,

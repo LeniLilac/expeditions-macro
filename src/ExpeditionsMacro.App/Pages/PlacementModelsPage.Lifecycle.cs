@@ -133,6 +133,8 @@ public partial class PlacementModelsPage
             SetSnapshotMatchSettings(
                 _fastPlacementIntervalMilliseconds,
                 _fastPlacementAttempts,
+                _fastDefaultTargetingPriority,
+                _fastDefaultAutoUpgradePriority,
                 _fastDefaultAfterStartDelayMilliseconds,
                 _fastImpossibilityThresholdMinutes,
                 recordingMode: true,

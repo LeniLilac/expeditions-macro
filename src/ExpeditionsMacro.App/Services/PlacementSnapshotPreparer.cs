@@ -32,6 +32,10 @@ internal static class PlacementSnapshotPreparer
             page.SetSnapshotMatchSettings(
                 placementIntervalMilliseconds: 900,
                 placementAttempts: 4,
+                defaultTargetingPriority:
+                    UnitTargetingPriority.Strongest,
+                defaultAutoUpgradePriority:
+                    UnitAutoUpgradePriority.Priority4,
                 defaultAfterStartDelayMilliseconds: 30_000,
                 impossibilityThresholdMinutes: 0,
                 recordingMode: false,
@@ -93,6 +97,10 @@ internal static class PlacementSnapshotPreparer
         page.SetSnapshotMatchSettings(
             placementIntervalMilliseconds: 900,
             placementAttempts: 2,
+            defaultTargetingPriority:
+                UnitTargetingPriority.First,
+            defaultAutoUpgradePriority:
+                UnitAutoUpgradePriority.Priority1,
             defaultAfterStartDelayMilliseconds: 30_000,
             impossibilityThresholdMinutes:
                 recording ? 18 : 0,
