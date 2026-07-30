@@ -49,6 +49,9 @@ public sealed class AppSettingsStoreTests
                 loaded.UpgradeUnitKey);
             Assert.Equal(
                 string.Empty,
+                loaded.SellUnitKey);
+            Assert.Equal(
+                string.Empty,
                 loaded.AutoUpgradeUnitKey);
             Assert.Equal(
                 string.Empty,
@@ -512,6 +515,7 @@ public sealed class AppSettingsStoreTests
                 CancelPlacementKey = "X",
                 ChangeUnitTargetingKey = "T",
                 UpgradeUnitKey = "Y",
+                SellUnitKey = "S",
                 AutoUpgradeUnitKey = "B",
                 ToggleAutoUpgradePlacedUnitsKey = "V",
                 ResourceRefuelDebug =
@@ -549,6 +553,9 @@ public sealed class AppSettingsStoreTests
             Assert.Equal(
                 "Y",
                 loaded.UpgradeUnitKey);
+            Assert.Equal(
+                "S",
+                loaded.SellUnitKey);
             Assert.Equal(
                 "B",
                 loaded.AutoUpgradeUnitKey);

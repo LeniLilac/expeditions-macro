@@ -158,6 +158,15 @@
                             Property="Foreground"
                             Value="{DynamicResource MatchStepUpgradeBrush}" />
                 </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}"
+                             Value="{x:Static core:MatchStepKind.SellUnit}">
+                    <Setter TargetName="ActionAccent"
+                            Property="Background"
+                            Value="{DynamicResource ErrorBrush}" />
+                    <Setter TargetName="StepTitleText"
+                            Property="Foreground"
+                            Value="{DynamicResource ErrorBrush}" />
+                </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
     </UserControl.Resources>
@@ -369,6 +378,7 @@
                              VirtualizingPanel.IsVirtualizing="False"
                              SelectionMode="Single"
                              ItemTemplate="{StaticResource PlacementStepTemplate}"
+                             PreviewMouseWheel="FastStepsList_PreviewMouseWheel"
                              PreviewMouseLeftButtonUp="FastStepsList_PreviewMouseLeftButtonUp"
                              PreviewMouseMove="FastStepsList_PreviewMouseMove"
                              DragOver="FastStepsList_DragOver"

@@ -96,6 +96,13 @@ public partial class SettingsKeyBindingsPanel
                 UpgradeUnitKey = key.ToString(),
             });
 
+    private Task ApplySellAsync(char key) =>
+        ApplySettingsAsync(
+            settings => settings with
+            {
+                SellUnitKey = key.ToString(),
+            });
+
     private Task ApplyAutoUpgradeUnitAsync(char key) =>
         ApplySettingsAsync(
             settings => settings with
@@ -158,6 +165,11 @@ public partial class SettingsKeyBindingsPanel
                     settings with
                     {
                         UpgradeUnitKey = string.Empty,
+                    },
+                BindingTarget.Sell =>
+                    settings with
+                    {
+                        SellUnitKey = string.Empty,
                     },
                 BindingTarget.AutoUpgradeUnit =>
                     settings with

@@ -140,7 +140,7 @@ public sealed class ResourceRefuelServiceTests
     }
 
     [Fact]
-    public async Task ScheduledNavigation_ClosesPlayAndReturnsToLobby()
+    public async Task ScheduledNavigation_UsesAreasAndReturnsToLobby()
     {
         RefuelAutomation automation =
             new(FakeScreen.Play);
@@ -158,7 +158,32 @@ public sealed class ResourceRefuelServiceTests
             },
             new LobbyDetectorPack());
 
-        Assert.Equal(3, automation.PlayPresses);
+        Assert.Equal(1, automation.PlayPresses);
+        Assert.Equal(3, automation.AreasPresses);
+        Assert.Equal(
+            FakeScreen.Lobby,
+            automation.CurrentScreen);
+    }
+
+    [Fact]
+    public async Task Completion_ReturnsViaAreasBecausePlayKeyIsOpenOnly()
+    {
+        RefuelAutomation automation = new();
+        ResourceRefuelService service = CreateService(
+            automation,
+            new FakeRecovery(automation));
+
+        await service.RunAsync(
+            Request(
+                ResourceRefuelStart.CurrentLobby,
+                ResourceRefuelTarget.GoldMine) with
+            {
+                ReturnToLobbyWhenComplete = true,
+            },
+            new LobbyDetectorPack());
+
+        Assert.Equal(1, automation.PlayPresses);
+        Assert.Equal(2, automation.AreasPresses);
         Assert.Equal(
             FakeScreen.Lobby,
             automation.CurrentScreen);
@@ -184,7 +209,7 @@ public sealed class ResourceRefuelServiceTests
             new LobbyDetectorPack());
 
         Assert.Equal(1, automation.ChallengeCloseClicks);
-        Assert.Equal(1, automation.PlayPresses);
+        Assert.Equal(0, automation.PlayPresses);
     }
 
     [Fact]
@@ -365,6 +390,7 @@ public sealed class ResourceRefuelServiceTests
         Lobby,
         AreasMenu,
         AreasExpeditions,
+        AreasLobby,
         Hub,
         GoldMine,
         ResourceDrill,
@@ -515,6 +541,21 @@ public sealed class ResourceRefuelServiceTests
             {
                 _screen = FakeScreen.AreasExpeditions;
             }
+            else if (_screen == FakeScreen.AreasMenu &&
+                     (x, y) == (198, 252))
+            {
+                _screen = FakeScreen.AreasLobby;
+            }
+            else if (_screen == FakeScreen.AreasExpeditions &&
+                     (x, y) == (198, 252))
+            {
+                _screen = FakeScreen.AreasLobby;
+            }
+            else if (_screen == FakeScreen.AreasLobby &&
+                     (x, y) == (318, 388))
+            {
+                _screen = FakeScreen.Lobby;
+            }
             else if (_screen == FakeScreen.AreasExpeditions &&
                      (x, y) == (322, 264))
             {
@@ -635,9 +676,7 @@ public sealed class ResourceRefuelServiceTests
             else if (key == 'P')
             {
                 PlayPresses++;
-                _screen = _screen == FakeScreen.Play
-                    ? FakeScreen.Lobby
-                    : FakeScreen.Play;
+                _screen = FakeScreen.Play;
             }
             return Task.CompletedTask;
         }
@@ -680,6 +719,8 @@ public sealed class ResourceRefuelServiceTests
                 [FakeScreen.AreasMenu] = LoadRefuel("AreasMenu_01.png"),
                 [FakeScreen.AreasExpeditions] =
                     LoadRefuel("AreasExpeditions_01.png"),
+                [FakeScreen.AreasLobby] =
+                    LoadRefuel("AreasLobby_01.png"),
                 [FakeScreen.Hub] = ImageCodec.Load(Path.Combine(
                     TestPaths.Datasets,
                     "Lobby_UI",
@@ -730,49 +771,4 @@ public sealed class ResourceRefuelServiceTests
         }
     }
 
-    private sealed class LobbyDetectorPack : IDetectorPack
-    {
-        public DetectorPackManifest Manifest =>
-            throw new NotSupportedException();
-
-        public IReadOnlyDictionary<string, double> ScoreStates(
-            ImageFrame clientImage) =>
-            new Dictionary<string, double>();
-
-        public string? Classify(
-            IReadOnlyDictionary<string, double> scores) =>
-            null;
-
-        public string? RecoveryState(ImageFrame clientImage) =>
-            AreasScreenDetectorForTest(clientImage) ||
-            ChallengeScreenDetector
-                .Detect(clientImage).State !=
-                ChallengeScreenState.None
-                ? "unknown"
-                : "lobby";
-
-        public string? CurrentNodeType(ImageFrame clientImage) =>
-            null;
-
-        public int? SelectedMap(ImageFrame clientImage) => null;
-
-        public int? SelectedDifficulty(ImageFrame clientImage) =>
-            null;
-
-        public IReadOnlyList<int> RemainingUnitKeys(
-            ImageFrame clientImage,
-            IReadOnlySet<int> unitKeys) =>
-            [];
-
-        public (int X, int Y) ActionFor(
-            string state,
-            ImageFrame? clientImage = null) =>
-            throw new NotSupportedException();
-
-        private static bool AreasScreenDetectorForTest(
-            ImageFrame image) =>
-            ExpeditionsMacro.Vision.Refuel.AreasScreenDetector
-                .Detect(image).State !=
-            ExpeditionsMacro.Vision.Refuel.AreasScreenState.None;
-    }
 }

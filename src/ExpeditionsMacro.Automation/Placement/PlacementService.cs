@@ -24,6 +24,7 @@ public sealed class PlacementService
         Func<char>? autoUpgradeKey = null,
         Func<int>? quickPlacementKey = null,
         Func<char>? upgradeKey = null,
+        Func<char>? sellKey = null,
         IPlacementMatchStartPlayback?
             matchStartPlayback = null)
     {
@@ -39,7 +40,8 @@ public sealed class PlacementService
                 autoUpgradeKey ?? (() => 'Y'),
                 quickPlacementKey ??
                     (() => KeyboardKey.LeftShift),
-                upgradeKey ?? (() => 'U'));
+                upgradeKey ?? (() => 'U'),
+                sellKey ?? (() => default));
     }
 
     public async Task<PlacementModel> RecordAsync(

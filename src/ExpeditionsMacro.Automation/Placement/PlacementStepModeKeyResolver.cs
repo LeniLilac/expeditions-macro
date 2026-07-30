@@ -7,13 +7,15 @@ internal sealed record PlacementStepModeKeys(
     char CancelPlacement,
     char Targeting,
     char AutoUpgrade,
-    char Upgrade);
+    char Upgrade,
+    char Sell);
 
 internal sealed class PlacementStepModeKeyResolver(
     Func<char> targetingKey,
     Func<char> autoUpgradeKey,
     Func<int> quickPlacementKey,
-    Func<char> upgradeKey)
+    Func<char> upgradeKey,
+    Func<char> sellKey)
 {
     public PlacementStepModeKeys Resolve(
         IReadOnlyList<PlacementStep> steps,
@@ -98,11 +100,25 @@ internal sealed class PlacementStepModeKeyResolver(
                 char.ToUpperInvariant(upgrade);
         }
 
+        char sell = default;
+        if (steps.Any(step =>
+                step.Kind == MatchStepKind.SellUnit))
+        {
+            sell = sellKey();
+            if (!char.IsAsciiLetter(sell))
+            {
+                throw new InvalidDataException(
+                    "Scroll down to Controls on the Dashboard and set Sell Unit key to the same A-Z letter assigned in Anime Expeditions.");
+            }
+            sell = char.ToUpperInvariant(sell);
+        }
+
         return new PlacementStepModeKeys(
             quickPlacement,
             normalizedCancel,
             targeting,
             autoUpgrade,
-            upgrade);
+            upgrade,
+            sell);
     }
 }

@@ -39,7 +39,8 @@ public static class ChallengeRunPolicy
                 {
                     MatchStepKind.Placement => step,
                     MatchStepKind.ReconfigureUnit or
-                        MatchStepKind.UpgradeUnit =>
+                        MatchStepKind.UpgradeUnit or
+                        MatchStepKind.SellUnit =>
                         PlacementReferencePolicy.ResolveTarget(
                             steps,
                             step),

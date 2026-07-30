@@ -36,6 +36,8 @@ public sealed record AppSettings
 
     public const string DefaultUpgradeUnitKey = "";
 
+    public const string DefaultSellUnitKey = "";
+
     public const string DefaultAutoUpgradeUnitKey = "";
 
     public const string
@@ -110,6 +112,9 @@ public sealed record AppSettings
 
     public string UpgradeUnitKey { get; init; } =
         DefaultUpgradeUnitKey;
+
+    public string SellUnitKey { get; init; } =
+        DefaultSellUnitKey;
 
     public string AutoUpgradeUnitKey { get; init; } =
         DefaultAutoUpgradeUnitKey;
@@ -372,6 +377,13 @@ public sealed record AppSettings
             settings,
             settings.UpgradeUnitKey,
             "Upgrade Unit");
+
+    public static char ParseSellUnitKey(
+        AppSettings settings) =>
+        ParseUnitActionKey(
+            settings,
+            settings.SellUnitKey,
+            "Sell Unit");
 
     public static int ParseQuickPlacementKey(
         AppSettings settings) =>

@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using ExpeditionsMacro.App.Models;
 using ExpeditionsMacro.Core.Models;
@@ -28,6 +29,8 @@ public partial class PlacementFastEditorView
     private ListBoxItem? _adornedStep;
     private StepInsertionAdorner? _stepInsertionAdorner;
     private DateTimeOffset _lastStepAutoScroll;
+    private HwndSource? _stepDragWindowSource;
+    private HwndSourceHook? _stepDragWheelHook;
 
     public event EventHandler<PlacementStepReorderEventArgs>?
         StepReorderRequested;
@@ -94,6 +97,7 @@ public partial class PlacementFastEditorView
         try
         {
             Mouse.Capture(null);
+            AttachStepDragWheelHook();
             DragDrop.DoDragDrop(
                 FastStepsList,
                 new DataObject(
@@ -103,6 +107,7 @@ public partial class PlacementFastEditorView
         }
         finally
         {
+            DetachStepDragWheelHook();
             ClearStepInsertionAdorner();
             _draggedStep = null;
             _stepDragOrigin = null;
@@ -270,6 +275,90 @@ public partial class PlacementFastEditorView
         {
             viewer.LineDown();
             _lastStepAutoScroll = now;
+        }
+    }
+
+    private void AttachStepDragWheelHook()
+    {
+        Window? window = Window.GetWindow(this);
+        _stepDragWindowSource =
+            window is null
+                ? null
+                : PresentationSource.FromVisual(window)
+                    as HwndSource;
+        if (_stepDragWindowSource is null)
+        {
+            return;
+        }
+
+        _stepDragWheelHook = StepDragWindowHook;
+        _stepDragWindowSource.AddHook(
+            _stepDragWheelHook);
+    }
+
+    private void DetachStepDragWheelHook()
+    {
+        if (_stepDragWindowSource is not null &&
+            _stepDragWheelHook is not null)
+        {
+            _stepDragWindowSource.RemoveHook(
+                _stepDragWheelHook);
+        }
+        _stepDragWheelHook = null;
+        _stepDragWindowSource = null;
+    }
+
+    private nint StepDragWindowHook(
+        nint hwnd,
+        int message,
+        nint wParam,
+        nint lParam,
+        ref bool handled)
+    {
+        const int mouseWheelMessage = 0x020A;
+        if (message != mouseWheelMessage ||
+            _draggedStep is null)
+        {
+            return 0;
+        }
+
+        int delta = unchecked(
+            (short)(wParam.ToInt64() >> 16));
+        ScrollStepDragByWheel(delta);
+        handled = true;
+        return 0;
+    }
+
+    private void ScrollStepDragByWheel(int delta)
+    {
+        if (delta == 0)
+        {
+            return;
+        }
+
+        ScrollViewer viewer =
+            FastWorkspaceScrollViewer;
+        int lines = SystemParameters.WheelScrollLines;
+        double distance =
+            lines < 0
+                ? viewer.ViewportHeight
+                : Math.Max(1, lines) * 16d;
+        viewer.ScrollToVerticalOffset(
+            viewer.VerticalOffset -
+            distance * delta / 120d);
+        viewer.UpdateLayout();
+
+        Point position =
+            Mouse.GetPosition(FastStepsList);
+        if (TryFindDropTarget(
+                position,
+                out _,
+                out ListBoxItem? container,
+                out bool insertAfter))
+        {
+            ShowStepInsertionAdorner(
+                container,
+                insertAfter);
         }
     }
 

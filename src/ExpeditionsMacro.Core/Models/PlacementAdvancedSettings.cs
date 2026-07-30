@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace ExpeditionsMacro.Core.Models;
 
 public sealed record PlacementAdvancedSettings
@@ -28,6 +30,33 @@ public sealed record PlacementAdvancedSettings
         get;
         init;
     } = true;
+
+    public bool?
+        VerifySelectedUnitPanelBeforeReconfigureActions
+    {
+        get;
+        init;
+    }
+
+    public bool? VerifyUpgradeUnitReadiness
+    {
+        get;
+        init;
+    }
+
+    [JsonIgnore]
+    public bool RequirePlacementActionProof =>
+        VerifySelectedUnitPanelBeforeActions;
+
+    [JsonIgnore]
+    public bool RequireReconfigureActionProof =>
+        VerifySelectedUnitPanelBeforeReconfigureActions ??
+        VerifySelectedUnitPanelBeforeActions;
+
+    [JsonIgnore]
+    public bool RequireUpgradeUnitReadiness =>
+        VerifyUpgradeUnitReadiness ??
+        VerifySelectedUnitPanelBeforeActions;
 
     public bool VerifyPrestartBeforeManualPlayback
     {

@@ -274,6 +274,16 @@ public partial class SettingsKeyBindingsPanel
             "Required only when a macro workflow uses Upgrade Unit.",
             value => UpgradeDiagnostic = value);
 
+    private void UpdateSellDisplay() =>
+        UpdateRequiredUnitActionDisplay(
+            BindingTarget.Sell,
+            Services.Settings.SellUnitKey,
+            "Sell Unit",
+            SellButton,
+            SellStatusText,
+            "Required only when Match Steps contain a Sell Unit action.",
+            value => SellDiagnostic = value);
+
     private void UpdateAutoUpgradeDisplay() =>
         UpdateRequiredUnitActionDisplay(
             BindingTarget.AutoUpgradeUnit,

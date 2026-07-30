@@ -9,13 +9,16 @@ public enum AreasScreenState
     None,
     Menu,
     Expeditions,
+    Lobby,
 }
 
 public sealed record AreasScreenMatch(
     AreasScreenState State,
     double Confidence,
     int? ActionX = null,
-    int? ActionY = null);
+    int? ActionY = null,
+    int? LobbyTabActionX = null,
+    int? LobbyTabActionY = null);
 
 public static class AreasScreenDetector
 {
@@ -29,10 +32,16 @@ public static class AreasScreenDetector
         new(145, 435, 520, 30);
     private static readonly ScreenRegion ExpeditionTab =
         new(148, 288, 98, 38);
+    private static readonly ScreenRegion LobbyTab =
+        new(148, 238, 98, 38);
     private static readonly ScreenRegion ExpeditionHeading =
+        new(250, 178, 180, 35);
+    private static readonly ScreenRegion LobbyHeading =
         new(250, 178, 180, 35);
     private static readonly ScreenRegion HubCard =
         new(250, 205, 140, 70);
+    private static readonly ScreenRegion LobbySpawnCard =
+        new(250, 345, 140, 80);
     private static readonly ScreenRegion[] NavigationButtons =
     [
         new(150, 188, 94, 28),
@@ -145,18 +154,70 @@ public static class AreasScreenDetector
                     0,
                     1);
 
-        AreasScreenMatch match = expeditions >= 0.76
+        double lobbySelectedTab =
+            RefuelVisionMetrics.ColorFraction(
+                image,
+                LobbyTab,
+                RefuelVisionMetrics.IsTeal);
+        double lobbyHeading =
+            RefuelVisionMetrics.ColorFraction(
+                image,
+                LobbyHeading,
+                RefuelVisionMetrics.IsTeal);
+        double lobbySpawn =
+            RefuelVisionMetrics.ColorFraction(
+                image,
+                LobbySpawnCard,
+                RefuelVisionMetrics.IsTeal);
+        double lobby =
+            structure == 0 ||
+            lobbySelectedTab < 0.25 ||
+            lobbyHeading < 0.04 ||
+            lobbySpawn < 0.035
+                ? 0
+                : Math.Clamp(
+                    0.52 * structure +
+                    0.20 * RefuelVisionMetrics.Ramp(
+                        lobbySelectedTab,
+                        0.25,
+                        0.55) +
+                    0.16 * RefuelVisionMetrics.Ramp(
+                        lobbyHeading,
+                        0.04,
+                        0.08) +
+                    0.12 * RefuelVisionMetrics.Ramp(
+                        lobbySpawn,
+                        0.035,
+                        0.07),
+                    0,
+                    1);
+
+        const int lobbyTabX = 198;
+        const int lobbyTabY = 252;
+        AreasScreenMatch match = lobby >= 0.76
+            ? new AreasScreenMatch(
+                AreasScreenState.Lobby,
+                lobby,
+                ActionX: 318,
+                ActionY: 388,
+                LobbyTabActionX: lobbyTabX,
+                LobbyTabActionY: lobbyTabY)
+            : expeditions >= 0.76
             ? new AreasScreenMatch(
                 AreasScreenState.Expeditions,
                 expeditions,
                 ActionX: 322,
-                ActionY: 264)
+                ActionY: 264,
+                LobbyTabActionX: lobbyTabX,
+                LobbyTabActionY: lobbyTabY)
             : structure >= 0.74
                 ? new AreasScreenMatch(
                     AreasScreenState.Menu,
                     structure,
                     ActionX: 198,
-                    ActionY: 304)
+                    ActionY: 304,
+                    LobbyTabActionX: lobbyTabX,
+                    LobbyTabActionY: lobbyTabY)
                 : new AreasScreenMatch(
                     AreasScreenState.None,
                     0);
@@ -175,8 +236,13 @@ public static class AreasScreenDetector
                 SelectedTab = selectedTab,
                 Heading = heading,
                 HubCard = hubCard,
+                LobbySelectedTab = lobbySelectedTab,
+                LobbyHeading = lobbyHeading,
+                LobbySpawn = lobbySpawn,
                 match.ActionX,
                 match.ActionY,
+                match.LobbyTabActionX,
+                match.LobbyTabActionY,
             });
         return match;
     }

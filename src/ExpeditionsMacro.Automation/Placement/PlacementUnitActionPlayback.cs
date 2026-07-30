@@ -9,11 +9,11 @@ internal sealed class PlacementUnitActionPlayback
 {
     private const int DefaultActionKeyIntervalMilliseconds =
         100;
-    private const int AutoUpgradeDisableHoldMilliseconds =
-        1500;
 
     private readonly IRobloxAutomation _automation;
     private readonly SelectedUnitPanelPlayback _selectedUnitPanel;
+    private readonly PlacementUpgradeActionPlayback
+        _upgradeActions;
     private readonly Dictionary<string, UnitState> _states =
         [];
 
@@ -23,6 +23,8 @@ internal sealed class PlacementUnitActionPlayback
         _automation = automation;
         _selectedUnitPanel =
             new SelectedUnitPanelPlayback(automation);
+        _upgradeActions =
+            new PlacementUpgradeActionPlayback(automation);
     }
 
     public void BeginMatch() =>
@@ -33,6 +35,8 @@ internal sealed class PlacementUnitActionPlayback
         PlacementModel model,
         MatchStepPlaybackItem playable,
         int stepCount,
+        bool requireProof,
+        bool requireFirstPriorityProof,
         Action<string>? status,
         CancellationToken cancellationToken)
     {
@@ -77,17 +81,21 @@ internal sealed class PlacementUnitActionPlayback
                     cancellationToken)
                 .ConfigureAwait(false);
         }
-        if (advanced.Enabled &&
-            !advanced
-                .VerifySelectedUnitPanelBeforeActions)
+        if (!requireProof)
         {
             status?.Invoke(
                 $"Step {playable.SourceIndex + 1}/{stepCount}: advanced mode skipped selected-unit proof.");
             return true;
         }
 
-        bool selected =
-            await _selectedUnitPanel.WaitForVisibleAsync(
+        bool selected = requireFirstPriorityProof
+            ? await _selectedUnitPanel
+                .WaitForVisibleAsync(
+                    window,
+                    cancellationToken)
+                .ConfigureAwait(false)
+            : await _selectedUnitPanel
+                .WaitForPanelVisibleAsync(
                     window,
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -196,31 +204,28 @@ internal sealed class PlacementUnitActionPlayback
         if (step.AutoUpgradeAction !=
             MatchAutoUpgradeAction.NoChange)
         {
+            UnitAutoUpgradePriority requestedAutoUpgrade =
+                AutoUpgradePriority(
+                    step.AutoUpgradeAction);
+            int stateCount =
+                Enum.GetValues<
+                        UnitAutoUpgradePriority>()
+                    .Length;
+            int autoUpgradeTaps =
+                ((int)requestedAutoUpgrade -
+                 (int)current.AutoUpgrade +
+                 stateCount) %
+                stateCount;
             status?.Invoke(
-                $"Step {playable.SourceIndex + 1}/{stepCount}: normalizing Auto Upgrade to Off.");
-            await HoldActionKeyAsync(
+                $"Step {playable.SourceIndex + 1}/{stepCount}: changing Auto Upgrade from {current.AutoUpgrade} to {requestedAutoUpgrade} ({autoUpgradeTaps} key taps).");
+            await TapActionKeyAsync(
                     window,
                     keys.AutoUpgrade,
-                    AutoUpgradeDisableHoldMilliseconds,
+                    autoUpgradeTaps,
+                    interval,
                     cancellationToken)
                 .ConfigureAwait(false);
-            autoUpgrade = UnitAutoUpgradePriority.Off;
-            int priority =
-                AutoUpgradePriority(step.AutoUpgradeAction);
-            if (priority > 0)
-            {
-                status?.Invoke(
-                    $"Step {playable.SourceIndex + 1}/{stepCount}: enabling Auto Upgrade Priority {priority}.");
-                await TapActionKeyAsync(
-                        window,
-                        keys.AutoUpgrade,
-                        priority,
-                        interval,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-                autoUpgrade =
-                    (UnitAutoUpgradePriority)priority;
-            }
+            autoUpgrade = requestedAutoUpgrade;
         }
 
         _states[playable.PlacementId] =
@@ -244,13 +249,17 @@ internal sealed class PlacementUnitActionPlayback
         Action<string>? status,
         CancellationToken cancellationToken)
     {
-        status?.Invoke(
-            $"Step {playable.SourceIndex + 1}/{stepCount}: pressing Upgrade Unit {playable.Step.UpgradeCount} time(s).");
-        await TapActionKeyAsync(
+        await _upgradeActions.ApplyAsync(
                 window,
                 keys.Upgrade,
                 playable.Step.UpgradeCount,
                 ActionInterval(model),
+                !model.AdvancedSettings.Enabled ||
+                model.AdvancedSettings
+                    .RequireUpgradeUnitReadiness,
+                playable.SourceIndex + 1,
+                stepCount,
+                status,
                 cancellationToken)
             .ConfigureAwait(false);
         await DismissAsync(
@@ -261,6 +270,36 @@ internal sealed class PlacementUnitActionPlayback
                 status,
                 cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    public async Task ApplySellAsync(
+        RobloxWindow window,
+        PlacementModel model,
+        MatchStepPlaybackItem playable,
+        int stepCount,
+        PlacementStepModeKeys keys,
+        Action<string>? status,
+        CancellationToken cancellationToken)
+    {
+        status?.Invoke(
+            $"Step {playable.SourceIndex + 1}/{stepCount}: selling placed Unit {playable.UnitKey}.");
+        await TapActionKeyAsync(
+                window,
+                keys.Sell,
+                1,
+                ActionInterval(model),
+                cancellationToken)
+            .ConfigureAwait(false);
+        if (!await _selectedUnitPanel
+                .WaitForHiddenAfterActionAsync(
+                    window,
+                    cancellationToken)
+                .ConfigureAwait(false))
+        {
+            throw new RobloxUiUnavailableException(
+                "The selected-unit panel remained open after Sell Unit was pressed.");
+        }
+        _states.Remove(playable.PlacementId);
     }
 
     private async Task DismissAsync(
@@ -305,28 +344,6 @@ internal sealed class PlacementUnitActionPlayback
                     .ConfigureAwait(false);
             }
         }
-    }
-
-    private async Task HoldActionKeyAsync(
-        RobloxWindow window,
-        char key,
-        int holdMilliseconds,
-        CancellationToken cancellationToken)
-    {
-        EnsureFocus(window);
-        await _automation.RunWithKeyHeldAsync(
-                window,
-                key,
-                async heldToken =>
-                {
-                    await Task.Delay(
-                            holdMilliseconds,
-                            heldToken)
-                        .ConfigureAwait(false);
-                    return true;
-                },
-                cancellationToken)
-            .ConfigureAwait(false);
     }
 
     private async Task EnsureSizeAsync(
@@ -377,17 +394,29 @@ internal sealed class PlacementUnitActionPlayback
                 .ActionKeyIntervalMilliseconds
             : DefaultActionKeyIntervalMilliseconds;
 
-    private static int AutoUpgradePriority(
+    private static UnitAutoUpgradePriority
+        AutoUpgradePriority(
         MatchAutoUpgradeAction action) =>
         action switch
         {
-            MatchAutoUpgradeAction.Priority1 => 1,
-            MatchAutoUpgradeAction.Priority2 => 2,
-            MatchAutoUpgradeAction.Priority3 => 3,
-            MatchAutoUpgradeAction.Priority4 => 4,
-            MatchAutoUpgradeAction.Priority5 => 5,
-            MatchAutoUpgradeAction.Priority6 => 6,
-            _ => 0,
+            MatchAutoUpgradeAction.Disable =>
+                UnitAutoUpgradePriority.Off,
+            MatchAutoUpgradeAction.Priority1 =>
+                UnitAutoUpgradePriority.Priority1,
+            MatchAutoUpgradeAction.Priority2 =>
+                UnitAutoUpgradePriority.Priority2,
+            MatchAutoUpgradeAction.Priority3 =>
+                UnitAutoUpgradePriority.Priority3,
+            MatchAutoUpgradeAction.Priority4 =>
+                UnitAutoUpgradePriority.Priority4,
+            MatchAutoUpgradeAction.Priority5 =>
+                UnitAutoUpgradePriority.Priority5,
+            MatchAutoUpgradeAction.Priority6 =>
+                UnitAutoUpgradePriority.Priority6,
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(action),
+                action,
+                "The Auto Upgrade action must select a state."),
         };
 
     private readonly record struct UnitState(

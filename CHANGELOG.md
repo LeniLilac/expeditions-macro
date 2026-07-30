@@ -29,10 +29,18 @@ All notable changes to Expeditions Macro are documented here.
 - Unit targeting and Auto Upgrade state now reset once per match, while Expedition retry queues contain placement actions only.
 - Selected-unit proof waits retain their strict consecutive-frame and click-attempt requirements while allowing slow capture devices to finish observations inside one bounded hard deadline.
 - Resource refuel now recognizes Gold Mine and Resource Drill in both fuel-present and missing-fuel states, revalidates the live Max and Confirm actions, and performs at most two verified cleanup actions before failing closed.
+- Match Step rows now refresh targeting and Auto Upgrade summaries immediately after editing.
+- Mouse-wheel input over Match Steps now scrolls the Placement Setup page, and adding or selecting a map placement no longer jumps down to its row.
+- Advanced Step Mode skips the selected-unit click when visual proof is disabled and a placement already requests the default Target First / Auto Off state.
+- Auto Upgrade reconfiguration now remembers each placed unit's current state and cycles forward with the minimum required key taps instead of holding the key or normalizing an already-known state.
+- Removing a placed-unit action now removes its dependent Reconfigure, Upgrade, and Sell actions in the same autosaved edit instead of leaving an invalid timeline.
+- Match Steps support a lazily required Sell Unit binding and action, with selected-panel proof and post-sale closure verification.
+- Advanced placement, reconfiguration, and Upgrade-readiness checks are independently configurable. Upgrade actions wait for a stable green control, wait through ordinary gray, and stop cleanly at the wider Maxed control.
+- Resource Utilities now return through the verified Areas Lobby category and Spawn card because the configured Play key is open-only.
 
 ### Tests
 
-- Passed 1,328 application and detector tests, 5 Deep Debug Viewer tests, and all 86 dark/light UI snapshot states.
+- Passed 1,362 application and detector tests, 5 Deep Debug Viewer tests, and all 86 dark/light UI snapshot states.
 
 ## [1.3.0-beta.40] - 2026-07-28
 

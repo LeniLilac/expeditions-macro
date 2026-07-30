@@ -1,6 +1,6 @@
 # Detector image dataset
 
-This repository includes 476 reviewed 808 by 611 Roblox client image fixtures used to build and regression-test the bundled Anime Expeditions detector pack and specialized UI detectors: 286 Expeditions fixtures, 81 selective Challenge fixtures, 53 Story/Raid/team/placement fixtures, 13 navigation variants, 10 resource-refuel fixtures, 15 game-settings fixtures, and 18 Event fixtures. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
+This repository includes 481 reviewed 808 by 611 Roblox client image fixtures used to build and regression-test the bundled Anime Expeditions detector pack and specialized UI detectors: 286 Expeditions fixtures, 81 selective Challenge fixtures, 57 Story/Raid/team/placement fixtures, 13 navigation variants, 11 resource-refuel fixtures, 15 game-settings fixtures, and 18 Event fixtures. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
 
 There is no camera-model, yaw-atlas, or automatic camera-region dataset. Beta.33 supports only deterministic Fast preparation, and the retired Camera Model workflow is retained solely as a deserialize-and-migrate compatibility boundary for public-beta user data.
 
@@ -14,7 +14,7 @@ Story, Raid, and saved-team fixtures are organized under `datasets/anime-expedit
 
 Lobby-entry and post-match Story, Raid, Challenge, and Expedition detail variants are organized under `datasets/anime-expeditions/navigation-variants/`. These fixtures prove that **Enter Matchmaking** is optional and that navigation must use the live **Select Stage** action in either party context. `ChatClosed.png` and `ChatOpen.png` are privacy-safe derived fixtures: only the exact fixed chat-button region remains on a black canonical canvas, with all world, account, and chat content removed. They preserve the outlined closed glyph and opaque filled open glyph used to normalize chat before Lobby or match input.
 
-Areas, Gold Mine, and Resource Drill fixtures are organized under `datasets/anime-expeditions/refuel/`. They protect the shared Debug route-calibration and scheduled Utility workflow across missing-fuel, fuel-present, and reward-availability variants.
+Areas, Gold Mine, and Resource Drill fixtures are organized under `datasets/anime-expeditions/refuel/`. They protect the shared Debug route-calibration and scheduled Utility workflow across missing-fuel, fuel-present, reward-availability, and verified Areas-to-Lobby navigation variants.
 
 Startup settings fixtures are organized under `datasets/anime-expeditions/settings/`. They cover the closed Lobby, both fixed Roblox Settings-gear offsets, their normal and derived high-contrast outline behavior, the Settings opening animation, supported UI Scale values, each required settings page, and the Units page at both scroll boundaries.
 

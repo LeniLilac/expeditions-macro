@@ -89,6 +89,86 @@ public sealed class PlacementReferencePolicyTests
             StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void RemovingPlacement_RemovesOnlyItsDependentActions()
+    {
+        PlacementStep first =
+            Placement("one-a", 1, 240);
+        PlacementStep second =
+            Placement("two-a", 2, 360);
+        PlacementStep reconfigure =
+            Reconfigure("one-a", 1);
+        PlacementStep upgrade = new()
+        {
+            Kind = MatchStepKind.UpgradeUnit,
+            TargetPlacementId = "one-a",
+            UnitKey = 1,
+            X = 0,
+            Y = 0,
+            UpgradeCount = 2,
+            DelayAfterMilliseconds = 0,
+        };
+        PlacementStep sell = new()
+        {
+            Kind = MatchStepKind.SellUnit,
+            TargetPlacementId = "one-a",
+            UnitKey = 1,
+            X = 0,
+            Y = 0,
+            DelayAfterMilliseconds = 0,
+        };
+        PlacementStep unrelated =
+            Reconfigure("two-a", 2);
+
+        IReadOnlyList<PlacementStep> remaining =
+            PlacementReferencePolicy
+                .RemovePlacementAndReferences(
+                    [
+                        first,
+                        second,
+                        reconfigure,
+                        upgrade,
+                        sell,
+                        unrelated,
+                    ],
+                    first.PlacementId);
+
+        Assert.Equal(
+            [second, unrelated],
+            remaining);
+        PlacementReferencePolicy.Validate(remaining);
+    }
+
+    [Fact]
+    public void SoldPlacement_CannotReceiveAnotherUnitAction()
+    {
+        PlacementStep placement =
+            Placement("one-a", 1, 240);
+        PlacementStep sell = new()
+        {
+            Kind = MatchStepKind.SellUnit,
+            TargetPlacementId = placement.PlacementId,
+            UnitKey = placement.UnitKey,
+            X = 0,
+            Y = 0,
+            DelayAfterMilliseconds = 0,
+        };
+        PlacementStep later =
+            Reconfigure(
+                placement.PlacementId,
+                placement.UnitKey);
+
+        InvalidDataException error =
+            Assert.Throws<InvalidDataException>(
+                () => PlacementReferencePolicy.Validate(
+                    [placement, sell, later]));
+
+        Assert.Contains(
+            "after its Sell Unit step",
+            error.Message,
+            StringComparison.Ordinal);
+    }
+
     private static PlacementStep Placement(
         string id,
         int unit,

@@ -30,6 +30,7 @@ internal sealed record DeepDebugSanitizedSettings(
     string CancelPlacementKey,
     string ChangeUnitTargetingKey,
     string UpgradeUnitKey,
+    string SellUnitKey,
     string AutoUpgradeUnitKey,
     string ToggleAutoUpgradePlacedUnitsKey,
     ResourceRefuelDebugSettings ResourceRefuelDebug)
@@ -64,6 +65,7 @@ internal sealed record DeepDebugSanitizedSettings(
         settings.CancelPlacementKey,
         settings.ChangeUnitTargetingKey,
         settings.UpgradeUnitKey,
+        settings.SellUnitKey,
         settings.AutoUpgradeUnitKey,
         settings.ToggleAutoUpgradePlacedUnitsKey,
         settings.ResourceRefuelDebug);

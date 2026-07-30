@@ -17,6 +17,7 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
             "Reconfigure unit"),
         new(MatchStepKind.Delay, "Delay"),
         new(MatchStepKind.UpgradeUnit, "Upgrade unit"),
+        new(MatchStepKind.SellUnit, "Sell unit"),
     ];
 
     public static IReadOnlyList<int> UnitSlots
@@ -192,7 +193,7 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         {
             if (!Set(ref _targetingPriority, value)) return;
             Raise(nameof(TargetingPriorityLabel));
-            Raise(nameof(ActionSummaryLabel));
+            RaiseActionSummaryLabels();
         }
     }
 
@@ -206,7 +207,7 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
             propertyChanged: () =>
             {
                 Raise(nameof(AutoUpgradePriorityLabel));
-                Raise(nameof(ActionSummaryLabel));
+                RaiseActionSummaryLabels();
             });
     }
 
@@ -221,7 +222,7 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
             {
                 return;
             }
-            Raise(nameof(ActionSummaryLabel));
+            RaiseActionSummaryLabels();
         }
     }
 
@@ -234,7 +235,7 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
             {
                 return;
             }
-            Raise(nameof(ActionSummaryLabel));
+            RaiseActionSummaryLabels();
         }
     }
 
@@ -249,7 +250,7 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
             {
                 return;
             }
-            Raise(nameof(ActionSummaryLabel));
+            RaiseActionSummaryLabels();
         }
     }
 
@@ -259,7 +260,7 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         set
         {
             if (!Set(ref _upgradeCount, value)) return;
-            Raise(nameof(ActionSummaryLabel));
+            RaiseActionSummaryLabels();
         }
     }
 
@@ -285,7 +286,8 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
 
     public bool HasPlacementReference =>
         Kind is MatchStepKind.ReconfigureUnit or
-            MatchStepKind.UpgradeUnit;
+            MatchStepKind.UpgradeUnit or
+            MatchStepKind.SellUnit;
 
     public bool IsStartGame =>
         Kind == MatchStepKind.StartGame;
@@ -303,6 +305,7 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
             MatchStepKind.Delay => "Wait",
             MatchStepKind.UpgradeUnit =>
                 "Upgrade unit",
+            MatchStepKind.SellUnit => "Sell unit",
             MatchStepKind.StartGame =>
                 "Start Game",
             _ => Kind.ToString(),
@@ -341,6 +344,7 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
                 $"Wait {DelayDurationMilliseconds:N0} ms",
             MatchStepKind.UpgradeUnit =>
                 $"Press Upgrade Unit {UpgradeCount}×",
+            MatchStepKind.SellUnit => "Press Sell Unit",
             MatchStepKind.StartGame =>
                 string.Empty,
             _ => string.Empty,
@@ -471,7 +475,13 @@ public sealed class PlacementStepRow : INotifyPropertyChanged
         Raise(nameof(StepTypeLabel));
         Raise(nameof(StepTitle));
         Raise(nameof(CoordinateLabel));
+        RaiseActionSummaryLabels();
+    }
+
+    private void RaiseActionSummaryLabels()
+    {
         Raise(nameof(ActionSummaryLabel));
+        Raise(nameof(ScheduleLabel));
     }
 
     private void Raise(string name) =>

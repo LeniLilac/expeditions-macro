@@ -48,14 +48,28 @@ public sealed class MatchStepModelTests
                 UnitAutoUpgradePriority.Off,
             UpgradeCount = 4,
         };
+        PlacementStep sell = placement with
+        {
+            Kind = MatchStepKind.SellUnit,
+            PlacementId = string.Empty,
+            TargetPlacementId =
+                placement.PlacementId,
+            X = 0,
+            Y = 0,
+            AutoUpgradePriority =
+                UnitAutoUpgradePriority.Off,
+        };
         PlacementModel model = Model(
-            [placement, reconfigure, delay, upgrade]) with
+            [placement, reconfigure, delay, upgrade, sell]) with
         {
             AdvancedSettings = new PlacementAdvancedSettings
             {
                 Enabled = true,
                 PlacementBurstDurationMilliseconds = 25,
                 VerifySelectedUnitPanelBeforeActions = false,
+                VerifySelectedUnitPanelBeforeReconfigureActions =
+                    true,
+                VerifyUpgradeUnitReadiness = false,
                 VerifyPrestartBeforeManualPlayback = false,
                 ManualPlaybackStartDelayMilliseconds = 900,
             },
@@ -77,16 +91,49 @@ public sealed class MatchStepModelTests
                 MatchStepKind.ReconfigureUnit,
                 MatchStepKind.Delay,
                 MatchStepKind.UpgradeUnit,
+                MatchStepKind.SellUnit,
             ],
             restored.Steps.Select(step => step.Kind));
         Assert.True(restored.AdvancedSettings.Enabled);
         Assert.False(
             restored.AdvancedSettings
                 .VerifySelectedUnitPanelBeforeActions);
+        Assert.True(
+            restored.AdvancedSettings
+                .RequireReconfigureActionProof);
+        Assert.False(
+            restored.AdvancedSettings
+                .RequireUpgradeUnitReadiness);
         Assert.Equal(
             900,
             restored.AdvancedSettings
                 .ManualPlaybackStartDelayMilliseconds);
+    }
+
+    [Fact]
+    public void LegacyActionProofValue_DefaultsBothNewControls()
+    {
+        PlacementAdvancedSettings enabled =
+            new()
+            {
+                VerifySelectedUnitPanelBeforeActions =
+                    true,
+            };
+        PlacementAdvancedSettings disabled =
+            new()
+            {
+                VerifySelectedUnitPanelBeforeActions =
+                    false,
+            };
+
+        Assert.True(
+            enabled.RequireReconfigureActionProof);
+        Assert.True(
+            enabled.RequireUpgradeUnitReadiness);
+        Assert.False(
+            disabled.RequireReconfigureActionProof);
+        Assert.False(
+            disabled.RequireUpgradeUnitReadiness);
     }
 
     [Fact]

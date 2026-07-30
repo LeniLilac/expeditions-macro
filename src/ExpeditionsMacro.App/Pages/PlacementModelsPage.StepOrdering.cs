@@ -27,12 +27,36 @@ public partial class PlacementModelsPage
             return false;
         }
 
+        PlacementStepRow[] rowsToRemove =
+            row.Kind == MatchStepKind.Placement
+                ? _steps.Where(candidate =>
+                        ReferenceEquals(
+                            candidate,
+                            row) ||
+                        candidate.HasPlacementReference &&
+                        string.Equals(
+                            candidate
+                                .TargetPlacementId,
+                            row.PlacementId,
+                            StringComparison.Ordinal))
+                    .ToArray()
+                : [row];
         List<PlacementStep> prospective =
-            _steps.Where(candidate =>
-                    !ReferenceEquals(candidate, row))
-                .Select(candidate =>
-                    candidate.ToModel())
-                .ToList();
+            row.Kind == MatchStepKind.Placement
+                ? PlacementReferencePolicy
+                    .RemovePlacementAndReferences(
+                        _steps.Select(candidate =>
+                                candidate.ToModel())
+                            .ToArray(),
+                        row.PlacementId)
+                    .ToList()
+                : _steps.Where(candidate =>
+                        !ReferenceEquals(
+                            candidate,
+                            row))
+                    .Select(candidate =>
+                        candidate.ToModel())
+                    .ToList();
         try
         {
             ValidateTimeline(prospective);
@@ -45,10 +69,21 @@ public partial class PlacementModelsPage
             return false;
         }
 
-        _steps.Remove(row);
-        NormalizeTimelineRows();
+        using (SuspendPlacementAutoSave())
+        {
+            foreach (PlacementStepRow removed
+                     in rowsToRemove)
+            {
+                _steps.Remove(removed);
+            }
+            NormalizeTimelineRows();
+        }
+        int dependentCount =
+            rowsToRemove.Length - 1;
         FastStatusText.Text =
-            $"{row.StepTypeLabel} removed.";
+            dependentCount == 0
+                ? $"{row.StepTypeLabel} removed."
+                : $"{row.StepTypeLabel} and {dependentCount} dependent action{(dependentCount == 1 ? string.Empty : "s")} removed.";
         SchedulePlacementAutoSave();
         return true;
     }

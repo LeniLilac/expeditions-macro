@@ -15,7 +15,8 @@ internal sealed class PlacementStepModePlayback
         Func<char> targetingKey,
         Func<char> autoUpgradeKey,
         Func<int> quickPlacementKey,
-        Func<char> upgradeKey)
+        Func<char> upgradeKey,
+        Func<char> sellKey)
     {
         _batch = new PlacementBatchPlayback(automation);
         _unitActions =
@@ -25,7 +26,8 @@ internal sealed class PlacementStepModePlayback
                 targetingKey,
                 autoUpgradeKey,
                 quickPlacementKey,
-                upgradeKey);
+                upgradeKey,
+                sellKey);
     }
 
     public void BeginMatch() =>
@@ -143,12 +145,36 @@ internal sealed class PlacementStepModePlayback
 
         foreach (MatchStepPlaybackItem playable in group)
         {
+            if (CanSkipDefaultPlacementConfiguration(
+                    model,
+                    playable.Step))
+            {
+                status?.Invoke(
+                    $"Step {playable.SourceIndex + 1}/{stepCount}: skipped the selected-unit click because Target First and Auto Off require no unit actions.");
+                stepSent?.Invoke(
+                    playable.SourceIndex + 1,
+                    stepCount,
+                    playable.Step);
+                await WaitDefaultIntervalAsync(
+                        playable,
+                        useDefaultInterval,
+                        defaultIntervalMilliseconds,
+                        status,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                continue;
+            }
+
             bool selected =
                 await _unitActions.TrySelectAsync(
                         window,
                         model,
                         playable,
                         stepCount,
+                        requireProof:
+                            PlacementActionProofRequired(
+                                model),
+                        requireFirstPriorityProof: true,
                         status,
                         cancellationToken)
                     .ConfigureAwait(false);
@@ -175,6 +201,10 @@ internal sealed class PlacementStepModePlayback
                             model,
                             playable,
                             stepCount,
+                            requireProof:
+                                PlacementActionProofRequired(
+                                    model),
+                            requireFirstPriorityProof: true,
                             status,
                             cancellationToken)
                         .ConfigureAwait(false);
@@ -208,6 +238,17 @@ internal sealed class PlacementStepModePlayback
                 .ConfigureAwait(false);
         }
     }
+
+    private static bool
+        CanSkipDefaultPlacementConfiguration(
+            PlacementModel model,
+            PlacementStep step) =>
+        model.AdvancedSettings.Enabled &&
+        !PlacementActionProofRequired(model) &&
+        step.TargetingPriority ==
+            UnitTargetingPriority.First &&
+        step.AutoUpgradePriority ==
+            UnitAutoUpgradePriority.Off;
 
     private async Task PlayActionStepAsync(
         RobloxWindow window,
@@ -243,6 +284,11 @@ internal sealed class PlacementStepModePlayback
                     model,
                     playable,
                     stepCount,
+                    requireProof:
+                        ActionProofRequired(
+                            model,
+                            step.Kind),
+                    requireFirstPriorityProof: false,
                     status,
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -277,6 +323,17 @@ internal sealed class PlacementStepModePlayback
                         cancellationToken)
                     .ConfigureAwait(false);
                 break;
+            case MatchStepKind.SellUnit:
+                await _unitActions.ApplySellAsync(
+                        window,
+                        model,
+                        playable,
+                        stepCount,
+                        keys,
+                        status,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                break;
             default:
                 throw new InvalidDataException(
                     "The match step action is invalid.");
@@ -294,6 +351,32 @@ internal sealed class PlacementStepModePlayback
                 cancellationToken)
             .ConfigureAwait(false);
     }
+
+    private static bool ActionProofRequired(
+        PlacementModel model,
+        MatchStepKind kind) =>
+        kind switch
+        {
+            MatchStepKind.ReconfigureUnit =>
+                !model.AdvancedSettings.Enabled ||
+                model.AdvancedSettings
+                    .RequireReconfigureActionProof,
+            MatchStepKind.UpgradeUnit =>
+                !model.AdvancedSettings.Enabled ||
+                model.AdvancedSettings
+                    .RequireUpgradeUnitReadiness,
+            MatchStepKind.SellUnit => true,
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(kind),
+                kind,
+                "The match step does not select a placed unit."),
+        };
+
+    private static bool PlacementActionProofRequired(
+        PlacementModel model) =>
+        !model.AdvancedSettings.Enabled ||
+        model.AdvancedSettings
+            .RequirePlacementActionProof;
 
     private static async Task WaitDefaultIntervalAsync(
         MatchStepPlaybackItem playable,
