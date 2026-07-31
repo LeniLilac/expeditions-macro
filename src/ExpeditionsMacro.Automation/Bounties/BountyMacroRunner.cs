@@ -75,7 +75,10 @@ public sealed class BountyMacroRunner
                 .ConfigureAwait(false))
             .AdvanceDay(DateTimeOffset.UtcNow);
         bool noGold = false;
-        bool boardReconciliationRequired = true;
+        bool boardReconciliationRequired =
+            !BountyPlanner.HasExecutableWork(
+                state.Active,
+                challengeAvailability);
         RobloxWindow window =
             _automation.FindWindow() ??
             throw new RobloxSessionUnavailableException(
@@ -252,7 +255,10 @@ public sealed class BountyMacroRunner
             }
             boardReconciliationRequired =
                 BountyPlanner.HasClaimableBounty(
-                    state.Active);
+                    state.Active) &&
+                !BountyPlanner.HasExecutableWork(
+                    state.Active,
+                    challengeAvailability);
             if (!execution.Completed)
             {
                 if (execution.ChallengeAvailability is not null)
@@ -282,7 +288,10 @@ public sealed class BountyMacroRunner
                     cancellationToken).ConfigureAwait(false);
                 boardReconciliationRequired =
                     BountyPlanner.HasClaimableBounty(
-                        state.Active);
+                        state.Active) &&
+                    !BountyPlanner.HasExecutableWork(
+                        state.Active,
+                        challengeAvailability);
             }
             Write(
                 $"Completed {Describe(route)}.",
@@ -290,8 +299,8 @@ public sealed class BountyMacroRunner
                 "bounty_objective_complete");
             Write(
                 boardReconciliationRequired
-                    ? "A complete Bounty is ready to claim; reopening the Bounty Board."
-                    : "No whole Bounty is complete; continuing the next objective from the Lobby.",
+                    ? "All currently executable active Bounty objectives are complete; reopening the Bounty Board to claim and reroll."
+                    : "Continuing the remaining active Bounty objectives before claiming or rerolling.",
                 MacroEventLevel.Information,
                 boardReconciliationRequired
                     ? "bounty_claim_ready"

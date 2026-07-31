@@ -4,6 +4,18 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.46] - 2026-07-30
+
+### Fixed
+
+- Bounty Challenge handoff now closes each verified Play layer, uses the existing in-match Return to Lobby door and confirmation flow, and separately proves Lobby before reopening Events.
+- Bounty mode now finishes every currently executable active objective before reopening the Bounty Board to claim or reroll. Recovery re-entry resumes persisted active work instead of creating an unnecessary board visit.
+- Saved-team preparation now recognizes a valid Load Team confirmation over a brightly populated Team 1 roster by prioritizing the live Confirm action and visible Load Team rows while retaining the modal-structure safety gates.
+
+### Tests
+
+- Passed 1,455 application and detector tests, 5 Deep Debug Viewer tests, and all 88 dark/light UI snapshot states.
+
 ## [1.3.0-beta.45] - 2026-07-30
 
 ### Added
@@ -1215,7 +1227,9 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.44...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.46...HEAD
+[1.3.0-beta.46]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.45...v1.3.0-beta.46
+[1.3.0-beta.45]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.44...v1.3.0-beta.45
 [1.3.0-beta.44]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.43...v1.3.0-beta.44
 [1.3.0-beta.43]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.42...v1.3.0-beta.43
 [1.3.0-beta.42]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.41...v1.3.0-beta.42

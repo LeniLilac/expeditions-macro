@@ -4,7 +4,6 @@ using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Bounties;
-using ExpeditionsMacro.Vision.Stages;
 
 namespace ExpeditionsMacro.Automation.Bounties;
 
@@ -20,6 +19,8 @@ internal sealed class BountyBoardNavigator
         CancellationToken,
         Task> _delay;
     private readonly Func<DateTimeOffset> _utcNow;
+    private readonly BountyLobbyHandoffNavigator
+        _lobbyHandoff;
 
     public BountyBoardNavigator(
         IRobloxAutomation automation)
@@ -39,6 +40,11 @@ internal sealed class BountyBoardNavigator
         _automation = automation;
         _delay = delay;
         _utcNow = utcNow;
+        _lobbyHandoff =
+            new BountyLobbyHandoffNavigator(
+                automation,
+                delay,
+                utcNow);
     }
 
     public async Task OpenAsync(
@@ -46,46 +52,10 @@ internal sealed class BountyBoardNavigator
         IDetectorPack detector,
         CancellationToken cancellationToken)
     {
-        ImageFrame lobby = Capture(
+        await _lobbyHandoff.EnsureAsync(
             window,
-            detector);
-        if (!string.Equals(
-                detector.RecoveryState(lobby),
-                "lobby",
-                StringComparison.OrdinalIgnoreCase) &&
-            PlayInterfaceCloser.DetectLayer(lobby) !=
-                PlayInterfaceLayer.Closed)
-        {
-            await PlayInterfaceCloser.CloseAsync(
-                () => PlayInterfaceCloser
-                    .DetectLayer(
-                        Capture(
-                            window,
-                            detector)),
-                token =>
-                {
-                    (int X, int Y) back =
-                        StageScreenDetector
-                            .SelectorBackAction;
-                    return ClickAsync(
-                        window,
-                        back.X,
-                        back.Y,
-                        token);
-                },
-                cancellationToken).ConfigureAwait(false);
-            lobby = Capture(
-                window,
-                detector);
-        }
-        if (!string.Equals(
-                detector.RecoveryState(lobby),
-                "lobby",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new RobloxUiUnavailableException(
-                "Bounty mode must start from a verified Lobby.");
-        }
+            detector,
+            cancellationToken).ConfigureAwait(false);
         (int X, int Y) events =
             BountyBoardDetector.LobbyEventAction;
         await ClickAsync(
