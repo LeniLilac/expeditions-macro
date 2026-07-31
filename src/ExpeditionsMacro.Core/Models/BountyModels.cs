@@ -311,3 +311,32 @@ public sealed record BountyWorkRoute
     public int ChallengeRuns { get; init; }
     public required IReadOnlyList<int> CoveredBounties { get; init; }
 }
+
+public static class BountyChallengePlacementPolicy
+{
+    public static PlacementModel ForChallengeRuntime(
+        PlacementModel storyPlacement,
+        ChallengeMapId map)
+    {
+        ArgumentNullException.ThrowIfNull(storyPlacement);
+        PlacementTarget storyInfinite = new()
+        {
+            Mode = PlacementTargetMode.Story,
+            MapNumber = (int)map,
+            StoryRunKind = StoryRunKind.Infinite,
+            ActNumber = 1,
+        };
+        storyPlacement.ValidateCompatibility(
+            CameraPreparationMode.FastNoAlign,
+            storyInfinite);
+
+        PlacementModel runtime = storyPlacement with
+        {
+            Target = PlacementTarget.ForChallenge(map),
+        };
+        runtime.ValidateCompatibility(
+            CameraPreparationMode.FastNoAlign,
+            runtime.Target);
+        return runtime;
+    }
+}

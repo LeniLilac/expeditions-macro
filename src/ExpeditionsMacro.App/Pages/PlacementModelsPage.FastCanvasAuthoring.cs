@@ -20,7 +20,9 @@ public partial class PlacementModelsPage
         int x = Math.Clamp((int)Math.Round(point.X), 0, 807);
         int y = Math.Clamp((int)Math.Round(point.Y), 0, 610);
         string? placementError =
-            PlacementSafetyRules.IsInsideFixedCentralHotbar(x, y)
+            PlacementSafetyRules.IsOnCanonicalClientEdge(x, y)
+                ? "That point is on the client edge, not inside the battlefield. Choose a map point away from the outer border."
+                : PlacementSafetyRules.IsInsideFixedCentralHotbar(x, y)
                 ? "That point is inside the fixed center unit hotbar. Choose a map point outside the bottom hotbar."
                 : CurrentFastTarget().Mode == PlacementTargetMode.Expedition &&
                     _steps.Any(step =>
@@ -52,9 +54,6 @@ public partial class PlacementModelsPage
             e.Handled = true;
             return;
         }
-        bool coveredByStart =
-            PlacementAuthoringRules
-                .IsCoveredByStartDialog(x, y);
         PlacementStepRow row = new()
         {
             Kind = MatchStepKind.Placement,
@@ -64,9 +63,7 @@ public partial class PlacementModelsPage
             UnitKey = _selectedFastUnit,
             X = x,
             Y = y,
-            Phase = coveredByStart
-                ? PlacementPhase.AfterStart
-                : PlacementPhase.BeforeStart,
+            Phase = PlacementPhase.AfterStart,
             DelayAfterMilliseconds =
                 _fastPlacementIntervalMilliseconds,
             TargetingPriority =
@@ -74,10 +71,11 @@ public partial class PlacementModelsPage
             AutoUpgradePriority =
                 _fastDefaultAutoUpgradePriority,
         };
-        int start = StartGameRowIndex();
-        int insertion = coveredByStart
-            ? start + 1
-            : start;
+        int insertion = PlacementTimelinePolicy
+            .NewActionInsertionIndex(
+                _steps.Select(step =>
+                        step.ToModel())
+                    .ToArray());
         List<PlacementStep> prospective =
             _steps.Select(step => step.ToModel())
                 .ToList();
@@ -101,7 +99,7 @@ public partial class PlacementModelsPage
         }
         FastStepsList.SelectedItem = row;
         FastStatusText.Text =
-            $"Added Unit {_selectedFastUnit} at ({x}, {y}) {(coveredByStart ? "below" : "above")} Start Game.";
+            $"Added Unit {_selectedFastUnit} at ({x}, {y}) below Start Game.";
         SchedulePlacementAutoSave();
         e.Handled = true;
     }

@@ -104,9 +104,13 @@ public partial class PlacementModelsPage
         string modelId =
             PlacementSetupCatalog.IdFor(
                 _selectedSetupTarget);
-        if (_steps.Count == 0 &&
-            string.IsNullOrWhiteSpace(
-                _fastManualRecordingId))
+        if (PlacementSetupCatalog
+                .IsEmptyRouteOverride(
+                    _selectedSetupTarget,
+                    _steps.Select(row =>
+                            row.ToModel())
+                        .ToArray(),
+                    _fastManualRecordingId))
         {
             _placementAutoSave.ScheduleDelete(
                 modelId);
@@ -174,7 +178,15 @@ public partial class PlacementModelsPage
                             candidate.Route.ModelId,
                             e.ModelId,
                             StringComparison.OrdinalIgnoreCase));
-            row?.UpdateModel(e.Model);
+            if (row is not null)
+            {
+                row.UpdateModel(
+                    e.Model,
+                    e.Model is null
+                        ? FindInheritedSetupName(
+                            row.Route)
+                        : null);
+            }
 
             if (!_placementAutoSave
                     .IsLatestVersion(e.Version))
@@ -188,10 +200,19 @@ public partial class PlacementModelsPage
             }
 
             _selectedModel = e.Model;
-            FastStatusText.Text =
-                e.Model is null
-                    ? "Setup cleared."
-                    : "All changes saved.";
+            if (e.Model is null && row is not null)
+            {
+                ApplySetup(row);
+                FastStatusText.Text =
+                    row.InheritedFrom is null
+                        ? "Setup cleared."
+                        : $"Override cleared. Uses {row.InheritedFrom}.";
+            }
+            else
+            {
+                FastStatusText.Text =
+                    "All changes saved.";
+            }
         });
 
     private void PlacementAutoSave_SaveFailed(

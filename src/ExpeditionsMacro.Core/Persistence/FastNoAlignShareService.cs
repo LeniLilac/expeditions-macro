@@ -157,6 +157,11 @@ public sealed class FastNoAlignShareService
             {
                 continue;
             }
+            if (PlacementSetupCatalog
+                    .IsEmptyRouteOverride(setup))
+            {
+                continue;
+            }
             setup.ValidateCompatibility(
                 CameraPreparationMode.FastNoAlign,
                 target);

@@ -61,6 +61,32 @@ public static class PlacementSetupCatalog
         }
     }
 
+    public static bool IsEmptyRouteOverride(
+        PlacementModel model)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        return model.Target is not null &&
+            IsEmptyRouteOverride(
+                model.Target,
+                model.Steps,
+                model.ManualInputRecordingId);
+    }
+
+    public static bool IsEmptyRouteOverride(
+        PlacementTarget target,
+        IReadOnlyList<PlacementStep> steps,
+        string? manualInputRecordingId)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(steps);
+        target.Validate();
+        return string.IsNullOrWhiteSpace(
+                manualInputRecordingId) &&
+            CandidatesFor(target).Skip(1).Any() &&
+            steps.All(step =>
+                step.Kind == MatchStepKind.StartGame);
+    }
+
     public static bool Covers(
         PlacementTarget setupTarget,
         PlacementTarget requiredTarget)

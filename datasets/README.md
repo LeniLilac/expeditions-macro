@@ -1,6 +1,6 @@
 # Detector image dataset
 
-This repository includes 490 reviewed 808 by 611 Roblox client image fixtures used to build and regression-test the bundled Anime Expeditions detector pack and specialized UI detectors: 286 Expeditions fixtures, 81 selective Challenge fixtures, 60 Story/Raid/team/placement fixtures, 13 navigation variants, 11 resource-refuel fixtures, 15 game-settings fixtures, 18 Event fixtures, and 6 Bounty Board fixtures. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
+This repository includes 492 reviewed 808 by 611 Roblox client image fixtures used to build and regression-test the bundled Anime Expeditions detector pack and specialized UI detectors: 286 Expeditions fixtures, 81 selective Challenge fixtures, 60 Story/Raid/team/placement fixtures, 13 navigation variants, 11 resource-refuel fixtures, 15 game-settings fixtures, 18 Event fixtures, and 8 Bounty fixtures. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
 
 There is no camera-model, yaw-atlas, or automatic camera-region dataset. Beta.33 supports only deterministic Fast preparation, and the retired Camera Model workflow is retained solely as a deserialize-and-migrate compatibility boundary for public-beta user data.
 
@@ -20,7 +20,7 @@ Startup settings fixtures are organized under `datasets/anime-expeditions/settin
 
 Villain Invasion Event fixtures are organized under `datasets/anime-expeditions/events/`. They cover the Event catalog when another Event is initially selected, both observed positions of the selected Villain Invasion card, act selection/detail, the horizontally scrolled Act 4 selector and detail, prestart, Defeat, and reviewed Victory action rails—with and without **Next Stage**, including the final Act 4 rail. Event navigation uses these specialized fixtures and remains separate from the shared Play-interface detector because Event is available only from Lobby.
 
-Bounty Board fixtures are organized under `datasets/anime-expeditions/bounties/`. They protect position-independent usable-card ownership when the remaining daily limit dims a card: yellow Reroll and green Claim are live actions, while a card with neither action is not clickable.
+Bounty fixtures are organized under `datasets/anime-expeditions/bounties/`. They protect position-independent usable-card ownership when the remaining daily limit dims a card and the alternate no-voice Infinite wave-counter layout. Yellow Reroll and green Claim are live card actions, while a card with neither action is not clickable.
 
 The current builder recognizes these dataset names:
 

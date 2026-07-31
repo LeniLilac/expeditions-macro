@@ -44,6 +44,14 @@ public partial class MacroPage
                     target,
                     cancellationToken)
                     .ConfigureAwait(false);
+            if (useStoryInfinitePlacements)
+            {
+                placement =
+                    BountyChallengePlacementPolicy
+                        .ForChallengeRuntime(
+                            placement,
+                            map);
+            }
             profiles.Add(
                 new ChallengeMapProfile
                 {
@@ -239,6 +247,11 @@ public partial class MacroPage
                         cancellationToken)
                     .ConfigureAwait(false);
             if (model is null)
+            {
+                continue;
+            }
+            if (PlacementSetupCatalog
+                    .IsEmptyRouteOverride(model))
             {
                 continue;
             }

@@ -46,6 +46,7 @@ public static class DetectorViewerCoverageAudit
             "ExpeditionsMacro.Vision.Bounties.BountyNoGoldRecognizer",
             "ExpeditionsMacro.Vision.Bounties.BountyNumberRecognizer",
             "ExpeditionsMacro.Vision.Bounties.WaveCounterRecognizer",
+            "ExpeditionsMacro.Vision.Bounties.WaveCounterOwnerDetector",
             "ExpeditionsMacro.Vision.Challenges.ChallengeMapDetector",
             "ExpeditionsMacro.Vision.Challenges.ChallengeMatchStateDetector",
             "ExpeditionsMacro.Vision.Challenges.ChallengeScreenDetector",

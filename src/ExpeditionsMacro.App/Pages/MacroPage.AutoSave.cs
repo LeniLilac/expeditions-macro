@@ -207,6 +207,9 @@ public partial class MacroPage
     {
         _currentPlanId = id;
         _persistedPlanId = id;
+        DeletePlanButton.IsEnabled =
+            !_services.Coordinator.IsBusy &&
+            !string.IsNullOrWhiteSpace(id);
     }
 
     private void WithoutPlanAutoSave(

@@ -6,6 +6,28 @@ namespace ExpeditionsMacro.Tests;
 public sealed class PresetDeletionTests
 {
     [Fact]
+    public async Task MacroPlanDeleteAsync_RemovesOnlyRequestedPlan()
+    {
+        string root = TestPaths.NewTemporaryDirectory();
+        try
+        {
+            MacroPlanRepository plans = new(
+                new AppPaths(root));
+            await plans.SaveAsync(Plan("first"));
+            await plans.SaveAsync(Plan("second"));
+
+            await plans.DeleteAsync("first");
+
+            Assert.Null(await plans.LoadAsync("first"));
+            Assert.NotNull(await plans.LoadAsync("second"));
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(root);
+        }
+    }
+
+    [Fact]
     public async Task DeleteAsync_RemovesEveryUnreferencedPresetType()
     {
         string root = TestPaths.NewTemporaryDirectory();
@@ -110,5 +132,20 @@ public sealed class PresetDeletionTests
     {
         Id = "raid-route",
         Name = "Raid route",
+    };
+
+    private static MacroPlan Plan(string id) => new()
+    {
+        Id = id,
+        Name = id,
+        Tasks =
+        [
+            new MacroTaskDefinition
+            {
+                Id = $"{id}-task",
+                Kind = MacroTaskKind.Story,
+                PresetId = "story-route",
+            },
+        ],
     };
 }
