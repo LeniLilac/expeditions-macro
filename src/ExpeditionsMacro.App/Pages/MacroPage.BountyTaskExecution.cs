@@ -21,6 +21,7 @@ public partial class MacroPage
         char cancelPlacementKey,
         MacroRunTotals macroTotals,
         ChallengeRotationState challengeRotation,
+        BountyOperationSession bountySession,
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken)
     {
@@ -59,6 +60,7 @@ public partial class MacroPage
 
         BountyRunResult result =
             await _services.Bounties.RunAsync(
+                bountySession,
                 task.BountyParkedNonViableLimit,
                 availability,
                 nextChallenge,

@@ -1,5 +1,6 @@
 using System.Windows;
 using ExpeditionsMacro.App.Services;
+using ExpeditionsMacro.Automation.Bounties;
 using ExpeditionsMacro.Automation.Challenges;
 using ExpeditionsMacro.Automation.Diagnostics;
 using ExpeditionsMacro.Automation.Discord;
@@ -40,6 +41,8 @@ public partial class MacroPage
         bool captureHistory = _services.Settings.AutoCaptureOnMacroError;
         MacroRunTotals macroTotals = new();
         ChallengeRotationState challengeRotation = new();
+        BountyOperationSession bountySession =
+            new();
         if (captureHistory) _services.DiagnosticCapture.BeginAutomaticHistory("Macro plan started");
         try
         {
@@ -57,6 +60,7 @@ public partial class MacroPage
                     cancelPlacementKey,
                     macroTotals,
                     challengeRotation,
+                    bountySession,
                     progress,
                     token),
                 progress,
