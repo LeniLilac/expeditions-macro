@@ -9,7 +9,8 @@ public sealed record ScheduledTaskResult(
     int Defeats,
     TimeSpan Runtime,
     DateTimeOffset? NextEligibleAtUtc = null,
-    bool Skipped = false);
+    bool Skipped = false,
+    bool SkipUntilSchedulerRestart = false);
 
 public enum ScheduledTaskContinuation
 {
@@ -37,6 +38,8 @@ public sealed class MacroScheduler
         CancellationToken cancellationToken = default)
     {
         initialPlan.Validate();
+        HashSet<string> sessionExcluded = new(
+            StringComparer.OrdinalIgnoreCase);
         MacroPlan plan =
             MacroPlanLoopPolicy.Normalize(
                 NormalizeProgress(initialPlan));
@@ -55,7 +58,10 @@ public sealed class MacroScheduler
                     cancellationToken)
                 .ConfigureAwait(false);
             MacroTaskDefinition? next =
-                SelectNextPrepared(plan, now);
+                SelectNextPrepared(
+                    plan,
+                    now,
+                    sessionExcluded);
             if (next is null)
             {
                 DateTimeOffset? wake = NextWake(plan, now);
@@ -81,6 +87,11 @@ public sealed class MacroScheduler
                 CancellationToken recordCancellationToken)
             {
                 resultRecorded = true;
+                if (result.SkipUntilSchedulerRestart)
+                {
+                    sessionExcluded.Add(
+                        activeTask.Id);
+                }
                 DateTimeOffset completedAt = DateTimeOffset.UtcNow;
                 MacroTaskProgress before = plan.ProgressFor(activeTask.Id);
                 MacroTaskProgress after = Advance(activeTask, before, result, completedAt);
@@ -105,12 +116,14 @@ public sealed class MacroScheduler
                 MacroTaskDefinition? following =
                     SelectNextPrepared(
                         plan,
-                        DateTimeOffset.UtcNow);
+                        DateTimeOffset.UtcNow,
+                        sessionExcluded);
                 if (!CanRepeatStage(activeTask, following, result))
                 {
                     return following?.Kind is
                             MacroTaskKind.Event or
-                            MacroTaskKind.Utility
+                            MacroTaskKind.Utility or
+                            MacroTaskKind.Bounty
                         ? ScheduledTaskContinuation.ReturnToLobby
                         : ScheduledTaskContinuation.Handoff;
                 }
@@ -150,11 +163,16 @@ public sealed class MacroScheduler
     private static MacroTaskDefinition?
         SelectNextPrepared(
         MacroPlan plan,
-        DateTimeOffset now) =>
+        DateTimeOffset now,
+        ISet<string>? excluded = null) =>
         MacroPlanLoopPolicy
             .ActiveTasks(plan, now)
             .Select((task, index) => new { Task = task, Index = index, Progress = plan.ProgressFor(task.Id) })
             .Where(value => value.Task.IsRecurring || !value.Progress.Completed)
+            .Where(value =>
+                excluded is null ||
+                !excluded.Contains(
+                    value.Task.Id))
             .Where(value => value.Progress.NextEligibleAtUtc is null || value.Progress.NextEligibleAtUtc <= now)
             .OrderBy(value => value.Task.Priority)
             .ThenBy(value => value.Index)
@@ -179,7 +197,8 @@ public sealed class MacroScheduler
         bool completed = task.Kind switch
         {
             MacroTaskKind.Challenge or
-                MacroTaskKind.Utility => false,
+                MacroTaskKind.Utility or
+                MacroTaskKind.Bounty => false,
             MacroTaskKind.Story when task.CompleteOnRuntimeDefeat =>
                 result.Defeats > 0 &&
                 targetRuntime >=

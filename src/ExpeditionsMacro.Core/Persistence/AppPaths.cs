@@ -20,6 +20,9 @@ public sealed class AppPaths
         Diagnostics = Path.Combine(Root, "diagnostics");
         Logs = Path.Combine(Root, "logs");
         SettingsFile = Path.Combine(Root, "settings.json");
+        BountyStateFile = Path.Combine(
+            Root,
+            "bounty-progress.json");
     }
 
     public string Root { get; }
@@ -49,6 +52,8 @@ public sealed class AppPaths
     public string Logs { get; }
 
     public string SettingsFile { get; }
+
+    public string BountyStateFile { get; }
 
     public void EnsureCreated()
     {

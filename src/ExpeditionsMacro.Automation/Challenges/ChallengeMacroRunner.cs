@@ -247,7 +247,7 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
                     PublishSummary();
                     if (maximumCompletedRuns is int maximum && completed >= maximum)
                     {
-                        Write($"Completed {completed} scheduled Challenge match(es). Returning control to the task scheduler.", MacroEventLevel.Success);
+                        await CompleteScheduledChallengeRunAsync(window, preset, detector, completed, Write, Report, cancellationToken).ConfigureAwait(false);
                         return;
                     }
                     ranChallenge = true;

@@ -15,7 +15,7 @@ public partial class MacroPage
         TaskEditorDialog.TaskDestinationCombo;
     private ComboBox TaskKindCombo =>
         TaskEditorDialog.TaskKindCombo;
-    private UniformGrid TaskKindButtonGrid =>
+    private Grid TaskKindButtonGrid =>
         TaskEditorDialog.TaskKindButtonGrid;
     private RadioButton ChallengeTaskKindButton =>
         TaskEditorDialog.ChallengeTaskKindButton;
@@ -29,6 +29,8 @@ public partial class MacroPage
         TaskEditorDialog.EventTaskKindButton;
     private RadioButton UtilityTaskKindButton =>
         TaskEditorDialog.UtilityTaskKindButton;
+    private RadioButton BountyTaskKindButton =>
+        TaskEditorDialog.BountyTaskKindButton;
     private ColumnDefinition TaskSelectionColumn =>
         TaskEditorDialog.TaskSelectionColumn;
     private ColumnDefinition TaskSelectionGapColumn =>
@@ -47,6 +49,10 @@ public partial class MacroPage
         TaskEditorDialog.TaskTargetText;
     private Border FastTaskOptionsPanel =>
         TaskEditorDialog.FastTaskOptionsPanel;
+    private Border BountyTaskOptionsPanel =>
+        TaskEditorDialog.BountyTaskOptionsPanel;
+    private Slider BountyParkedSlider =>
+        TaskEditorDialog.BountyParkedSlider;
     private StackPanel TaskDefeatRetriesPanel =>
         TaskEditorDialog.TaskDefeatRetriesPanel;
     private TextBox TaskDefeatRetriesText =>
@@ -93,6 +99,7 @@ public partial class MacroPage
                      RaidTaskKindButton,
                      EventTaskKindButton,
                      UtilityTaskKindButton,
+                     BountyTaskKindButton,
                  })
         {
             button.Checked +=
@@ -204,6 +211,12 @@ public partial class MacroPage
                 .Any(choice =>
                     choice.Value ==
                     MacroTaskKind.Utility);
+        bool supportsBounty =
+            TaskKindCombo.Items
+                .Cast<NamedChoice<MacroTaskKind>>()
+                .Any(choice =>
+                    choice.Value ==
+                    MacroTaskKind.Bounty);
         _syncingTaskKindButtons = true;
         try
         {
@@ -225,14 +238,16 @@ public partial class MacroPage
                 supportsUtility
                     ? Visibility.Visible
                     : Visibility.Collapsed;
-            TaskKindButtonGrid.Columns =
-                4 +
-                (supportsEvent ? 1 : 0) +
-                (supportsUtility ? 1 : 0);
+            BountyTaskKindButton.Visibility =
+                supportsBounty
+                    ? Visibility.Visible
+                    : Visibility.Collapsed;
             EventTaskKindButton.IsChecked =
                 selected == MacroTaskKind.Event;
             UtilityTaskKindButton.IsChecked =
                 selected == MacroTaskKind.Utility;
+            BountyTaskKindButton.IsChecked =
+                selected == MacroTaskKind.Bounty;
         }
         finally
         {

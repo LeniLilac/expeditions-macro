@@ -173,6 +173,7 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
             "started" => "Started",
             "attempt" => "Challenge started",
             "victory" => "Victory",
+            "objective" => "Objective complete",
             "defeat" => "Defeat",
             "error" => "Error",
             "recovery" => "Rejoin needed",
@@ -348,7 +349,7 @@ public sealed class DiscordWebhookClient : IDiscordNotifier, IDisposable
     private static int? AccentColor(string eventName) => eventName switch
     {
         "started" or "attempt" => StartAccentColor,
-        "victory" => VictoryAccentColor,
+        "victory" or "objective" => VictoryAccentColor,
         "defeat" => DefeatAccentColor,
         "error" => ErrorAccentColor,
         _ => null,

@@ -29,7 +29,8 @@ public sealed partial class StageMacroRunner
         MacroRunTotals? macroTotals = null,
         char cancelPlacementKey =
             AppSettings
-                .DefaultCancelPlacementKeyChar) =>
+                .DefaultCancelPlacementKeyChar,
+        StageWaveObjective? waveObjective = null) =>
         RunAsync(
             StageMode.Story,
             preset,
@@ -43,7 +44,8 @@ public sealed partial class StageMacroRunner
             cancellationToken,
             continueScheduledRoute,
             macroTotals,
-            cancelPlacementKey);
+            cancelPlacementKey,
+            waveObjective);
 
     public Task<StageRunResult> RunRaidAsync(
         RaidPreset preset,
@@ -79,5 +81,6 @@ public sealed partial class StageMacroRunner
             cancellationToken,
             continueScheduledRoute,
             macroTotals,
-            cancelPlacementKey);
+            cancelPlacementKey,
+            waveObjective: null);
 }

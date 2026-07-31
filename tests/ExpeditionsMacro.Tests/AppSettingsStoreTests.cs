@@ -105,7 +105,7 @@ public sealed class AppSettingsStoreTests
                 await File.ReadAllTextAsync(
                     paths.SettingsFile);
             Assert.Contains(
-                "\"schema_version\": 4",
+                "\"schema_version\": 5",
                 normalized,
                 StringComparison.Ordinal);
 
@@ -291,6 +291,76 @@ public sealed class AppSettingsStoreTests
             if (Directory.Exists(root))
             {
                 Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task
+        SchemaFourRefuelRoute_UsesFieldDefaultsOnceThenPreservesEdits()
+    {
+        string root = Path.Combine(
+            Path.GetTempPath(),
+            $"expeditions-settings-{Guid.NewGuid():N}");
+        try
+        {
+            AppPaths paths = new(root);
+            paths.EnsureCreated();
+            await File.WriteAllTextAsync(
+                paths.SettingsFile,
+                """
+                {
+                  "schema_version": 4,
+                  "resource_refuel_debug": {
+                    "retry_count": 4,
+                    "gold_forward1_milliseconds": 1200,
+                    "gold_left_milliseconds": 700,
+                    "gold_forward2_milliseconds": 900,
+                    "drill_forward1_milliseconds": 1200,
+                    "drill_left1_milliseconds": 700,
+                    "drill_forward2_milliseconds": 900,
+                    "drill_left2_milliseconds": 700
+                  }
+                }
+                """);
+            AppSettingsStore store = new(paths);
+
+            AppSettings migrated =
+                await store.LoadAsync();
+
+            Assert.Equal(
+                new ResourceRefuelDebugSettings(),
+                migrated.ResourceRefuelDebug);
+            Assert.Equal(
+                AppSettings.CurrentSchemaVersion,
+                migrated.SchemaVersion);
+
+            ResourceRefuelDebugSettings edited =
+                migrated.ResourceRefuelDebug with
+                {
+                    GoldForward1Milliseconds = 4321,
+                    RetryCount = 4,
+                };
+            await store.SaveAsync(
+                migrated with
+                {
+                    ResourceRefuelDebug = edited,
+                });
+
+            AppSettings reloaded =
+                await store.LoadAsync();
+
+            Assert.Equal(
+                edited,
+                reloaded.ResourceRefuelDebug);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(
+                    root,
+                    recursive: true);
             }
         }
     }

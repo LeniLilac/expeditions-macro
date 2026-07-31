@@ -6,6 +6,7 @@ using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
+using ExpeditionsMacro.Vision.Bounties;
 using ExpeditionsMacro.Vision.Stages;
 
 namespace ExpeditionsMacro.Automation.Stages;
@@ -22,6 +23,7 @@ public sealed partial class StageMacroRunner
         int stableDetections,
         char cancelPlacementKey,
         bool manualPlayback,
+        StageWaveObjective? waveObjective,
         CancellationToken cancellationToken)
     {
         PlacementModel? afterStartModel =
@@ -42,6 +44,7 @@ public sealed partial class StageMacroRunner
             stableDetections,
             cancelPlacementKey,
             models.Placement,
+            waveObjective,
             cancellationToken);
     }
 
@@ -56,6 +59,7 @@ public sealed partial class StageMacroRunner
         int stableDetections,
         char cancelPlacementKey,
         PlacementModel? runtimePolicyPlacement,
+        StageWaveObjective? waveObjective,
         CancellationToken cancellationToken)
     {
         int nextFastStep = 0;
@@ -65,6 +69,11 @@ public sealed partial class StageMacroRunner
         StableStateTracker<string> recoveryTracker = new(stableDetections);
         RaidDropDismissalTracker dropDismissal = new(raid);
         InactivityKeepAlive keepAlive = new();
+        BountyWaveCompletionTracker? waveTracker =
+            waveObjective is null
+                ? null
+                : new(
+                    waveObjective);
         TimeSpan? matchLimit =
             MatchRuntimePolicy.StageLimit(story, raid);
         if (runtimePolicyPlacement is not null)
@@ -80,6 +89,21 @@ public sealed partial class StageMacroRunner
             ImageFrame frame = CaptureClient(window, detector);
             StageScreenMatch state =
                 StageScreenDetector.DetectMatchState(frame);
+            int? observedWave =
+                waveTracker is null
+                    ? null
+                    : WaveCounterRecognizer
+                        .Detect(frame)
+                        ?.Wave;
+            if (waveTracker?.Observe(
+                    observedWave) == true)
+            {
+                return new TerminalObservation(
+                    StageScreenState.None,
+                    1,
+                    frame.Clone(),
+                    observedWave);
+            }
             string? terminalCandidate = state.State switch
             {
                 StageScreenState.Victory => "victory",

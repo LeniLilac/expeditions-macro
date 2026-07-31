@@ -13,7 +13,8 @@ public partial class MacroPage
             ChallengeMapRuntimeModels> Models)>
         BuildChallengeSetupAsync(
             MacroTaskDefinition task,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            bool useStoryInfinitePlacements = false)
     {
         List<ChallengeMapProfile> profiles = [];
         Dictionary<
@@ -22,11 +23,22 @@ public partial class MacroPage
         foreach (ChallengeMapId map in
                  Enum.GetValues<ChallengeMapId>())
         {
-            PlacementTarget target = new()
-            {
-                Mode = PlacementTargetMode.Challenge,
-                MapNumber = (int)map,
-            };
+            PlacementTarget target =
+                useStoryInfinitePlacements
+                    ? new PlacementTarget
+                    {
+                        Mode = PlacementTargetMode.Story,
+                        MapNumber = (int)map,
+                        StoryRunKind =
+                            StoryRunKind.Infinite,
+                        ActNumber = 1,
+                    }
+                    : new PlacementTarget
+                    {
+                        Mode =
+                            PlacementTargetMode.Challenge,
+                        MapNumber = (int)map,
+                    };
             PlacementModel placement =
                 await LoadPlacementSetupAsync(
                     target,

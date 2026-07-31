@@ -38,6 +38,7 @@ internal static class UiSnapshotRenderer
         ("Macro Plan", "macro-plan-add-story-mastery", false, false, MacroPlanSnapshotState.StoryMasteryTaskPopup, ManualRecordingsSnapshotState.Ready),
         ("Macro Plan", "macro-plan-add-story-infinite", false, false, MacroPlanSnapshotState.StoryInfiniteTaskPopup, ManualRecordingsSnapshotState.Ready),
         ("Macro Plan", "macro-plan-add-utility", false, false, MacroPlanSnapshotState.UtilityTaskPopup, ManualRecordingsSnapshotState.Ready),
+        ("Macro Plan", "macro-plan-add-bounty", false, false, MacroPlanSnapshotState.BountyTaskPopup, ManualRecordingsSnapshotState.Ready),
         ("Macro Plan", "macro-plan-share", true, false, MacroPlanSnapshotState.NestedLoops, ManualRecordingsSnapshotState.Ready),
         ("Placement Setup", "placement-setup", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Placement Setup", "placement-setup-timing", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),

@@ -173,6 +173,16 @@ public sealed record FastNoAlignShareBundle
         List<PlacementTarget> targets = [];
         foreach (MacroTaskDefinition task in plan.Tasks)
         {
+            if (task.Kind == MacroTaskKind.Bounty)
+            {
+                foreach (PlacementTarget required in
+                         BountyCatalog
+                             .RequiredPlacementTargets)
+                {
+                    AddTarget(targets, required);
+                }
+                continue;
+            }
             if (!task.UsesPlacementSetup)
             {
                 continue;

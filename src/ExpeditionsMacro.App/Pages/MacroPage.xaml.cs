@@ -409,7 +409,9 @@ public partial class MacroPage : UserControl, IAppPage
         left.BossesBeforeExtract == right.BossesBeforeExtract &&
         left.RefuelTarget == right.RefuelTarget &&
         left.RefuelIntervalMinutes ==
-            right.RefuelIntervalMinutes;
+            right.RefuelIntervalMinutes &&
+        left.BountyParkedNonViableLimit ==
+            right.BountyParkedNonViableLimit;
 
     private static int ParsePositiveInt(TextBox field, string label) =>
         int.TryParse(field.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) && value > 0
@@ -424,6 +426,7 @@ public partial class MacroPage : UserControl, IAppPage
         MacroTaskKind.Raid => "Raid",
         MacroTaskKind.Event => "Event",
         MacroTaskKind.Utility => "Utilities",
+        MacroTaskKind.Bounty => "Bounty",
         _ => kind.ToString(),
     };
 

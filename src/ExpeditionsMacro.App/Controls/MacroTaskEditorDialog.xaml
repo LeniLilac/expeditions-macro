@@ -51,46 +51,69 @@
                     <ComboBox x:Name="TaskKindCombo"
                               Visibility="Collapsed"
                               DisplayMemberPath="Name" />
-                    <UniformGrid x:Name="TaskKindButtonGrid"
-                                 Margin="0,7,0,0"
-                                 Columns="6">
+                    <Grid x:Name="TaskKindButtonGrid"
+                          Margin="0,7,0,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
                         <RadioButton x:Name="ChallengeTaskKindButton"
                                      GroupName="TaskKind"
-                                     Margin="0,0,6,0"
+                                     Margin="0,0,6,6"
                                      Style="{StaticResource PlacementChoiceButton}"
                                      Tag="Challenge"
                                      Content="Challenge" />
                         <RadioButton x:Name="ExpeditionTaskKindButton"
+                                     Grid.Column="1"
                                      GroupName="TaskKind"
-                                     Margin="0,0,6,0"
+                                     Margin="0,0,6,6"
                                      Style="{StaticResource PlacementChoiceButton}"
                                      Tag="Expedition"
                                      Content="Expedition" />
                         <RadioButton x:Name="StoryTaskKindButton"
+                                     Grid.Column="2"
                                      GroupName="TaskKind"
-                                     Margin="0,0,6,0"
+                                     Margin="0,0,6,6"
                                      Style="{StaticResource PlacementChoiceButton}"
                                      Tag="Story"
                                      Content="Story" />
                         <RadioButton x:Name="RaidTaskKindButton"
+                                     Grid.Column="3"
                                      GroupName="TaskKind"
-                                     Margin="0,0,6,0"
+                                     Margin="0,0,0,6"
                                      Style="{StaticResource PlacementChoiceButton}"
                                      Tag="Raid"
                                      Content="Raid" />
                         <RadioButton x:Name="EventTaskKindButton"
+                                     Grid.Row="1"
                                      GroupName="TaskKind"
                                      Margin="0,0,6,0"
                                      Style="{StaticResource PlacementChoiceButton}"
                                      Tag="Event"
                                      Content="Event" />
                         <RadioButton x:Name="UtilityTaskKindButton"
+                                     Grid.Row="1"
+                                     Grid.Column="1"
                                      GroupName="TaskKind"
-                                     Margin="0"
+                                     Margin="0,0,6,0"
                                      Style="{StaticResource PlacementChoiceButton}"
                                      Tag="Utility"
                                      Content="Utilities" />
-                    </UniformGrid>
+                        <RadioButton x:Name="BountyTaskKindButton"
+                                     Grid.Row="1"
+                                     Grid.Column="2"
+                                     GroupName="TaskKind"
+                                     Margin="0,0,6,0"
+                                     Style="{StaticResource PlacementChoiceButton}"
+                                     Tag="Bounty"
+                                     Content="Bounty" />
+                    </Grid>
 
                     <Border Margin="0,10,0,0"
                             Padding="12"
@@ -131,6 +154,49 @@
                                 </StackPanel>
                             </Grid>
 
+                        </StackPanel>
+                    </Border>
+
+                    <Border x:Name="BountyTaskOptionsPanel"
+                            Margin="0,10,0,0"
+                            Padding="12"
+                            Background="{DynamicResource RaisedBrush}"
+                            BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="5"
+                            Visibility="Collapsed">
+                        <StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource FieldLabel}"
+                                           Text="Park non-viable Bounties" />
+                                <TextBlock Grid.Column="1"
+                                           Style="{StaticResource FieldLabel}"
+                                           Text="{Binding ElementName=BountyParkedSlider, Path=Value, StringFormat={}{0:0}}" />
+                            </Grid>
+                            <Slider x:Name="BountyParkedSlider"
+                                    Margin="2,10,2,0"
+                                    Minimum="0"
+                                    Maximum="4"
+                                    TickFrequency="1"
+                                    IsSnapToTickEnabled="True"
+                                    Value="2"
+                                    AutomationProperties.Name="Parked non-viable Bounties" />
+                            <Grid Margin="0,5,0,0">
+                                <TextBlock HorizontalAlignment="Left"
+                                           Style="{StaticResource Caption}"
+                                           Text="0 · faster, more Gold" />
+                                <TextBlock HorizontalAlignment="Right"
+                                           Style="{StaticResource Caption}"
+                                           Text="4 · slower, less Gold" />
+                            </Grid>
+                            <TextBlock Margin="0,10,0,0"
+                                       Style="{StaticResource Caption}"
+                                       TextWrapping="Wrap"
+                                       Text="Requires Spirit City Raid Act 1 and all five Story Infinite Placement Setups. Progress is stored locally for this Windows user." />
                         </StackPanel>
                     </Border>
 

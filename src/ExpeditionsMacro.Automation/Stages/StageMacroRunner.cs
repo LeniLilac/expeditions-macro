@@ -61,7 +61,8 @@ public sealed partial class StageMacroRunner
             Task<ScheduledTaskContinuation>>?
             continueScheduledRoute,
         MacroRunTotals? macroTotals,
-        char cancelPlacementKey)
+        char cancelPlacementKey,
+        StageWaveObjective? waveObjective)
     {
         StoryPreset? story = preset as StoryPreset;
         RaidPreset? raid = preset as RaidPreset;
@@ -72,6 +73,13 @@ public sealed partial class StageMacroRunner
 
         story?.Validate(requireModels: true);
         raid?.Validate(requireModels: true);
+        waveObjective?.Validate();
+        if (waveObjective is not null &&
+            story?.RunKind != StoryRunKind.Infinite)
+        {
+            throw new InvalidDataException(
+                "A Bounty wave objective requires an Infinite Story route.");
+        }
         CameraPreparationMode cameraMode =
             story?.CameraPreparationMode ??
             raid!.CameraPreparationMode;
@@ -201,7 +209,46 @@ public sealed partial class StageMacroRunner
                         stableDetections,
                         cancelPlacementKey,
                         manualPlayback,
+                        waveObjective,
                         cancellationToken).ConfigureAwait(false);
+                if (terminal.ObjectiveWave is int objectiveWave)
+                {
+                    matchCompleted = true;
+                    matchRuntimeTotal +=
+                        matchRuntime.Elapsed;
+                    last = new StageRunResult(
+                        StageRunOutcome
+                            .ObjectiveComplete,
+                        matchRuntimeTotal,
+                        attempts,
+                        victories,
+                        defeats,
+                        terminal.Frame);
+                    Write(
+                        $"{RouteLabel(mode, story, raid)} reached safe Bounty exit wave {objectiveWave}.",
+                        MacroEventLevel.Success,
+                        "bounty_wave_complete");
+                    await reporter.SendAsync(
+                        "objective",
+                        $"{route} reached safe Bounty exit wave {objectiveWave}.",
+                        terminal.Frame,
+                        totalRuntime.Elapsed,
+                        victories,
+                        defeats,
+                        reportTarget,
+                        cancellationToken,
+                        matchRuntime.Elapsed)
+                        .ConfigureAwait(false);
+                    await new MatchLobbyNavigator(
+                            _automation)
+                        .ReturnAsync(
+                            window,
+                            detector,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                    _fastNoAlign.ObserveLobby(window);
+                    return last;
+                }
                 StageRunOutcome outcome = terminal.State == StageScreenState.Victory ? StageRunOutcome.Victory : StageRunOutcome.Defeat;
                 matchCompleted = true;
                 matchRuntimeTotal += matchRuntime.Elapsed;
@@ -352,7 +399,11 @@ public sealed partial class StageMacroRunner
         _ => map.ToString(),
     };
 
-    private sealed record TerminalObservation(StageScreenState State, double Confidence, ImageFrame Frame);
+    private sealed record TerminalObservation(
+        StageScreenState State,
+        double Confidence,
+        ImageFrame Frame,
+        int? ObjectiveWave = null);
 
     private sealed class StageRecoveryException : Exception
     {

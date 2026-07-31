@@ -10,6 +10,7 @@ public enum MacroTaskKind
     Raid,
     Event,
     Utility,
+    Bounty,
 }
 
 public sealed record MacroTaskDefinition
@@ -47,12 +48,15 @@ public sealed record MacroTaskDefinition
     public ResourceRefuelTarget RefuelTarget { get; init; } =
         ResourceRefuelTarget.GoldMine;
     public int RefuelIntervalMinutes { get; init; } = 60;
+    public int BountyParkedNonViableLimit { get; init; } = 2;
 
     public bool IsRecurring =>
         Kind is MacroTaskKind.Challenge or
-            MacroTaskKind.Utility;
+            MacroTaskKind.Utility or
+            MacroTaskKind.Bounty;
     public bool UsesPlacementSetup =>
-        Kind != MacroTaskKind.Utility &&
+        Kind is not MacroTaskKind.Utility and
+            not MacroTaskKind.Bounty &&
         string.IsNullOrWhiteSpace(PresetId);
 
     public void Validate()
@@ -84,6 +88,21 @@ public sealed record MacroTaskDefinition
             {
                 throw new InvalidDataException(
                     "Utility interval must be 1 minute through 7 days.");
+            }
+            return;
+        }
+        if (Kind == MacroTaskKind.Bounty)
+        {
+            if (!string.IsNullOrWhiteSpace(PresetId) ||
+                PlacementTarget is not null)
+            {
+                throw new InvalidDataException(
+                    "Bounty tasks use the required Placement Setup routes automatically.");
+            }
+            if (BountyParkedNonViableLimit is < 0 or > 4)
+            {
+                throw new InvalidDataException(
+                    "Parked non-viable Bounties must be 0 through 4.");
             }
             return;
         }
@@ -190,7 +209,8 @@ public sealed record MacroPlan
 
     public bool UsesPlacementSetupWorkflow =>
         Tasks.All(task =>
-            task.Kind == MacroTaskKind.Utility ||
+            task.Kind is MacroTaskKind.Utility or
+                MacroTaskKind.Bounty ||
             task.UsesPlacementSetup);
 
     public void Validate()
