@@ -14,7 +14,10 @@ internal static class EventBountyInspectionDefinitions
             "Event screen",
             "Classifies Villain Invasion catalog, home, Act, party, prestart, and terminal screens.",
             DetectorInspectionDetailLevel.Partial,
-            [typeof(EventScreenDetector)],
+            [
+                typeof(EventScreenDetector),
+                typeof(EventActSelectorHeadingDetector),
+            ],
             image =>
             {
                 EventScreenMatch match =

@@ -1,6 +1,6 @@
 # Villain Invasion Event fixtures
 
-These eighteen reviewed 808 by 611 Roblox client frames cover the
+These nineteen reviewed 808 by 611 Roblox client frames cover the
 Villain Invasion Event catalog, home, act selection, prestart, and
 terminal states. They are specialized detector regressions and are not
 inputs to the compiled Expedition detector-pack builder.
@@ -49,3 +49,11 @@ beta.44 field report supplied on 2026-07-31. Both border checks scan the
 strongest row only inside their narrow expected bands; the selected tab,
 button body, separator, opaque label, and opposite border remain
 mandatory.
+
+`EventHome_PerformanceOverlay_01.png` is a privacy-reviewed full-client
+game capture from a beta.49 field failure. Roblox's performance overlay
+added red and white evidence across the broad heading area, causing the
+older Act Selector score to beat the otherwise valid Event Home action.
+The fixture contains only Roblox game UI. It protects the compact
+Act Selection heading/subtitle spacing while keeping Event Home owned by
+its selected Villain tab and live Event Gamemode action.

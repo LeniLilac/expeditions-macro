@@ -52,6 +52,7 @@ public static class DetectorViewerCoverageAudit
             "ExpeditionsMacro.Vision.Challenges.ChallengeScreenDetector",
             "ExpeditionsMacro.Vision.Challenges.ChallengeVictoryDetector",
             "ExpeditionsMacro.Vision.Events.EventActAnchorDetector",
+            "ExpeditionsMacro.Vision.Events.EventActSelectorHeadingDetector",
             "ExpeditionsMacro.Vision.Events.EventEntryDetector",
             "ExpeditionsMacro.Vision.Events.EventScreenDetector",
             "ExpeditionsMacro.Vision.Navigation.LobbyExitConfirmationDetector",

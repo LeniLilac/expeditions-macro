@@ -8,6 +8,8 @@ This folder contains privacy-reviewed canonical 808 by 611 Bounty Board captures
 
 `BountyBoard_FourLiveOneDimmed_01.png` also preserves exact action-anchored `#1`, `#2`, `#6`, and `#10` suffixes across four randomized paper placements; the wide `#10` title sits 46 pixels left and 87 pixels above its live reroll action.
 
+`BountyBoard_NumberRasterVariant_01.png` through `BountyBoard_NumberRasterVariant_03.png` are privacy-reviewed full-client game captures from separate beta.49 and beta.50 failures. They preserve live Board/action ownership and the distinct post-Cancel `#5`, `#6`, and `#4` rasterizations that differed from the canonical suffix templates while remaining unambiguous. They contain only Roblox game UI and no account identity, webhook, desktop, or private overlay.
+
 The Board itself is owned by the stable header plus the two-button rail. The per-card production rule is position-independent and does not assume that the last card is the dimmed one. After a claim, two fresh Board observations must agree on the slot's settlement: no yellow or green action means dimmed and removes that number from the UTC-day reroll pool, while a live yellow Reroll action keeps the number available.
 
 `WaveCounterNoVoice.png` is a privacy-safe derivative of a canonical no-voice match capture. It retains only the top status badges, bottom hotbar, and right-side Unit Manager/Stage Info controls on an opaque black canvas. The wave digit remains at its observed `(421,28)` origin, and the other retained regions provide independent gameplay-HUD ownership without preserving the world, player identity, or Settings contents.

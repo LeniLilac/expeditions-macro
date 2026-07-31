@@ -1,3 +1,4 @@
+using ExpeditionsMacro.Automation.Bounties;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Vision.Bounties;
 using ExpeditionsMacro.Vision.Infrastructure;
@@ -168,6 +169,108 @@ public sealed class BountyNumberRecognizerTests
                 value.Number));
     }
 
+    [Fact]
+    public void Detect_AcceptsFieldRasterVariantAfterCancel()
+    {
+        ImageFrame image = ImageCodec.Load(
+            Path.Combine(
+                TestPaths.BountyDatasets,
+                "BountyBoard_NumberRasterVariant_01.png"));
+
+        BountyNumberMatch match = Assert.Single(
+            BountyNumberRecognizer.Detect(
+                image,
+                [
+                    new BountyCardAction(
+                        BountyCardActionKind.Reroll,
+                        263,
+                        356),
+                ]));
+
+        Assert.Equal(5, match.Number);
+        Assert.InRange(match.CenterX, 254, 258);
+
+        BountyBoardMatch board =
+            BountyBoardDetector.Detect(image);
+        Assert.Equal(
+            BountyBoardState.Board,
+            board.State);
+        Assert.Equal(
+            5,
+            BountyBoardLayout.NumberForSlot(
+                board,
+                slot: 1,
+                rightView: true));
+    }
+
+    [Fact]
+    public void Detect_AcceptsSecondFieldRasterVariantAfterCancel()
+    {
+        ImageFrame image = ImageCodec.Load(
+            Path.Combine(
+                TestPaths.BountyDatasets,
+                "BountyBoard_NumberRasterVariant_02.png"));
+
+        BountyNumberMatch match = Assert.Single(
+            BountyNumberRecognizer.Detect(
+                image,
+                [
+                    new BountyCardAction(
+                        BountyCardActionKind.Reroll,
+                        263,
+                        357),
+                ]));
+
+        Assert.Equal(6, match.Number);
+        Assert.InRange(match.CenterX, 254, 258);
+
+        BountyBoardMatch board =
+            BountyBoardDetector.Detect(image);
+        Assert.Equal(
+            BountyBoardState.Board,
+            board.State);
+        Assert.Equal(
+            6,
+            BountyBoardLayout.NumberForSlot(
+                board,
+                slot: 1,
+                rightView: true));
+    }
+
+    [Fact]
+    public void Detect_AcceptsThirdFieldRasterVariantAfterCancel()
+    {
+        ImageFrame image = ImageCodec.Load(
+            Path.Combine(
+                TestPaths.BountyDatasets,
+                "BountyBoard_NumberRasterVariant_03.png"));
+
+        BountyNumberMatch match = Assert.Single(
+            BountyNumberRecognizer.Detect(
+                image,
+                [
+                    new BountyCardAction(
+                        BountyCardActionKind.Reroll,
+                        263,
+                        356),
+                ]));
+
+        Assert.Equal(4, match.Number);
+        Assert.InRange(match.CenterX, 254, 258);
+
+        BountyBoardMatch board =
+            BountyBoardDetector.Detect(image);
+        Assert.Equal(
+            BountyBoardState.Board,
+            board.State);
+        Assert.Equal(
+            4,
+            BountyBoardLayout.NumberForSlot(
+                board,
+                slot: 1,
+                rightView: true));
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
@@ -248,7 +351,7 @@ public sealed class BountyNumberRecognizerTests
     }
 
     [Fact]
-    public void Detect_RejectsMoreThanOneUnexpectedSuffixPixel()
+    public void Detect_AcceptsUnambiguousRasterPhaseVariation()
     {
         const int actionX = 315;
         const int actionY = 359;
@@ -270,6 +373,38 @@ public sealed class BountyNumberRecognizerTests
             centerX + 6,
             top + 1,
             255);
+
+        BountyNumberMatch match = Assert.Single(
+            BountyNumberRecognizer.Detect(
+                image,
+                [
+                    new BountyCardAction(
+                        BountyCardActionKind.Reroll,
+                        actionX,
+                        actionY),
+                ]));
+
+        Assert.Equal(1, match.Number);
+    }
+
+    [Fact]
+    public void Detect_RejectsAmbiguousRasterVariant()
+    {
+        const int actionX = 315;
+        const int actionY = 359;
+        const int centerX = actionX - 7;
+        const int top = actionY - 97;
+        ImageFrame image = CreateFrame();
+        DrawGlyph(
+            image,
+            NumberGlyphs[4],
+            centerX,
+            top);
+        DrawGlyph(
+            image,
+            NumberGlyphs[5],
+            centerX,
+            top);
 
         Assert.Empty(
             BountyNumberRecognizer.Detect(

@@ -166,24 +166,13 @@
                             CornerRadius="5"
                             Visibility="Collapsed">
                         <StackPanel>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Style="{StaticResource FieldLabel}"
-                                           Text="Park non-viable Bounties" />
-                                <TextBlock Grid.Column="1"
-                                           Style="{StaticResource FieldLabel}"
-                                           Text="{Binding ElementName=BountyParkedSlider, Path=Value, StringFormat={}{0:0}}" />
-                            </Grid>
                             <Slider x:Name="BountyParkedSlider"
-                                    Margin="2,10,2,0"
+                                    Margin="2,0"
                                     Minimum="0"
                                     Maximum="4"
                                     TickFrequency="1"
                                     IsSnapToTickEnabled="True"
-                                    Value="2"
+                                    Value="0"
                                     AutomationProperties.Name="Parked non-viable Bounties" />
                             <Grid Margin="0,5,0,0">
                                 <TextBlock HorizontalAlignment="Left"
