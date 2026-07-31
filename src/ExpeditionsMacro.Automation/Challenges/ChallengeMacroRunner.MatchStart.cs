@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using ExpeditionsMacro.Automation.Navigation;
 using ExpeditionsMacro.Automation.Placement;
+using ExpeditionsMacro.Automation.Teams;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
@@ -26,6 +27,7 @@ public sealed partial class ChallengeMacroRunner
         char? unitMenuKey,
         Action<string, int, string, string?, double?> report,
         Action<string, MacroEventLevel, string?, double?> log,
+        TeamOperationSession? teamSession,
         CancellationToken cancellationToken)
     {
         ImageFrame prestart =
@@ -40,6 +42,8 @@ public sealed partial class ChallengeMacroRunner
                     .ConfigureAwait(false);
         if (!teamLoaded)
         {
+            teamSession?.BeginSelection(
+                profile.TeamSlot);
             await _teams.SelectAsync(
                     window,
                     profile.TeamSlot,
@@ -48,6 +52,9 @@ public sealed partial class ChallengeMacroRunner
                     cancellationToken)
                 .ConfigureAwait(false);
             teamLoaded = true;
+            teamSession?.MarkLoaded(
+                window,
+                profile.TeamSlot);
             prestart = await WaitForScreenAsync(
                     window,
                     preset,

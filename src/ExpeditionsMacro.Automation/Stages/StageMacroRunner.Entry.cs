@@ -1,5 +1,6 @@
 using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Scheduling;
+using ExpeditionsMacro.Automation.Teams;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
@@ -30,7 +31,8 @@ public sealed partial class StageMacroRunner
         char cancelPlacementKey =
             AppSettings
                 .DefaultCancelPlacementKeyChar,
-        StageWaveObjective? waveObjective = null) =>
+        StageWaveObjective? waveObjective = null,
+        TeamOperationSession? teamSession = null) =>
         RunAsync(
             StageMode.Story,
             preset,
@@ -45,7 +47,8 @@ public sealed partial class StageMacroRunner
             continueScheduledRoute,
             macroTotals,
             cancelPlacementKey,
-            waveObjective);
+            waveObjective,
+            teamSession);
 
     public Task<StageRunResult> RunRaidAsync(
         RaidPreset preset,
@@ -67,7 +70,8 @@ public sealed partial class StageMacroRunner
         MacroRunTotals? macroTotals = null,
         char cancelPlacementKey =
             AppSettings
-                .DefaultCancelPlacementKeyChar) =>
+                .DefaultCancelPlacementKeyChar,
+        TeamOperationSession? teamSession = null) =>
         RunAsync(
             StageMode.Raid,
             preset,
@@ -82,5 +86,6 @@ public sealed partial class StageMacroRunner
             continueScheduledRoute,
             macroTotals,
             cancelPlacementKey,
-            waveObjective: null);
+            waveObjective: null,
+            teamSession);
 }

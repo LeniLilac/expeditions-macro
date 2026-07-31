@@ -42,3 +42,19 @@ outline without adding duplicate corpus files. The detector still
 requires the gear structure and distinguishes its outline from the
 filled selected state; the optional microphone/headset pixels are never
 used as evidence.
+
+Settled Settings-panel ownership uses the scale-aware nine-page action
+rail: one cyan selected page and the repeated neutral unselected page
+controls must accompany the red Close component. Variable page-body
+brightness is not an ownership gate. The structurally similar Areas
+Lobby panel remains a cross-state negative because it does not expose
+the complete Settings page rail.
+
+Derived detector regressions also remove one raster row from each
+fixed-offset closed gear and from both Units scrollbar anchors. These
+variants preserve the reviewed action geometry while proving that one
+rendering row cannot erase an otherwise complete gear or scrollbar.
+Toggle evidence may move only within the reviewed two-pixel vertical
+neighborhood; the returned click coordinate remains the canonical control
+center. Tests keep unrelated nearby pixels negative so this tolerance cannot
+move the action or authorize a different row.

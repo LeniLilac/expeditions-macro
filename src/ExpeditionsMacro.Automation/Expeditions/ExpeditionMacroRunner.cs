@@ -66,7 +66,8 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
             continueScheduledRoute = null,
         MacroRunTotals? macroTotals = null,
         char cancelPlacementKey =
-            AppSettings.DefaultCancelPlacementKeyChar)
+            AppSettings.DefaultCancelPlacementKeyChar,
+        TeamOperationSession? teamSession = null)
     {
         if (maximumRuns is < 1) throw new ArgumentOutOfRangeException(nameof(maximumRuns));
         preset.Validate();
@@ -96,7 +97,11 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
         int defeats = 0;
         int recoveries = 0;
         int bossesSeen = 0;
-        RepeatedRoutePreparationState preparation = new(preset.TeamSlot);
+        RepeatedRoutePreparationState preparation = new(
+            preset.TeamSlot,
+            teamSession?.IsLoaded(
+                window,
+                preset.TeamSlot) == true);
 
         void Write(string message, MacroEventLevel level = MacroEventLevel.Information, string? state = null, double? confidence = null) =>
             log?.Invoke(new MacroEvent(DateTimeOffset.Now, level, message, state, confidence));
@@ -177,6 +182,7 @@ public sealed partial class ExpeditionMacroRunner : IGameModeWorkflow
                         preset,
                         unitMenuKey,
                         preparation,
+                        teamSession,
                         arrivedFromRepeatStage,
                         progress,
                         Write,

@@ -24,193 +24,66 @@ public sealed record ResourceStationScreenMatch(
 
 public static class ResourceStationScreenDetector
 {
-    private static readonly ScreenRegion Panel =
-        new(160, 155, 490, 305);
-    private static readonly ScreenRegion Header =
-        new(120, 135, 210, 85);
+    private static readonly ScreenRegion AddFuelSearch =
+        new(320, 395, 180, 70);
     private static readonly ScreenRegion Close =
-        new(615, 145, 55, 55);
-    private static readonly ScreenRegion AddFuel =
-        new(335, 410, 145, 48);
-    private static readonly ScreenRegion ClaimRewards =
-        new(505, 405, 140, 55);
-    private static readonly ScreenRegion RewardsPanel =
-        new(505, 245, 140, 160);
-    private static readonly ScreenRegion BuildingStatsBar =
-        new(365, 222, 270, 20);
-    private static readonly ScreenRegion AddFuelButtonCore =
-        new(342, 415, 128, 30);
-    private static readonly ScreenRegion Dialog =
-        new(265, 245, 280, 120);
-    private static readonly ScreenRegion DialogConfirm =
-        new(270, 327, 135, 35);
-    private static readonly ScreenRegion DialogTitle =
-        new(365, 250, 95, 35);
+        new(610, 145, 50, 50);
+    private static readonly ScreenRegion Accent =
+        new(120, 145, 220, 70);
+    private static readonly ScreenRegion FirstBuildingStatsBar =
+        new(365, 211, 270, 10);
+    private static readonly ScreenRegion SecondBuildingStatsBar =
+        new(365, 229, 270, 10);
+    private static readonly ScreenRegion RewardsRightRail =
+        new(630, 255, 10, 130);
+    private static readonly ScreenRegion RewardsBottomRail =
+        new(515, 380, 125, 10);
 
     public static ResourceStationScreenMatch Detect(
         ImageFrame image)
     {
         RefuelVisionMetrics.ValidateClient(image);
-        double panelDark =
-            RefuelVisionMetrics.ColorFraction(
-                image,
-                Panel,
-                RefuelVisionMetrics.IsDark);
-        double close =
-            RefuelVisionMetrics.ColorFraction(
-                image,
-                Close,
-                RefuelVisionMetrics.IsRed);
-        double addFuel =
-            RefuelVisionMetrics.ColorFraction(
-                image,
-                AddFuel,
-                RefuelVisionMetrics.IsOrange);
-        double claim =
-            RefuelVisionMetrics.ColorFraction(
-                image,
-                ClaimRewards,
-                RefuelVisionMetrics.IsGreen);
-        double rewardsPanelDark =
-            RefuelVisionMetrics.ColorFraction(
-                image,
-                RewardsPanel,
-                RefuelVisionMetrics.IsDark);
-        double buildingStatsLine =
-            RefuelVisionMetrics.BestHorizontalLineFraction(
-                image,
-                BuildingStatsBar,
-                IsStationStatBar);
-        double addFuelLine =
-            RefuelVisionMetrics.BestHorizontalLineFraction(
-                image,
-                AddFuelButtonCore,
-                RefuelVisionMetrics.IsOrange);
-        double common =
-            panelDark < 0.52 ||
-            close < 0.02 ||
-            addFuel < 0.08 ||
-            rewardsPanelDark < 0.85 ||
-            buildingStatsLine < 0.75 ||
-            addFuelLine < 0.75
-                ? 0
-                : Math.Clamp(
-                    0.40 +
-                    0.10 * RefuelVisionMetrics.Ramp(
-                        panelDark,
-                        0.52,
-                        0.82) +
-                    0.08 * RefuelVisionMetrics.Ramp(
-                        close,
-                        0.02,
-                        0.14) +
-                    0.10 * RefuelVisionMetrics.Ramp(
-                        addFuel,
-                        0.08,
-                        0.42) +
-                    0.10 * RefuelVisionMetrics.Ramp(
-                        rewardsPanelDark,
-                        0.85,
-                        0.99) +
-                    0.11 * RefuelVisionMetrics.Ramp(
-                        buildingStatsLine,
-                        0.75,
-                        0.98) +
-                    0.11 * RefuelVisionMetrics.Ramp(
-                        addFuelLine,
-                        0.75,
-                        0.99),
-                    0,
-                    1);
-
-        double dialogDark =
-            RefuelVisionMetrics.ColorFraction(
-                image,
-                Dialog,
-                RefuelVisionMetrics.IsDark);
-        double confirm =
-            RefuelVisionMetrics.ColorFraction(
-                image,
-                DialogConfirm,
-                RefuelVisionMetrics.IsGreen);
-        double title =
-            RefuelVisionMetrics.ColorFraction(
-                image,
-                DialogTitle,
-                RefuelVisionMetrics.IsBrightNeutral);
-        double dialog =
-            panelDark < 0.52 ||
-            close < 0.008 ||
-            dialogDark < 0.55 ||
-            confirm < 0.12 ||
-            title < 0.025 ||
-            buildingStatsLine < 0.75
-                ? 0
-                : Math.Clamp(
-                    0.38 +
-                    0.16 * RefuelVisionMetrics.Ramp(
-                        panelDark,
-                        0.52,
-                        0.82) +
-                    0.06 * RefuelVisionMetrics.Ramp(
-                        close,
-                        0.008,
-                        0.12) +
-                    0.14 * RefuelVisionMetrics.Ramp(
-                        dialogDark,
-                        0.55,
-                        0.85) +
-                    0.15 * RefuelVisionMetrics.Ramp(
-                        confirm,
-                        0.12,
-                        0.50) +
-                    0.11 * RefuelVisionMetrics.Ramp(
-                        title,
-                        0.025,
-                        0.13),
-                    0,
-                    1);
-
-        double gold =
-            RefuelVisionMetrics.ColorFraction(
-                image,
-                Header,
-                RefuelVisionMetrics.IsGold);
-        double blue =
-            RefuelVisionMetrics.ColorFraction(
-                image,
-                Header,
-                RefuelVisionMetrics.IsBlue);
-        double goldScore = StationScore(common, gold);
-        double drillScore = StationScore(common, blue);
+        AddFuelDialogEvidence dialog =
+            AddFuelDialogDetector.Detect(image);
+        StationEvidence station = DetectStation(image);
+        double goldScore = StationScore(
+            station.Common,
+            station.GoldAccent);
+        double drillScore = StationScore(
+            station.Common,
+            station.BlueAccent);
 
         ResourceStationScreenMatch match =
-            dialog >= 0.76
+            dialog.Confidence >= 0.76
                 ? new ResourceStationScreenMatch(
                     ResourceStationScreenState.AddFuelDialog,
-                    dialog,
-                    ActionX: 516,
-                    ActionY: 312,
-                    ConfirmActionX: 337,
-                    ConfirmActionY: 345,
-                    DismissActionX: 470,
-                    DismissActionY: 345)
+                    dialog.Confidence,
+                    dialog.MaxX,
+                    dialog.MaxY,
+                    dialog.ConfirmX,
+                    dialog.ConfirmY,
+                    dialog.CancelX,
+                    dialog.CancelY)
                 : goldScore >= 0.74
                     ? new ResourceStationScreenMatch(
                         ResourceStationScreenState.GoldMine,
                         goldScore,
-                        ActionX: 406,
-                        ActionY: 438,
-                        DismissActionX: 636,
-                        DismissActionY: 170)
+                        station.AddFuelX,
+                        station.AddFuelY,
+                        DismissActionX:
+                            station.CloseX,
+                        DismissActionY:
+                            station.CloseY)
                     : drillScore >= 0.74
                         ? new ResourceStationScreenMatch(
                             ResourceStationScreenState.ResourceDrill,
                             drillScore,
-                            ActionX: 406,
-                            ActionY: 429,
-                            DismissActionX: 636,
-                            DismissActionY: 170)
+                            station.AddFuelX,
+                            station.AddFuelY,
+                            DismissActionX:
+                                station.CloseX,
+                            DismissActionY:
+                                station.CloseY)
                         : new ResourceStationScreenMatch(
                             ResourceStationScreenState.None,
                             0);
@@ -220,16 +93,31 @@ public static class ResourceStationScreenDetector
             match.Confidence,
             new
             {
-                Common = common,
-                Dialog = dialog,
-                RewardsPanelDark = rewardsPanelDark,
-                ClaimAvailable = claim,
-                BuildingStatsLine = buildingStatsLine,
-                AddFuelLine = addFuelLine,
-                Gold = gold,
-                Blue = blue,
+                Common = station.Common,
+                Dialog = dialog.Confidence,
+                station.OffsetX,
+                station.OffsetY,
+                station.AddFuelPixels,
+                station.FirstStatsBar,
+                station.SecondStatsBar,
+                station.RewardsRightDark,
+                station.RewardsBottomDark,
+                station.ClosePixels,
+                station.GoldAccent,
+                station.BlueAccent,
                 GoldScore = goldScore,
                 DrillScore = drillScore,
+                DialogOffsetX = dialog.OffsetX,
+                DialogOffsetY = dialog.OffsetY,
+                DialogMaxPixels = dialog.MaxPixels,
+                DialogConfirmPixels =
+                    dialog.ConfirmPixels,
+                DialogCancelPixels =
+                    dialog.CancelPixels,
+                DialogFirstStatsBar =
+                    dialog.FirstStatsBar,
+                DialogSecondStatsBar =
+                    dialog.SecondStatsBar,
                 match.ActionX,
                 match.ActionY,
                 match.ConfirmActionX,
@@ -240,28 +128,209 @@ public static class ResourceStationScreenDetector
         return match;
     }
 
+    private static StationEvidence DetectStation(
+        ImageFrame image)
+    {
+        RefuelColorComponent? addFuel =
+            RefuelVisionMetrics.FindComponent(
+            image,
+            AddFuelSearch,
+            RefuelVisionMetrics.IsOrange,
+            component =>
+                component.Width is >= 120 and <= 145 &&
+                component.Height is >= 20 and <= 35 &&
+                component.Count >= 1000);
+        if (addFuel is not RefuelColorComponent action)
+        {
+            return default;
+        }
+
+        int actionX = RoundCenter(action.CenterX);
+        int actionY = RoundCenter(action.CenterY);
+        int offsetX = actionX - 406;
+        int offsetY = actionY - 430;
+        if (Math.Abs(offsetX) > 12 ||
+            Math.Abs(offsetY) > 12)
+        {
+            return default;
+        }
+
+        RefuelColorComponent? close =
+            RefuelVisionMetrics.FindComponent(
+            image,
+            Close.Translate(offsetX, offsetY),
+            RefuelVisionMetrics.IsRed,
+            component =>
+                component.Width is >= 18 and <= 30 &&
+                component.Height is >= 16 and <= 30 &&
+                component.Count >= 180);
+        double firstStatsBar = StatsBarScore(
+            image,
+            FirstBuildingStatsBar,
+            offsetX,
+            offsetY);
+        double secondStatsBar = StatsBarScore(
+            image,
+            SecondBuildingStatsBar,
+            offsetX,
+            offsetY);
+        double rewardsRightDark =
+            RefuelVisionMetrics.ColorFraction(
+                image,
+                RewardsRightRail.Translate(
+                    offsetX,
+                    offsetY),
+                RefuelVisionMetrics.IsDark);
+        double rewardsBottomDark =
+            RefuelVisionMetrics.ColorFraction(
+                image,
+                RewardsBottomRail.Translate(
+                    offsetX,
+                    offsetY),
+                RefuelVisionMetrics.IsDark);
+        double goldAccent = AccentScore(
+            image,
+            offsetX,
+            offsetY,
+            RefuelVisionMetrics.IsGold);
+        double blueAccent = AccentScore(
+            image,
+            offsetX,
+            offsetY,
+            RefuelVisionMetrics.IsBlue);
+        if (close is not RefuelColorComponent closeAction ||
+            firstStatsBar < 0.78 ||
+            secondStatsBar < 0.78 ||
+            rewardsRightDark < 0.90 ||
+            rewardsBottomDark < 0.90)
+        {
+            return new StationEvidence(
+                OffsetX: offsetX,
+                OffsetY: offsetY,
+                AddFuelPixels: action.Count,
+                FirstStatsBar: firstStatsBar,
+                SecondStatsBar: secondStatsBar,
+                RewardsRightDark: rewardsRightDark,
+                RewardsBottomDark: rewardsBottomDark,
+                GoldAccent: goldAccent,
+                BlueAccent: blueAccent);
+        }
+
+        double common = Math.Clamp(
+            0.56 +
+            0.10 * RefuelVisionMetrics.Ramp(
+                action.Count,
+                1000,
+                2800) +
+            0.10 * RefuelVisionMetrics.Ramp(
+                firstStatsBar,
+                0.78,
+                0.96) +
+            0.10 * RefuelVisionMetrics.Ramp(
+                secondStatsBar,
+                0.78,
+                0.96) +
+            0.07 * RefuelVisionMetrics.Ramp(
+                rewardsRightDark,
+                0.90,
+                1.00) +
+            0.07 * RefuelVisionMetrics.Ramp(
+                rewardsBottomDark,
+                0.90,
+                1.00) +
+            0.10 * RefuelVisionMetrics.Ramp(
+                closeAction.Count,
+                180,
+                300),
+            0,
+            1);
+        return new StationEvidence(
+            common,
+            offsetX,
+            offsetY,
+            actionX,
+            actionY,
+            RoundCenter(closeAction.CenterX),
+            RoundCenter(closeAction.CenterY),
+            action.Count,
+            firstStatsBar,
+            secondStatsBar,
+            rewardsRightDark,
+            rewardsBottomDark,
+            closeAction.Count,
+            goldAccent,
+            blueAccent);
+    }
+
+    private static double StatsBarScore(
+        ImageFrame image,
+        ScreenRegion region,
+        int offsetX,
+        int offsetY) =>
+        RefuelVisionMetrics.BestHorizontalBandFraction(
+            image,
+            region.Translate(offsetX, offsetY),
+            bandHeight: 2,
+            RefuelVisionMetrics.IsStationStatBar);
+
+    private static double AccentScore(
+        ImageFrame image,
+        int offsetX,
+        int offsetY,
+        Func<byte, byte, byte, bool> color)
+    {
+        RefuelColorComponent? accent =
+            RefuelVisionMetrics.FindComponent(
+            image,
+            Accent.Translate(offsetX, offsetY),
+            color,
+            component =>
+                component.Width >= 140 &&
+                component.Height >= 20 &&
+                component.Count >= 1200);
+        return accent is not RefuelColorComponent component
+            ? 0
+            : Math.Clamp(
+                0.74 +
+                0.26 * RefuelVisionMetrics.Ramp(
+                    component.Count,
+                    1200,
+                    2900),
+                0,
+                1);
+    }
+
     private static double StationScore(
         double common,
         double accent) =>
-        common == 0 || accent < 0.02
+        common == 0 || accent == 0
             ? 0
             : Math.Clamp(
                 0.78 * common +
-                0.22 * RefuelVisionMetrics.Ramp(
-                    accent,
-                    0.02,
-                    0.14),
+                0.22 * accent,
                 0,
                 1);
 
-    private static bool IsStationStatBar(
-        byte red,
-        byte green,
-        byte blue)
-    {
-        int maximum = Math.Max(red, Math.Max(green, blue));
-        int minimum = Math.Min(red, Math.Min(green, blue));
-        return maximum >= 100 &&
-            maximum - minimum >= 30;
-    }
+    private static int RoundCenter(double value) =>
+        (int)Math.Round(
+            value,
+            MidpointRounding.AwayFromZero);
+
+    private readonly record struct StationEvidence(
+        double Common = 0,
+        int OffsetX = 0,
+        int OffsetY = 0,
+        int AddFuelX = 0,
+        int AddFuelY = 0,
+        int CloseX = 0,
+        int CloseY = 0,
+        int AddFuelPixels = 0,
+        double FirstStatsBar = 0,
+        double SecondStatsBar = 0,
+        double RewardsRightDark = 0,
+        double RewardsBottomDark = 0,
+        int ClosePixels = 0,
+        double GoldAccent = 0,
+        double BlueAccent = 0);
+
 }

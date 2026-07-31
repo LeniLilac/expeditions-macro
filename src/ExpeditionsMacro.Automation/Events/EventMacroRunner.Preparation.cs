@@ -1,5 +1,6 @@
 using ExpeditionsMacro.Automation.Placement;
 using ExpeditionsMacro.Automation.Scheduling;
+using ExpeditionsMacro.Automation.Teams;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
@@ -16,6 +17,7 @@ public sealed partial class EventMacroRunner
         PlacementModel placement,
         char? unitMenuKey,
         RepeatedRoutePreparationState preparation,
+        TeamOperationSession? teamSession,
         bool arrivedFromRepeatStage,
         IDetectorPack detector,
         IProgress<MacroProgress>? progress,
@@ -32,6 +34,8 @@ public sealed partial class EventMacroRunner
                 throw new RobloxUiUnavailableException(
                     "Event team loading requires a confirmed prestart screen.");
             }
+            teamSession?.BeginSelection(
+                preset.TeamSlot);
             await _teams.SelectAsync(
                 window,
                 preset.TeamSlot,
@@ -45,6 +49,9 @@ public sealed partial class EventMacroRunner
                 detector,
                 cancellationToken).ConfigureAwait(false);
             preparation.MarkTeamLoaded();
+            teamSession?.MarkLoaded(
+                window,
+                preset.TeamSlot);
         }
 
         if (preparation.ShouldAlignCamera(

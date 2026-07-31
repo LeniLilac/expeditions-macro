@@ -198,6 +198,30 @@ public sealed class ChallengeScreenDetectorTests
         Assert.InRange(match.ActionY!.Value, 345, 360);
     }
 
+    [Theory]
+    [InlineData("PostMatchPreview_01.png")]
+    [InlineData("PostMatchPreview_02.png")]
+    [InlineData("PostMatchPreview_03.png")]
+    public void VariableBrightPartyContents_DoNotSuppressLivePostMatchActions(
+        string fileName)
+    {
+        string file = Path.Combine(
+            TestPaths.ChallengeDatasets,
+            "PostMatchPreview",
+            fileName);
+        ImageFrame image = ImageCodec.Load(file);
+        BrightenDarkPartyContent(image);
+
+        ChallengeScreenMatch match =
+            ChallengeScreenDetector.Detect(image);
+
+        Assert.Equal(
+            ChallengeScreenState.PostMatchPreview,
+            match.State);
+        Assert.NotNull(match.ActionX);
+        Assert.NotNull(match.ActionY);
+    }
+
     [Fact]
     public void LegacySmallPlayHud_IsNotAnActionableChallengeScreen()
     {
@@ -348,6 +372,33 @@ public sealed class ChallengeScreenDetectorTests
     }
 
     [Fact]
+    public void VictoryOwnership_DoesNotDependOnRosterRewardColors()
+    {
+        string directory =
+            Path.Combine(TestPaths.ChallengeDatasets, "Victory");
+        foreach (string file in
+                 Directory.EnumerateFiles(directory, "*.png"))
+        {
+            ImageFrame image = ImageCodec.Load(file);
+            RecolorRosterRewardYellow(image);
+
+            ChallengeScreenMatch fullMatch =
+                ChallengeScreenDetector.Detect(image);
+            ChallengeScreenMatch matchState =
+                ChallengeScreenDetector.DetectMatchState(image);
+
+            Assert.Equal(
+                ChallengeScreenState.Victory,
+                fullMatch.State);
+            Assert.Equal(
+                ChallengeScreenState.Victory,
+                matchState.State);
+            Assert.NotNull(fullMatch.ActionX);
+            Assert.NotNull(fullMatch.ActionY);
+        }
+    }
+
+    [Fact]
     public void ChallengeDetailTooltip_DoesNotMatchATerminalScreen()
     {
         string directory = Path.Combine(TestPaths.ChallengeDatasets, "ChallengeDetailTooltipNegative");
@@ -368,6 +419,58 @@ public sealed class ChallengeScreenDetectorTests
         {
             ChallengeScreenState state = ChallengeScreenDetector.Detect(ImageCodec.Load(file)).State;
             Assert.True(state is ChallengeScreenState.None or ChallengeScreenState.Prestart);
+        }
+    }
+
+    [Fact]
+    public void UnrelatedCorpus_DoesNotAcquireVictoryOrPostMatchOwnership()
+    {
+        string datasetRoot =
+            Directory.GetParent(TestPaths.ChallengeDatasets)!.FullName;
+        string victoryDirectory =
+            Path.Combine(TestPaths.ChallengeDatasets, "Victory");
+        string postMatchDirectory =
+            Path.Combine(
+                TestPaths.ChallengeDatasets,
+                "PostMatchPreview");
+        foreach (string file in Directory.EnumerateFiles(
+                     datasetRoot,
+                     "*.png",
+                     SearchOption.AllDirectories))
+        {
+            string directory = Path.GetDirectoryName(file)!;
+            IReadOnlyDictionary<ChallengeScreenState, double>
+                scores =
+                ChallengeScreenDetector.ScoreStates(
+                    ImageCodec.Load(file));
+            if (!directory.Equals(
+                    victoryDirectory,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                Assert.True(
+                    scores[ChallengeScreenState.Victory] <
+                    ChallengeScreenDetector.Threshold(
+                        ChallengeScreenState.Victory),
+                    $"{Path.GetRelativePath(datasetRoot, file)} matched Challenge Victory.");
+            }
+
+            bool compatiblePostMatchParty =
+                directory.Equals(
+                    postMatchDirectory,
+                    StringComparison.OrdinalIgnoreCase) ||
+                Path.GetFileName(file).Contains(
+                    "PostMatchParty",
+                    StringComparison.OrdinalIgnoreCase);
+            if (!compatiblePostMatchParty)
+            {
+                Assert.True(
+                    scores[
+                        ChallengeScreenState.PostMatchPreview] <
+                    ChallengeScreenDetector.Threshold(
+                        ChallengeScreenState
+                            .PostMatchPreview),
+                    $"{Path.GetRelativePath(datasetRoot, file)} matched a post-match party.");
+            }
         }
     }
 
@@ -413,6 +516,54 @@ public sealed class ChallengeScreenDetectorTests
     {
         Fill(image, x, y, width, height, red, green, blue);
         Fill(image, x + width / 3, y + height / 3, width / 5, height / 4, 0, 0, 0);
+    }
+
+    private static void BrightenDarkPartyContent(
+        ImageFrame image)
+    {
+        for (int y = 160; y < 410; y++)
+        {
+            for (int x = 410; x < 765; x++)
+            {
+                int pixel = (y * image.Width + x) * 3;
+                int brightness =
+                    image.Pixels[pixel] +
+                    image.Pixels[pixel + 1] +
+                    image.Pixels[pixel + 2];
+                if (brightness > 150) continue;
+                image.Pixels[pixel] = 100;
+                image.Pixels[pixel + 1] = 100;
+                image.Pixels[pixel + 2] = 100;
+            }
+        }
+    }
+
+    private static void RecolorRosterRewardYellow(
+        ImageFrame image)
+    {
+        for (int y = 180; y < 455; y++)
+        {
+            for (int x = 510; x < 660; x++)
+            {
+                int pixel = (y * image.Width + x) * 3;
+                byte red = image.Pixels[pixel];
+                byte green = image.Pixels[pixel + 1];
+                byte blue = image.Pixels[pixel + 2];
+                if (red < 120 ||
+                    green < 80 ||
+                    blue > 95 ||
+                    red - blue < 45)
+                {
+                    continue;
+                }
+
+                byte neutral =
+                    (byte)((red + green + blue) / 3);
+                image.Pixels[pixel] = neutral;
+                image.Pixels[pixel + 1] = neutral;
+                image.Pixels[pixel + 2] = neutral;
+            }
+        }
     }
 
     private static void Fill(ImageFrame image, int x, int y, int width, int height, byte red, byte green, byte blue)

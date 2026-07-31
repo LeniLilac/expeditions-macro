@@ -122,6 +122,33 @@ public sealed class RobloxSettingsButtonDetectorTests
             RobloxSettingsButtonDetector.Detect(frame).State);
     }
 
+    [Theory]
+    [InlineData(
+        "LobbyClosed.png",
+        RobloxSettingsButtonDetector.NoVoiceActionX)]
+    [InlineData(
+        "SettingsButtonVoiceClosed.png",
+        RobloxSettingsButtonDetector.VoiceActionX)]
+    public void ClosedGear_ToleratesOneMissingRasterRow(
+        string fileName,
+        int actionX)
+    {
+        ImageFrame frame = PaintRegion(
+            Load(fileName),
+            left: actionX - 17,
+            top: 31,
+            right: actionX + 18,
+            bottom: 32);
+
+        RobloxSettingsButtonMatch match =
+            RobloxSettingsButtonDetector.Detect(frame);
+
+        Assert.Equal(
+            RobloxSettingsButtonState.Closed,
+            match.State);
+        Assert.Equal(actionX, match.ActionX);
+    }
+
     [Fact]
     public void EllipsisAndDoorWithoutGear_AreRejected()
     {

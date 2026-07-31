@@ -4,6 +4,32 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.48] - 2026-07-31
+
+### Added
+
+- Added a source-only Detector Viewer that opens images, recursive image folders, and Deep Debug ZIPs to visualize production-owned detector geometry, actions, evidence, thresholds, and explicit inspection limitations in dark and light themes.
+- Added a machine coverage audit that independently checks every production detector, recognizer, image matcher, detector-owned metrics surface, and scorer against the inspection catalog.
+
+### Changed
+
+- Saved-team selection is now remembered globally for one user-started Macro operation and one Roblox process. Routes sharing the same Team reuse it, while a failed switch, process replacement, stop, or new start returns the state to unknown.
+- Bounty Board usable slots are derived from live yellow Reroll and green Claim controls, so a dimmed card may occupy any slot without receiving input.
+- Detector ownership across Settings, Events, Challenges, Teams, Refuel, Stage selection, chat, placement, and Expeditions now favors bounded structural and semantic evidence over exact one-pixel decorations or mutable content brightness.
+- Detector engineering policy now requires bounded local raster-variation coverage, independent owner evidence, and structural crop ownership before OCR or template output may corroborate a state.
+
+### Fixed
+
+- Mythic Bounty #2 now routes its wave-30 objective to Flower Forest instead of Fairy King Forest. The unreleased Bounty-state schema is reset rather than translating the incorrect objective key.
+- Claim processing now distinguishes a dimmed card from a new live Reroll action across two fresh Board observations. Both outcomes count the claim and clear completed progress, but only a dimmed card removes that Bounty number from the reroll pool until UTC reset.
+- Villain Invasion Event Home no longer rejects the live Event Gamemode button when a narrow red border rasterizes one row thinner.
+- Fractionally scaled detector subregions now map both half-open edges without expanding past their matched owner.
+
+### Tests
+
+- Passed 1,574 application and detector tests, 5 Deep Debug Viewer tests, 6 Detector Viewer tests, all 88 main-app dark/light UI states, and all 8 Detector Viewer dark/light UI states.
+- Added field-derived dimmed-card coverage for every horizontal Bounty slot, conditional claim-settlement coverage, all ten Bounty definitions, operation-scoped Team reuse, one-pixel raster variants, mutable-content variants, cross-state negatives, and Detector Viewer coverage/input/UI smoke tests.
+
 ## [1.3.0-beta.47] - 2026-07-30
 
 ### Fixed
@@ -1238,7 +1264,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.47...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.48...HEAD
+[1.3.0-beta.48]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.47...v1.3.0-beta.48
 [1.3.0-beta.47]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.46...v1.3.0-beta.47
 [1.3.0-beta.46]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.45...v1.3.0-beta.46
 [1.3.0-beta.45]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.44...v1.3.0-beta.45

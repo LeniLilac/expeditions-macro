@@ -22,10 +22,13 @@ internal readonly record struct AdaptiveRegionMatch(
 
     public ScreenRegion MapRegion(ScreenRegion region)
     {
-        (int x, int y) = MapPoint(region.X, region.Y);
-        int width = Math.Max(1, (int)Math.Round(region.Width * ScaleX, MidpointRounding.AwayFromZero));
-        int height = Math.Max(1, (int)Math.Round(region.Height * ScaleY, MidpointRounding.AwayFromZero));
-        return new ScreenRegion(x, y, width, height);
+        (int left, int top) = MapPoint(region.X, region.Y);
+        (int right, int bottom) = MapPoint(region.Right, region.Bottom);
+        return new ScreenRegion(
+            left,
+            top,
+            Math.Max(1, right - left),
+            Math.Max(1, bottom - top));
     }
 }
 

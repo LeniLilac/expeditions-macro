@@ -13,6 +13,7 @@ public sealed class BountyPlannerTests
         Assert.True(
             BountyPlanner.HasEveryRetainableBounty(
                 observed,
+                unavailableToday: new HashSet<int>(),
                 parkedNonViable: 0,
                 parkedLimit: 0,
                 BountyChallengeAvailability.DailyLimit));
@@ -30,6 +31,7 @@ public sealed class BountyPlannerTests
         Assert.False(
             BountyPlanner.HasEveryRetainableBounty(
                 observed,
+                unavailableToday: new HashSet<int>(),
                 parkedNonViable: 0,
                 parkedLimit: 0,
                 availability));
@@ -44,6 +46,7 @@ public sealed class BountyPlannerTests
         Assert.False(
             BountyPlanner.HasEveryRetainableBounty(
                 observed,
+                unavailableToday: new HashSet<int>(),
                 parkedNonViable: 0,
                 parkedLimit: 1,
                 BountyChallengeAvailability.DailyLimit));
@@ -64,6 +67,7 @@ public sealed class BountyPlannerTests
             shouldReroll,
             BountyPlanner.ShouldReroll(
                 bountyNumber: 1,
+                unavailableToday: new HashSet<int>(),
                 alreadyParked,
                 limit,
                 BountyChallengeAvailability.Available));
@@ -77,12 +81,14 @@ public sealed class BountyPlannerTests
             Assert.False(
                 BountyPlanner.ShouldReroll(
                     number,
+                    unavailableToday: new HashSet<int>(),
                     parkedNonViable: 4,
                     parkedLimit: 0,
                     BountyChallengeAvailability.Cooldown));
             Assert.True(
                 BountyPlanner.ShouldReroll(
                     number,
+                    unavailableToday: new HashSet<int>(),
                     parkedNonViable: 0,
                     parkedLimit: 4,
                     BountyChallengeAvailability.DailyLimit));
@@ -97,10 +103,56 @@ public sealed class BountyPlannerTests
             Assert.False(
                 BountyPlanner.ShouldReroll(
                     number,
+                    unavailableToday: new HashSet<int>(),
                     parkedNonViable: 4,
                     parkedLimit: 0,
                     BountyChallengeAvailability.Available));
         }
+    }
+
+    [Fact]
+    public void DimmedClaimedBounty_IsExcludedUntilTheNextDailyReset()
+    {
+        HashSet<int> unavailableToday = [5];
+        HashSet<int> observed =
+            [2, 4, 6, 7, 9];
+
+        Assert.True(
+            BountyPlanner.HasEveryRetainableBounty(
+                observed,
+                unavailableToday,
+                parkedNonViable: 0,
+                parkedLimit: 0,
+                BountyChallengeAvailability.Available));
+        Assert.True(
+            BountyPlanner.ShouldReroll(
+                bountyNumber: 5,
+                unavailableToday,
+                parkedNonViable: 0,
+                parkedLimit: 0,
+                BountyChallengeAvailability.Available));
+    }
+
+    [Fact]
+    public void ClaimedNonViableBounty_ReducesTheReachableParkingTarget()
+    {
+        Assert.True(
+            BountyPlanner.HasEveryRetainableBounty(
+                observed:
+                    new HashSet<int>
+                    {
+                        2,
+                        4,
+                        5,
+                        6,
+                        7,
+                        9,
+                    },
+                unavailableToday:
+                    new HashSet<int> { 1 },
+                parkedNonViable: 3,
+                parkedLimit: 4,
+                BountyChallengeAvailability.Available));
     }
 
     [Fact]
@@ -128,7 +180,7 @@ public sealed class BountyPlannerTests
     }
 
     [Fact]
-    public void RoutePlanner_CompletesAllLowerWaveObjectivesOnTheSameMap()
+    public void RoutePlanner_MergesOnlyObjectivesOnTheSameMap()
     {
         BountyActiveProgress[] active =
         [
@@ -165,9 +217,19 @@ public sealed class BountyPlannerTests
                     BountyObjectiveKind.InfiniteWave &&
                 route.Map ==
                     ChallengeMapId.FairyKingForest &&
+                route.TargetWave == 15 &&
+                route.CoveredBounties.SequenceEqual(
+                    new[] { 4 }));
+        Assert.Contains(
+            routes,
+            route =>
+                route.Kind ==
+                    BountyObjectiveKind.InfiniteWave &&
+                route.Map ==
+                    ChallengeMapId.FlowerForest &&
                 route.TargetWave == 30 &&
                 route.CoveredBounties.SequenceEqual(
-                    new[] { 2, 4 }));
+                    new[] { 2 }));
     }
 
     [Fact]
@@ -215,7 +277,7 @@ public sealed class BountyPlannerTests
         [
             Progress(
                 2,
-                ("fkf-30", 1),
+                ("ff-30", 1),
                 ("sg-30", 1)),
             Progress(
                 4,
@@ -258,7 +320,7 @@ public sealed class BountyPlannerTests
         [
             Progress(
                 2,
-                ("fkf-30", 1),
+                ("ff-30", 1),
                 ("sg-30", 1),
                 ("raid-spirit-city-act-1", 1)),
             Progress(
@@ -278,7 +340,7 @@ public sealed class BountyPlannerTests
     }
 
     [Fact]
-    public void UtcDailyReset_ClearsClaimCountButKeepsActiveProgress()
+    public void UtcDailyReset_ClearsClaimIdentityButKeepsActiveProgress()
     {
         DateTimeOffset previous =
             new(2026, 7, 30, 23, 59, 0, TimeSpan.Zero);
@@ -287,6 +349,7 @@ public sealed class BountyPlannerTests
             DailyEpochUtc =
                 BountyProgressState.UtcDay(previous),
             ClaimedToday = 8,
+            UnavailableNumbersToday = [1, 5],
             Active = [Active(6)],
         };
 
@@ -294,6 +357,7 @@ public sealed class BountyPlannerTests
             previous.AddMinutes(2));
 
         Assert.Equal(0, next.ClaimedToday);
+        Assert.Empty(next.UnavailableNumbersToday);
         Assert.Single(next.Active);
         Assert.Equal(6, next.Active[0].Number);
     }

@@ -50,22 +50,15 @@ public static class GameSettingsScreenDetector
                 (closeX -
                  GameSettingsLayout.PanelCenterX) /
                 GameSettingsLayout.BaseCloseOffsetX;
-            ScreenRegion? interior =
-                InteriorForScale(scale);
-            if (interior is null)
+            GameSettingsTabRailMatch tabRail =
+                GameSettingsTabRailDetector.Detect(
+                    image,
+                    scale);
+            if (!tabRail.Available)
             {
                 continue;
             }
 
-            double dark =
-                GameSettingsVisionMetrics.ColorFraction(
-                    image,
-                    interior.Value,
-                    GameSettingsVisionMetrics.IsDark);
-            if (dark < 0.54)
-            {
-                continue;
-            }
             double expectedCloseY =
                 GameSettingsLayout.PanelCenterY +
                 GameSettingsLayout.BaseCloseOffsetY *
@@ -75,17 +68,22 @@ public static class GameSettingsScreenDetector
                     closeY -
                     expectedCloseY) <= 8;
             double confidence = Math.Clamp(
-                0.58 +
-                0.24 *
-                GameSettingsVisionMetrics.Ramp(
-                    dark,
-                    0.54,
-                    0.90) +
-                0.18 *
+                0.72 +
+                0.10 *
                 GameSettingsVisionMetrics.Ramp(
                     close.Count,
                     70,
-                    300),
+                    300) +
+                0.10 *
+                GameSettingsVisionMetrics.Ramp(
+                    tabRail.SelectedScore,
+                    0.25,
+                    0.70) +
+                0.08 *
+                GameSettingsVisionMetrics.Ramp(
+                    tabRail.NeutralRows,
+                    7,
+                    8),
                 0,
                 1);
             return TracePanel(
@@ -228,8 +226,28 @@ public static class GameSettingsScreenDetector
         int x,
         int y)
     {
+        return Enumerable.Range(-2, 5)
+            .Select(offsetY =>
+                MeasureToggleAt(
+                    image,
+                    setting,
+                    x,
+                    y + offsetY,
+                    y))
+            .OrderByDescending(
+                candidate => candidate.Confidence)
+            .First();
+    }
+
+    private static GameSettingToggleMatch MeasureToggleAt(
+        ImageFrame image,
+        RequiredGameSetting setting,
+        int x,
+        int sampleY,
+        int actionY)
+    {
         ScreenRegion sample =
-            new(x - 8, y - 8, 17, 17);
+            new(x - 8, sampleY - 8, 17, 17);
         double enabled =
             GameSettingsVisionMetrics.ColorFraction(
                 image,
@@ -281,7 +299,7 @@ public static class GameSettingsScreenDetector
             state,
             confidence,
             x,
-            y);
+            actionY);
     }
 
     public static GameSettingsScrollbarThumb?
@@ -303,7 +321,8 @@ public static class GameSettingsScreenDetector
                     x,
                     180,
                     455,
-                    GameSettingsVisionMetrics.IsScrollbarBlue);
+                    GameSettingsVisionMetrics.IsScrollbarBlue,
+                    maximumGap: 1);
             if (run.EndY - run.StartY + 1 >= 120)
             {
                 runs.Add((x, run.StartY, run.EndY));
@@ -368,45 +387,6 @@ public static class GameSettingsScreenDetector
                 nameof(setting),
                 setting,
                 "The required game setting has no visual layout.");
-
-    private static ScreenRegion? InteriorForScale(
-        double scale)
-    {
-        int left = (int)Math.Round(
-            GameSettingsLayout.PanelCenterX -
-            271 * scale);
-        int right = (int)Math.Round(
-            GameSettingsLayout.PanelCenterX +
-            271 * scale);
-        int top = (int)Math.Round(
-            GameSettingsLayout.PanelCenterY -
-            154 * scale);
-        int bottom = (int)Math.Round(
-            GameSettingsLayout.PanelCenterY +
-            154 * scale);
-        ScreenRegion interior = new(
-            Math.Clamp(
-                left + (int)(120 * scale),
-                0,
-                ClientWidth - 1),
-            Math.Clamp(
-                top + (int)(38 * scale),
-                0,
-                ClientHeight - 1),
-            Math.Clamp(
-                right - left - (int)(140 * scale),
-                1,
-                ClientWidth),
-            Math.Clamp(
-                bottom - top - (int)(58 * scale),
-                1,
-                ClientHeight));
-        return interior.FitsWithin(
-            ClientWidth,
-            ClientHeight)
-            ? interior
-            : null;
-    }
 
     private static void Validate(ImageFrame image)
     {

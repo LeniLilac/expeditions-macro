@@ -17,16 +17,8 @@ internal static class MapSelectionDetector
         new(16, 307, 24, 55),
     ];
 
-    private static readonly ScreenRegion[] PanelRegions =
-    [
-        new(18, 195, 160, 60),
-        new(18, 256, 160, 51),
-        new(18, 307, 160, 55),
-    ];
-
     private const int MinimumSelectedPixels = 320;
     private const int MinimumPixelGap = 150;
-    private const double MinimumDarkPanelRatio = 0.75;
 
     public static int? Detect(ImageFrame clientImage)
     {
@@ -51,36 +43,7 @@ internal static class MapSelectionDetector
             return null;
         }
 
-        // The selected row can brighten substantially because its map artwork is
-        // no longer dimmed. Exclude that mutable artwork from the structural gate
-        // and require the two inactive selector rows to retain their dark panels.
-        if (!HasInactiveSelectorPanels(clientImage, ranked[0].Map)) return null;
-
         return ranked[0].Map;
-    }
-
-    private static bool HasInactiveSelectorPanels(ImageFrame image, int selectedMap)
-    {
-        for (int index = 0; index < PanelRegions.Length; index++)
-        {
-            if (index + 1 == selectedMap) continue;
-            ScreenRegion region = PanelRegions[index];
-            if (!region.FitsWithin(image.Width, image.Height)) return false;
-            int darkPixels = 0;
-            for (int y = region.Y; y < region.Bottom; y++)
-            {
-                for (int x = region.X; x < region.Right; x++)
-                {
-                    int offset = (y * image.Width + x) * 3;
-                    int luminance = (77 * image.Pixels[offset] + 150 * image.Pixels[offset + 1] + 29 * image.Pixels[offset + 2]) >> 8;
-                    if (luminance < 70) darkPixels++;
-                }
-            }
-
-            if ((double)darkPixels / (region.Width * region.Height) < MinimumDarkPanelRatio) return false;
-        }
-
-        return true;
     }
 
     private static int CountCyanPixels(Mat hsv, ScreenRegion region)

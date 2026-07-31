@@ -11,14 +11,18 @@ public static class BountyPlanner
 {
     public static bool HasEveryRetainableBounty(
         IReadOnlySet<int> observed,
+        IReadOnlySet<int> unavailableToday,
         int parkedNonViable,
         int parkedLimit,
         BountyChallengeAvailability challengeAvailability)
     {
         ArgumentNullException.ThrowIfNull(observed);
+        ArgumentNullException.ThrowIfNull(unavailableToday);
         bool hasEveryViable =
             BountyCatalog.All
                 .Where(definition =>
+                    !unavailableToday.Contains(
+                        definition.Number) &&
                     !definition.AlwaysReroll &&
                     !(definition.ChallengeConditional &&
                         challengeAvailability ==
@@ -27,16 +31,31 @@ public static class BountyPlanner
                 .All(definition =>
                     observed.Contains(
                         definition.Number));
+        int availableNonViable =
+            BountyCatalog.All.Count(definition =>
+                definition.AlwaysReroll &&
+                !unavailableToday.Contains(
+                    definition.Number));
+        int requiredParked =
+            Math.Min(
+                parkedLimit,
+                availableNonViable);
         return hasEveryViable &&
-            parkedNonViable >= parkedLimit;
+            parkedNonViable >= requiredParked;
     }
 
     public static bool ShouldReroll(
         int bountyNumber,
+        IReadOnlySet<int> unavailableToday,
         int parkedNonViable,
         int parkedLimit,
         BountyChallengeAvailability challengeAvailability)
     {
+        ArgumentNullException.ThrowIfNull(unavailableToday);
+        if (unavailableToday.Contains(bountyNumber))
+        {
+            return true;
+        }
         BountyDefinition definition =
             BountyCatalog.For(bountyNumber);
         if (definition.ChallengeConditional)

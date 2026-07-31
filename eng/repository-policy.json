@@ -20,7 +20,7 @@
   "lineDebt": [
     {
       "path": "src/ExpeditionsMacro.Automation/Challenges/ChallengeMacroRunner.cs",
-      "maxLines": 742,
+      "maxLines": 595,
       "reason": "Existing mode-runner orchestration debt; extract state-specific workflow services when touched."
     },
     {
@@ -67,6 +67,13 @@
     "tools/ExpeditionsMacro.DatasetBuilder/ExpeditionsMacro.DatasetBuilder.csproj": [
       "src/ExpeditionsMacro.Core/ExpeditionsMacro.Core.csproj",
       "src/ExpeditionsMacro.Vision/ExpeditionsMacro.Vision.csproj"
+    ],
+    "tools/ExpeditionsMacro.DetectorViewer/ExpeditionsMacro.DetectorViewer.csproj": [
+      "src/ExpeditionsMacro.Core/ExpeditionsMacro.Core.csproj",
+      "src/ExpeditionsMacro.Vision/ExpeditionsMacro.Vision.csproj"
+    ],
+    "tools/ExpeditionsMacro.DetectorViewer.Tests/ExpeditionsMacro.DetectorViewer.Tests.csproj": [
+      "tools/ExpeditionsMacro.DetectorViewer/ExpeditionsMacro.DetectorViewer.csproj"
     ],
     "tools/ExpeditionsMacro.DeepDebugViewer/ExpeditionsMacro.DeepDebugViewer.csproj": [],
     "tools/ExpeditionsMacro.DeepDebugViewer.Tests/ExpeditionsMacro.DeepDebugViewer.Tests.csproj": [

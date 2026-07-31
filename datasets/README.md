@@ -1,6 +1,6 @@
 # Detector image dataset
 
-This repository includes 484 reviewed 808 by 611 Roblox client image fixtures used to build and regression-test the bundled Anime Expeditions detector pack and specialized UI detectors: 286 Expeditions fixtures, 81 selective Challenge fixtures, 60 Story/Raid/team/placement fixtures, 13 navigation variants, 11 resource-refuel fixtures, 15 game-settings fixtures, and 18 Event fixtures. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
+This repository includes 489 reviewed 808 by 611 Roblox client image fixtures used to build and regression-test the bundled Anime Expeditions detector pack and specialized UI detectors: 286 Expeditions fixtures, 81 selective Challenge fixtures, 60 Story/Raid/team/placement fixtures, 13 navigation variants, 11 resource-refuel fixtures, 15 game-settings fixtures, 18 Event fixtures, and 5 Bounty Board fixtures. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
 
 There is no camera-model, yaw-atlas, or automatic camera-region dataset. Beta.33 supports only deterministic Fast preparation, and the retired Camera Model workflow is retained solely as a deserialize-and-migrate compatibility boundary for public-beta user data.
 
@@ -19,6 +19,8 @@ Areas, Gold Mine, and Resource Drill fixtures are organized under `datasets/anim
 Startup settings fixtures are organized under `datasets/anime-expeditions/settings/`. They cover the closed Lobby, both fixed Roblox Settings-gear offsets, their normal and derived high-contrast outline behavior, the Settings opening animation, supported UI Scale values, each required settings page, and the Units page at both scroll boundaries.
 
 Villain Invasion Event fixtures are organized under `datasets/anime-expeditions/events/`. They cover the Event catalog when another Event is initially selected, both observed positions of the selected Villain Invasion card, act selection/detail, the horizontally scrolled Act 4 selector and detail, prestart, Defeat, and reviewed Victory action rails—with and without **Next Stage**, including the final Act 4 rail. Event navigation uses these specialized fixtures and remains separate from the shared Play-interface detector because Event is available only from Lobby.
+
+Bounty Board fixtures are organized under `datasets/anime-expeditions/bounties/`. They protect position-independent usable-card ownership when the remaining daily limit dims a card: yellow Reroll and green Claim are live actions, while a card with neither action is not clickable.
 
 The current builder recognizes these dataset names:
 
@@ -47,6 +49,6 @@ The three `Difficultly*_LayoutShift` folders and `AFK_Chamber` are golden-test f
 
 The `CurrentUI*.png` files in the three map and difficulty folders preserve the 2026-07-25 full-screen Expedition selector. Its active map is owned by the cyan perimeter on the left-side card rail, while difficulty is owned by the current lower-left green, red, or purple control. The old compact selector remains in the same folders as a supported legacy layout.
 
-`LobbyEventTheme.png` preserves the red Event-theme Lobby whose bright railing resembles the Settings close circle. Settings detection must require independent dark panel geometry before accepting that red component. `GraphicsPageCurrent.png` includes the new **Event Theme Enabled** control, which the startup profile disables. `MiscellaneousPageCurrent.png` and `MiscellaneousPageEventUpdate.png` preserve both observed vertical layouts for the required Misc controls. `MatchLobbyDoor_NoVoiceChat.png` and `MatchLobbyDoor_VoiceChat.png` cover the two fixed door offsets that open the Back-to-Lobby confirmation; `LobbyExitConfirmation.png` covers its detector-owned red action.
+`LobbyEventTheme.png` preserves the red Event-theme Lobby whose bright railing resembles the Settings close circle. Settings detection therefore requires the scale-aware complete page rail—one cyan selected page plus repeated neutral unselected controls—in addition to the red Close component; page-body brightness is not ownership evidence. `GraphicsPageCurrent.png` includes the new **Event Theme Enabled** control, which the startup profile disables. `MiscellaneousPageCurrent.png` and `MiscellaneousPageEventUpdate.png` preserve both observed vertical layouts for the required Misc controls. `MatchLobbyDoor_NoVoiceChat.png` and `MatchLobbyDoor_VoiceChat.png` cover the two fixed door offsets that open the Back-to-Lobby confirmation; `LobbyExitConfirmation.png` covers its detector-owned red action.
 
 When extending the dataset, use several captures per state across lighting and moving-object variations. Crop to the Roblox client area and do not include desktop chrome, other applications, notifications, account names, webhook tokens, or chat content.

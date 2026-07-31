@@ -5,6 +5,7 @@ using ExpeditionsMacro.Automation.Challenges;
 using ExpeditionsMacro.Automation.Diagnostics;
 using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Navigation;
+using ExpeditionsMacro.Automation.Teams;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
@@ -43,6 +44,7 @@ public partial class MacroPage
         ChallengeRotationState challengeRotation = new();
         BountyOperationSession bountySession =
             new();
+        TeamOperationSession teamSession = new();
         if (captureHistory) _services.DiagnosticCapture.BeginAutomaticHistory("Macro plan started");
         try
         {
@@ -61,6 +63,7 @@ public partial class MacroPage
                     macroTotals,
                     challengeRotation,
                     bountySession,
+                    teamSession,
                     progress,
                     token),
                 progress,

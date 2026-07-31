@@ -26,6 +26,15 @@ public sealed class BountyStateRepository
                         cancellationToken)
                     .ConfigureAwait(false) ??
                 new BountyProgressState();
+            if (state.SchemaVersion == 1)
+            {
+                state = new BountyProgressState();
+                await JsonFileStore.WriteAtomicAsync(
+                        _path,
+                        state,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
             state.Validate();
             return state.AdvanceDay(
                 DateTimeOffset.UtcNow);

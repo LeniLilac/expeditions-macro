@@ -1,3 +1,4 @@
+using ExpeditionsMacro.Automation.Bounties;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Vision.Bounties;
 using ExpeditionsMacro.Vision.Infrastructure;
@@ -6,6 +7,77 @@ namespace ExpeditionsMacro.Tests;
 
 public sealed class BountyBoardDetectorTests
 {
+    [Theory]
+    [InlineData(
+        "BountyBoard_DimmedSlot1_01.png",
+        "",
+        false)]
+    [InlineData(
+        "BountyBoard_DimmedSlot2_01.png",
+        "1,4",
+        false)]
+    [InlineData(
+        "BountyBoard_DimmedSlot3_01.png",
+        "1,2,4",
+        false)]
+    [InlineData(
+        "BountyBoard_DimmedSlot4_01.png",
+        "1",
+        false)]
+    [InlineData(
+        "BountyBoard_FourLiveOneDimmed_01.png",
+        "1,2,3,4",
+        true)]
+    public void ReducedDailyLimit_ExposesOnlyLiveCardActions(
+        string fileName,
+        string expectedSlotList,
+        bool rightView)
+    {
+        BountyBoardMatch match =
+            BountyBoardDetector.Detect(
+                ImageCodec.Load(
+                    Path.Combine(
+                        TestPaths.BountyDatasets,
+                        fileName)));
+
+        Assert.Equal(
+            BountyBoardState.Board,
+            match.State);
+        IReadOnlyList<BountyLiveSlot> slots =
+            BountyBoardLayout.LiveSlots(
+                match,
+                rightView);
+        int[] expectedSlots = string.IsNullOrEmpty(
+                expectedSlotList)
+            ? []
+            : expectedSlotList
+                .Split(',')
+                .Select(int.Parse)
+                .ToArray();
+        Assert.Equal(
+            expectedSlots,
+            slots.Select(value =>
+                value.Slot));
+        Assert.All(
+            slots,
+            value => Assert.Equal(
+                BountyCardActionKind.Reroll,
+                value.Action.Kind));
+        for (int slot = 1;
+             slot <= 5;
+             slot++)
+        {
+            Assert.Equal(
+                expectedSlots.Contains(slot),
+                BountyBoardLayout.FindAction(
+                    match,
+                    slot,
+                    rightView,
+                    BountyCardActionKind.Reroll)
+                is not null);
+        }
+    }
+
     [Theory]
     [InlineData("EventHome.png", 234)]
     [InlineData("ActSelector.png", 234)]

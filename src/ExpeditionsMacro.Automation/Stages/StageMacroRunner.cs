@@ -62,7 +62,8 @@ public sealed partial class StageMacroRunner
             continueScheduledRoute,
         MacroRunTotals? macroTotals,
         char cancelPlacementKey,
-        StageWaveObjective? waveObjective)
+        StageWaveObjective? waveObjective,
+        TeamOperationSession? teamSession)
     {
         StoryPreset? story = preset as StoryPreset;
         RaidPreset? raid = preset as RaidPreset;
@@ -116,7 +117,11 @@ public sealed partial class StageMacroRunner
         int defeats = 0;
         TimeSpan matchRuntimeTotal = TimeSpan.Zero;
         StageRunResult? last = null;
-        RepeatedRoutePreparationState preparation = new(teamSlot);
+        RepeatedRoutePreparationState preparation = new(
+            teamSlot,
+            teamSession?.IsLoaded(
+                window,
+                teamSlot) == true);
 
         Write($"Using Roblox window '{window.Title}' ({window.ProcessDescription}).");
         Focus(window);
@@ -174,6 +179,7 @@ public sealed partial class StageMacroRunner
                     models,
                     unitMenuKey,
                     preparation,
+                    teamSession,
                     repeatedPrestartReady,
                     progress,
                     detector,

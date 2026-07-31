@@ -1,0 +1,69 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>ExpeditionsMacro.DetectorViewer</RootNamespace>
+    <AssemblyName>ExpeditionsMacro.DetectorViewer</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <Product>Expeditions Macro Detector Viewer</Product>
+    <Description>A standalone visual inspection tool for Expeditions Macro production detectors.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ExpeditionsMacro.Core\ExpeditionsMacro.Core.csproj" />
+    <ProjectReference Include="..\..\src\ExpeditionsMacro.Vision\ExpeditionsMacro.Vision.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\ExpeditionsMacro.DeepDebugViewer\Services\DeepDebugArchive.cs"
+             Link="Services\DeepDebugArchive.cs" />
+    <Resource Include="..\..\assets\app.ico"><Link>Resources\app.ico</Link></Resource>
+    <Resource Include="..\..\assets\fonts\Fredoka-Light.ttf"><Link>Resources\Fonts\Fredoka-Light.ttf</Link></Resource>
+    <Resource Include="..\..\assets\fonts\Fredoka-Regular.ttf"><Link>Resources\Fonts\Fredoka-Regular.ttf</Link></Resource>
+    <Resource Include="..\..\assets\fonts\Fredoka-Medium.ttf"><Link>Resources\Fonts\Fredoka-Medium.ttf</Link></Resource>
+    <Resource Include="..\..\assets\fonts\Fredoka-SemiBold.ttf"><Link>Resources\Fonts\Fredoka-SemiBold.ttf</Link></Resource>
+    <Resource Include="..\..\assets\fonts\Fredoka-Bold.ttf"><Link>Resources\Fonts\Fredoka-Bold.ttf</Link></Resource>
+    <Content Include="..\..\assets\fonts\Fredoka-OFL.txt">
+      <Link>Licenses\Fredoka-OFL.txt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\..\assets\licenses\Lucide-LICENSE.txt">
+      <Link>Licenses\Lucide-LICENSE.txt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\..\LICENSE.md">
+      <Link>LICENSE.md</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\..\NOTICE.md">
+      <Link>NOTICE.md</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\..\PRIVACY.md">
+      <Link>PRIVACY.md</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\..\THIRD-PARTY-NOTICES.md">
+      <Link>THIRD-PARTY-NOTICES.md</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="README.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\..\detector-packs\anime-expeditions-expeditions\1.0.2\**\*">
+      <Link>Resources\DetectorPacks\anime-expeditions-expeditions\1.0.2\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+</Project>

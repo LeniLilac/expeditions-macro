@@ -161,6 +161,8 @@ Automatic failure capture is enabled by default. It retains the latest 10 action
 
 Developers can replay these archives with the source-only [Deep Debug Viewer](tools/ExpeditionsMacro.DeepDebugViewer/README.md), which synchronizes captured frames with nearby detector, workflow, and input events. The viewer is not included in release artifacts.
 
+Developers can inspect the same captures with the standalone [Detector Viewer](tools/ExpeditionsMacro.DetectorViewer/README.md). It visualizes every production detector's owned regions, live action, explicit checks, thresholds, and result, including clear limitations where an internal helper does not expose a safe standalone detail path.
+
 ## Local files and privacy
 
 Application data is stored under `%LocalAppData%\ExpeditionsMacro`:

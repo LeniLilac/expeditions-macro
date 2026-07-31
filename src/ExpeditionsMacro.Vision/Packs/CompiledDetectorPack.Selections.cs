@@ -28,6 +28,11 @@ public sealed partial class CompiledDetectorPack
         {
             return markerSelection;
         }
+        if (UsesAnimeExpeditionsDetectors &&
+            !HasLegacySelectorOwner(clientImage))
+        {
+            return null;
+        }
 
         int? selected = BestSelection(
             _maps,
@@ -51,6 +56,11 @@ public sealed partial class CompiledDetectorPack
                 clientImage) is int currentSelection)
         {
             return currentSelection;
+        }
+        if (UsesAnimeExpeditionsDetectors &&
+            !HasLegacySelectorOwner(clientImage))
+        {
+            return null;
         }
 
         (bool observed, int? selected) =
@@ -111,6 +121,12 @@ public sealed partial class CompiledDetectorPack
         Manifest.PackId.Equals(
             AnimeExpeditionsDetectorSpec.PackId,
             StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasLegacySelectorOwner(
+        ImageFrame image) =>
+        ActionButtonDetector.Score(
+            image,
+            "map_select") > 0;
 
     private int? BestSelection(
         IReadOnlyDictionary<int, SelectionRuntime> selections,

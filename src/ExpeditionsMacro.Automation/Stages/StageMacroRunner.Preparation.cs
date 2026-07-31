@@ -1,4 +1,5 @@
 using ExpeditionsMacro.Automation.Scheduling;
+using ExpeditionsMacro.Automation.Teams;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
@@ -16,6 +17,7 @@ public sealed partial class StageMacroRunner
         StageRuntimeModels models,
         char? unitMenuKey,
         RepeatedRoutePreparationState preparation,
+        TeamOperationSession? teamSession,
         bool arrivedFromRepeatStage,
         IProgress<MacroProgress>? progress,
         IDetectorPack detector,
@@ -35,6 +37,7 @@ public sealed partial class StageMacroRunner
                 null);
             StageNavigationPolicy.RequirePrestartForTeamLoad(
                 StageScreenDetector.Detect(CaptureClient(window, detector)));
+            teamSession?.BeginSelection(teamSlot);
             await _teams.SelectAsync(
                 window,
                 teamSlot,
@@ -49,6 +52,9 @@ public sealed partial class StageMacroRunner
                 stableDetections,
                 cancellationToken).ConfigureAwait(false);
             preparation.MarkTeamLoaded();
+            teamSession?.MarkLoaded(
+                window,
+                teamSlot);
             log(
                 $"Team {teamSlot} loaded from the confirmed {Label(mode)} prestart screen.",
                 MacroEventLevel.Success,

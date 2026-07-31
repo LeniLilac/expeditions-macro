@@ -6,11 +6,15 @@ internal sealed class RepeatedRoutePreparationState
     private bool _cameraAligned;
     private bool _repeatStageRequested;
 
-    public RepeatedRoutePreparationState(int teamSlot)
+    public RepeatedRoutePreparationState(
+        int teamSlot,
+        bool teamAlreadyLoaded = false)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(teamSlot);
         _teamSelectionRequired = teamSlot > 0;
-        TeamLoaded = !_teamSelectionRequired;
+        TeamLoaded =
+            !_teamSelectionRequired ||
+            teamAlreadyLoaded;
     }
 
     public bool TeamLoaded { get; private set; }

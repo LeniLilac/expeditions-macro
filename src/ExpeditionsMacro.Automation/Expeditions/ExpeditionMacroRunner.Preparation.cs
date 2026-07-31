@@ -1,4 +1,5 @@
 using ExpeditionsMacro.Automation.Scheduling;
+using ExpeditionsMacro.Automation.Teams;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
@@ -12,6 +13,7 @@ public sealed partial class ExpeditionMacroRunner
         ExpeditionPreset preset,
         char? unitMenuKey,
         RepeatedRoutePreparationState preparation,
+        TeamOperationSession? teamSession,
         bool arrivedFromRepeatStage,
         IProgress<MacroProgress>? progress,
         Action<string, MacroEventLevel, string?, double?> log,
@@ -19,6 +21,8 @@ public sealed partial class ExpeditionMacroRunner
     {
         if (preparation.ShouldLoadTeam)
         {
+            teamSession?.BeginSelection(
+                preset.TeamSlot);
             await _teams.SelectAsync(
                 window,
                 preset.TeamSlot,
@@ -26,6 +30,9 @@ public sealed partial class ExpeditionMacroRunner
                 progress,
                 cancellationToken).ConfigureAwait(false);
             preparation.MarkTeamLoaded();
+            teamSession?.MarkLoaded(
+                window,
+                preset.TeamSlot);
         }
 
         if (!preparation.ShouldAlignCamera(arrivedFromRepeatStage))

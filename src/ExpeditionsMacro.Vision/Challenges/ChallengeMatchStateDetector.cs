@@ -13,7 +13,6 @@ public static class ChallengeMatchStateDetector
         double defeat =
             TerminalScreenDetector.Score(image, "defeat");
         double victory = ChallengeVictoryDetector.Score(
-            image,
             ActionButtonDetector.Score(
                 image,
                 "challenge_victory_close"),

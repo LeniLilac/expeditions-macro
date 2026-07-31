@@ -43,3 +43,9 @@ its decorative red header may still be loading. A deterministic
 privacy-safe transform of the retained Home fixture removes the second
 lower-border row and reproduces the one-pixel border thickness observed
 in a beta.34 field failure without retaining that private capture.
+A second deterministic transform removes one of the two upper-border
+rows, reproducing the otherwise identical one-pixel upper border from a
+beta.44 field report supplied on 2026-07-31. Both border checks scan the
+strongest row only inside their narrow expected bands; the selected tab,
+button body, separator, opaque label, and opposite border remain
+mandatory.

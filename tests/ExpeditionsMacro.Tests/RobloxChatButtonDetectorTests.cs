@@ -81,6 +81,95 @@ public sealed class RobloxChatButtonDetectorTests
                 .State);
     }
 
+    [Theory]
+    [InlineData(
+        "challenges/ChallengeList/ChallengeList_12.png")]
+    [InlineData(
+        "events/Act1Detail.png")]
+    [InlineData(
+        "events/EventCatalog_BeginnerPathSelected.png")]
+    [InlineData(
+        "expeditions/Lobby_UI2/Lobby_UI2_001.png")]
+    [InlineData(
+        "expeditions/Expedition_Map_Select_Selection_Regression/Map1_GreenLightingVerticalPhase.png")]
+    [InlineData(
+        "stages/TeamLoadConfirm_Team1_BrightRoster_01.png")]
+    public void ReviewedFullFrameOutlines_RemainClosed(
+        string relativePath)
+    {
+        RobloxChatButtonMatch match =
+            RobloxChatButtonDetector.Detect(
+                LoadCorpus(relativePath));
+
+        Assert.Equal(
+            RobloxChatButtonState.Closed,
+            match.State);
+    }
+
+    [Fact]
+    public void MicrophoneAtTheChatPosition_IsNotChatEvidence()
+    {
+        ImageFrame image = ImageCodec.Load(
+            Path.Combine(
+                TestPaths.StageDatasets,
+                "RaidDetail_Current_CustomFont_01.png"));
+
+        RobloxChatButtonMatch match =
+            RobloxChatButtonDetector.Detect(image);
+
+        Assert.Equal(
+            RobloxChatButtonState.None,
+            match.State);
+        Assert.False(match.Available);
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void CrossStateCorpus_DoesNotInventAnOpenChat()
+    {
+        string openFixture = Path.GetFullPath(
+            Path.Combine(
+                TestPaths.NavigationVariantDatasets,
+                "ChatOpen.png"));
+        string[] falseOpen = CorpusPngs()
+            .Where(file =>
+                !Path.GetFullPath(file).Equals(
+                    openFixture,
+                    StringComparison.OrdinalIgnoreCase))
+            .Where(file =>
+                RobloxChatButtonDetector
+                    .Detect(ImageCodec.Load(file))
+                    .State == RobloxChatButtonState.Open)
+            .Select(file =>
+                Path.GetRelativePath(
+                    TestPaths.RepositoryRoot,
+                    file))
+            .ToArray();
+
+        Assert.Empty(falseOpen);
+    }
+
+    private static ImageFrame LoadCorpus(
+        string relativePath) =>
+        ImageCodec.Load(
+            Path.Combine(
+                TestPaths.RepositoryRoot,
+                "datasets",
+                "anime-expeditions",
+                relativePath.Replace(
+                    '/',
+                    Path.DirectorySeparatorChar)));
+
+    private static IEnumerable<string> CorpusPngs()
+        =>
+        Directory.EnumerateFiles(
+            Path.Combine(
+                TestPaths.RepositoryRoot,
+                "datasets",
+                "anime-expeditions"),
+            "*.png",
+            SearchOption.AllDirectories);
+
     private static ImageFrame Load(
         string fileName) =>
         ImageCodec.Load(

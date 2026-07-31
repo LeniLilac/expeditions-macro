@@ -49,6 +49,7 @@ public static class StageOptionSelectionDetector
     private const int RailSearchTop = 150;
     private const int RailSearchBottom = 470;
     private const int MinimumRailAccentPixels = 240;
+    private const int RailBandRadius = 1;
     private const int RowHalfHeight = 12;
     private const int RowLeftOffset = 4;
     private const int RowRightOffset = 46;
@@ -168,37 +169,56 @@ public static class StageOptionSelectionDetector
 
     private static int? FindRailLeft(ImageFrame image)
     {
+        // Keep the one-pixel rail structural while allowing its opaque coverage
+        // to phase across immediately adjacent raster columns.
         int bestX = -1;
-        int bestCount = 0;
-        for (int x = RailSearchLeft;
-             x < RailSearchRight;
+        int bestSupport = 0;
+        int bestCenterCount = 0;
+        for (int x = RailSearchLeft + RailBandRadius;
+             x < RailSearchRight - RailBandRadius;
              x++)
         {
-            int count = 0;
+            int support = 0;
+            int centerCount = 0;
             for (int y = RailSearchTop;
                  y < RailSearchBottom;
                  y++)
             {
-                ReadPixel(
-                    image,
-                    x,
-                    y,
-                    out byte red,
-                    out byte green,
-                    out byte blue);
-                if (IsStrongAccent(red, green, blue))
+                bool rowSupported = false;
+                for (int offset = -RailBandRadius;
+                     offset <= RailBandRadius;
+                     offset++)
                 {
-                    count++;
+                    ReadPixel(
+                        image,
+                        x + offset,
+                        y,
+                        out byte red,
+                        out byte green,
+                        out byte blue);
+                    if (!IsStrongAccent(red, green, blue))
+                    {
+                        continue;
+                    }
+                    rowSupported = true;
+                    if (offset == 0)
+                    {
+                        centerCount++;
+                    }
                 }
+                if (rowSupported) support++;
             }
-            if (count <= bestCount)
+            if (support < bestSupport ||
+                support == bestSupport &&
+                centerCount <= bestCenterCount)
             {
                 continue;
             }
-            bestCount = count;
+            bestSupport = support;
+            bestCenterCount = centerCount;
             bestX = x;
         }
-        return bestCount >= MinimumRailAccentPixels
+        return bestSupport >= MinimumRailAccentPixels
             ? bestX
             : null;
     }
