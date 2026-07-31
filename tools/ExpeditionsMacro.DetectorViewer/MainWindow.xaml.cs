@@ -1,9 +1,9 @@
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using ExpeditionsMacro.DetectorViewer.Controls;
 using ExpeditionsMacro.DetectorViewer.Models;
 using ExpeditionsMacro.DetectorViewer.Services;
-using ExpeditionsMacro.DetectorViewer.Controls;
 using ExpeditionsMacro.Vision.Inspection;
 
 namespace ExpeditionsMacro.DetectorViewer;
@@ -13,9 +13,12 @@ public partial class MainWindow : Window
     private readonly DetectorInspectionCatalogResult _catalog;
     private readonly IReadOnlyList<DetectorCatalogItem> _catalogItems;
     private readonly ViewerSourceSession _sourceSession = new();
+    private readonly RepositoryDatasetLocation?
+        _repositoryDatasets;
     private readonly bool _shutdownApplicationOnClose;
+    private readonly DetectorEvaluationController _evaluation;
+    private readonly DetectorAnnotationController _annotations;
     private DecodedViewerFrame? _currentFrame;
-    private DetectorInspectionReport? _currentReport;
     private CancellationTokenSource? _workCancellation;
     private long _generation;
     private ViewerTheme _theme;
@@ -32,12 +35,26 @@ public partial class MainWindow : Window
         _shutdownApplicationOnClose =
             shutdownApplicationOnClose;
         InitializeComponent();
+        _repositoryDatasets =
+            RepositoryDatasetLocator.Find();
         _catalogItems =
             catalog.Definitions
                 .Select(definition =>
                     new DetectorCatalogItem(
                         definition))
                 .ToArray();
+        _evaluation = new DetectorEvaluationController(
+            _catalogItems,
+            CatalogPane,
+            EvidencePane,
+            Viewport,
+            StatusText);
+        _annotations = new DetectorAnnotationController(
+            Viewport,
+            AnnotationPane,
+            message => StatusText.Text = message);
+        _evaluation.DetectorPresented +=
+            _annotations.SetDetector;
         CatalogPane.SetCatalog(_catalogItems);
         SetTheme(
             ViewerThemeManager.SystemTheme());
@@ -49,6 +66,10 @@ public partial class MainWindow : Window
         {
             StatusText.Text = startupWarning;
         }
+        OpenRepositoryDatasetsButton.ToolTip =
+            _repositoryDatasets is null
+                ? "Repository checkout not found. Use Open folder and choose its datasets folder."
+                : $"Open every image under {_repositoryDatasets.DatasetRoot} (Ctrl+D)";
     }
 
     internal async Task OpenInitialPathAsync(
@@ -61,6 +82,8 @@ public partial class MainWindow : Window
         SnapshotScenario scenario)
     {
         _currentFrame = frame;
+        Viewport.SetFrameSet(
+            ["canonical-snapshot.png"]);
         SourcePathText.Text = label;
         SourceSummaryText.Text =
             "Synthetic canonical frame • local snapshot fixture";
@@ -77,10 +100,14 @@ public partial class MainWindow : Window
                 0,
                 0,
                 TimeSpan.Zero));
-        await EvaluateSelectedAsync(
-            ++_generation,
+        await _evaluation.EvaluateSelectedAsync(
+            frame.Image,
             CancellationToken.None);
         ApplySnapshotScenario(scenario);
+        if (scenario == SnapshotScenario.Annotation)
+        {
+            PrepareAnnotationSnapshot();
+        }
         UpdateLayout();
         Viewport.Fit();
         StatusText.Text =
@@ -99,7 +126,7 @@ public partial class MainWindow : Window
                 ? ViewerIconKind.Moon
                 : ViewerIconKind.Sun);
         Viewport.SetReport(
-            _currentReport,
+            _evaluation.CurrentReport,
             EvidencePane.SelectedCheck?
                 .RegionIds
                 .ToHashSet(
@@ -111,7 +138,7 @@ public partial class MainWindow : Window
     {
         SnapshotPresentation presentation =
             SnapshotFixture.Present(
-                _currentReport,
+                _evaluation.CurrentReport,
                 scenario);
         if (presentation.Error is not null)
         {
@@ -125,16 +152,32 @@ public partial class MainWindow : Window
         {
             return;
         }
-        _currentReport = presentation.Report;
-        EvidencePane.SetReport(
-            _currentReport);
-        Viewport.SetReport(
-            _currentReport);
+        _evaluation.Present(
+            CatalogPane.SelectedItem,
+            presentation.Report);
         StatusText.Text =
             presentation.Status;
     }
 
-    private async Task OpenPathAsync(string path)
+    private void PrepareAnnotationSnapshot()
+    {
+        DetectorImageAnnotation annotation =
+            SnapshotFixture.CreateAnnotation(
+                CatalogPane.SelectedItem?.Id ??
+                "bounty-board");
+        SetInspectorMode(annotations: true);
+        AnnotationPane.SetAnnotation(
+            "Bounty Board",
+            annotation,
+            "datasets/detector-annotations.json");
+        Viewport.SetAnnotations(
+            annotation.Regions,
+            annotation.Regions[0].Id);
+    }
+
+    private async Task OpenPathAsync(
+        string path,
+        bool repositoryDatasets = false)
     {
         long generation = StartWork();
         CancellationToken token =
@@ -147,10 +190,16 @@ public partial class MainWindow : Window
                 new(message =>
                     StatusText.Text = message);
             LoadedViewerFrame loaded =
-                await _sourceSession.OpenAsync(
-                    path,
-                    progress,
-                    token);
+                repositoryDatasets
+                    ? await _sourceSession
+                        .OpenRepositoryDatasetsAsync(
+                            path,
+                            progress,
+                            token)
+                    : await _sourceSession.OpenAsync(
+                        path,
+                        progress,
+                        token);
             token.ThrowIfCancellationRequested();
             if (generation != _generation)
             {
@@ -158,10 +207,14 @@ public partial class MainWindow : Window
             }
             _currentFrame = loaded.Frame;
             Viewport.SetFrameSet(
-                loaded.FrameCount);
+                loaded.Frames
+                    .Select(frame =>
+                        frame.DisplayPath)
+                    .ToArray());
             ShowCurrentFrame(loaded);
-            await EvaluateSelectedAsync(
-                generation,
+            await _evaluation.AutoSelectAsync(
+                loaded.Frame.Image,
+                loaded.Record.DisplayPath,
                 token);
         }
         catch (OperationCanceledException)
@@ -200,8 +253,9 @@ public partial class MainWindow : Window
             }
             _currentFrame = loaded.Frame;
             ShowCurrentFrame(loaded);
-            await EvaluateSelectedAsync(
-                generation,
+            await _evaluation.AutoSelectAsync(
+                loaded.Frame.Image,
+                loaded.Record.DisplayPath,
                 token);
         }
         catch (OperationCanceledException)
@@ -218,6 +272,7 @@ public partial class MainWindow : Window
     private void ShowCurrentFrame(
         LoadedViewerFrame loaded)
     {
+        _annotations.SetFrame(loaded);
         SourcePathText.Text =
             loaded.SourcePath;
         SourceSummaryText.Text =
@@ -230,70 +285,6 @@ public partial class MainWindow : Window
             loaded.Record.Timestamp);
         StatusText.Text =
             $"{loaded.Frame.Image.Width:N0} × {loaded.Frame.Image.Height:N0} • {loaded.Frame.Image.Format}";
-    }
-
-    private async Task EvaluateSelectedAsync(
-        long generation,
-        CancellationToken token)
-    {
-        DetectorCatalogItem? item =
-            CatalogPane.SelectedItem;
-        EvidencePane.SetDefinition(item);
-        if (item is null ||
-            _currentFrame is null)
-        {
-            _currentReport = null;
-            Viewport.SetReport(null);
-            return;
-        }
-        if (_currentFrame.Image.Width != 808 ||
-            _currentFrame.Image.Height != 611)
-        {
-            string message =
-                $"Production detectors require the canonical 808 × 611 Roblox client. This frame is {_currentFrame.Image.Width} × {_currentFrame.Image.Height}; it is displayed but not evaluated.";
-            _currentReport =
-                DetectorInspectionReport.Unavailable(
-                    message,
-                    item.Definition.Regions);
-            EvidencePane.SetError(message);
-            Viewport.SetReport(_currentReport);
-            return;
-        }
-
-        EvidencePane.SetEvaluating();
-        StatusText.Text =
-            $"Evaluating {item.Name}…";
-        try
-        {
-            DetectorInspectionReport report =
-                await Task.Run(
-                    () =>
-                        item.Definition.Evaluate(
-                            _currentFrame.Image),
-                    token);
-            token.ThrowIfCancellationRequested();
-            if (generation != _generation ||
-                item != CatalogPane.SelectedItem)
-            {
-                return;
-            }
-            _currentReport = report;
-            EvidencePane.SetReport(report);
-            Viewport.SetReport(report);
-            StatusText.Text =
-                $"Evaluated {item.Name} • {report.FinalState}";
-        }
-        catch (OperationCanceledException)
-        {
-        }
-        catch (Exception error)
-        {
-            _currentReport = null;
-            EvidencePane.SetError(error.Message);
-            Viewport.SetReport(null);
-            StatusText.Text =
-                $"Evaluation failed: {error.Message}";
-        }
     }
 
     private long StartWork()
@@ -329,17 +320,36 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OpenRepositoryDatasets_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_repositoryDatasets is null)
+        {
+            StatusText.Text =
+                "Repository checkout not found. Use Open folder and choose the datasets folder.";
+            return;
+        }
+        _ = OpenPathAsync(
+            _repositoryDatasets.DatasetRoot,
+            repositoryDatasets: true);
+    }
+
     private void CatalogPane_SelectedDetectorChanged(
         object sender,
         EventArgs e)
     {
+        if (_evaluation.IsSelectingDetector)
+        {
+            return;
+        }
         EvidencePane.SetDefinition(
             CatalogPane.SelectedItem);
         if (_currentFrame is not null)
         {
-            long generation = StartWork();
-            _ = EvaluateSelectedAsync(
-                generation,
+            StartWork();
+            _ = _evaluation.EvaluateSelectedAsync(
+                _currentFrame.Image,
                 _workCancellation!.Token);
         }
     }
@@ -358,9 +368,7 @@ public partial class MainWindow : Window
                 .ToHashSet(
                     StringComparer.Ordinal) ??
             new HashSet<string>();
-        Viewport.SetReport(
-            _currentReport,
-            selected);
+        _evaluation.SetSelectedRegions(selected);
     }
 
     private void Viewport_PixelHovered(
@@ -407,6 +415,33 @@ public partial class MainWindow : Window
                 ? ViewerTheme.Light
                 : ViewerTheme.Dark);
 
+    private void EvidenceMode_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        SetInspectorMode(annotations: false);
+
+    private void AnnotationMode_Click(
+        object sender,
+        RoutedEventArgs e) =>
+        SetInspectorMode(annotations: true);
+
+    private void SetInspectorMode(bool annotations)
+    {
+        EvidencePane.Visibility = annotations
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        AnnotationPane.Visibility = annotations
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        EvidenceModeButton.Tag = annotations
+            ? null
+            : "Active";
+        AnnotationModeButton.Tag = annotations
+            ? "Active"
+            : null;
+        _annotations.SetAnnotationMode(annotations);
+    }
+
     private void Window_DragOver(
         object sender,
         DragEventArgs e) =>
@@ -433,6 +468,9 @@ public partial class MainWindow : Window
             e,
             () => OpenSource_Click(this, e),
             () => OpenFolder_Click(this, e),
+            () => OpenRepositoryDatasets_Click(
+                this,
+                e),
             index => _ = LoadFrameAsync(index),
             Viewport.FrameIndex,
             Viewport.Fit);

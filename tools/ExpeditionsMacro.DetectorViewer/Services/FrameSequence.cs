@@ -7,6 +7,7 @@ public enum FrameSourceKind
 {
     Image,
     Folder,
+    RepositoryDatasets,
     DeepDebugArchive,
 }
 
@@ -53,6 +54,7 @@ public sealed class FrameSequence : IDisposable
         {
             return await OpenFolderAsync(
                     fullPath,
+                    FrameSourceKind.Folder,
                     progress,
                     cancellationToken)
                 .ConfigureAwait(false);
@@ -115,6 +117,29 @@ public sealed class FrameSequence : IDisposable
             ]);
     }
 
+    public static async Task<FrameSequence>
+        OpenRepositoryDatasetsAsync(
+            string datasetRoot,
+            IProgress<string>? progress = null,
+            CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(
+            datasetRoot);
+        string fullPath = Path.GetFullPath(
+            datasetRoot);
+        if (!Directory.Exists(fullPath))
+        {
+            throw new DirectoryNotFoundException(
+                $"Repository dataset folder was not found: {fullPath}");
+        }
+        return await OpenFolderAsync(
+                fullPath,
+                FrameSourceKind.RepositoryDatasets,
+                progress,
+                cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task<byte[]> ReadFrameBytesAsync(
         int index,
         CancellationToken cancellationToken = default)
@@ -168,13 +193,16 @@ public sealed class FrameSequence : IDisposable
 
     private static Task<FrameSequence> OpenFolderAsync(
         string folder,
+        FrameSourceKind kind,
         IProgress<string>? progress,
         CancellationToken cancellationToken) =>
         Task.Run(
             () =>
             {
                 progress?.Report(
-                    "Indexing image folder...");
+                    kind == FrameSourceKind.RepositoryDatasets
+                        ? "Indexing repository datasets..."
+                        : "Indexing image folder...");
                 List<string> images = [];
                 Stack<string> pending = new();
                 pending.Push(folder);
@@ -239,7 +267,7 @@ public sealed class FrameSequence : IDisposable
                         .ToArray();
                 return new FrameSequence(
                     folder,
-                    FrameSourceKind.Folder,
+                    kind,
                     frames);
             },
             cancellationToken);

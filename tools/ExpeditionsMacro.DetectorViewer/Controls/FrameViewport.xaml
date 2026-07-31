@@ -36,24 +36,33 @@
                             Click="NextButton_Click"
                             icons:ViewerIcon.Icon="ChevronRight" />
                 </StackPanel>
-                <StackPanel x:Name="FrameIdentity"
-                           Grid.Column="1"
-                           Margin="10,0,0,0"
-                           VerticalAlignment="Center"
-                           Orientation="Horizontal">
+                <Grid x:Name="FrameIdentity"
+                      Grid.Column="1"
+                      Margin="10,0,0,0"
+                      VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
                     <TextBlock x:Name="FrameNumberText"
                                VerticalAlignment="Center"
                                Foreground="{DynamicResource MutedBrush}"
                                Text="No frame" />
-                    <TextBlock x:Name="FrameNameText"
-                               Margin="10,0,0,0"
-                               MaxWidth="240"
-                               VerticalAlignment="Center"
-                               Foreground="{DynamicResource FaintBrush}"
-                               Text="Open an image source to begin"
-                               TextTrimming="CharacterEllipsis"
-                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
-                </StackPanel>
+                    <ComboBox x:Name="FramePicker"
+                              Grid.Column="1"
+                              Margin="10,0,0,0"
+                              MinWidth="180"
+                              MaxWidth="420"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Center"
+                              DisplayMemberPath="Label"
+                              IsEditable="True"
+                              IsTextSearchEnabled="True"
+                              StaysOpenOnEdit="True"
+                              TextSearch.TextPath="Label"
+                              ToolTip="Type a dataset filename to jump directly to it"
+                              SelectionChanged="FramePicker_SelectionChanged" />
+                </Grid>
                 <StackPanel Grid.Row="1"
                             Grid.ColumnSpan="2"
                             HorizontalAlignment="Right"
@@ -93,6 +102,8 @@
                           HorizontalAlignment="Left"
                           VerticalAlignment="Top"
                           Background="#050606"
+                          MouseLeftButtonDown="ImageContent_MouseLeftButtonDown"
+                          MouseLeftButtonUp="ImageContent_MouseLeftButtonUp"
                           MouseMove="ImageContent_MouseMove"
                           MouseLeave="ImageContent_MouseLeave">
                         <Grid.LayoutTransform>
@@ -106,6 +117,10 @@
                                Stretch="Fill"
                                SnapsToDevicePixels="True" />
                         <Canvas x:Name="OverlayCanvas"
+                                Width="{Binding ActualWidth, ElementName=ImageContent}"
+                                Height="{Binding ActualHeight, ElementName=ImageContent}"
+                                IsHitTestVisible="False" />
+                        <Canvas x:Name="AnnotationCanvas"
                                 Width="{Binding ActualWidth, ElementName=ImageContent}"
                                 Height="{Binding ActualHeight, ElementName=ImageContent}"
                                 IsHitTestVisible="False" />

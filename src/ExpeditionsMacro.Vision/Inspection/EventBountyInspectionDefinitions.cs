@@ -53,7 +53,11 @@ internal static class EventBountyInspectionDefinitions
             "Bounty Board",
             "Classifies Event entry, Board, reroll confirmation, and reward overlays with live card evidence.",
             DetectorInspectionDetailLevel.Partial,
-            [typeof(BountyBoardDetector)],
+            [
+                typeof(BountyBoardDetector),
+                typeof(BountyBoardHeaderRecognizer),
+                typeof(BountyBoardOwnerDetector),
+            ],
             image =>
             {
                 BountyBoardMatch match =
@@ -89,6 +93,29 @@ internal static class EventBountyInspectionDefinitions
                                 ? "True"
                                 : "False",
                             BooleanValue: match.NoGold),
+                        new DetectorProbeMetric(
+                            "board_button_rail_score",
+                            match.BoardButtonRailScore.ToString(
+                                "0.000",
+                                System.Globalization
+                                    .CultureInfo
+                                    .InvariantCulture),
+                            match.BoardButtonRailScore),
+                        new DetectorProbeMetric(
+                            "board_header_score",
+                            match.BoardHeaderScore.ToString(
+                                "0.000",
+                                System.Globalization
+                                    .CultureInfo
+                                    .InvariantCulture),
+                            match.BoardHeaderScore),
+                        new DetectorProbeMetric(
+                            "board_header_text_fallback",
+                            match.BoardHeaderUsedTextFallback
+                                ? "True"
+                                : "False",
+                            BooleanValue:
+                                match.BoardHeaderUsedTextFallback),
                     ]);
             },
             "Accepted live actions and numbers are exposed. Rejected card/action candidates remain internal."),

@@ -4,6 +4,23 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.49] - 2026-07-31
+
+### Added
+
+- Detector Viewer can load every supported repository dataset image with one action and jump directly to fixtures through a searchable filename-first frame picker.
+- Detector Viewer automatically selects the detector associated with each fixture or its strongest positive production evidence, while keeping the editable frame picker themed in dark and light modes.
+- Detector Viewer can annotate repository fixtures with per-detector expected results, implementation notes, and one or more labeled canonical detection regions. Edits autosave atomically to `datasets/detector-annotations.json` and remain separate from production detector decisions.
+
+### Changed
+
+- Bounty Board ownership now requires only the independently aligned **Back + Calendar** action rail and the bounded **Bounty Board** header. A local glyph recognizer can corroborate the marked header crop when its normal gold-image evidence changes; neither header path can authorize the Board without the live action rail.
+
+### Tests
+
+- Passed 1,579 application and detector tests, 5 Deep Debug Viewer tests, 13 Detector Viewer tests, and all 10 Detector Viewer dark/light UI states.
+- Added a privacy-safe field regression containing only the annotated Bounty Board header and Back + Calendar rail, recolored-header fallback coverage, missing-owner negatives, and the complete repository cross-state corpus.
+
 ## [1.3.0-beta.48] - 2026-07-31
 
 ### Added
@@ -1264,7 +1281,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.48...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.49...HEAD
+[1.3.0-beta.49]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.48...v1.3.0-beta.49
 [1.3.0-beta.48]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.47...v1.3.0-beta.48
 [1.3.0-beta.47]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.46...v1.3.0-beta.47
 [1.3.0-beta.46]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.45...v1.3.0-beta.46

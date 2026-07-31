@@ -30,6 +30,8 @@ internal static class DetectorViewerSnapshotRenderer
         [
             new(ViewerTheme.Dark, SnapshotScenario.Matched),
             new(ViewerTheme.Light, SnapshotScenario.Matched),
+            new(ViewerTheme.Dark, SnapshotScenario.Annotation),
+            new(ViewerTheme.Light, SnapshotScenario.Annotation),
             new(ViewerTheme.Dark, SnapshotScenario.Negative),
             new(ViewerTheme.Light, SnapshotScenario.Negative),
             new(ViewerTheme.Dark, SnapshotScenario.Error),
@@ -76,7 +78,7 @@ internal static class DetectorViewerSnapshotRenderer
             Path.Combine(
                 outputDirectory,
                 "detector-viewer-snapshots.txt"),
-            $"PASS: {specs.Length} dark/light matched, negative, error, and minimum-size snapshots rendered from the packaged executable.");
+            $"PASS: {specs.Length} dark/light matched, annotation, negative, error, and minimum-size snapshots rendered from the packaged executable.");
     }
 
     private static MainWindow CreateWindow(

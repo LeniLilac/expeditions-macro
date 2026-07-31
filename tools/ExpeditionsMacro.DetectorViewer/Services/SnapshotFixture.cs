@@ -1,6 +1,7 @@
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using ExpeditionsMacro.Core.Imaging;
+using ExpeditionsMacro.DetectorViewer.Models;
 using ExpeditionsMacro.Vision.Inspection;
 using CorePixelFormat =
     ExpeditionsMacro.Core.Imaging.PixelFormat;
@@ -10,6 +11,7 @@ namespace ExpeditionsMacro.DetectorViewer.Services;
 internal enum SnapshotScenario
 {
     Matched,
+    Annotation,
     Negative,
     Error,
 }
@@ -40,7 +42,7 @@ internal static class SnapshotFixture
                 "Snapshot fixture has no report");
         }
         bool matched =
-            scenario == SnapshotScenario.Matched;
+            scenario != SnapshotScenario.Negative;
         DetectorInspectionCheck[] checks =
             report.Checks
                 .Select(check =>
@@ -223,6 +225,37 @@ internal static class SnapshotFixture
             image,
             bitmap);
     }
+
+    public static DetectorImageAnnotation CreateAnnotation(
+        string detectorId) =>
+        new()
+        {
+            ImagePath =
+                "anime-expeditions/bounties/BountyBoard_DimmedSlot1_01.png",
+            DetectorId = detectorId,
+            Expected = DetectorExpectedResult.Match,
+            Notes =
+                "The live yellow Reroll action owns this usable card. The dimmed card is a negative region.",
+            Regions =
+            [
+                new DetectorAnnotationRegion
+                {
+                    Label = "Live reroll action",
+                    X = 566,
+                    Y = 486,
+                    Width = 72,
+                    Height = 38,
+                },
+                new DetectorAnnotationRegion
+                {
+                    Label = "Dimmed negative slot",
+                    X = 665,
+                    Y = 312,
+                    Width = 128,
+                    Height = 232,
+                },
+            ],
+        };
 
     private static void Fill(
         byte[] pixels,
