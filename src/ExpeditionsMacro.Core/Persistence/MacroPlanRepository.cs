@@ -53,6 +53,14 @@ public sealed class MacroPlanRepository
             cancellationToken);
     }
 
+    public Task DeleteAsync(
+        string id,
+        CancellationToken cancellationToken = default) =>
+        NamedJsonRepository.DeleteAsync(
+            _paths.MacroPlans,
+            id,
+            cancellationToken);
+
     public async Task SaveReplacingAsync(
         MacroPlan plan,
         string? previousId,

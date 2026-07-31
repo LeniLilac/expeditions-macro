@@ -4,6 +4,24 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.50] - 2026-07-31
+
+### Added
+
+- Macro Plan now exposes a confirmed Delete action for the selected saved plan and safely opens the next saved plan, or a clean unsaved plan when none remain.
+
+### Fixed
+
+- Removing the final user-authored action from an act or map-specific Step Mode Placement Setup now clears that override and restores its shared category setup; the required Start Game timeline row no longer keeps an otherwise empty override active.
+- Newly added Match Steps now start below Start Game at the bottom of the timeline, reducing manual reordering for the common After Start workflow.
+- Legacy placement rows saved on the canonical client edge, including the default `(0,0)` coordinate, are skipped before any unit-selection key or mouse input can open an unrelated HUD panel.
+- Bounty Challenge objectives now adapt the required Story Infinite Placement Setup to the matching Challenge runtime target without rewriting the saved setup, closing the map-or-act compatibility failure after a successful board reconciliation.
+- Infinite Bounty wave recognition now covers both reviewed top-bar layouts, scores only the uniquely owned dark/blue Wave pill, and requires independent gameplay-HUD ownership before a recognized number can advance safe-exit evidence.
+
+### Tests
+
+- Passed 1,613 application and detector tests, 5 Deep Debug Viewer tests, 14 Detector Viewer tests, all 88 main-app dark/light UI states, and all 10 Detector Viewer dark/light UI states.
+
 ## [1.3.0-beta.49] - 2026-07-31
 
 ### Added
@@ -1281,7 +1299,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.49...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.50...HEAD
+[1.3.0-beta.50]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.49...v1.3.0-beta.50
 [1.3.0-beta.49]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.48...v1.3.0-beta.49
 [1.3.0-beta.48]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.47...v1.3.0-beta.48
 [1.3.0-beta.47]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.46...v1.3.0-beta.47

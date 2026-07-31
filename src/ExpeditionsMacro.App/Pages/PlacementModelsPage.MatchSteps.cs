@@ -288,6 +288,15 @@ public partial class PlacementModelsPage
         }
         if (candidate.HasCoordinate &&
             PlacementSafetyRules
+                .IsOnCanonicalClientEdge(
+                    candidate.X,
+                    candidate.Y))
+        {
+            throw new InvalidOperationException(
+                "That coordinate is on the client edge, not inside the battlefield. Choose a map point away from the outer border.");
+        }
+        if (candidate.HasCoordinate &&
+            PlacementSafetyRules
                 .IsInsideFixedCentralHotbar(
                     candidate.X,
                     candidate.Y))
@@ -384,18 +393,11 @@ public partial class PlacementModelsPage
     }
 
     private int NewStepInsertionIndex()
-    {
-        int start = StartGameRowIndex();
-        if (FastStepsList.SelectedItem is not
-                PlacementStepRow selected)
-        {
-            return start;
-        }
-        int selectedIndex = _steps.IndexOf(selected);
-        return selected.IsStartGame
-            ? selectedIndex
-            : selectedIndex + 1;
-    }
+        => PlacementTimelinePolicy
+            .NewActionInsertionIndex(
+                _steps.Select(row =>
+                        row.ToModel())
+                    .ToArray());
 
     private int StartGameRowIndex()
     {

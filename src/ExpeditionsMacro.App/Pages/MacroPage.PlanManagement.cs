@@ -138,6 +138,117 @@ public partial class MacroPage
         }
     }
 
+    private async void DeletePlan_Click(
+        object sender,
+        RoutedEventArgs e)
+    {
+        if (_services.Coordinator.IsBusy ||
+            string.IsNullOrWhiteSpace(
+                _persistedPlanId))
+        {
+            return;
+        }
+
+        string displayName =
+            PlanNameText.Text.Trim();
+        if (MessageBox.Show(
+                Window.GetWindow(this),
+                $"Permanently delete the saved plan '{displayName}'?",
+                "Delete plan",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning) !=
+            MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        _changingPlan = true;
+        bool deleted = false;
+        try
+        {
+            await _planAutoSave.FlushAsync();
+            string id = _persistedPlanId ??
+                throw new InvalidOperationException(
+                    "This plan has not been saved yet.");
+            int previousIndex = Math.Max(
+                0,
+                _plans.Select(
+                        (plan, index) =>
+                            new { plan, index })
+                    .FirstOrDefault(value =>
+                        string.Equals(
+                            value.plan.Id,
+                            id,
+                            StringComparison
+                                .OrdinalIgnoreCase))
+                    ?.index ?? 0);
+
+            await _services.MacroPlans
+                .DeleteAsync(id);
+            deleted = true;
+
+            bool previousLoading = _loading;
+            _loading = true;
+            MacroPlan? next;
+            try
+            {
+                MacroPlan? removed =
+                    _plans.FirstOrDefault(plan =>
+                        string.Equals(
+                            plan.Id,
+                            id,
+                            StringComparison
+                                .OrdinalIgnoreCase));
+                if (removed is not null)
+                {
+                    _plans.Remove(removed);
+                }
+                next = _plans.Count == 0
+                    ? null
+                    : _plans[Math.Min(
+                        previousIndex,
+                        _plans.Count - 1)];
+                PlanCombo.SelectedItem = next;
+                if (next is null)
+                {
+                    ApplyNewPlan();
+                }
+                else
+                {
+                    ApplyPlan(next);
+                }
+            }
+            finally
+            {
+                _loading = previousLoading;
+            }
+
+            await _services.UpdateSettingsAsync(
+                settings => settings with
+                {
+                    SelectedMacroPlanId =
+                        next?.Id ?? string.Empty,
+                });
+            ShowPlanBlocksStatus(
+                $"Deleted '{displayName}'.");
+        }
+        catch (Exception error)
+        {
+            ShowPlanBlocksStatus(
+                deleted
+                    ? $"Plan was deleted, but the next selection could not be saved: {error.Message}"
+                    : $"Could not delete plan: {error.Message}");
+        }
+        finally
+        {
+            _changingPlan = false;
+            DeletePlanButton.IsEnabled =
+                !_services.Coordinator.IsBusy &&
+                !string.IsNullOrWhiteSpace(
+                    _persistedPlanId);
+        }
+    }
+
     private void ApplyNewPlan()
     {
         WithoutPlanAutoSave(() =>

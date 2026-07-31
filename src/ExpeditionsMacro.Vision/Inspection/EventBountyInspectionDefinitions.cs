@@ -1,5 +1,6 @@
 using ExpeditionsMacro.Vision.Bounties;
 using ExpeditionsMacro.Vision.Events;
+using ExpeditionsMacro.Vision.Stages;
 
 namespace ExpeditionsMacro.Vision.Inspection;
 
@@ -177,21 +178,46 @@ internal static class EventBountyInspectionDefinitions
             "bounty.wave-counter",
             "Bounties",
             "Wave counter",
-            "Recognizes the bounded wave counter through the production template set.",
-            DetectorInspectionDetailLevel.Partial,
-            [typeof(WaveCounterRecognizer)],
+            "Recognizes either bounded wave-counter layout and requires independent gameplay-HUD ownership.",
+            DetectorInspectionDetailLevel.Detailed,
+            [
+                typeof(WaveCounterOwnerDetector),
+                typeof(WaveCounterRecognizer),
+                typeof(StageGameplayHudDetector),
+            ],
             image =>
             {
                 WaveCounterMatch? match =
                     WaveCounterRecognizer.Detect(image);
+                StageGameplayHudMatch gameplayHud =
+                    StageGameplayHudDetector.Detect(
+                        image);
+                bool passed =
+                    match is not null &&
+                    gameplayHud.Visible;
                 return DetectorProbeResult.Create(
                     match is null
                         ? "None"
-                        : $"Wave {match.Value.Wave}",
-                    match?.Confidence,
-                    passed: match is not null,
+                        : gameplayHud.Visible
+                            ? $"Wave {match.Value.Wave}"
+                            : $"Wave {match.Value.Wave} (HUD unowned)",
+                    match is null
+                        ? gameplayHud.Confidence
+                        : Math.Min(
+                            match.Value.Confidence,
+                            gameplayHud.Confidence),
+                    passed: passed,
                     metrics: match is null
-                        ? []
+                        ?
+                        [
+                            new DetectorProbeMetric(
+                                "gameplay_hud",
+                                gameplayHud.Visible
+                                    ? "true"
+                                    : "false",
+                                BooleanValue:
+                                    gameplayHud.Visible),
+                        ]
                         :
                         [
                             new DetectorProbeMetric(
@@ -213,11 +239,18 @@ internal static class EventBountyInspectionDefinitions
                                 match.Value.Margin.ToString(
                                     System.Globalization
                                         .CultureInfo
-                                        .InvariantCulture),
+                                    .InvariantCulture),
                                 match.Value.Margin),
+                            new DetectorProbeMetric(
+                                "gameplay_hud",
+                                gameplayHud.Visible
+                                    ? "true"
+                                    : "false",
+                                BooleanValue:
+                                    gameplayHud.Visible),
                         ]);
             },
-            "The accepted wave, winning distance, and margin are exposed. The complete 0 through 100 candidate table is intentionally omitted."),
+            "Both production counter regions, the accepted wave, winning distance, margin, and gameplay-HUD gate are exposed. The complete 0 through 100 candidate table is intentionally omitted."),
     ];
 
     private static (int X, int Y)? LiveBountyAction(

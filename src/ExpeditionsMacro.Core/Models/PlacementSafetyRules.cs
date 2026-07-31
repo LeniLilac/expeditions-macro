@@ -2,6 +2,8 @@ namespace ExpeditionsMacro.Core.Models;
 
 public static class PlacementSafetyRules
 {
+    private const int CanonicalClientRight = 807;
+    private const int CanonicalClientBottom = 610;
     private const int CentralHotbarLeft = 235;
     private const int CentralHotbarTop = 525;
     private const int CentralHotbarRight = 585;
@@ -14,6 +16,14 @@ public static class PlacementSafetyRules
         x < CentralHotbarRight &&
         y >= CentralHotbarTop &&
         y < CentralHotbarBottom;
+
+    public static bool IsOnCanonicalClientEdge(
+        int x,
+        int y) =>
+        x <= 0 ||
+        y <= 0 ||
+        x >= CanonicalClientRight ||
+        y >= CanonicalClientBottom;
 
     public static int? FindDuplicateUnitSlot(
         PlacementTargetMode mode,
@@ -42,6 +52,12 @@ public static class PlacementSafetyRules
     {
         ArgumentNullException.ThrowIfNull(model);
         ArgumentNullException.ThrowIfNull(step);
+        if (step.HasCoordinate &&
+            IsOnCanonicalClientEdge(step.X, step.Y))
+        {
+            return
+                $"placement ({step.X}, {step.Y}) is on the canonical client edge rather than a verified map point. Remove it in Placement Setup and choose a point inside the battlefield.";
+        }
         if (step.HasCoordinate &&
             IsInsideFixedCentralHotbar(step.X, step.Y))
         {

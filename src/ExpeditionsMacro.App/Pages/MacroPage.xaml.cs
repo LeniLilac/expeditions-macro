@@ -198,6 +198,10 @@ public partial class MacroPage : UserControl, IAppPage
         StopButton.IsEnabled = busy;
         PlanCombo.IsEnabled = !busy;
         PlanNameText.IsEnabled = !busy;
+        DeletePlanButton.IsEnabled =
+            !busy &&
+            !string.IsNullOrWhiteSpace(
+                _persistedPlanId);
         TaskRowsControl.IsEnabled = !busy;
         TaskKindCombo.IsEnabled = !busy;
         TaskRouteCombo.IsEnabled = !busy;

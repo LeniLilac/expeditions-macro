@@ -74,6 +74,160 @@ public sealed class BountyModelTests
     }
 
     [Fact]
+    public void ChallengePlacement_AdaptsStoryInfiniteWithoutMutatingSavedSetup()
+    {
+        PlacementTarget savedTarget = new()
+        {
+            Mode = PlacementTargetMode.Story,
+            MapNumber = (int)ChallengeMapId.FlowerForest,
+            StoryRunKind = StoryRunKind.Infinite,
+            ActNumber = 1,
+        };
+        PlacementModel saved = new()
+        {
+            Id = "setup-story-map-2-infinite",
+            Name = "Flower Forest Infinite",
+            ClientWidth = 808,
+            ClientHeight = 611,
+            CameraPreparationMode =
+                CameraPreparationMode.FastNoAlign,
+            Target = savedTarget,
+            TeamSlot = 3,
+            Steps =
+            [
+                new PlacementStep
+                {
+                    Kind = MatchStepKind.StartGame,
+                    UnitKey = 0,
+                    X = 0,
+                    Y = 0,
+                    DelayAfterMilliseconds = 0,
+                },
+            ],
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+
+        PlacementModel runtime =
+            BountyChallengePlacementPolicy
+                .ForChallengeRuntime(
+                    saved,
+                    ChallengeMapId.FlowerForest);
+
+        Assert.Same(savedTarget, saved.Target);
+        Assert.Equal(PlacementTargetMode.Story, saved.Target.Mode);
+        Assert.Equal(PlacementTargetMode.Challenge, runtime.Target!.Mode);
+        Assert.Equal((int)ChallengeMapId.FlowerForest, runtime.Target.MapNumber);
+        Assert.Equal(saved.Id, runtime.Id);
+        Assert.Equal(saved.TeamSlot, runtime.TeamSlot);
+        Assert.Same(saved.Steps, runtime.Steps);
+        runtime.ValidateCompatibility(
+            CameraPreparationMode.FastNoAlign,
+            PlacementTarget.ForChallenge(
+                ChallengeMapId.FlowerForest));
+    }
+
+    [Fact]
+    public void ChallengePlacement_RejectsAnotherStoryMap()
+    {
+        PlacementModel saved = new()
+        {
+            Id = "setup-story-map-1-infinite",
+            Name = "School Grounds Infinite",
+            ClientWidth = 808,
+            ClientHeight = 611,
+            CameraPreparationMode =
+                CameraPreparationMode.FastNoAlign,
+            Target = new PlacementTarget
+            {
+                Mode = PlacementTargetMode.Story,
+                MapNumber = (int)ChallengeMapId.SchoolGrounds,
+                StoryRunKind = StoryRunKind.Infinite,
+                ActNumber = 1,
+            },
+            Steps =
+            [
+                new PlacementStep
+                {
+                    Kind = MatchStepKind.StartGame,
+                    UnitKey = 0,
+                    X = 0,
+                    Y = 0,
+                    DelayAfterMilliseconds = 0,
+                },
+            ],
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+
+        Assert.Throws<InvalidDataException>(() =>
+            BountyChallengePlacementPolicy
+                .ForChallengeRuntime(
+                    saved,
+                    ChallengeMapId.FlowerForest));
+    }
+
+    [Theory]
+    [InlineData(ChallengeMapId.SchoolGrounds)]
+    [InlineData(ChallengeMapId.FlowerForest)]
+    [InlineData(ChallengeMapId.RoseKingdom)]
+    [InlineData(ChallengeMapId.FairyKingForest)]
+    [InlineData(ChallengeMapId.KingsTomb)]
+    public void ChallengePlacement_AdaptsSharedStoryCategoryForEveryMap(
+        ChallengeMapId map)
+    {
+        PlacementModel saved = new()
+        {
+            Id = $"setup-story-map-{(int)map}-shared",
+            Name = $"Story map {(int)map} shared",
+            ClientWidth = 808,
+            ClientHeight = 611,
+            CameraPreparationMode =
+                CameraPreparationMode.FastNoAlign,
+            Target = new PlacementTarget
+            {
+                Mode = PlacementTargetMode.Story,
+                MapNumber = (int)map,
+                StoryRunKind = StoryRunKind.Act,
+                ActNumber =
+                    PlacementSetupCatalog
+                        .SharedStoryActNumber,
+            },
+            TeamSlot = 4,
+            Steps =
+            [
+                new PlacementStep
+                {
+                    Kind = MatchStepKind.StartGame,
+                    UnitKey = 0,
+                    X = 0,
+                    Y = 0,
+                    DelayAfterMilliseconds = 0,
+                },
+            ],
+            CreatedAt = DateTimeOffset.UtcNow,
+        };
+
+        PlacementModel runtime =
+            BountyChallengePlacementPolicy
+                .ForChallengeRuntime(
+                    saved,
+                    map);
+
+        Assert.Equal(
+            PlacementTargetMode.Story,
+            saved.Target!.Mode);
+        Assert.Equal(
+            PlacementSetupCatalog
+                .SharedStoryActNumber,
+            saved.Target.ActNumber);
+        Assert.Equal(saved.Id, runtime.Id);
+        Assert.Equal(saved.TeamSlot, runtime.TeamSlot);
+        Assert.Same(saved.Steps, runtime.Steps);
+        runtime.ValidateCompatibility(
+            CameraPreparationMode.FastNoAlign,
+            PlacementTarget.ForChallenge(map));
+    }
+
+    [Fact]
     public async Task Repository_RoundTripsOneLocalAccountState()
     {
         string root = TestPaths.NewTemporaryDirectory();

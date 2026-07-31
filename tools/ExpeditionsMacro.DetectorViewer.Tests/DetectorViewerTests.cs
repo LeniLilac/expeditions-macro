@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text;
 using ExpeditionsMacro.DetectorViewer.Models;
 using ExpeditionsMacro.DetectorViewer.Services;
+using ExpeditionsMacro.Vision.Infrastructure;
 using ExpeditionsMacro.Vision.Inspection;
 
 namespace ExpeditionsMacro.DetectorViewer.Tests;
@@ -99,6 +100,48 @@ public sealed class DetectorViewerTests
                         "Boolean result",
                         StringComparison.Ordinal),
                     $"{check.Id}: {check.Threshold}"));
+    }
+
+    [Fact]
+    public async Task WaveCounterInspectionExposesBothLayoutsAndOwnerGate()
+    {
+        DetectorInspectionCatalogResult catalog =
+            await CreateCatalogAsync();
+        DetectorInspectionDefinition definition =
+            catalog.Definitions.Single(item =>
+                item.Id == "bounty.wave-counter");
+
+        Assert.Contains(
+            definition.Regions,
+            region =>
+                region.Region.X == 389 &&
+                region.Region.Y == 48);
+        Assert.Contains(
+            definition.Regions,
+            region =>
+                region.Region.X == 421 &&
+                region.Region.Y == 28);
+
+        DetectorInspectionReport report =
+            definition.Evaluate(
+                ImageCodec.Load(
+                    Path.Combine(
+                        FindRepositoryRoot(),
+                        "datasets",
+                        "anime-expeditions",
+                        "bounties",
+                        "WaveCounterNoVoice.png")));
+
+        Assert.True(report.Passed);
+        Assert.Equal("Wave 2", report.FinalState);
+        Assert.Contains(
+            report.Checks,
+            check =>
+                check.Label.Contains(
+                    "gameplay hud",
+                    StringComparison.OrdinalIgnoreCase) &&
+                check.Status ==
+                    DetectorInspectionCheckStatus.Passed);
     }
 
     [Fact]

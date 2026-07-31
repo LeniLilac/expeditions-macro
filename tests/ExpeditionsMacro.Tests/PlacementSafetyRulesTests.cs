@@ -28,6 +28,23 @@ public sealed class PlacementSafetyRulesTests
             PlacementSafetyRules
                 .IsInsideFixedCentralHotbar(x, y));
 
+    [Theory]
+    [InlineData(0, 0, true)]
+    [InlineData(0, 300, true)]
+    [InlineData(400, 0, true)]
+    [InlineData(807, 300, true)]
+    [InlineData(400, 610, true)]
+    [InlineData(1, 1, false)]
+    [InlineData(806, 609, false)]
+    public void CanonicalClientEdge_IsNotAPlacementPoint(
+        int x,
+        int y,
+        bool expected) =>
+        Assert.Equal(
+            expected,
+            PlacementSafetyRules
+                .IsOnCanonicalClientEdge(x, y));
+
     [Fact]
     public void LegacyUnsafeRows_RemainModelValidButHaveSkipReasons()
     {
@@ -110,6 +127,38 @@ public sealed class PlacementSafetyRulesTests
             message => message.Contains(
                 "fixed center unit hotbar",
                 StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Playback_SkipsDefaultCoordinateBeforeUnitInput()
+    {
+        PlacementModel model = ExpeditionModel(
+            Step(6, 0, 0),
+            Step(2, 320, 280));
+        PlacementServiceTests.FakeAutomation automation =
+            new();
+        List<string> status = [];
+        List<PlacementStep> sent = [];
+
+        await PlayAsync(
+            automation,
+            model,
+            status,
+            sent);
+
+        Assert.DoesNotContain(
+            "key:6",
+            automation.InputActions);
+        Assert.DoesNotContain(
+            "click-retain:0,0",
+            automation.InputActions);
+        Assert.Contains(
+            status,
+            message => message.Contains(
+                "canonical client edge",
+                StringComparison.Ordinal));
+        Assert.Single(sent);
+        Assert.Equal(2, sent[0].UnitKey);
     }
 
     [Fact]

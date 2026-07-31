@@ -89,12 +89,15 @@ public sealed partial class StageMacroRunner
             ImageFrame frame = CaptureClient(window, detector);
             StageScreenMatch state =
                 StageScreenDetector.DetectMatchState(frame);
+            StageGameplayHudMatch gameplayHud =
+                StageGameplayHudDetector.Detect(frame);
             int? observedWave =
-                waveTracker is null
+                waveTracker is null ||
+                !gameplayHud.Visible
                     ? null
-                    : WaveCounterRecognizer
-                        .Detect(frame)
-                        ?.Wave;
+                    : DetectOwnedBountyWave(
+                        frame,
+                        gameplayHud);
             if (waveTracker?.Observe(
                     observedWave) == true)
             {
@@ -174,7 +177,7 @@ public sealed partial class StageMacroRunner
                 dropDismissal.Observe(
                     afterStartPlacementComplete: true,
                     gameplayHudVisible:
-                        StageGameplayHudDetector.Detect(frame).Visible,
+                        gameplayHud.Visible,
                     terminalCandidateVisible: terminalCandidate is not null,
                     DateTimeOffset.UtcNow))
             {
@@ -188,4 +191,20 @@ public sealed partial class StageMacroRunner
             await Task.Delay(Math.Max(200, story?.PollMilliseconds ?? raid!.PollMilliseconds), cancellationToken).ConfigureAwait(false);
         }
     }
+
+    internal static int? DetectOwnedBountyWave(
+        ImageFrame frame) =>
+        DetectOwnedBountyWave(
+            frame,
+            StageGameplayHudDetector
+                .Detect(frame));
+
+    private static int? DetectOwnedBountyWave(
+        ImageFrame frame,
+        StageGameplayHudMatch gameplayHud) =>
+        gameplayHud.Visible
+            ? WaveCounterRecognizer
+                .Detect(frame)
+                ?.Wave
+            : null;
 }

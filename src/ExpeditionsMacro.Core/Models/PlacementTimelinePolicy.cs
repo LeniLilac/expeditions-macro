@@ -61,6 +61,18 @@ public static class PlacementTimelinePolicy
         return -1;
     }
 
+    public static int NewActionInsertionIndex(
+        IReadOnlyList<PlacementStep> steps)
+    {
+        ArgumentNullException.ThrowIfNull(steps);
+        if (StartGameIndex(steps) < 0)
+        {
+            throw new InvalidOperationException(
+                "The required Start Game step is missing.");
+        }
+        return steps.Count;
+    }
+
     public static bool IsBeforeStart(
         IReadOnlyList<PlacementStep> steps,
         int index)

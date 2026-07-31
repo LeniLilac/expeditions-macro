@@ -16,6 +16,8 @@ public partial class PlacementModelsPage
                     model.CameraPreparationMode ==
                         CameraPreparationMode.FastNoAlign &&
                     model.Target is not null &&
+                    !PlacementSetupCatalog
+                        .IsEmptyRouteOverride(model) &&
                     string.Equals(
                         model.Id,
                         PlacementSetupCatalog.IdFor(
@@ -346,4 +348,21 @@ public partial class PlacementModelsPage
                 ? "Not configured"
                 : $"Uses {setup.InheritedFrom}";
     }
+
+    private string? FindInheritedSetupName(
+        PlacementSetupRoute route) =>
+        PlacementSetupCatalog
+            .CandidatesFor(route.Target)
+            .Skip(1)
+            .Select(candidate =>
+                _setupRows.FirstOrDefault(row =>
+                    string.Equals(
+                        row.Route.ModelId,
+                        candidate.ModelId,
+                        StringComparison.OrdinalIgnoreCase)))
+            .FirstOrDefault(row =>
+                row?.Model is not null &&
+                !PlacementSetupCatalog
+                    .IsEmptyRouteOverride(row.Model))
+            ?.Route.Name;
 }

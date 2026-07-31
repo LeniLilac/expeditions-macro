@@ -1,3 +1,4 @@
+using ExpeditionsMacro.Core.Geometry;
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Vision.Diagnostics;
 
@@ -11,8 +12,6 @@ public readonly record struct WaveCounterMatch(
 
 public static class WaveCounterRecognizer
 {
-    private const int CounterX = 389;
-    private const int CounterY = 48;
     private const int Width = 16;
     private const int Height = 11;
     private const int BytesPerTemplate = 22;
@@ -21,8 +20,10 @@ public static class WaveCounterRecognizer
     private const int SearchRadius = 1;
     private const int SearchDiameter =
         2 * SearchRadius + 1;
-    private const int ObservationCount =
+    private const int ObservationsPerAnchor =
         SearchDiameter * SearchDiameter;
+    private const int ObservationCount =
+        ObservationsPerAnchor;
     private const double MinimumCoverage = 0.70;
     private const double MinimumDice = 0.72;
 
@@ -37,6 +38,15 @@ public static class WaveCounterRecognizer
         ImageFrame image)
     {
         Validate(image);
+        WaveCounterOwnerMatch? owner =
+            WaveCounterOwnerDetector
+                .Detect(image);
+        if (owner is null)
+        {
+            return null;
+        }
+        ScreenRegion counterRegion =
+            owner.Value.CounterRegion;
         Span<byte> observations =
             stackalloc byte[
                 BytesPerTemplate * ObservationCount];
@@ -57,17 +67,19 @@ public static class WaveCounterRecognizer
                         observation *
                             BytesPerTemplate,
                         BytesPerTemplate);
-                for (int y = 0; y < Height; y++)
+                for (int y = 0;
+                     y < Height;
+                     y++)
                 {
                     for (int x = 0;
                          x < Width;
                          x++)
                     {
                         int pixel =
-                            ((CounterY +
+                            ((counterRegion.Y +
                               offsetY + y) *
                                  image.Width +
-                             CounterX +
+                             counterRegion.X +
                              offsetX + x) * 3;
                         int luminance =
                             (299 *
@@ -83,11 +95,14 @@ public static class WaveCounterRecognizer
                         {
                             continue;
                         }
-                        int bit = y * Width + x;
+                        int bit =
+                            y * Width + x;
                         observed[bit / 8] |=
                             (byte)(
-                                1 << (bit % 8));
-                        observedPixels[observation]++;
+                                1 <<
+                                (bit % 8));
+                        observedPixels[
+                            observation]++;
                     }
                 }
                 observation++;
@@ -140,10 +155,14 @@ public static class WaveCounterRecognizer
                         observedPixels[index] +
                         TemplatePixels[wave]);
                 int offsetX =
-                    index % SearchDiameter -
+                    index %
+                        ObservationsPerAnchor %
+                        SearchDiameter -
                     SearchRadius;
                 int offsetY =
-                    index / SearchDiameter -
+                    index %
+                        ObservationsPerAnchor /
+                        SearchDiameter -
                     SearchRadius;
                 Candidate candidate = new(
                     wave,
@@ -151,6 +170,8 @@ public static class WaveCounterRecognizer
                     coverage,
                     dice,
                     observedPixels[index],
+                    counterRegion.X,
+                    counterRegion.Y,
                     offsetX,
                     offsetY);
                 if (waveBest is null ||
@@ -208,6 +229,8 @@ public static class WaveCounterRecognizer
                 winner.Coverage,
                 winner.Dice,
                 winner.ObservedPixels,
+                winner.CounterX,
+                winner.CounterY,
                 winner.OffsetX,
                 winner.OffsetY,
             });
@@ -288,6 +311,9 @@ public static class WaveCounterRecognizer
         double Coverage,
         double Dice,
         int ObservedPixels,
+        int CounterX,
+        int CounterY,
         int OffsetX,
         int OffsetY);
+
 }
