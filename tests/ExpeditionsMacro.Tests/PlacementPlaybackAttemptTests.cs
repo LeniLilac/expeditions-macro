@@ -470,6 +470,7 @@ public sealed partial class PlacementPlaybackAttemptTests
         private (int X, int Y)? _verification;
         private bool _panelDismissed;
         private int _burstCount;
+        private int _sellAttemptCount;
         private readonly Dictionary<(int X, int Y), int>
             _verificationCounts = [];
 
@@ -489,6 +490,18 @@ public sealed partial class PlacementPlaybackAttemptTests
         public int CancelOnBurst { get; init; }
 
         public bool UseAffordableUpgradeFrame
+        {
+            get;
+            init;
+        }
+
+        public int SellSucceedsOnAttempt
+        {
+            get;
+            init;
+        } = 1;
+
+        public int CancelOnSellAttempt
         {
             get;
             init;
@@ -679,7 +692,19 @@ public sealed partial class PlacementPlaybackAttemptTests
                 $"letter:{char.ToUpperInvariant(key)}");
             if (char.ToUpperInvariant(key) == 'X')
             {
-                _panelDismissed = true;
+                _sellAttemptCount++;
+                if (_sellAttemptCount >=
+                    SellSucceedsOnAttempt)
+                {
+                    _panelDismissed = true;
+                }
+                if (_sellAttemptCount ==
+                    CancelOnSellAttempt)
+                {
+                    PlacementCancellation?.Cancel();
+                    cancellationToken
+                        .ThrowIfCancellationRequested();
+                }
             }
             return Task.CompletedTask;
         }

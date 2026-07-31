@@ -205,6 +205,44 @@ public sealed class PlacementServiceObservationBoundaryTests
     }
 
     [Fact]
+    public async Task SellAcknowledgement_WaitsForDelayedStableClosure()
+    {
+        DateTimeOffset now =
+            DateTimeOffset.Parse(
+                "2026-07-31T12:00:00Z");
+        ImageFrame visible = LoadPanel(
+            "SelectedUnitPanel_01.png");
+        ImageFrame hidden = LoadPanel(
+            "SelectedUnitPanelHoverNegative_01.png");
+        PlacementServiceTests.FakeAutomation automation =
+            new(
+                Enumerable.Repeat(visible, 6)
+                    .Concat([hidden, hidden])
+                    .ToArray());
+        SelectedUnitPanelPlayback playback = new(
+            automation,
+            () => now,
+            (duration, token) =>
+            {
+                token.ThrowIfCancellationRequested();
+                now += duration;
+                return Task.CompletedTask;
+            });
+
+        bool closed =
+            await playback.WaitForHiddenAfterActionAsync(
+                Window,
+                CancellationToken.None);
+
+        Assert.True(closed);
+        Assert.Equal(8, automation.CaptureCount);
+        Assert.Equal(
+            DateTimeOffset.Parse(
+                "2026-07-31T12:00:00.700Z"),
+            now);
+    }
+
+    [Fact]
     public async Task PanelDismissal_HardDeadlineKeepsTheEightClickCap()
     {
         DateTimeOffset now =

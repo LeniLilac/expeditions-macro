@@ -4,6 +4,17 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.52] - 2026-07-31
+
+### Fixed
+
+- Sell Unit Match Steps now give Roblox one second to acknowledge the configured key and retry no more than twice when the same selected-unit panel remains freshly verified. Normal sales still send one keypress; cancellation or lost panel ownership sends no additional input.
+
+### Tests
+
+- Added field-derived coverage for an ignored first Sell Unit keypress, delayed panel closure, cancellation before retry, and the three-attempt hard cap.
+- Passed 1,624 application and detector tests, 5 Deep Debug Viewer tests, 14 Detector Viewer tests, all 88 main-app dark/light UI states, and all 10 Detector Viewer dark/light UI states.
+
 ## [1.3.0-beta.51] - 2026-07-31
 
 ### Changed
@@ -1315,7 +1326,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.51...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.52...HEAD
+[1.3.0-beta.52]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.51...v1.3.0-beta.52
 [1.3.0-beta.51]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.50...v1.3.0-beta.51
 [1.3.0-beta.50]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.49...v1.3.0-beta.50
 [1.3.0-beta.49]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.48...v1.3.0-beta.49
