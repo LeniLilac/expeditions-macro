@@ -48,7 +48,7 @@ public sealed record MacroTaskDefinition
     public ResourceRefuelTarget RefuelTarget { get; init; } =
         ResourceRefuelTarget.GoldMine;
     public int RefuelIntervalMinutes { get; init; } = 60;
-    public int BountyParkedNonViableLimit { get; init; } = 2;
+    public int BountyParkedNonViableLimit { get; init; }
 
     public bool IsRecurring =>
         Kind is MacroTaskKind.Challenge or

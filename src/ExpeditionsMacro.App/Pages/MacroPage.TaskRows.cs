@@ -39,7 +39,7 @@ public partial class MacroPage
         TaskExtractCheck.IsChecked = true;
         TaskBossNodesText.Text = "1";
         TaskHardModeCheck.IsChecked = false;
-        BountyParkedSlider.Value = 2;
+        BountyParkedSlider.Value = 0;
         TaskDifficultyCombo.SelectedIndex = 0;
         HideTaskEditorError();
         UpdateTaskTargetEditor();

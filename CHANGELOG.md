@@ -4,6 +4,22 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.51] - 2026-07-31
+
+### Changed
+
+- New Bounty tasks now default to zero parked non-viable Bounties. The redundant visible parking label was removed while the compact zero-to-four Gold/time guidance and accessible control name remain.
+
+### Fixed
+
+- Mythic Bounty suffix recognition now keeps its exact `#1` through `#10` path first, then accepts only a high-similarity, action-anchored raster variant with a clear runner-up margin and reviewed title position. Ambiguous glyph evidence remains unknown and sends no input.
+- Villain Invasion Event Home is no longer misclassified as Act Selection when Roblox's performance overlay adds red and white pixels across the broad title area. Act Selection now requires the compact owned heading/subtitle spacing plus the selector rail.
+
+### Tests
+
+- Added privacy-reviewed field regressions for the distinct Mythic `#4`, `#5`, and `#6` suffix rasterizations rejected after correctly canceling reroll confirmation, plus the performance-overlay Event Home misclassification.
+- Passed 1,620 application and detector tests, 5 Deep Debug Viewer tests, 14 Detector Viewer tests, all 88 main-app dark/light UI states, and all 10 Detector Viewer dark/light UI states.
+
 ## [1.3.0-beta.50] - 2026-07-31
 
 ### Added
@@ -1299,7 +1315,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.50...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.51...HEAD
+[1.3.0-beta.51]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.50...v1.3.0-beta.51
 [1.3.0-beta.50]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.49...v1.3.0-beta.50
 [1.3.0-beta.49]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.48...v1.3.0-beta.49
 [1.3.0-beta.48]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.47...v1.3.0-beta.48

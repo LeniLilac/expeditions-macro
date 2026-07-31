@@ -19,6 +19,11 @@ public static class BountyNumberRecognizer
     private const int MaximumTemplateWidth = 17;
     private const int MaximumPixelDistance = 1;
     private const int MinimumDistanceMargin = 3;
+    private const double MinimumRasterSimilarity = 0.90;
+    private const double MinimumRasterSimilarityMargin = 0.03;
+    private const double MinimumClearRasterSimilarity = 0.80;
+    private const double MinimumClearRasterSimilarityMargin = 0.08;
+    private const int MaximumRasterPositionDistance = 4;
     // The widest reviewed paper places its suffix 46 pixels left of the live action.
     private const int ActionWindowLeft = 54;
     private const int ActionWindowTop = 105;
@@ -102,19 +107,55 @@ public static class BountyNumberRecognizer
             int margin =
                 ranked[1].Distance -
                 match.Distance;
-            if (match.Distance <=
-                    MaximumPixelDistance &&
-                margin >= MinimumDistanceMargin)
+            bool accepted =
+                match.Distance <=
+                MaximumPixelDistance &&
+                margin >= MinimumDistanceMargin;
+            if (!accepted)
+            {
+                Candidate[] rasterRanked = candidates
+                    .OrderByDescending(candidate =>
+                        candidate.Similarity)
+                    .ThenBy(candidate =>
+                        candidate.PositionDistance)
+                    .ThenByDescending(candidate =>
+                        candidate.Template.Width)
+                    .ToArray();
+                Candidate rasterMatch = rasterRanked[0];
+                double rasterMargin =
+                    rasterMatch.Similarity -
+                    rasterRanked[1].Similarity;
+                bool highSimilarity =
+                    rasterMatch.Similarity >=
+                        MinimumRasterSimilarity &&
+                    rasterMargin >=
+                        MinimumRasterSimilarityMargin;
+                bool clearIdentity =
+                    rasterMatch.Similarity >=
+                        MinimumClearRasterSimilarity &&
+                    rasterMargin >=
+                        MinimumClearRasterSimilarityMargin;
+                if ((highSimilarity || clearIdentity) &&
+                    rasterMatch.PositionDistance <=
+                        MaximumRasterPositionDistance)
+                {
+                    match = rasterMatch;
+                    accepted = true;
+                }
+            }
+            if (accepted)
             {
                 matches.Add(
                     new BountyNumberMatch(
                         match.Template.Number,
                         Math.Clamp(
-                            1d -
-                            match.Distance /
-                            (double)(
-                                match.Template.Width *
-                                TemplateHeight),
+                            Math.Max(
+                                match.Similarity,
+                                1d -
+                                match.Distance /
+                                (double)(
+                                    match.Template.Width *
+                                    TemplateHeight)),
                             0,
                             1),
                         SearchX + left +
@@ -170,6 +211,8 @@ public static class BountyNumberRecognizer
             {
                 // Right-side pixels disambiguate #1 from the identical prefix of #10.
                 int distance = 0;
+                int livePixels = 0;
+                int intersection = 0;
                 for (int y = 0;
                      y < TemplateHeight;
                      y++)
@@ -191,6 +234,14 @@ public static class BountyNumberRecognizer
                             template.Mask[
                                 y * template.Width +
                                 x] != 0;
+                        if (live)
+                        {
+                            livePixels++;
+                        }
+                        if (live && expected)
+                        {
+                            intersection++;
+                        }
                         if (live != expected)
                         {
                             distance++;
@@ -205,9 +256,14 @@ public static class BountyNumberRecognizer
                     Math.Abs(
                         localY -
                         ExpectedGlyphTop);
+                double similarity =
+                    2d * intersection /
+                    (livePixels +
+                     template.ForegroundPixels);
                 Candidate candidate = new(
                     template,
                     distance,
+                    similarity,
                     positionDistance,
                     localX,
                     localY);
@@ -308,7 +364,8 @@ public static class BountyNumberRecognizer
         return new Template(
             number,
             width,
-            pixels);
+            pixels,
+            pixels.Count(value => value != 0));
     }
 
     private static void Validate(ImageFrame image)
@@ -326,11 +383,13 @@ public static class BountyNumberRecognizer
     private sealed record Template(
         int Number,
         int Width,
-        byte[] Mask);
+        byte[] Mask,
+        int ForegroundPixels);
 
     private readonly record struct Candidate(
         Template Template,
         int Distance,
+        double Similarity,
         int PositionDistance,
         int LocalX,
         int LocalY);

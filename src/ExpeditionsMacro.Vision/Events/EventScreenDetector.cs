@@ -30,10 +30,6 @@ public static class EventScreenDetector
 {
     private static readonly ScreenRegion EventHeader =
         new(0, 55, 180, 55);
-    private static readonly ScreenRegion ActTitle =
-        new(380, 20, 225, 58);
-    private static readonly ScreenRegion ActSubtitle =
-        new(400, 40, 220, 80);
     private static readonly ScreenRegion ActScrollRail =
         new(190, 548, 610, 25);
 
@@ -297,32 +293,22 @@ public static class EventScreenDetector
         double eventContext)
     {
         if (eventContext == 0) return 0;
-        double titleRed = ColorFraction(
-            image,
-            ActTitle,
-            IsEventRed);
+        double heading =
+            EventActSelectorHeadingDetector.Score(
+                image);
         double scrollRed =
             BestHorizontalLineFraction(
                 image,
                 ActScrollRail,
                 IsEventRed);
-        double subtitleWhite =
-            BestHorizontalLineFraction(
-                image,
-                ActSubtitle,
-                IsNeutralWhite);
-        if (titleRed < 0.025 ||
-            scrollRed < 0.55 ||
-            subtitleWhite < 0.08)
+        if (heading == 0 ||
+            scrollRed < 0.55)
         {
             return 0;
         }
         return Math.Clamp(
             0.68 +
-            0.12 * Ramp(
-                titleRed,
-                0.025,
-                0.18) +
+            0.12 * heading +
             0.12 * Ramp(
                 scrollRed,
                 0.55,

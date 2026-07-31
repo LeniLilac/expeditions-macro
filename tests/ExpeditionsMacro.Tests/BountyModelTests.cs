@@ -6,6 +6,20 @@ namespace ExpeditionsMacro.Tests;
 public sealed class BountyModelTests
 {
     [Fact]
+    public void TaskDefinition_DefaultsParkingToZero()
+    {
+        MacroTaskDefinition task = new()
+        {
+            Id = "bounty",
+            Kind = MacroTaskKind.Bounty,
+        };
+
+        Assert.Equal(
+            0,
+            task.BountyParkedNonViableLimit);
+    }
+
+    [Fact]
     public void MythicTwo_UsesFlowerForestForItsWaveThirtyObjective()
     {
         BountyObjective objective =

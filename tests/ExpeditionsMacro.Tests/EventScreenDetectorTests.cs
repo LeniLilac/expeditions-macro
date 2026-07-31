@@ -31,6 +31,9 @@ public sealed class EventScreenDetectorTests
     [InlineData(
         "EventHome_BeginnerPathPresent_03.png",
         EventScreenState.EventHome)]
+    [InlineData(
+        "EventHome_PerformanceOverlay_01.png",
+        EventScreenState.EventHome)]
     [InlineData("ActSelector.png", EventScreenState.ActSelector)]
     [InlineData("Act4Selector.png", EventScreenState.ActSelector)]
     [InlineData("Act1Detail.png", EventScreenState.ActDetail)]
@@ -119,6 +122,7 @@ public sealed class EventScreenDetectorTests
     [InlineData("EventHome_BeginnerPathPresent_01.png")]
     [InlineData("EventHome_BeginnerPathPresent_02.png")]
     [InlineData("EventHome_BeginnerPathPresent_03.png")]
+    [InlineData("EventHome_PerformanceOverlay_01.png")]
     public void SelectedVillainEvent_UsesGameModeAction(
         string fileName)
     {
