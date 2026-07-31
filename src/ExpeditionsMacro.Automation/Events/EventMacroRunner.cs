@@ -61,7 +61,8 @@ public sealed partial class EventMacroRunner
             continueScheduledRoute = null,
         MacroRunTotals? macroTotals = null,
         char cancelPlacementKey =
-            AppSettings.DefaultCancelPlacementKeyChar)
+            AppSettings.DefaultCancelPlacementKeyChar,
+        TeamOperationSession? teamSession = null)
     {
         ArgumentNullException.ThrowIfNull(preset);
         ArgumentNullException.ThrowIfNull(placement);
@@ -106,7 +107,11 @@ public sealed partial class EventMacroRunner
         TimeSpan matchRuntimeTotal = TimeSpan.Zero;
         StageRunResult? last = null;
         RepeatedRoutePreparationState preparation =
-            new(preset.TeamSlot);
+            new(
+                preset.TeamSlot,
+                teamSession?.IsLoaded(
+                    window,
+                    preset.TeamSlot) == true);
         DiscordRunTarget reportTarget =
             new(0, 0, RouteLabel(preset));
         DiscordRunReporter reporter = new(
@@ -162,6 +167,7 @@ public sealed partial class EventMacroRunner
                 placement,
                 unitMenuKey,
                 preparation,
+                teamSession,
                 repeatedPrestart,
                 detector,
                 progress,

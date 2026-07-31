@@ -20,6 +20,20 @@ public sealed class RepeatedRoutePreparationStateTests
     }
 
     [Fact]
+    public void OperationKnownTeam_IsReadyOnTheFirstRouteAttempt()
+    {
+        RepeatedRoutePreparationState state =
+            new(
+                teamSlot: 6,
+                teamAlreadyLoaded: true);
+
+        Assert.False(state.ShouldLoadTeam);
+        Assert.True(
+            state.ShouldAlignCamera(
+                arrivedFromRepeatStage: false));
+    }
+
+    [Fact]
     public void OrdinaryNavigation_RealignsCameraWithoutReloadingTheTeam()
     {
         RepeatedRoutePreparationState state = new(teamSlot: 3);

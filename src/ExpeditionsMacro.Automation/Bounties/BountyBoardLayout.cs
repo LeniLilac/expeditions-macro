@@ -1,7 +1,10 @@
-using ExpeditionsMacro.Core.Runtime;
 using ExpeditionsMacro.Vision.Bounties;
 
 namespace ExpeditionsMacro.Automation.Bounties;
+
+internal readonly record struct BountyLiveSlot(
+    int Slot,
+    BountyCardAction Action);
 
 internal static class BountyBoardLayout
 {
@@ -33,19 +36,6 @@ internal static class BountyBoardLayout
             : null;
     }
 
-    public static BountyCardAction RequireAction(
-        BountyBoardMatch board,
-        int slot,
-        bool rightView,
-        BountyCardActionKind kind) =>
-        FindAction(
-            board,
-            slot,
-            rightView,
-            kind) ??
-        throw new RobloxUiUnavailableException(
-            $"Bounty slot {slot} has no verified {kind} action.");
-
     public static BountyCardAction? FindAction(
         BountyBoardMatch board,
         int slot,
@@ -69,6 +59,56 @@ internal static class BountyBoardLayout
                 column) <= 18
             ? action
             : null;
+    }
+
+    public static IReadOnlyList<BountyLiveSlot>
+        LiveSlots(
+        BountyBoardMatch board,
+        bool rightView)
+    {
+        int[] columns = rightView
+            ? RightSlotColumns
+            : LeftSlotColumns;
+        return board.Actions
+            .Select(action =>
+            {
+                int slot = Enumerable.Range(
+                        0,
+                        columns.Length)
+                    .OrderBy(index =>
+                        Math.Abs(
+                            columns[index] -
+                            action.CardAnchorX))
+                    .First();
+                return new
+                {
+                    Slot = slot + 1,
+                    Distance = Math.Abs(
+                        columns[slot] -
+                        action.CardAnchorX),
+                    Action = action,
+                };
+            })
+            .Where(value =>
+                value.Distance <= 18)
+            .GroupBy(value =>
+                value.Slot)
+            .Select(group =>
+            {
+                var selected = group
+                    .OrderByDescending(value =>
+                        value.Action.Kind ==
+                        BountyCardActionKind.Claim)
+                    .ThenBy(value =>
+                        value.Distance)
+                    .First();
+                return new BountyLiveSlot(
+                    selected.Slot,
+                    selected.Action);
+            })
+            .OrderBy(value =>
+                value.Slot)
+            .ToArray();
     }
 
     private static int SlotColumn(

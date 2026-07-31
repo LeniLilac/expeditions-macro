@@ -33,6 +33,11 @@ internal sealed class BountyBoardProcessor
         Action<string>? log,
         CancellationToken cancellationToken)
     {
+        await _navigator.ScrollAsync(
+            window,
+            detector,
+            right: true,
+            cancellationToken).ConfigureAwait(false);
         state = await ClaimReadyAsync(
                 window,
                 detector,
@@ -43,79 +48,94 @@ internal sealed class BountyBoardProcessor
         if (state.ClaimedToday >=
             BountyCatalog.DailyClaimLimit)
         {
+            await _navigator.ScrollAsync(
+                window,
+                detector,
+                right: false,
+                cancellationToken).ConfigureAwait(false);
             return new(
                 state,
                 GoldUnavailable: false);
         }
         if (!rerollEnabled)
         {
+            await _navigator.ScrollAsync(
+                window,
+                detector,
+                right: false,
+                cancellationToken).ConfigureAwait(false);
             return new(
                 state,
                 GoldUnavailable: true);
         }
 
+        (_, IReadOnlyList<BountyLiveSlot> liveSlots) =
+            await _navigator.WaitForLiveSlotsAsync(
+                    window,
+                    detector,
+                    rightView: true,
+                    cancellationToken)
+                .ConfigureAwait(false);
         HashSet<int> observed = [];
+        HashSet<int> unavailableToday =
+            state.UnavailableNumbersToday.ToHashSet();
         int parked = 0;
         bool noGold = false;
-        for (int slot = 1;
-             slot <= 4 && !noGold;
-             slot++)
+        bool retentionTargetReached = false;
+        foreach (int slot in liveSlots
+                     .Where(value =>
+                         value.Action.Kind ==
+                         BountyCardActionKind.Reroll)
+                     .Select(value =>
+                         value.Slot))
         {
+            retentionTargetReached =
+                BountyPlanner.HasEveryRetainableBounty(
+                    observed,
+                    unavailableToday,
+                    parked,
+                    parkedLimit,
+                    challengeAvailability);
+            if (noGold ||
+                retentionTargetReached)
+            {
+                break;
+            }
             (state, parked, noGold) =
                 await ProcessSlotAsync(
                         window,
                         detector,
                         state,
                         slot,
-                        rightView: false,
+                        rightView: true,
                         parked,
                         parkedLimit,
                         challengeAvailability,
+                        unavailableToday,
                         observed,
                         log,
                         cancellationToken)
                     .ConfigureAwait(false);
         }
 
-        bool retentionTargetReached =
+        retentionTargetReached =
+            retentionTargetReached ||
             BountyPlanner.HasEveryRetainableBounty(
                 observed,
+                unavailableToday,
                 parked,
                 parkedLimit,
                 challengeAvailability);
-        if (!noGold &&
-            !retentionTargetReached)
-        {
-            await _navigator.ScrollAsync(
-                window,
-                detector,
-                right: true,
-                cancellationToken).ConfigureAwait(false);
-            (state, parked, noGold) =
-                await ProcessSlotAsync(
-                        window,
-                        detector,
-                        state,
-                        slot: 5,
-                        rightView: true,
-                        parked,
-                        parkedLimit,
-                        challengeAvailability,
-                        observed,
-                        log,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-            await _navigator.ScrollAsync(
-                window,
-                detector,
-                right: false,
-                cancellationToken).ConfigureAwait(false);
-        }
-        else if (retentionTargetReached)
+        if (retentionTargetReached)
         {
             log?.Invoke(
                 "Bounty slot scanning stopped because every Mythic retained by the current parking and Challenge policy is already active.");
         }
+        await _navigator.ScrollAsync(
+            window,
+            detector,
+            right: false,
+            cancellationToken).ConfigureAwait(false);
 
         IReadOnlyList<BountyActiveProgress> reconciled =
             state.Active
@@ -141,47 +161,36 @@ internal sealed class BountyBoardProcessor
         Action<string>? log,
         CancellationToken cancellationToken)
     {
-        for (int slot = 1;
-             slot <= 4 &&
-             state.ClaimedToday <
-                BountyCatalog.DailyClaimLimit;
-             slot++)
+        while (state.ClaimedToday <
+               BountyCatalog.DailyClaimLimit)
         {
+            (_, IReadOnlyList<BountyLiveSlot> liveSlots) =
+                await _navigator.WaitForLiveSlotsAsync(
+                        window,
+                        detector,
+                        rightView: true,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            BountyLiveSlot? claim = liveSlots
+                .Where(value =>
+                    value.Action.Kind ==
+                    BountyCardActionKind.Claim)
+                .Cast<BountyLiveSlot?>()
+                .FirstOrDefault();
+            if (claim is null)
+            {
+                return state;
+            }
             state = await ClaimSlotAsync(
                     window,
                     detector,
                     state,
-                    slot,
-                    rightView: false,
+                    claim.Value.Slot,
+                    rightView: true,
                     log,
                     cancellationToken)
                 .ConfigureAwait(false);
         }
-
-        if (state.ClaimedToday >=
-            BountyCatalog.DailyClaimLimit)
-        {
-            return state;
-        }
-        await _navigator.ScrollAsync(
-            window,
-            detector,
-            right: true,
-            cancellationToken).ConfigureAwait(false);
-        state = await ClaimSlotAsync(
-                window,
-                detector,
-                state,
-                slot: 5,
-                rightView: true,
-                log,
-                cancellationToken)
-            .ConfigureAwait(false);
-        await _navigator.ScrollAsync(
-            window,
-            detector,
-            right: false,
-            cancellationToken).ConfigureAwait(false);
         return state;
     }
 
@@ -195,31 +204,29 @@ internal sealed class BountyBoardProcessor
         Action<string>? log,
         CancellationToken cancellationToken)
     {
-        int? number = await _navigator.ClaimAsync(
+        BountyClaimResult? result =
+            await _navigator.ClaimAsync(
                 window,
                 detector,
                 slot,
                 rightView,
                 cancellationToken)
             .ConfigureAwait(false);
-        if (number is not int claimed)
+        if (result is not BountyClaimResult claim)
         {
             return state;
         }
         log?.Invoke(
-            $"Claimed Mythic Bounty #{claimed}.");
-        return state with
-        {
-            ClaimedToday = Math.Min(
-                BountyCatalog.DailyClaimLimit,
-                state.ClaimedToday + 1),
-            Active = state.Active
-                .Where(active =>
-                    active.Number != claimed)
-                .ToArray(),
-            UpdatedAtUtc =
-                DateTimeOffset.UtcNow,
-        };
+            claim.Settlement ==
+                BountyClaimSettlement.Dimmed
+                ? $"Claimed Mythic Bounty #{claim.Number}; its dimmed slot removes that number from today's reroll pool."
+                : $"Claimed Mythic Bounty #{claim.Number}; its live Reroll action keeps that number in today's reroll pool.");
+        return state.RecordClaim(
+            claim.Number,
+            excludeNumberUntilReset:
+                claim.Settlement ==
+                BountyClaimSettlement.Dimmed,
+            DateTimeOffset.UtcNow);
     }
 
     private async Task<(
@@ -235,6 +242,7 @@ internal sealed class BountyBoardProcessor
         int parkedLimit,
         BountyChallengeAvailability
             challengeAvailability,
+        IReadOnlySet<int> unavailableToday,
         ISet<int> observed,
         Action<string>? log,
         CancellationToken cancellationToken)
@@ -304,6 +312,7 @@ internal sealed class BountyBoardProcessor
             bool reroll =
                 BountyPlanner.ShouldReroll(
                     number,
+                    unavailableToday,
                     parked,
                     parkedLimit,
                     challengeAvailability);

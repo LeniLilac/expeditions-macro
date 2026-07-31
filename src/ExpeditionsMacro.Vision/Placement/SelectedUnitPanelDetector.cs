@@ -43,12 +43,13 @@ public static class SelectedUnitPanelDetector
             image,
             PanelBody,
             IsDark);
-        bool panelVisible =
-            close >= MinimumCloseScore &&
-            panel >= MinimumPanelScore;
         bool visible =
             close >= MinimumCloseScore &&
             first >= MinimumFirstPriorityScore;
+        bool panelVisible =
+            visible ||
+            (close >= MinimumCloseScore &&
+             panel >= MinimumPanelScore);
         double confidence = Math.Clamp(
             0.50 * Ramp(close, MinimumCloseScore, 0.26) +
             0.40 * Ramp(

@@ -34,7 +34,7 @@ The full bursts remain local diagnostic artifacts. Frames containing a visible p
 
 `Defeat_04.png` verifies the current wide terminal whose dim red outer decoration connects to its bright title banner. Defeat recognition isolates the bright banner body and still requires the independent yellow **Repeat Stage** action.
 
-`Victory_08.png` through `Victory_10.png` verify that the animated cyan reward artwork is not required for a stable terminal decision. Victory instead requires its independently detected Close and **View Party** actions plus the repeated roster-reward structure.
+`Victory_08.png` through `Victory_10.png` verify that animated reward artwork, roster size, reward values, and reward colors are not required for a stable terminal decision. Victory is owned by the independently detected red Close and wide purple **View Party** actions. Post-match party ownership likewise comes from its live **Change Gamemode** action, paired with **Change Map** in the compact Expedition layout, rather than the brightness of variable map and roster content.
 
 `Prestart_KingsTomb_03.png` reproduces the reported v1.2.0 prestart timeout and verifies that a geometrically valid Start Game dialog takes precedence over coincidental post-match anchor matches.
 

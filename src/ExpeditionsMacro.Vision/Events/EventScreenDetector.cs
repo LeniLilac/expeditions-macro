@@ -81,23 +81,23 @@ public static class EventScreenDetector
             return Trace(sharedState.Value);
         }
 
-        double eventChrome = EventChromeScore(image);
+        double eventContext = EventContextScore(image);
         if (shared.State == StageScreenState.RaidDetail &&
-            eventChrome >= 0.72)
+            eventContext >= 0.72)
         {
             return Trace(
                 new EventScreenMatch(
                     EventScreenState.ActDetail,
                     Math.Min(
                         shared.Confidence,
-                        eventChrome),
+                        eventContext),
                     shared.ActionX,
                     shared.ActionY));
         }
 
         double actSelector = ActSelectorScore(
             image,
-            eventChrome);
+            eventContext);
         if (actSelector >= 0.72)
         {
             return Trace(
@@ -210,28 +210,39 @@ public static class EventScreenDetector
             : null;
     }
 
-    private static double EventChromeScore(
+    private static double EventContextScore(
         ImageFrame image)
     {
         double headerRed = ColorFraction(
             image,
             EventHeader,
             IsEventRed);
+        double selectedVillainTab = Math.Max(
+            SelectedVillainTabScore(
+                image,
+                top: 109),
+            SelectedVillainTabScore(
+                image,
+                top: 160));
         double dark = ColorFraction(
             image,
             new ScreenRegion(0, 0, 808, 611),
             IsDark);
-        if (headerRed < 0.08 ||
+        if ((headerRed < 0.08 &&
+             selectedVillainTab == 0) ||
             dark < 0.33)
         {
             return 0;
         }
-        return Math.Clamp(
-            0.68 +
-            0.20 * Ramp(
+        double ownedContext = Math.Max(
+            Ramp(
                 headerRed,
                 0.08,
-                0.45) +
+                0.45),
+            selectedVillainTab);
+        return Math.Clamp(
+            0.68 +
+            0.20 * ownedContext +
             0.12 * Ramp(
                 dark,
                 0.33,
@@ -240,11 +251,52 @@ public static class EventScreenDetector
             1);
     }
 
+    private static double SelectedVillainTabScore(
+        ImageFrame image,
+        int top)
+    {
+        // The selected Villain tab persists across Event Home, Act
+        // selection, and Act detail while the decorative Events header can
+        // finish later. Its wide body distinguishes it from an unselected
+        // card's thin rail.
+        double railRed = ColorFraction(
+            image,
+            new ScreenRegion(
+                13,
+                top,
+                4,
+                44),
+            IsEventRed);
+        double bodyRed = ColorFraction(
+            image,
+            new ScreenRegion(
+                17,
+                top,
+                11,
+                44),
+            IsEventRed);
+        if (railRed < 0.55 ||
+            bodyRed < 0.55)
+        {
+            return 0;
+        }
+        return (
+            Ramp(
+                railRed,
+                0.55,
+                0.80) +
+            Ramp(
+                bodyRed,
+                0.55,
+                0.90)) /
+            2;
+    }
+
     private static double ActSelectorScore(
         ImageFrame image,
-        double eventChrome)
+        double eventContext)
     {
-        if (eventChrome == 0) return 0;
+        if (eventContext == 0) return 0;
         double titleRed = ColorFraction(
             image,
             ActTitle,
@@ -275,7 +327,7 @@ public static class EventScreenDetector
                 scrollRed,
                 0.55,
                 0.95) +
-            0.08 * eventChrome,
+            0.08 * eventContext,
             0,
             1);
     }

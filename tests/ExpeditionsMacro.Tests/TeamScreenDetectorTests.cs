@@ -126,6 +126,46 @@ public sealed class TeamScreenDetectorTests
         Assert.Null(TeamScreenDetector.FindScrollbarThumb(image));
     }
 
+    [Theory]
+    [InlineData("TeamUnits_DenseRoster_01.png", TeamScreenState.Units)]
+    [InlineData("TeamList_Aligned_Team1_Current_01.png", TeamScreenState.Teams)]
+    public void OwnedTeamScreens_DoNotRequireTheDecorativeGoldHeader(
+        string fileName,
+        TeamScreenState expected)
+    {
+        ImageFrame image = Load(fileName).Clone();
+        Fill(image, x: 80, y: 100, width: 285, height: 110);
+
+        Assert.Equal(expected, TeamScreenDetector.Detect(image).State);
+    }
+
+    [Theory]
+    [InlineData("TeamLoadConfirm_Team1_BrightRoster_01.png", TeamScreenState.LoadConfirm)]
+    [InlineData("TeamEquipmentConfirm_01.png", TeamScreenState.EquipmentConfirm)]
+    public void ConfirmationOwnership_DoesNotDependOnRosterBrightness(
+        string fileName,
+        TeamScreenState expected)
+    {
+        ImageFrame image = Load(fileName).Clone();
+        Fill(image, x: 140, y: 210, width: 400, height: 40, red: 120, green: 150, blue: 170);
+        Fill(image, x: 140, y: 250, width: 120, height: 215, red: 120, green: 150, blue: 170);
+
+        Assert.Equal(expected, TeamScreenDetector.Detect(image).State);
+    }
+
+    [Theory]
+    [InlineData("TeamLoadConfirm_01.png", TeamScreenState.LoadConfirm)]
+    [InlineData("TeamEquipmentConfirm_01.png", TeamScreenState.EquipmentConfirm)]
+    public void ConfirmationOwnership_DoesNotRequireDecorativeModalFill(
+        string fileName,
+        TeamScreenState expected)
+    {
+        ImageFrame image = Load(fileName).Clone();
+        Fill(image, x: 260, y: 250, width: 290, height: 70, red: 120, green: 150, blue: 170);
+
+        Assert.Equal(expected, TeamScreenDetector.Detect(image).State);
+    }
+
     [Fact]
     public void Team4TwoRowLoadConfirm_UsesTheLiveConfirmAction()
     {
@@ -259,6 +299,29 @@ public sealed class TeamScreenDetectorTests
         Assert.True(TeamScreenDetector.IsScrollbarAtTop(thumb));
     }
 
+    [Fact]
+    public void ScrollbarThumb_ToleratesASingleRasterGap()
+    {
+        ImageFrame original =
+            Load("TeamList_Aligned_Team1_Current_01.png");
+        TeamScrollbarThumb expected =
+            TeamScreenDetector.FindScrollbarThumb(original)!.Value;
+        ImageFrame image = original.Clone();
+        Fill(
+            image,
+            x: expected.X - 6,
+            y: expected.CenterY,
+            width: 13,
+            height: 1);
+
+        TeamScrollbarThumb thumb =
+            TeamScreenDetector.FindScrollbarThumb(image)!.Value;
+
+        Assert.InRange(thumb.X, expected.X - 1, expected.X + 1);
+        Assert.InRange(thumb.CenterY, expected.CenterY - 1, expected.CenterY + 1);
+        Assert.InRange(thumb.Height, 70, 90);
+    }
+
     [Theory]
     [InlineData("TeamUnits_01.png")]
     [InlineData("TeamUnits_CurrentGreenDecoys_01.png")]
@@ -286,11 +349,76 @@ public sealed class TeamScreenDetectorTests
     }
 
     [Fact]
+    [Trait("Category", "Golden")]
+    public void EveryOtherReviewedScreen_DoesNotMatchTheTeamInterface()
+    {
+        string[] roots =
+        [
+            TestPaths.Datasets,
+            TestPaths.ChallengeDatasets,
+            TestPaths.StageDatasets,
+            TestPaths.NavigationVariantDatasets,
+            TestPaths.RefuelDatasets,
+            TestPaths.SettingsDatasets,
+            TestPaths.EventDatasets,
+            TestPaths.BountyDatasets,
+        ];
+        string[] falseMatches = roots
+            .SelectMany(root => Directory.EnumerateFiles(
+                root,
+                "*.png",
+                SearchOption.AllDirectories))
+            .Where(path =>
+                !Path.GetFullPath(path).StartsWith(
+                    Path.GetFullPath(TestPaths.StageDatasets) +
+                    Path.DirectorySeparatorChar,
+                    StringComparison.OrdinalIgnoreCase) ||
+                !Path.GetFileName(path).StartsWith(
+                    "Team",
+                    StringComparison.OrdinalIgnoreCase))
+            .Select(path => (
+                Path: path,
+                Match: TeamScreenDetector.Detect(
+                    ImageCodec.Load(path))))
+            .Where(result =>
+                result.Match.State != TeamScreenState.None)
+            .Select(result =>
+                $"{Path.GetRelativePath(TestPaths.RepositoryRoot, result.Path)}: " +
+                $"{result.Match.State} ({result.Match.Confidence:F3})")
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Empty(falseMatches);
+    }
+
+    [Fact]
     public void Detector_RejectsUnexpectedClientDimensions()
     {
         ImageFrame image = new(800, 600, PixelFormat.Rgb24, new byte[800 * 600 * 3], takeOwnership: true);
 
         Assert.Throws<InvalidDataException>(() => TeamScreenDetector.Detect(image));
+    }
+
+    private static void Fill(
+        ImageFrame image,
+        int x,
+        int y,
+        int width,
+        int height,
+        byte red = 0,
+        byte green = 0,
+        byte blue = 0)
+    {
+        for (int row = y; row < y + height; row++)
+        {
+            for (int column = x; column < x + width; column++)
+            {
+                int pixel = (row * image.Width + column) * 3;
+                image.Pixels[pixel] = red;
+                image.Pixels[pixel + 1] = green;
+                image.Pixels[pixel + 2] = blue;
+            }
+        }
     }
 
     private static ImageFrame Load(string name) => ImageCodec.Load(Path.Combine(TestPaths.StageDatasets, name));

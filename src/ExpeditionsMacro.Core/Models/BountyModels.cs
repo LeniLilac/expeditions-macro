@@ -64,7 +64,7 @@ public static class BountyCatalog
             2,
             Raid(),
             Infinite("sg-30", ChallengeMapId.SchoolGrounds, 30),
-            Infinite("fkf-30", ChallengeMapId.FairyKingForest, 30)),
+            Infinite("ff-30", ChallengeMapId.FlowerForest, 30)),
         Skip(3),
         Work(
             4,
@@ -175,12 +175,13 @@ public sealed record BountyActiveProgress
 
 public sealed record BountyProgressState
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
 
     public int SchemaVersion { get; init; } = CurrentSchemaVersion;
     public DateTimeOffset DailyEpochUtc { get; init; } =
         UtcDay(DateTimeOffset.UtcNow);
     public int ClaimedToday { get; init; }
+    public IReadOnlyList<int> UnavailableNumbersToday { get; init; } = [];
     public IReadOnlyList<BountyActiveProgress> Active { get; init; } = [];
     public DateTimeOffset UpdatedAtUtc { get; init; } =
         DateTimeOffset.UtcNow;
@@ -194,8 +195,39 @@ public sealed record BountyProgressState
             {
                 DailyEpochUtc = day,
                 ClaimedToday = 0,
+                UnavailableNumbersToday = [],
                 UpdatedAtUtc = now.ToUniversalTime(),
             };
+    }
+
+    public BountyProgressState RecordClaim(
+        int bountyNumber,
+        bool excludeNumberUntilReset,
+        DateTimeOffset now)
+    {
+        _ = BountyCatalog.For(bountyNumber);
+        bool newlyExcluded =
+            excludeNumberUntilReset &&
+            !UnavailableNumbersToday.Contains(
+                bountyNumber);
+        return this with
+        {
+            ClaimedToday = Math.Min(
+                DailyClaimLimitWithBuffer,
+                ClaimedToday + 1),
+            UnavailableNumbersToday = newlyExcluded
+                ?
+                [
+                    .. UnavailableNumbersToday,
+                    bountyNumber,
+                ]
+                : UnavailableNumbersToday,
+            Active = Active
+                .Where(active =>
+                    active.Number != bountyNumber)
+                .ToArray(),
+            UpdatedAtUtc = now.ToUniversalTime(),
+        };
     }
 
     public void Validate()
@@ -209,6 +241,23 @@ public sealed record BountyProgressState
         {
             throw new InvalidDataException(
                 "Bounty daily claim progress is invalid.");
+        }
+        if (UnavailableNumbersToday.Count >
+                ClaimedToday ||
+            UnavailableNumbersToday.Distinct().Count() !=
+                UnavailableNumbersToday.Count)
+        {
+            throw new InvalidDataException(
+                "Bounty daily unavailable-number progress is invalid.");
+        }
+        foreach (int unavailable in UnavailableNumbersToday)
+        {
+            if (!BountyCatalog.All.Any(definition =>
+                    definition.Number == unavailable))
+            {
+                throw new InvalidDataException(
+                    "Bounty daily unavailable-number progress refers to an unknown Bounty.");
+            }
         }
         if (Active.Select(value => value.Number).Distinct().Count() !=
             Active.Count)

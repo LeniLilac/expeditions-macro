@@ -25,3 +25,13 @@ data, private-server links, or other secrets.
 - `ResourceDrill_MissingFuel_01.png`: current Resource Drill panel with Missing Fuel.
 - `ResourceDrill_FuelPresent_01.png`: current Resource Drill panel with fuel present.
 - `ResourceDrill_AddFuel_01.png`: Resource Drill Add Fuel quantity dialog.
+
+Detector regression coverage also derives in-memory variants from these reviewed
+captures. Areas ownership follows the five-row category rail and the live target
+card frame; decorative panel borders and mutable page contents are not
+authorization. Ordinary station ownership requires the station accent, red
+Close component, both Building Stats bars, the Rewards frame, and a live Add
+Fuel control. The Add Fuel dialog is independently owned by live Max, Confirm,
+and Cancel controls plus both Stats bars and the Rewards frame. Click
+coordinates follow those live controls when the owned layout moves within its
+supported tolerance.

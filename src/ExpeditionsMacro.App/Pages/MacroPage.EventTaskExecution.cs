@@ -1,6 +1,7 @@
 using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Scheduling;
 using ExpeditionsMacro.Automation.Stages;
+using ExpeditionsMacro.Automation.Teams;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
@@ -23,6 +24,7 @@ public partial class MacroPage
         char? unitMenuKey,
         char cancelPlacementKey,
         MacroRunTotals macroTotals,
+        TeamOperationSession teamSession,
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken)
     {
@@ -62,7 +64,9 @@ public partial class MacroPage
                         token).ConfigureAwait(false),
                 macroTotals: macroTotals,
                 cancelPlacementKey:
-                    cancelPlacementKey)
+                    cancelPlacementKey,
+                teamSession:
+                    teamSession)
                 .ConfigureAwait(false);
         return ToScheduledResult(result);
     }

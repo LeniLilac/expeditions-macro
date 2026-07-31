@@ -109,6 +109,7 @@ public sealed class SelectedUnitPanelDetectorTests
                     takeOwnership: true));
 
         Assert.True(match.Visible);
+        Assert.True(match.PanelVisible);
         Assert.True(match.PanelScore < 0.52);
     }
 

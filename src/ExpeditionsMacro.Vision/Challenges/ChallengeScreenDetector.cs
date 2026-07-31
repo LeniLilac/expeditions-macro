@@ -136,9 +136,8 @@ public static class ChallengeScreenDetector
         double postMatchAction = Math.Max(changeMode, compactExpeditionParty);
         double postMatchPreview = previewStart > 0 || postMatchAction == 0
             ? 0
-            : Math.Clamp(0.72 * postMatchAction + 0.28 * DarkPartyPanelScore(image), 0, 1);
+            : postMatchAction;
         double victory = ChallengeVictoryDetector.Score(
-            image,
             victoryClose,
             victoryParty);
         double teleporting = TeleportingScore(image);
@@ -381,13 +380,6 @@ public static class ChallengeScreenDetector
         double first = BestHorizontalLineFraction(image, ChallengeListFirstSeparatorRegion, IsNeutralGray);
         double second = BestHorizontalLineFraction(image, ChallengeListSecondSeparatorRegion, IsNeutralGray);
         return first >= 0.65 && second >= 0.65 ? (first + second) / 2 : 0;
-    }
-
-    private static double DarkPartyPanelScore(ImageFrame image)
-    {
-        ScreenRegion partyPanel = new(410, 160, 355, 250);
-        double dark = ColorFraction(image, partyPanel, IsDark);
-        return dark < 0.45 ? 0 : 0.65 + 0.35 * Ramp(dark, 0.45, 0.85);
     }
 
     private static double CooldownFooterScore(ImageFrame image)

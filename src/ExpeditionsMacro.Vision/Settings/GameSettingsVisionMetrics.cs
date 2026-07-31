@@ -131,12 +131,14 @@ internal static class GameSettingsVisionMetrics
         int x,
         int minimumY,
         int maximumY,
-        Func<byte, byte, byte, bool> predicate)
+        Func<byte, byte, byte, bool> predicate,
+        int maximumGap = 0)
     {
         int bestStart = 0;
         int bestEnd = -1;
-        int currentStart = 0;
-        bool inside = false;
+        int currentStart = -1;
+        int lastMatch = -1;
+        int gap = 0;
         for (int y = minimumY; y <= maximumY; y++)
         {
             int pixel = (y * image.Width + x) * 3;
@@ -144,24 +146,49 @@ internal static class GameSettingsVisionMetrics
                 image.Pixels[pixel],
                 image.Pixels[pixel + 1],
                 image.Pixels[pixel + 2]);
-            if (matches && !inside)
+            if (matches)
             {
-                currentStart = y;
-                inside = true;
-            }
-            if ((!matches || y == maximumY) && inside)
-            {
-                int currentEnd =
-                    matches && y == maximumY ? y : y - 1;
-                if (currentEnd - currentStart >
-                    bestEnd - bestStart)
+                if (currentStart < 0)
                 {
-                    bestStart = currentStart;
-                    bestEnd = currentEnd;
+                    currentStart = y;
                 }
-                inside = false;
+
+                lastMatch = y;
+                gap = 0;
+                continue;
             }
+
+            if (currentStart < 0)
+            {
+                continue;
+            }
+
+            gap++;
+            if (gap <= maximumGap)
+            {
+                continue;
+            }
+
+            if (lastMatch - currentStart >
+                bestEnd - bestStart)
+            {
+                bestStart = currentStart;
+                bestEnd = lastMatch;
+            }
+
+            currentStart = -1;
+            lastMatch = -1;
+            gap = 0;
         }
+
+        if (currentStart >= 0 &&
+            lastMatch - currentStart >
+            bestEnd - bestStart)
+        {
+            bestStart = currentStart;
+            bestEnd = lastMatch;
+        }
+
         return (bestStart, bestEnd);
     }
 
@@ -205,6 +232,20 @@ internal static class GameSettingsVisionMetrics
         green is >= 45 and <= 125 &&
         blue is >= 80 and <= 180 &&
         blue - green >= 25;
+
+    public static bool IsNeutralTabSurface(
+        byte red,
+        byte green,
+        byte blue)
+    {
+        int maximum =
+            Math.Max(red, Math.Max(green, blue));
+        int minimum =
+            Math.Min(red, Math.Min(green, blue));
+        return maximum - minimum <= 8 &&
+            minimum >= 30 &&
+            maximum <= 105;
+    }
 
     public static double Ramp(
         double value,

@@ -154,6 +154,119 @@ public sealed class StageOptionSelectionDetectorTests
     }
 
     [Fact]
+    public void StoryRailCoverageSplitAcrossAdjacentColumns_RetainsSelectedOption()
+    {
+        ImageFrame image = Load("StoryDetail_01.png").Clone();
+        SplitRailCoverage(image, railX: 124);
+
+        StoryOptionSelectionMatch match =
+            StageOptionSelectionDetector.DetectStory(image);
+
+        Assert.True(match.Matches(
+            StoryRunKind.Act,
+            expectedActNumber: 1,
+            expectedHardMode: false));
+        Assert.NotNull(match.ActionX);
+        Assert.NotNull(match.ActionY);
+    }
+
+    [Fact]
+    public void RaidRailCoverageSplitAcrossAdjacentColumns_RetainsSelectedAct()
+    {
+        ImageFrame image = Load("RaidDetail_01.png").Clone();
+        SplitRailCoverage(image, railX: 124);
+
+        RaidOptionSelectionMatch match =
+            StageOptionSelectionDetector.DetectRaid(image);
+
+        Assert.True(match.Matches(RaidAct.Act1));
+        Assert.NotNull(match.ActionX);
+        Assert.NotNull(match.ActionY);
+    }
+
+    [Fact]
+    public void SplitRailCoverage_WithAmbiguousRows_DoesNotAuthorizeAnOption()
+    {
+        ImageFrame image = Load("StoryDetail_01.png").Clone();
+        SplitRailCoverage(image, railX: 124);
+        CopyRegion(
+            image,
+            sourceX: 128,
+            sourceY: 189,
+            targetX: 128,
+            targetY: 228,
+            width: 42,
+            height: 24);
+
+        StoryOptionSelectionMatch match =
+            StageOptionSelectionDetector.DetectStory(image);
+
+        Assert.Null(match.RunKind);
+        Assert.Null(match.ActionX);
+        Assert.Null(match.ActionY);
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void OptionSelection_DoesNotStealOtherCapturedScreens()
+    {
+        string[] roots =
+        [
+            TestPaths.Datasets,
+            TestPaths.ChallengeDatasets,
+            TestPaths.StageDatasets,
+            TestPaths.NavigationVariantDatasets,
+            TestPaths.EventDatasets,
+            TestPaths.RefuelDatasets,
+            TestPaths.SettingsDatasets,
+            TestPaths.BountyDatasets,
+        ];
+        List<string> failures = [];
+        foreach (string file in roots
+                     .Where(Directory.Exists)
+                     .SelectMany(root =>
+                         Directory.EnumerateFiles(
+                             root,
+                             "*.png",
+                             SearchOption.AllDirectories)))
+        {
+            string fileName =
+                Path.GetFileNameWithoutExtension(file);
+            if (fileName.Contains(
+                    "StoryDetail",
+                    StringComparison.Ordinal) ||
+                fileName.Contains(
+                    "RaidDetail",
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            ImageFrame image = ImageCodec.Load(file);
+            if (image.Width != 808 ||
+                image.Height != 611)
+            {
+                continue;
+            }
+
+            StoryOptionSelectionMatch story =
+                StageOptionSelectionDetector.DetectStory(image);
+            RaidOptionSelectionMatch raid =
+                StageOptionSelectionDetector.DetectRaid(image);
+            if (story.RunKind is not null ||
+                raid.Act is not null)
+            {
+                failures.Add(
+                    $"{Path.GetRelativePath(TestPaths.RepositoryRoot, file)}: Story={story.RunKind}, Raid={raid.Act}");
+            }
+        }
+
+        Assert.True(
+            failures.Count == 0,
+            $"Stage option false matches:{Environment.NewLine}{string.Join(Environment.NewLine, failures)}");
+    }
+
+    [Fact]
     public async Task UnchangedPreClickFrames_NeverAuthorizeWrongRoute()
     {
         DateTimeOffset now =
@@ -425,6 +538,85 @@ public sealed class StageOptionSelectionDetectorTests
         match.ActionY is int y
             ? (x, y)
             : null;
+
+    private static void SplitRailCoverage(
+        ImageFrame image,
+        int railX)
+    {
+        for (int y = 150; y < 470; y++)
+        {
+            int source =
+                (y * image.Width + railX) * 3;
+            byte red = image.Pixels[source];
+            byte green = image.Pixels[source + 1];
+            byte blue = image.Pixels[source + 2];
+            int targetX =
+                railX + (y & 1);
+            FillPixel(
+                image,
+                railX,
+                y,
+                red: 12,
+                green: 12,
+                blue: 12);
+            FillPixel(
+                image,
+                railX + 1,
+                y,
+                red: 12,
+                green: 12,
+                blue: 12);
+            FillPixel(
+                image,
+                targetX,
+                y,
+                red,
+                green,
+                blue);
+        }
+    }
+
+    private static void CopyRegion(
+        ImageFrame image,
+        int sourceX,
+        int sourceY,
+        int targetX,
+        int targetY,
+        int width,
+        int height)
+    {
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int source =
+                    ((sourceY + y) * image.Width +
+                     sourceX + x) * 3;
+                FillPixel(
+                    image,
+                    targetX + x,
+                    targetY + y,
+                    image.Pixels[source],
+                    image.Pixels[source + 1],
+                    image.Pixels[source + 2]);
+            }
+        }
+    }
+
+    private static void FillPixel(
+        ImageFrame image,
+        int x,
+        int y,
+        byte red,
+        byte green,
+        byte blue)
+    {
+        int pixel =
+            (y * image.Width + x) * 3;
+        image.Pixels[pixel] = red;
+        image.Pixels[pixel + 1] = green;
+        image.Pixels[pixel + 2] = blue;
+    }
 
     private static ImageFrame Load(string name) =>
         ImageCodec.Load(

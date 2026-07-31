@@ -62,7 +62,7 @@ internal static class EventEntryDetector
             image,
             EventHomeActionSeparator,
             IsEventRed);
-        double topBorderRed = ColorFraction(
+        double topBorderRed = BestHorizontalLineFraction(
             image,
             EventHomeActionTopBorder,
             IsEventRed);

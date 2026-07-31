@@ -10,6 +10,7 @@ This guide holds the detailed engineering conventions intentionally kept out of 
 - `src/ExpeditionsMacro.Automation`: Fast camera-pose preparation, placement workflows, mode runners, scheduling, recovery, diagnostics, and Discord.
 - `src/ExpeditionsMacro.App`: WPF shell, pages, themes, dialogs, and exclusive operation coordination.
 - `tools/ExpeditionsMacro.DatasetBuilder`: compiles reviewed captures into detector packs.
+- `tools/ExpeditionsMacro.DetectorViewer`: standalone read-only detector geometry, evidence, threshold, and result inspection.
 - `tools/ExpeditionsMacro.DeepDebugViewer`: local viewer for deep-debug archives.
 - `tests/ExpeditionsMacro.Tests`: application, Windows-input, detector, workflow, and golden-image tests.
 - `datasets`: reviewed detector fixtures. See `datasets/README.md` before editing.
@@ -34,6 +35,7 @@ Core <- Vision ----\
 - Automation may consume Core, Vision, and Windows.
 - App composes all product layers; lower layers never reference it.
 - Tools and tests have explicit project-reference allowlists in `eng/repository-policy.json`.
+- Detector inspection stays in Vision and calls production detectors without changing their decisions. The Detector Viewer may present only explicit production results/gates as pass or fail; reflected constants without a typed metric association remain advisory.
 
 `scripts/Test-RepositoryPolicy.ps1` checks every project reference against this graph and requires policy review when a project is added.
 

@@ -3,6 +3,7 @@ using ExpeditionsMacro.Automation.Challenges;
 using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Scheduling;
 using ExpeditionsMacro.Automation.Stages;
+using ExpeditionsMacro.Automation.Teams;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Runtime;
@@ -22,6 +23,7 @@ public partial class MacroPage
         MacroRunTotals macroTotals,
         ChallengeRotationState challengeRotation,
         BountyOperationSession bountySession,
+        TeamOperationSession teamSession,
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken)
     {
@@ -76,6 +78,7 @@ public partial class MacroPage
                         cancelPlacementKey,
                         macroTotals,
                         challengeRotation,
+                        teamSession,
                         progress,
                         token),
                 progress,
@@ -111,6 +114,7 @@ public partial class MacroPage
         char cancelPlacementKey,
         MacroRunTotals macroTotals,
         ChallengeRotationState challengeRotation,
+        TeamOperationSession teamSession,
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken) =>
         route.Kind switch
@@ -124,6 +128,7 @@ public partial class MacroPage
                     unitMenuKey,
                     cancelPlacementKey,
                     macroTotals,
+                    teamSession,
                     progress,
                     cancellationToken),
             BountyObjectiveKind.InfiniteWave =>
@@ -136,6 +141,7 @@ public partial class MacroPage
                     unitMenuKey,
                     cancelPlacementKey,
                     macroTotals,
+                    teamSession,
                     progress,
                     cancellationToken),
             BountyObjectiveKind.Challenge =>
@@ -149,6 +155,7 @@ public partial class MacroPage
                     cancelPlacementKey,
                     macroTotals,
                     challengeRotation,
+                    teamSession,
                     progress,
                     cancellationToken),
             _ => throw new ArgumentOutOfRangeException(
@@ -164,6 +171,7 @@ public partial class MacroPage
         char? unitMenuKey,
         char cancelPlacementKey,
         MacroRunTotals macroTotals,
+        TeamOperationSession teamSession,
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken)
     {
@@ -206,7 +214,9 @@ public partial class MacroPage
                                     .ReturnToLobby),
                     macroTotals: macroTotals,
                     cancelPlacementKey:
-                        cancelPlacementKey)
+                        cancelPlacementKey,
+                    teamSession:
+                        teamSession)
                 .ConfigureAwait(false);
         return new()
         {
@@ -232,6 +242,7 @@ public partial class MacroPage
         char? unitMenuKey,
         char cancelPlacementKey,
         MacroRunTotals macroTotals,
+        TeamOperationSession teamSession,
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken)
     {
@@ -274,7 +285,9 @@ public partial class MacroPage
                         {
                             QuestWave =
                                 route.TargetWave,
-                        })
+                        },
+                    teamSession:
+                        teamSession)
                 .ConfigureAwait(false);
         return new()
         {
@@ -303,6 +316,7 @@ public partial class MacroPage
         char cancelPlacementKey,
         MacroRunTotals macroTotals,
         ChallengeRotationState challengeRotation,
+        TeamOperationSession teamSession,
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken)
     {
@@ -338,7 +352,9 @@ public partial class MacroPage
                 unitMenuKey: unitMenuKey,
                 macroTotals: macroTotals,
                 cancelPlacementKey:
-                    cancelPlacementKey)
+                    cancelPlacementKey,
+                teamSession:
+                    teamSession)
             .ConfigureAwait(false);
         ChallengeRunSummary actual =
             summary ??

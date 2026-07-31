@@ -22,223 +22,138 @@ public sealed record AreasScreenMatch(
 
 public static class AreasScreenDetector
 {
-    private static readonly ScreenRegion Panel =
-        new(145, 150, 520, 315);
-    private static readonly ScreenRegion Header =
-        new(100, 130, 220, 75);
-    private static readonly ScreenRegion Close =
-        new(630, 140, 45, 50);
-    private static readonly ScreenRegion BottomEdge =
-        new(145, 435, 520, 30);
-    private static readonly ScreenRegion ExpeditionTab =
-        new(148, 288, 98, 38);
-    private static readonly ScreenRegion LobbyTab =
-        new(148, 238, 98, 38);
-    private static readonly ScreenRegion ExpeditionHeading =
-        new(250, 178, 180, 35);
-    private static readonly ScreenRegion LobbyHeading =
-        new(250, 178, 180, 35);
-    private static readonly ScreenRegion HubCard =
-        new(250, 205, 140, 70);
-    private static readonly ScreenRegion LobbySpawnCard =
-        new(250, 345, 140, 80);
-    private static readonly ScreenRegion[] NavigationButtons =
-    [
-        new(150, 188, 94, 28),
-        new(150, 218, 94, 28),
-        new(150, 248, 94, 28),
-        new(150, 278, 94, 28),
-        new(150, 298, 94, 28),
-    ];
+    private const int RailX = 151;
+    private const int FirstRowY = 186;
+    private const int RowWidth = 92;
+    private const int RowHeight = 24;
+    private const int RowPitch = 27;
+    private const int RowCount = 5;
+    private const int LobbyRow = 2;
+    private const int ExpeditionsRow = 4;
+
+    private static readonly ScreenRegion CloseSearch =
+        new(620, 130, 65, 70);
+    private static readonly ScreenRegion HubTop =
+        new(250, 200, 140, 15);
+    private static readonly ScreenRegion HubLeft =
+        new(250, 205, 12, 72);
+    private static readonly ScreenRegion HubRight =
+        new(376, 205, 14, 72);
+    private static readonly ScreenRegion LobbySpawnTop =
+        new(250, 350, 140, 15);
+    private static readonly ScreenRegion LobbySpawnLeft =
+        new(250, 355, 12, 72);
+    private static readonly ScreenRegion LobbySpawnRight =
+        new(376, 355, 14, 72);
 
     public static AreasScreenMatch Detect(ImageFrame image)
     {
         RefuelVisionMetrics.ValidateClient(image);
-        double panelDark =
-            RefuelVisionMetrics.ColorFraction(
+        AreasLayoutMatch? layout = FindLayout(image);
+        double hubFrame = layout is AreasLayoutMatch found
+            ? CardFrameScore(
                 image,
-                Panel,
-                RefuelVisionMetrics.IsDark);
-        double close =
-            RefuelVisionMetrics.ColorFraction(
+                HubTop,
+                HubLeft,
+                HubRight,
+                found.OffsetX,
+                found.OffsetY)
+            : 0;
+        double lobbySpawnFrame = layout is AreasLayoutMatch lobbyLayout
+            ? CardFrameScore(
                 image,
-                Close,
-                RefuelVisionMetrics.IsRed);
-        double accent = Math.Max(
-            RefuelVisionMetrics.ColorFraction(
-                image,
-                Header,
-                RefuelVisionMetrics.IsPurple),
-            RefuelVisionMetrics.ColorFraction(
-                image,
-                Header,
-                RefuelVisionMetrics.IsTeal));
-        double bottom = Math.Max(
-            RefuelVisionMetrics.BestHorizontalLineFraction(
-                image,
-                BottomEdge,
-                RefuelVisionMetrics.IsPurple),
-            RefuelVisionMetrics.BestHorizontalLineFraction(
-                image,
-                BottomEdge,
-                RefuelVisionMetrics.IsTeal));
-        int supportedNavigationButtons =
-            NavigationButtons.Count(region =>
-                RefuelVisionMetrics.ColorFraction(
-                    image,
-                    region,
-                    RefuelVisionMetrics.IsNeutralGray) >= 0.12);
-        double structure =
-            panelDark < 0.48 ||
-            close < 0.025 ||
-            accent < 0.018 ||
-            bottom < 0.55 ||
-            supportedNavigationButtons < 4
-                ? 0
-                : Math.Clamp(
-                    0.58 +
-                    0.14 * RefuelVisionMetrics.Ramp(
-                        panelDark,
-                        0.48,
-                        0.82) +
-                    0.10 * RefuelVisionMetrics.Ramp(
-                        close,
-                        0.025,
-                        0.16) +
-                    0.10 * RefuelVisionMetrics.Ramp(
-                        accent,
-                        0.018,
-                        0.12) +
-                    0.08 * RefuelVisionMetrics.Ramp(
-                        bottom,
-                        0.55,
-                        0.95),
-                    0,
-                    1);
+                LobbySpawnTop,
+                LobbySpawnLeft,
+                LobbySpawnRight,
+                lobbyLayout.OffsetX,
+                lobbyLayout.OffsetY)
+            : 0;
 
-        double selectedTab =
-            RefuelVisionMetrics.ColorFraction(
-                image,
-                ExpeditionTab,
-                RefuelVisionMetrics.IsTeal);
-        double heading =
-            RefuelVisionMetrics.ColorFraction(
-                image,
-                ExpeditionHeading,
-                RefuelVisionMetrics.IsTeal);
-        double hubCard =
-            RefuelVisionMetrics.ColorFraction(
-                image,
-                HubCard,
-                RefuelVisionMetrics.IsTeal);
-        double expeditions =
-            structure == 0 ||
-            selectedTab < 0.045 ||
-            heading < 0.016 ||
-            hubCard < 0.025
-                ? 0
-                : Math.Clamp(
-                    0.52 * structure +
-                    0.20 * RefuelVisionMetrics.Ramp(
-                        selectedTab,
-                        0.045,
-                        0.20) +
-                    0.16 * RefuelVisionMetrics.Ramp(
-                        heading,
-                        0.016,
-                        0.10) +
-                    0.12 * RefuelVisionMetrics.Ramp(
-                        hubCard,
-                        0.025,
-                        0.16),
-                    0,
-                    1);
-
-        double lobbySelectedTab =
-            RefuelVisionMetrics.ColorFraction(
-                image,
-                LobbyTab,
-                RefuelVisionMetrics.IsTeal);
-        double lobbyHeading =
-            RefuelVisionMetrics.ColorFraction(
-                image,
-                LobbyHeading,
-                RefuelVisionMetrics.IsTeal);
-        double lobbySpawn =
-            RefuelVisionMetrics.ColorFraction(
-                image,
-                LobbySpawnCard,
-                RefuelVisionMetrics.IsTeal);
-        double lobby =
-            structure == 0 ||
-            lobbySelectedTab < 0.25 ||
-            lobbyHeading < 0.04 ||
-            lobbySpawn < 0.035
-                ? 0
-                : Math.Clamp(
-                    0.52 * structure +
-                    0.20 * RefuelVisionMetrics.Ramp(
-                        lobbySelectedTab,
-                        0.25,
-                        0.55) +
-                    0.16 * RefuelVisionMetrics.Ramp(
-                        lobbyHeading,
-                        0.04,
-                        0.08) +
-                    0.12 * RefuelVisionMetrics.Ramp(
-                        lobbySpawn,
-                        0.035,
-                        0.07),
-                    0,
-                    1);
-
-        const int lobbyTabX = 198;
-        const int lobbyTabY = 252;
-        AreasScreenMatch match = lobby >= 0.76
-            ? new AreasScreenMatch(
-                AreasScreenState.Lobby,
-                lobby,
-                ActionX: 318,
-                ActionY: 388,
-                LobbyTabActionX: lobbyTabX,
-                LobbyTabActionY: lobbyTabY)
-            : expeditions >= 0.76
-            ? new AreasScreenMatch(
-                AreasScreenState.Expeditions,
-                expeditions,
-                ActionX: 322,
-                ActionY: 264,
-                LobbyTabActionX: lobbyTabX,
-                LobbyTabActionY: lobbyTabY)
-            : structure >= 0.74
+        AreasScreenMatch match;
+        if (layout is not AreasLayoutMatch candidate)
+        {
+            match = new AreasScreenMatch(
+                AreasScreenState.None,
+                0);
+        }
+        else if (candidate.SelectedRow == ExpeditionsRow)
+        {
+            double confidence =
+                0.65 * candidate.Confidence +
+                0.35 * hubFrame;
+            match = hubFrame >= 0.74 &&
+                    confidence >= 0.76
                 ? new AreasScreenMatch(
-                    AreasScreenState.Menu,
-                    structure,
-                    ActionX: 198,
-                    ActionY: 304,
-                    LobbyTabActionX: lobbyTabX,
-                    LobbyTabActionY: lobbyTabY)
+                    AreasScreenState.Expeditions,
+                    confidence,
+                    ActionX: 322 + candidate.OffsetX,
+                    ActionY: 264 + candidate.OffsetY,
+                    LobbyTabActionX:
+                        198 + candidate.OffsetX,
+                    LobbyTabActionY:
+                        252 + candidate.OffsetY)
                 : new AreasScreenMatch(
                     AreasScreenState.None,
                     0);
+        }
+        else if (candidate.SelectedRow == LobbyRow)
+        {
+            double confidence =
+                0.65 * candidate.Confidence +
+                0.35 * lobbySpawnFrame;
+            match = lobbySpawnFrame >= 0.74 &&
+                    confidence >= 0.76
+                ? new AreasScreenMatch(
+                    AreasScreenState.Lobby,
+                    confidence,
+                    ActionX: 318 + candidate.OffsetX,
+                    ActionY: 388 + candidate.OffsetY,
+                    LobbyTabActionX:
+                        198 + candidate.OffsetX,
+                    LobbyTabActionY:
+                        252 + candidate.OffsetY)
+                : new AreasScreenMatch(
+                    AreasScreenState.None,
+                    0);
+        }
+        else
+        {
+            match = new AreasScreenMatch(
+                AreasScreenState.Menu,
+                candidate.Confidence,
+                ActionX: 198 + candidate.OffsetX,
+                ActionY:
+                    FirstRowY +
+                    ExpeditionsRow * RowPitch +
+                    RowHeight / 2 +
+                    candidate.OffsetY,
+                LobbyTabActionX:
+                    198 + candidate.OffsetX,
+                LobbyTabActionY:
+                    FirstRowY +
+                    LobbyRow * RowPitch +
+                    RowHeight / 2 +
+                    candidate.OffsetY);
+        }
+
         VisionTrace.Emit(
             "areas_screen",
             match.State.ToString(),
             match.Confidence,
             new
             {
-                PanelDark = panelDark,
-                Close = close,
-                Accent = accent,
-                Bottom = bottom,
-                SupportedNavigationButtons =
-                    supportedNavigationButtons,
-                SelectedTab = selectedTab,
-                Heading = heading,
-                HubCard = hubCard,
-                LobbySelectedTab = lobbySelectedTab,
-                LobbyHeading = lobbyHeading,
-                LobbySpawn = lobbySpawn,
+                LayoutConfidence = layout?.Confidence ?? 0,
+                SelectedRow = layout?.SelectedRow,
+                OffsetX = layout?.OffsetX,
+                OffsetY = layout?.OffsetY,
+                SelectedAccent = layout?.SelectedAccent ?? 0,
+                MinimumNeutralRow =
+                    layout?.MinimumNeutralRow ?? 0,
+                LowerRailButtonPixels =
+                    layout?.LowerRailButtonPixels ?? 0,
+                ClosePixels = layout?.ClosePixels ?? 0,
+                HubFrame = hubFrame,
+                LobbySpawnFrame = lobbySpawnFrame,
                 match.ActionX,
                 match.ActionY,
                 match.LobbyTabActionX,
@@ -246,4 +161,196 @@ public static class AreasScreenDetector
             });
         return match;
     }
+
+    private static AreasLayoutMatch? FindLayout(
+        ImageFrame image)
+    {
+        RefuelColorBounds? close =
+            RefuelVisionMetrics.FindColorBounds(
+                image,
+                CloseSearch,
+                RefuelVisionMetrics.IsRed);
+        if (close is not RefuelColorBounds closeAction ||
+            closeAction.Width is < 18 or > 32 ||
+            closeAction.Height is < 14 or > 32 ||
+            closeAction.Count < 100)
+        {
+            return null;
+        }
+
+        int offsetX =
+            (int)Math.Round(closeAction.CenterX) - 652;
+        if (Math.Abs(offsetX) > 10)
+        {
+            return null;
+        }
+
+        AreasLayoutMatch? best = null;
+        for (int offsetY = -12;
+             offsetY <= 12;
+             offsetY++)
+        {
+            double[] neutral = new double[RowCount];
+            double[] accent = new double[RowCount];
+            for (int row = 0; row < RowCount; row++)
+            {
+                ScreenRegion region = new(
+                    RailX + offsetX,
+                    FirstRowY +
+                    row * RowPitch +
+                    offsetY,
+                    RowWidth,
+                    RowHeight);
+                neutral[row] =
+                    RefuelVisionMetrics.ColorFraction(
+                        image,
+                        region,
+                        RefuelVisionMetrics.IsNeutralGray);
+                accent[row] = Math.Max(
+                    RefuelVisionMetrics.ColorFraction(
+                        image,
+                        region,
+                        RefuelVisionMetrics.IsTeal),
+                    RefuelVisionMetrics.ColorFraction(
+                        image,
+                        region,
+                        RefuelVisionMetrics.IsPurple));
+            }
+
+            int selectedRow = Array.IndexOf(
+                accent,
+                accent.Max());
+            double selectedAccent = accent[selectedRow];
+            double secondAccent = accent
+                .Where((_, index) => index != selectedRow)
+                .Max();
+            double minimumNeutral = neutral
+                .Where((_, index) => index != selectedRow)
+                .Min();
+            double averageNeutral = neutral
+                .Where((_, index) => index != selectedRow)
+                .Average();
+            ScreenRegion lowerRail = new(
+                RailX + offsetX,
+                328 + offsetY,
+                RowWidth,
+                102);
+            RefuelColorComponent? lowerRailButton =
+                RefuelVisionMetrics.FindComponent(
+                    image,
+                    lowerRail,
+                    RefuelVisionMetrics.IsNeutralGray,
+                    component =>
+                        component.Width >= 60 &&
+                        component.Height >= 8 &&
+                        component.Count >= 350);
+            if (selectedAccent < 0.30 ||
+                secondAccent > 0.20 ||
+                minimumNeutral < 0.65 ||
+                lowerRailButton is not null)
+            {
+                continue;
+            }
+
+            double confidence = Math.Clamp(
+                0.55 +
+                0.20 * RefuelVisionMetrics.Ramp(
+                    averageNeutral,
+                    0.65,
+                    0.86) +
+                0.15 * RefuelVisionMetrics.Ramp(
+                    selectedAccent,
+                    0.30,
+                    0.70) +
+                0.10 * RefuelVisionMetrics.Ramp(
+                    closeAction.Count,
+                    100,
+                    260),
+                0,
+                1);
+            AreasLayoutMatch current = new(
+                offsetX,
+                offsetY,
+                selectedRow,
+                confidence,
+                selectedAccent,
+                minimumNeutral,
+                lowerRailButton?.Count ?? 0,
+                closeAction.Count);
+            if (best is null ||
+                current.Confidence > best.Value.Confidence)
+            {
+                best = current;
+            }
+        }
+
+        return best;
+    }
+
+    private static double CardFrameScore(
+        ImageFrame image,
+        ScreenRegion top,
+        ScreenRegion left,
+        ScreenRegion right,
+        int offsetX,
+        int offsetY)
+    {
+        RefuelColorComponent? topBorder =
+            RefuelVisionMetrics.FindComponent(
+                image,
+                top.Translate(offsetX, offsetY),
+                RefuelVisionMetrics.IsTeal,
+                component =>
+                    component.Width >= 115 &&
+                    component.Height >= 2 &&
+                    component.Count >= 100);
+        RefuelColorComponent? leftBorder =
+            RefuelVisionMetrics.FindComponent(
+                image,
+                left.Translate(offsetX, offsetY),
+                RefuelVisionMetrics.IsTeal,
+                component =>
+                    component.Width >= 3 &&
+                    component.Height >= 28 &&
+                    component.Count >= 25);
+        RefuelColorComponent? rightBorder =
+            RefuelVisionMetrics.FindComponent(
+                image,
+                right.Translate(offsetX, offsetY),
+                RefuelVisionMetrics.IsTeal,
+                component =>
+                    component.Width >= 3 &&
+                    component.Height >= 28 &&
+                    component.Count >= 25);
+        return topBorder is not RefuelColorComponent topMatch ||
+               leftBorder is not RefuelColorComponent leftMatch ||
+               rightBorder is not RefuelColorComponent rightMatch
+            ? 0
+            : Math.Clamp(
+                0.58 +
+                0.18 * RefuelVisionMetrics.Ramp(
+                    topMatch.Width,
+                    115,
+                    135) +
+                0.12 * RefuelVisionMetrics.Ramp(
+                    leftMatch.Height,
+                    28,
+                    50) +
+                0.12 * RefuelVisionMetrics.Ramp(
+                    rightMatch.Height,
+                    28,
+                    50),
+                0,
+                1);
+    }
+
+    private readonly record struct AreasLayoutMatch(
+        int OffsetX,
+        int OffsetY,
+        int SelectedRow,
+        double Confidence,
+        double SelectedAccent,
+        double MinimumNeutralRow,
+        int LowerRailButtonPixels,
+        int ClosePixels);
 }

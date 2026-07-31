@@ -44,7 +44,6 @@ internal static class AfkChamberDetector
             !ButtonRegion.FitsWithin(image.Width, image.Height)) return null;
 
         double headerScore = ScoreHeader(image);
-        if (headerScore == 0) return null;
 
         IReadOnlyList<Component> yellow = Components(image, ButtonColor.Yellow);
         IReadOnlyList<Component> neutral = Components(image, ButtonColor.Neutral);
@@ -65,13 +64,24 @@ internal static class AfkChamberDetector
                     Plateau(Math.Abs(returnToLobby.Height - selectStage.Height), 0, 0, 5, 12)) / 2;
                 if (vertical == 0 || gap == 0 || sizeAgreement == 0) continue;
 
+                double actionRailQuality = Math.Clamp(
+                    (
+                        0.22 * selectScore +
+                        0.22 * returnScore +
+                        0.12 * vertical +
+                        0.09 * gap +
+                        0.07 * sizeAgreement) /
+                    0.72,
+                    0,
+                    1);
+                if (actionRailQuality < 0.70) continue;
+
+                // The gold title is decorative and may settle separately from
+                // the live actions. Keep it as confidence, while the uniquely
+                // paired Select Stage / Return to Lobby rail owns the state.
                 double quality = Math.Clamp(
-                    0.28 * headerScore +
-                    0.22 * selectScore +
-                    0.22 * returnScore +
-                    0.12 * vertical +
-                    0.09 * gap +
-                    0.07 * sizeAgreement,
+                    0.20 * headerScore +
+                    0.80 * actionRailQuality,
                     0,
                     1);
                 double score = 0.84 + 0.16 * quality;

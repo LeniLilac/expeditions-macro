@@ -96,11 +96,11 @@ public sealed class ResourceRefuelServiceTests
         Assert.Equal(1, automation.ConfirmClicks);
         int max = Find(
             automation.Events,
-            "click:516,312",
+            "click:515,312",
             0);
         int confirm = Find(
             automation.Events,
-            "click:337,345",
+            "click:337,344",
             max + 1);
         Assert.Contains(
             "capture",
@@ -518,12 +518,12 @@ public sealed class ResourceRefuelServiceTests
         {
             Events.Add($"click:{x},{y}");
             if (_screen == FakeScreen.AreasMenu &&
-                (x, y) == (198, 304))
+                (x, y) == (198, 312))
             {
                 _screen = FakeScreen.AreasExpeditions;
             }
             else if (_screen == FakeScreen.AreasMenu &&
-                     (x, y) == (198, 252))
+                     (x, y) == (198, 258))
             {
                 _screen = FakeScreen.AreasLobby;
             }
@@ -546,7 +546,7 @@ public sealed class ResourceRefuelServiceTests
             else if ((_screen is
                           FakeScreen.GoldMine or
                           FakeScreen.ResourceDrill) &&
-                     (x, y) == (636, 170))
+                     (x, y) is (635, 178) or (635, 171))
             {
                 StationCloseClicks++;
                 _screen = FakeScreen.Lobby;
@@ -559,7 +559,7 @@ public sealed class ResourceRefuelServiceTests
                 _screen = FakeScreen.AddFuel;
             }
             else if (_screen == FakeScreen.AddFuel &&
-                     (x, y) == (516, 312))
+                     (x, y) == (515, 312))
             {
                 MaxClicks++;
                 if (MaxClicks <= FailedMaxAttempts)
@@ -569,13 +569,13 @@ public sealed class ResourceRefuelServiceTests
                 }
             }
             else if (_screen == FakeScreen.AddFuel &&
-                     (x, y) == (337, 345))
+                     (x, y) == (337, 344))
             {
                 ConfirmClicks++;
                 _screen = _stationBeforeDialog;
             }
             else if (_screen == FakeScreen.AddFuel &&
-                     (x, y) == (470, 345))
+                     (x, y) == (470, 344))
             {
                 DialogCancelClicks++;
                 _screen = _stationBeforeDialog;

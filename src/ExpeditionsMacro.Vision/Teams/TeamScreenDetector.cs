@@ -57,18 +57,29 @@ public static class TeamScreenDetector
         double modalDark = DarkFraction(image, Modal);
         double include = ActionButtonDetector.Score(image, "team_equipment_include");
         double exclude = ActionButtonDetector.Score(image, "team_equipment_exclude");
-        if (modalTeams >= 0.70 && modalDark >= 0.58 && include > 0 && exclude > 0)
+        if (modalTeams >= 0.70 && include > 0 && exclude > 0)
         {
             (int X, int Y)? action = ActionButtonDetector.ActionFor(image, "team_equipment_include");
-            double confidence = Math.Clamp(0.35 * modalTeams + 0.20 * Ramp(modalDark, 0.58, 0.90) + 0.25 * include + 0.20 * exclude, 0, 1);
+            double confidence = Math.Clamp(
+                0.32 * modalTeams +
+                0.32 * include +
+                0.32 * exclude +
+                0.04 * Ramp(modalDark, 0.42, 0.90),
+                0,
+                1);
             return Trace(new TeamScreenMatch(TeamScreenState.EquipmentConfirm, confidence, action?.X, action?.Y));
         }
 
         double loadConfirm = ActionButtonDetector.Score(image, "team_load_confirm");
-        if (modalTeams >= 0.70 && modalDark >= 0.58 && loadConfirm > 0)
+        if (modalTeams >= 0.70 && loadConfirm > 0)
         {
             (int X, int Y)? action = ActionButtonDetector.ActionFor(image, "team_load_confirm");
-            double confidence = Math.Clamp(0.45 * modalTeams + 0.20 * Ramp(modalDark, 0.58, 0.90) + 0.35 * loadConfirm, 0, 1);
+            double confidence = Math.Clamp(
+                0.48 * modalTeams +
+                0.48 * loadConfirm +
+                0.04 * Ramp(modalDark, 0.42, 0.90),
+                0,
+                1);
             return Trace(new TeamScreenMatch(TeamScreenState.LoadConfirm, confidence, action?.X, action?.Y));
         }
 
@@ -196,17 +207,15 @@ public static class TeamScreenDetector
         double unequip = ActionButtonDetector.Score(image, "units_unequip_all");
         double teams = ActionButtonDetector.Score(image, "units_teams");
         double quickSell = ActionButtonDetector.Score(image, "units_quick_sell");
-        // A dense roster can fill the panel with bright unit artwork. Keep
-        // panel darkness as optional confidence, but never let roster content
-        // override the complete header and four live inventory actions.
-        if (header < 0.018 || close == 0 || unequip == 0 || teams == 0 || quickSell == 0) return 0;
+        // The four independently colored live controls own Unit Inventory.
+        // Decorative title pixels and roster-dependent panel darkness only
+        // refine confidence after that complete control rail is present.
+        if (close == 0 || unequip == 0 || teams == 0 || quickSell == 0) return 0;
+        double controls = (close + unequip + teams + quickSell) / 4d;
         return Math.Clamp(
-            0.18 * Ramp(header, 0.018, 0.12) +
-            0.12 * Ramp(dark, 0.42, 0.82) +
-            0.16 * close +
-            0.18 * unequip +
-            0.18 * teams +
-            0.18 * quickSell,
+            0.95 * controls +
+            0.025 * Ramp(header, 0.018, 0.12) +
+            0.025 * Ramp(dark, 0.42, 0.82),
             0,
             1);
     }
@@ -219,14 +228,17 @@ public static class TeamScreenDetector
         int loadRows = LoadButtonRows.Count(
             region => ColorFraction(image, region, IsGreenButton) >=
                 MinimumVisibleLoadButtonFraction);
-        const double minimumHeader = 0.018;
-        const double minimumDark = 0.42;
-        if (header < minimumHeader || dark < minimumDark || close == 0 || loadRows < 2) return 0;
+        TeamScrollbarThumb? thumb = FindScrollbarThumb(image);
+        // Repeated Load Team rows, the live Close control, and the anchored
+        // scrollbar own this screen. The gold title and changing roster fill
+        // are useful confidence only and cannot replace that geometry.
+        if (close == 0 || loadRows < 2 || thumb is null) return 0;
         return Math.Clamp(
-            0.25 * Ramp(header, minimumHeader, 0.12) +
-            0.15 * Ramp(dark, minimumDark, 0.86) +
-            0.25 * close +
-            0.35 * (loadRows / 3d),
+            0.35 * close +
+            0.30 * (loadRows / 3d) +
+            0.25 +
+            0.05 * Ramp(header, 0.018, 0.12) +
+            0.05 * Ramp(dark, 0.42, 0.86),
             0,
             1);
     }
@@ -240,11 +252,14 @@ public static class TeamScreenDetector
         int loadRows = LoadButtonRows.Count(
             region => ColorFraction(image, region, IsGreenButton) >=
                 MinimumVisibleLoadButtonFraction);
-        const double minimumDark = 0.78;
-        if (dark < minimumDark || loadRows < 2) return 0;
+        if (loadRows < 2) return 0;
+        // Modal actions are independently required by Detect. Once two
+        // repeated underlying rows remain, roster and modal brightness can
+        // support confidence but cannot veto otherwise complete ownership.
         return Math.Clamp(
-            0.25 * Ramp(dark, minimumDark, 0.96) +
-            0.75 * Math.Min(1, loadRows / 2d),
+            0.75 +
+            0.15 * (loadRows - 2) +
+            0.10 * Ramp(dark, 0.42, 0.90),
             0,
             1);
     }
@@ -253,10 +268,12 @@ public static class TeamScreenDetector
 
     private static (int StartY, int EndY) LongestThumbRun(ImageFrame image, int x)
     {
+        const int maximumRasterGap = 1;
         int bestStart = 0;
         int bestEnd = -1;
-        int currentStart = 0;
-        bool inside = false;
+        int currentStart = -1;
+        int currentEnd = -1;
+        int gaps = 0;
         for (int y = 190; y <= 440; y++)
         {
             int pixel = (y * image.Width + x) * 3;
@@ -264,23 +281,40 @@ public static class TeamScreenDetector
                 image.Pixels[pixel],
                 image.Pixels[pixel + 1],
                 image.Pixels[pixel + 2]);
-            if (matches && !inside)
+            if (matches)
             {
-                currentStart = y;
-                inside = true;
-            }
-            if ((!matches || y == 440) && inside)
-            {
-                int currentEnd = matches && y == 440 ? y : y - 1;
-                if (currentEnd - currentStart > bestEnd - bestStart)
+                if (currentStart < 0)
                 {
-                    bestStart = currentStart;
-                    bestEnd = currentEnd;
+                    currentStart = y;
+                    gaps = 0;
                 }
-                inside = false;
+                currentEnd = y;
+                continue;
             }
+
+            if (currentStart < 0) continue;
+            if (gaps < maximumRasterGap)
+            {
+                gaps++;
+                continue;
+            }
+
+            KeepLongest();
+            currentStart = -1;
+            currentEnd = -1;
+            gaps = 0;
         }
+
+        KeepLongest();
         return (bestStart, bestEnd);
+
+        void KeepLongest()
+        {
+            if (currentStart < 0 ||
+                currentEnd - currentStart <= bestEnd - bestStart) return;
+            bestStart = currentStart;
+            bestEnd = currentEnd;
+        }
     }
 
     private static (int MinX, int MinY, int MaxX, int MaxY, int Count)? GreenBounds(

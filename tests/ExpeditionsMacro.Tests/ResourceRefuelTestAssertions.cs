@@ -23,7 +23,7 @@ internal static class ResourceRefuelTestAssertions
     {
         int confirm = Find(
             events,
-            "click:337,345",
+            "click:337,344",
             0);
         int firstKey = -1;
         for (int index = confirm + 1;

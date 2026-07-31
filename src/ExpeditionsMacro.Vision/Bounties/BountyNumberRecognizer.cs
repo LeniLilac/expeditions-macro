@@ -1,7 +1,5 @@
 using ExpeditionsMacro.Core.Imaging;
 using ExpeditionsMacro.Vision.Diagnostics;
-using ExpeditionsMacro.Vision.Infrastructure;
-using OpenCvSharp;
 
 namespace ExpeditionsMacro.Vision.Bounties;
 
@@ -17,11 +15,17 @@ public static class BountyNumberRecognizer
     private const int SearchY = 200;
     private const int SearchWidth = 628;
     private const int SearchHeight = 320;
-    private const double MatchThreshold = 0.985;
-    private const int ActionWindowLeft = 22;
+    private const int TemplateHeight = 7;
+    private const int MaximumTemplateWidth = 17;
+    private const int MaximumPixelDistance = 1;
+    private const int MinimumDistanceMargin = 3;
+    // The widest reviewed paper places its suffix 46 pixels left of the live action.
+    private const int ActionWindowLeft = 54;
     private const int ActionWindowTop = 105;
-    private const int ActionWindowWidth = 24;
-    private const int ActionWindowHeight = 24;
+    private const int ActionWindowWidth = 62;
+    private const int ActionWindowHeight = 26;
+    private const int ExpectedGlyphCenter = 47;
+    private const int ExpectedGlyphTop = 8;
 
     private static readonly Template[] Templates =
     [
@@ -38,10 +42,13 @@ public static class BountyNumberRecognizer
     ];
 
     public static IReadOnlyList<BountyNumberMatch> Detect(
-        ImageFrame image) =>
-        Detect(
+        ImageFrame image)
+    {
+        Validate(image);
+        return Detect(
             image,
             BountyBoardActionDetector.Find(image));
+    }
 
     internal static IReadOnlyList<BountyNumberMatch> Detect(
         ImageFrame image,
@@ -49,13 +56,6 @@ public static class BountyNumberRecognizer
     {
         Validate(image);
         byte[] mask = BuildMask(image);
-        using Mat search = ImageCodec.ToMat(
-            new ImageFrame(
-                SearchWidth,
-                SearchHeight,
-                PixelFormat.Gray8,
-                mask,
-                takeOwnership: true));
         List<BountyNumberMatch> matches = [];
         foreach (BountyCardAction action in
                  actions
@@ -72,64 +72,57 @@ public static class BountyNumberRecognizer
             if (left < 0 ||
                 top < 0 ||
                 left + ActionWindowWidth >
-                search.Width ||
+                SearchWidth ||
                 top + ActionWindowHeight >
-                search.Height)
+                SearchHeight)
             {
                 continue;
             }
 
-            using Mat window = new(
-                search,
-                new Rect(
-                    left,
-                    top,
-                    ActionWindowWidth,
-                    ActionWindowHeight));
-            Candidate? best = null;
+            List<Candidate> candidates = [];
             foreach (Template template in Templates)
             {
-                using Mat result = new();
-                Cv2.MatchTemplate(
-                    window,
-                    template.Mask,
-                    result,
-                    TemplateMatchModes.CCoeffNormed);
-                Cv2.MinMaxLoc(
-                    result,
-                    out _,
-                    out double maximum,
-                    out _,
-                    out Point location);
-                Candidate candidate = new(
-                    template,
-                    maximum,
-                    location);
-                if (best is null ||
-                    candidate.Confidence >
-                    best.Value.Confidence ||
-                    Math.Abs(
-                        candidate.Confidence -
-                        best.Value.Confidence) <
-                        0.000001 &&
-                    candidate.Template.Width >
-                    best.Value.Template.Width)
-                {
-                    best = candidate;
-                }
+                candidates.Add(
+                    BestCandidate(
+                        mask,
+                        left,
+                        top,
+                        template));
             }
-            if (best is Candidate match &&
-                match.Confidence >= MatchThreshold)
+
+            Candidate[] ranked = candidates
+                .OrderBy(candidate =>
+                    candidate.Distance)
+                .ThenBy(candidate =>
+                    candidate.PositionDistance)
+                .ThenByDescending(candidate =>
+                    candidate.Template.Width)
+                .ToArray();
+            Candidate match = ranked[0];
+            int margin =
+                ranked[1].Distance -
+                match.Distance;
+            if (match.Distance <=
+                    MaximumPixelDistance &&
+                margin >= MinimumDistanceMargin)
             {
                 matches.Add(
                     new BountyNumberMatch(
                         match.Template.Number,
-                        match.Confidence,
+                        Math.Clamp(
+                            1d -
+                            match.Distance /
+                            (double)(
+                                match.Template.Width *
+                                TemplateHeight),
+                            0,
+                            1),
                         SearchX + left +
-                            match.Location.X +
+                            match.LocalX +
                             match.Template.Width / 2,
                         SearchY + top +
-                            match.Location.Y + 3));
+                            match.LocalY +
+                            TemplateHeight / 2));
             }
         }
         BountyNumberMatch[] ordered =
@@ -155,6 +148,82 @@ public static class BountyNumberRecognizer
                 }),
             });
         return ordered;
+    }
+
+    private static Candidate BestCandidate(
+        IReadOnlyList<byte> mask,
+        int windowLeft,
+        int windowTop,
+        Template template)
+    {
+        Candidate? best = null;
+        for (int localY = 0;
+             localY <=
+             ActionWindowHeight - TemplateHeight;
+             localY++)
+        {
+            for (int localX = 0;
+                 localX <=
+                 ActionWindowWidth -
+                 MaximumTemplateWidth;
+                 localX++)
+            {
+                // Right-side pixels disambiguate #1 from the identical prefix of #10.
+                int distance = 0;
+                for (int y = 0;
+                     y < TemplateHeight;
+                     y++)
+                {
+                    for (int x = 0;
+                         x <
+                         MaximumTemplateWidth;
+                         x++)
+                    {
+                        bool live =
+                            mask[
+                                (windowTop +
+                                 localY + y) *
+                                    SearchWidth +
+                                windowLeft +
+                                localX + x] != 0;
+                        bool expected =
+                            x < template.Width &&
+                            template.Mask[
+                                y * template.Width +
+                                x] != 0;
+                        if (live != expected)
+                        {
+                            distance++;
+                        }
+                    }
+                }
+                int positionDistance =
+                    Math.Abs(
+                        localX +
+                        template.Width / 2 -
+                        ExpectedGlyphCenter) +
+                    Math.Abs(
+                        localY -
+                        ExpectedGlyphTop);
+                Candidate candidate = new(
+                    template,
+                    distance,
+                    positionDistance,
+                    localX,
+                    localY);
+                if (best is null ||
+                    candidate.Distance <
+                    best.Value.Distance ||
+                    candidate.Distance ==
+                    best.Value.Distance &&
+                    candidate.PositionDistance <
+                    best.Value.PositionDistance)
+                {
+                    best = candidate;
+                }
+            }
+        }
+        return best!.Value;
     }
 
     private static BountyNumberMatch[]
@@ -239,13 +308,7 @@ public static class BountyNumberRecognizer
         return new Template(
             number,
             width,
-            ImageCodec.ToMat(
-                new ImageFrame(
-                    width,
-                    7,
-                    PixelFormat.Gray8,
-                    pixels,
-                    takeOwnership: true)));
+            pixels);
     }
 
     private static void Validate(ImageFrame image)
@@ -263,10 +326,12 @@ public static class BountyNumberRecognizer
     private sealed record Template(
         int Number,
         int Width,
-        Mat Mask);
+        byte[] Mask);
 
     private readonly record struct Candidate(
         Template Template,
-        double Confidence,
-        Point Location);
+        int Distance,
+        int PositionDistance,
+        int LocalX,
+        int LocalY);
 }

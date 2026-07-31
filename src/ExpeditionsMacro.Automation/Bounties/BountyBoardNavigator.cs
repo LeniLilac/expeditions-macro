@@ -7,7 +7,7 @@ using ExpeditionsMacro.Vision.Bounties;
 
 namespace ExpeditionsMacro.Automation.Bounties;
 
-internal sealed class BountyBoardNavigator
+internal sealed partial class BountyBoardNavigator
 {
     private static readonly TimeSpan PollInterval =
         TimeSpan.FromMilliseconds(180);
@@ -21,6 +21,8 @@ internal sealed class BountyBoardNavigator
     private readonly Func<DateTimeOffset> _utcNow;
     private readonly BountyLobbyHandoffNavigator
         _lobbyHandoff;
+    private readonly BountyBoardLiveActionObserver
+        _liveActions;
 
     public BountyBoardNavigator(
         IRobloxAutomation automation)
@@ -43,6 +45,11 @@ internal sealed class BountyBoardNavigator
         _lobbyHandoff =
             new BountyLobbyHandoffNavigator(
                 automation,
+                delay,
+                utcNow);
+        _liveActions =
+            new BountyBoardLiveActionObserver(
+                Capture,
                 delay,
                 utcNow);
     }
@@ -155,6 +162,21 @@ internal sealed class BountyBoardNavigator
             TimeSpan.FromSeconds(8),
             cancellationToken).ConfigureAwait(false);
 
+    public async Task<(
+        BountyBoardMatch Board,
+        IReadOnlyList<BountyLiveSlot> Slots)>
+        WaitForLiveSlotsAsync(
+        RobloxWindow window,
+        IDetectorPack detector,
+        bool rightView,
+        CancellationToken cancellationToken) =>
+        await _liveActions.WaitForLiveSlotsAsync(
+                window,
+                detector,
+                rightView,
+                cancellationToken)
+            .ConfigureAwait(false);
+
     public async Task ScrollAsync(
         RobloxWindow window,
         IDetectorPack detector,
@@ -186,17 +208,23 @@ internal sealed class BountyBoardNavigator
         bool rightView,
         CancellationToken cancellationToken)
     {
-        BountyBoardMatch board =
-            await WaitForBoardAsync(
-                window,
-                detector,
-                cancellationToken).ConfigureAwait(false);
-        BountyCardAction action =
-            BountyBoardLayout.RequireAction(
-                board,
-                slot,
-                rightView,
-                BountyCardActionKind.Reroll);
+        (_, IReadOnlyList<BountyLiveSlot> slots) =
+            await WaitForLiveSlotsAsync(
+                    window,
+                    detector,
+                    rightView,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        BountyCardAction action = slots
+            .Where(value =>
+                value.Slot == slot &&
+                value.Action.Kind ==
+                    BountyCardActionKind.Reroll)
+            .Select(value => value.Action)
+            .Cast<BountyCardAction?>()
+            .FirstOrDefault() ??
+            throw new RobloxUiUnavailableException(
+                $"Bounty slot {slot} has no stable live Reroll action.");
         await ClickAsync(
             window,
             action.X,
@@ -319,58 +347,6 @@ internal sealed class BountyBoardNavigator
         {
             throw new BountyGoldUnavailableException();
         }
-    }
-
-    public async Task<int?> ClaimAsync(
-        RobloxWindow window,
-        IDetectorPack detector,
-        int slot,
-        bool rightView,
-        CancellationToken cancellationToken)
-    {
-        BountyBoardMatch board =
-            await WaitForBoardAsync(
-                window,
-                detector,
-                cancellationToken).ConfigureAwait(false);
-        BountyCardAction? action =
-            BountyBoardLayout.FindAction(
-                board,
-                slot,
-                rightView,
-                BountyCardActionKind.Claim);
-        if (action is null)
-        {
-            return null;
-        }
-        int? number =
-            BountyBoardLayout.NumberForSlot(
-                board,
-                slot,
-                rightView);
-        await ClickAsync(
-            window,
-            action.Value.X,
-            action.Value.Y,
-            cancellationToken).ConfigureAwait(false);
-        await WaitForStateAsync(
-            window,
-            detector,
-            BountyBoardState.RewardOverlay,
-            TimeSpan.FromSeconds(8),
-            cancellationToken).ConfigureAwait(false);
-        (int X, int Y) dismiss =
-            BountyBoardDetector.RewardDismissAction;
-        await ClickAsync(
-            window,
-            dismiss.X,
-            dismiss.Y,
-            cancellationToken).ConfigureAwait(false);
-        await WaitForBoardAsync(
-            window,
-            detector,
-            cancellationToken).ConfigureAwait(false);
-        return number;
     }
 
     private async Task<BountyBoardMatch>

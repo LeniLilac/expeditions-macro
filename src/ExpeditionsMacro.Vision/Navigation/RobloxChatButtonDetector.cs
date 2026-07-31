@@ -25,49 +25,69 @@ public static class RobloxChatButtonDetector
     public const int ActionX = 139;
     public const int ActionY = 34;
 
-    private const int RegionLeft = 122;
-    private const int RegionTop = 18;
-    private const int RegionRight = 156;
-    private const int RegionBottom = 50;
+    private const int TopSearchLeft = 124;
+    private const int TopSearchTop = 22;
+    private const int TopSearchRight = 152;
+    private const int TopSearchBottom = 28;
+    private const int SideSearchLeft = 124;
+    private const int SideSearchTop = 22;
+    private const int SideSearchRight = 133;
+    private const int SideSearchBottom = 41;
+    private const int FillLeft = 130;
+    private const int FillTop = 27;
+    private const int FillRight = 137;
+    private const int FillBottom = 36;
+    private const int TailLeft = 135;
+    private const int TailTop = 38;
+    private const int TailRight = 149;
+    private const int TailBottom = 44;
 
     public static RobloxChatButtonMatch Detect(
         ImageFrame image)
     {
         Validate(image);
-        int opaqueNeutralPixels = 0;
-        for (int y = RegionTop;
-             y <= RegionBottom;
-             y++)
-        {
-            for (int x = RegionLeft;
-                 x <= RegionRight;
-                 x++)
-            {
-                if (IsOpaqueNeutral(image, x, y))
-                {
-                    opaqueNeutralPixels++;
-                }
-            }
-        }
-
+        // Notification badges overlap the upper-right corner,
+        // so only badge-independent speech geometry owns state.
+        int topRun = LongestHorizontalRun(image);
+        int sideRun = LongestVerticalRun(image);
+        int fillPixels = CountOpaqueNeutral(
+            image,
+            FillLeft,
+            FillTop,
+            FillRight,
+            FillBottom);
+        int tailPixels = CountOpaqueNeutral(
+            image,
+            TailLeft,
+            TailTop,
+            TailRight,
+            TailBottom);
+        bool ownsSpeechGlyph =
+            topRun >= 16 &&
+            sideRun >= 12 &&
+            tailPixels >= 18;
         RobloxChatButtonState state =
-            opaqueNeutralPixels is >= 230 and <= 380
+            !ownsSpeechGlyph
+                ? RobloxChatButtonState.None
+                : fillPixels >= 40
                 ? RobloxChatButtonState.Open
-                : opaqueNeutralPixels is >= 60 and <= 170
+                : fillPixels <= 20
                     ? RobloxChatButtonState.Closed
                     : RobloxChatButtonState.None;
         double confidence = state switch
         {
             RobloxChatButtonState.Open =>
-                Closeness(
-                    opaqueNeutralPixels,
-                    expected: 303,
-                    tolerance: 77),
+                StructureConfidence(
+                    topRun,
+                    sideRun,
+                    tailPixels,
+                    Ramp(fillPixels, 40, 68)),
             RobloxChatButtonState.Closed =>
-                Closeness(
-                    opaqueNeutralPixels,
-                    expected: 90,
-                    tolerance: 80),
+                StructureConfidence(
+                    topRun,
+                    sideRun,
+                    tailPixels,
+                    1 - Ramp(fillPixels, 20, 40)),
             _ => 0,
         };
         RobloxChatButtonMatch match = new(
@@ -87,19 +107,99 @@ public static class RobloxChatButtonDetector
             {
                 match.ActionX,
                 match.ActionY,
-                opaqueNeutralPixels,
+                topRun,
+                sideRun,
+                fillPixels,
+                tailPixels,
             });
         return match;
     }
 
-    private static double Closeness(
-        int value,
-        int expected,
-        int tolerance) =>
+    private static double StructureConfidence(
+        int topRun,
+        int sideRun,
+        int tailPixels,
+        double stateConfidence) =>
         Math.Clamp(
-            1 -
-            Math.Abs(value - expected) /
-            (double)tolerance,
+            0.25 * Ramp(topRun, 16, 21) +
+            0.25 * Ramp(sideRun, 12, 14) +
+            0.25 * Ramp(tailPixels, 18, 21) +
+            0.25 * stateConfidence,
+            0,
+            1);
+
+    private static int LongestHorizontalRun(
+        ImageFrame image)
+    {
+        int longest = 0;
+        for (int y = TopSearchTop;
+             y <= TopSearchBottom;
+             y++)
+        {
+            int current = 0;
+            for (int x = TopSearchLeft;
+                 x <= TopSearchRight;
+                 x++)
+            {
+                current = IsOpaqueNeutral(image, x, y)
+                    ? current + 1
+                    : 0;
+                longest = Math.Max(longest, current);
+            }
+        }
+        return longest;
+    }
+
+    private static int LongestVerticalRun(
+        ImageFrame image)
+    {
+        int longest = 0;
+        for (int x = SideSearchLeft;
+             x <= SideSearchRight;
+             x++)
+        {
+            int current = 0;
+            for (int y = SideSearchTop;
+                 y <= SideSearchBottom;
+                 y++)
+            {
+                current = IsOpaqueNeutral(image, x, y)
+                    ? current + 1
+                    : 0;
+                longest = Math.Max(longest, current);
+            }
+        }
+        return longest;
+    }
+
+    private static int CountOpaqueNeutral(
+        ImageFrame image,
+        int left,
+        int top,
+        int right,
+        int bottom)
+    {
+        int count = 0;
+        for (int y = top; y <= bottom; y++)
+        {
+            for (int x = left; x <= right; x++)
+            {
+                if (IsOpaqueNeutral(image, x, y))
+                {
+                    count++;
+                }
+            }
+        }
+        return count;
+    }
+
+    private static double Ramp(
+        double value,
+        double minimum,
+        double maximum) =>
+        Math.Clamp(
+            (value - minimum) /
+            (maximum - minimum),
             0,
             1);
 
