@@ -209,6 +209,45 @@ public sealed class BountyPlannerTests
     }
 
     [Fact]
+    public void PartialFieldRoutes_DoNotRequireBoardReconciliation()
+    {
+        BountyActiveProgress[] active =
+        [
+            Progress(
+                2,
+                ("fkf-30", 1),
+                ("sg-30", 1)),
+            Progress(
+                4,
+                ("fkf-15", 1),
+                ("sg-30", 1)),
+            Progress(
+                6,
+                ("fkf-60", 1),
+                ("fkf-30", 1)),
+            Active(7),
+            Active(9),
+        ];
+
+        Assert.False(
+            BountyPlanner.HasClaimableBounty(active));
+
+        BountyWorkRoute raid = new()
+        {
+            Kind = BountyObjectiveKind.RaidActOne,
+            CoveredBounties = [2, 4],
+        };
+        IReadOnlyList<BountyActiveProgress> completed =
+            BountyPlanner.ApplyCompletedRoute(
+                active,
+                raid);
+
+        Assert.True(
+            BountyPlanner.HasClaimableBounty(
+                completed));
+    }
+
+    [Fact]
     public void UtcDailyReset_ClearsClaimCountButKeepsActiveProgress()
     {
         DateTimeOffset previous =
@@ -276,6 +315,17 @@ public sealed class BountyPlannerTests
         new()
         {
             Number = number,
+        };
+
+    private static BountyActiveProgress Progress(
+        int number,
+        params (string Key, int Value)[] values) =>
+        new()
+        {
+            Number = number,
+            ObjectiveProgress = values.ToDictionary(
+                value => value.Key,
+                value => value.Value),
         };
 
     private static void AssertInfinite(

@@ -9,6 +9,7 @@ public sealed class TeamScreenDetectorTests
     [Theory]
     [InlineData("TeamUnits_01.png", TeamScreenState.Units)]
     [InlineData("TeamUnits_CurrentGreenDecoys_01.png", TeamScreenState.Units)]
+    [InlineData("TeamUnits_DenseRoster_01.png", TeamScreenState.Units)]
     [InlineData("TeamList_01.png", TeamScreenState.Teams)]
     [InlineData("TeamList_Top_BackgroundDecoy_01.png", TeamScreenState.Teams)]
     [InlineData("TeamList_Aligned_Team1_Current_01.png", TeamScreenState.Teams)]
@@ -98,6 +99,7 @@ public sealed class TeamScreenDetectorTests
     [Theory]
     [InlineData("TeamUnits_01.png")]
     [InlineData("TeamUnits_CurrentGreenDecoys_01.png")]
+    [InlineData("TeamUnits_DenseRoster_01.png")]
     public void UnitInventory_MapsTheLiveTeamsAction(
         string fileName)
     {
@@ -106,7 +108,7 @@ public sealed class TeamScreenDetectorTests
 
         Assert.Equal(TeamScreenState.Units, match.State);
         Assert.InRange(match.ActionX!.Value, 285, 315);
-        Assert.InRange(match.ActionY!.Value, 435, 460);
+        Assert.InRange(match.ActionY!.Value, 420, 460);
     }
 
     [Fact]

@@ -246,6 +246,7 @@ public sealed partial class StageMacroRunner
                             detector,
                             cancellationToken)
                         .ConfigureAwait(false);
+                    _fastNoAlign.ObserveLobby(window);
                     return last;
                 }
                 StageRunOutcome outcome = terminal.State == StageScreenState.Victory ? StageRunOutcome.Victory : StageRunOutcome.Defeat;

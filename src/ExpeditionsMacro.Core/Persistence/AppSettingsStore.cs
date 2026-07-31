@@ -48,8 +48,8 @@ public sealed class AppSettingsStore
             return settings;
         }
 
-        // Rewriting schema 3 removes the retired Fast workflow toggle while
-        // preserving every setting that remains part of the product.
+        // Rewriting removes retired settings and applies each one-time
+        // product migration before user changes become authoritative again.
         AppSettings migrated = settings with
         {
             SchemaVersion =
@@ -72,6 +72,13 @@ public sealed class AppSettingsStore
                 AutoCheckUiScaleOnStart =
                     settings
                         .AutoCheckGameSettingsOnStart,
+            };
+        }
+        if (persistedSchemaVersion < 5)
+        {
+            migrated = migrated with
+            {
+                ResourceRefuelDebug = new(),
             };
         }
         await SaveAsync(

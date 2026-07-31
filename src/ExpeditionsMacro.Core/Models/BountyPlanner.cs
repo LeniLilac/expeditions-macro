@@ -207,6 +207,13 @@ public static class BountyPlanner
                 objective.RequiredCount);
     }
 
+    public static bool HasClaimableBounty(
+        IReadOnlyList<BountyActiveProgress> active)
+    {
+        ArgumentNullException.ThrowIfNull(active);
+        return active.Any(IsComplete);
+    }
+
     private static BountyActiveProgress Apply(
         BountyActiveProgress progress,
         BountyWorkRoute route,

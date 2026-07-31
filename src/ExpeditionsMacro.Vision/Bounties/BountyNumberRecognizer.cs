@@ -59,10 +59,11 @@ public static class BountyNumberRecognizer
         List<BountyNumberMatch> matches = [];
         foreach (BountyCardAction action in
                  actions
-                     .GroupBy(value => value.X)
+                     .GroupBy(value =>
+                         value.CardAnchorX)
                      .Select(group => group.First()))
         {
-            int left = action.X -
+            int left = action.CardAnchorX -
                 ActionWindowLeft -
                 SearchX;
             int top = action.Y -
@@ -131,9 +132,8 @@ public static class BountyNumberRecognizer
                             match.Location.Y + 3));
             }
         }
-        BountyNumberMatch[] ordered = matches
-            .OrderBy(value => value.CenterX)
-            .ToArray();
+        BountyNumberMatch[] ordered =
+            CollapseSameCardMatches(matches);
         VisionTrace.Emit(
             "bounty_numbers",
             string.Join(
@@ -155,6 +155,38 @@ public static class BountyNumberRecognizer
                 }),
             });
         return ordered;
+    }
+
+    private static BountyNumberMatch[]
+        CollapseSameCardMatches(
+        IEnumerable<BountyNumberMatch> matches)
+    {
+        List<BountyNumberMatch> collapsed = [];
+        foreach (BountyNumberMatch match in
+                 matches
+                     .OrderBy(value =>
+                         value.CenterX)
+                     .ThenByDescending(value =>
+                         value.Confidence))
+        {
+            int existing = collapsed.FindIndex(
+                value =>
+                    Math.Abs(
+                        value.CenterX -
+                        match.CenterX) <= 18);
+            if (existing < 0)
+            {
+                collapsed.Add(match);
+            }
+            else if (match.Confidence >
+                     collapsed[existing].Confidence)
+            {
+                collapsed[existing] = match;
+            }
+        }
+        return collapsed
+            .OrderBy(value => value.CenterX)
+            .ToArray();
     }
 
     private static byte[] BuildMask(ImageFrame image)

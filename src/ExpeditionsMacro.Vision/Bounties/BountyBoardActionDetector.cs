@@ -12,7 +12,15 @@ public enum BountyCardActionKind
 public readonly record struct BountyCardAction(
     BountyCardActionKind Kind,
     int X,
-    int Y);
+    int Y)
+{
+    private const int ClaimCenterToCardAnchor = 40;
+
+    public int CardAnchorX =>
+        Kind == BountyCardActionKind.Claim
+            ? X + ClaimCenterToCardAnchor
+            : X;
+}
 
 internal static class BountyBoardActionDetector
 {

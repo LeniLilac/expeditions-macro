@@ -14,7 +14,7 @@ public sealed record AppSettings
     private const string ControlConflictGuidance =
         " Scroll down to Controls on the Dashboard to choose different keys, and keep every game control matched to Anime Expeditions.";
 
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
 
     public const int DefaultMacroHotkeyVirtualKey = 0x75;
 

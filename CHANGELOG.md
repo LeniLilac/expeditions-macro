@@ -21,13 +21,19 @@ All notable changes to Expeditions Macro are documented here.
 
 ### Fixed
 
+- Completed Bounty cards now map their left-shifted green Claim action back to the owning card for slot and number recognition while still clicking the live Claim center.
+- Saved-team preparation now accepts dense, brightly populated Unit Inventories from their stable gold header and four live actions instead of rejecting them because changing roster artwork reduced whole-panel darkness.
 - Bounty Board entry now detects the unhovered live row, supports the Beginner's Path vertical offset, and requires a stable owner-state action instead of depending on the mouse hover highlight.
 - Infinite Bounty runs no longer fail during wave-counter initialization because the embedded 0-through-100 template payload is normalized and length-validated before recognition.
 - Bounty slot scanning stops once every Mythic retainable under the current Challenge and parking policy is already active, avoiding an unnecessary fifth-slot reroll in the zero-parking daily-limit case.
+- Partial Bounty objectives now continue directly from the verified Lobby into the next deterministic route. The board reopens only when a whole active Bounty is ready to claim.
+- Returning to Lobby after an Infinite objective now invalidates the previous match's Fast camera-preparation cache, so the next map prepares its own camera pose.
+- Bounty objective-complete Discord notifications now use the supported objective event title and success accent.
+- Upgrading users receive the field-confirmed Gold Mine and Resource Drill route defaults once, while later user edits remain preserved.
 
 ### Tests
 
-- Passed 1,441 application and detector tests, 5 Deep Debug Viewer tests, and all 88 dark/light UI snapshot states.
+- Passed 1,450 application and detector tests, 5 Deep Debug Viewer tests, and all 88 dark/light UI snapshot states.
 
 ## [1.3.0-beta.44] - 2026-07-30
 

@@ -196,7 +196,10 @@ public static class TeamScreenDetector
         double unequip = ActionButtonDetector.Score(image, "units_unequip_all");
         double teams = ActionButtonDetector.Score(image, "units_teams");
         double quickSell = ActionButtonDetector.Score(image, "units_quick_sell");
-        if (header < 0.018 || dark < 0.42 || close == 0 || unequip == 0 || teams == 0 || quickSell == 0) return 0;
+        // A dense roster can fill the panel with bright unit artwork. Keep
+        // panel darkness as optional confidence, but never let roster content
+        // override the complete header and four live inventory actions.
+        if (header < 0.018 || close == 0 || unequip == 0 || teams == 0 || quickSell == 0) return 0;
         return Math.Clamp(
             0.18 * Ramp(header, 0.018, 0.12) +
             0.12 * Ramp(dark, 0.42, 0.82) +

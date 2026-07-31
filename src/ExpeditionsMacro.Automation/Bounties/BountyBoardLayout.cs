@@ -58,12 +58,14 @@ internal static class BountyBoardLayout
         BountyCardAction? action = board.Actions
             .Where(value => value.Kind == kind)
             .OrderBy(value =>
-                Math.Abs(value.X - column))
+                Math.Abs(
+                    value.CardAnchorX -
+                    column))
             .Cast<BountyCardAction?>()
             .FirstOrDefault();
         return action is not null &&
             Math.Abs(
-                action.Value.X -
+                action.Value.CardAnchorX -
                 column) <= 18
             ? action
             : null;

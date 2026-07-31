@@ -77,6 +77,60 @@ public sealed class BountyNumberRecognizerTests
                 ]));
     }
 
+    [Fact]
+    public void Detect_UsesTheCardAnchorForAClaimAction()
+    {
+        const int cardAnchorX = 315;
+        const int actionY = 359;
+        ImageFrame image = CreateFrame();
+        DrawGlyph(
+            image,
+            NumberGlyphs[3],
+            centerX: cardAnchorX - 7,
+            top: actionY - 97);
+
+        BountyNumberMatch match = Assert.Single(
+            BountyNumberRecognizer.Detect(
+                image,
+                [
+                    new BountyCardAction(
+                        BountyCardActionKind.Claim,
+                        cardAnchorX - 40,
+                        actionY),
+                ]));
+
+        Assert.Equal(4, match.Number);
+    }
+
+    [Fact]
+    public void Detect_CollapsesClaimAndRerollEvidenceForOneCard()
+    {
+        const int cardAnchorX = 315;
+        const int actionY = 359;
+        ImageFrame image = CreateFrame();
+        DrawGlyph(
+            image,
+            NumberGlyphs[3],
+            centerX: cardAnchorX - 7,
+            top: actionY - 97);
+
+        BountyNumberMatch match = Assert.Single(
+            BountyNumberRecognizer.Detect(
+                image,
+                [
+                    new BountyCardAction(
+                        BountyCardActionKind.Reroll,
+                        cardAnchorX,
+                        actionY),
+                    new BountyCardAction(
+                        BountyCardActionKind.Claim,
+                        cardAnchorX - 40,
+                        actionY),
+                ]));
+
+        Assert.Equal(4, match.Number);
+    }
+
     private static ImageFrame CreateFrame() =>
         new(
             808,

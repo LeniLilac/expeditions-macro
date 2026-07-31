@@ -119,6 +119,7 @@ public sealed class DiscordAndWindowsTests
     [InlineData("started", DiscordWebhookClient.StartAccentColor)]
     [InlineData("attempt", DiscordWebhookClient.StartAccentColor)]
     [InlineData("victory", DiscordWebhookClient.VictoryAccentColor)]
+    [InlineData("objective", DiscordWebhookClient.VictoryAccentColor)]
     [InlineData("defeat", DiscordWebhookClient.DefeatAccentColor)]
     [InlineData("error", DiscordWebhookClient.ErrorAccentColor)]
     public void ComponentsPayload_UsesTheSemanticEventAccent(string eventName, int expectedAccent)
@@ -141,6 +142,42 @@ public sealed class DiscordAndWindowsTests
         Assert.Equal(
             expectedAccent,
             document.RootElement.GetProperty("components")[0].GetProperty("accent_color").GetInt32());
+    }
+
+    [Fact]
+    public void ObjectiveComponentsPayload_ReportsSafeBountyExit()
+    {
+        DiscordNotification notification = new()
+        {
+            WebhookUrl =
+                "https://discord.com/api/webhooks/123/token",
+            Event = "objective",
+            Runtime = TimeSpan.FromMinutes(18),
+            MatchRuntime = TimeSpan.FromMinutes(16),
+            Victories = 0,
+            Defeats = 0,
+            MapNumber = 2,
+            Difficulty = 0,
+            Detail =
+                "School Grounds Infinite reached safe Bounty exit wave 32.",
+            MacroName = "Bounty Macro",
+            Route =
+                "Story · School Grounds · Infinite",
+        };
+
+        string json = JsonSerializer.Serialize(
+            DiscordWebhookClient.BuildComponentsPayload(
+                notification,
+                null));
+
+        Assert.Contains(
+            "Bounty Macro: Objective complete",
+            json,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "safe Bounty exit wave 32",
+            json,
+            StringComparison.Ordinal);
     }
 
     [Fact]

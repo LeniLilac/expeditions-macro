@@ -63,14 +63,8 @@ public sealed class BountyModelTests
             BountyProgressState expected = new()
             {
                 DailyEpochUtc =
-                    new DateTimeOffset(
-                        2026,
-                        7,
-                        30,
-                        0,
-                        0,
-                        0,
-                        TimeSpan.Zero),
+                    BountyProgressState.UtcDay(
+                        DateTimeOffset.UtcNow),
                 ClaimedToday = 3,
                 Active =
                 [

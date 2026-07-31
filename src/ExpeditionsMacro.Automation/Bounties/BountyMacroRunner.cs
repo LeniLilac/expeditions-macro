@@ -75,6 +75,7 @@ public sealed class BountyMacroRunner
                 .ConfigureAwait(false))
             .AdvanceDay(DateTimeOffset.UtcNow);
         bool noGold = false;
+        bool boardReconciliationRequired = true;
         RobloxWindow window =
             _automation.FindWindow() ??
             throw new RobloxSessionUnavailableException(
@@ -119,48 +120,54 @@ public sealed class BountyMacroRunner
                     NextUtcDay());
             }
 
-            Report(
-                "Opening the Bounty Board.",
-                5,
-                "bounty_navigation");
-            await _navigator.OpenAsync(
-                window,
-                detector,
-                cancellationToken).ConfigureAwait(false);
-            BountyBoardProcessingResult processed =
-                await _processor.ProcessAsync(
-                        window,
-                        detector,
-                        state,
-                        parkedNonViableLimit,
-                        challengeAvailability,
-                        rerollEnabled: !noGold,
-                        message => Write(message),
-                        cancellationToken)
-                    .ConfigureAwait(false);
-            state = processed.State;
-            noGold |= processed.GoldUnavailable;
-            await _states.SaveAsync(
-                state,
-                cancellationToken).ConfigureAwait(false);
-
-            if (state.ClaimedToday >=
-                BountyCatalog.DailyClaimLimit)
+            bool boardOpened = false;
+            if (boardReconciliationRequired)
             {
-                Write(
-                    "All 10 daily Bounties have been claimed.",
-                    MacroEventLevel.Success,
-                    "bounty_daily_complete");
-                await _navigator.ReturnToLobbyAsync(
+                Report(
+                    "Opening the Bounty Board.",
+                    5,
+                    "bounty_navigation");
+                await _navigator.OpenAsync(
                     window,
                     detector,
                     cancellationToken).ConfigureAwait(false);
-                return Result(
+                boardOpened = true;
+                BountyBoardProcessingResult processed =
+                    await _processor.ProcessAsync(
+                            window,
+                            detector,
+                            state,
+                            parkedNonViableLimit,
+                            challengeAvailability,
+                            rerollEnabled: !noGold,
+                            message => Write(message),
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                state = processed.State;
+                noGold |= processed.GoldUnavailable;
+                boardReconciliationRequired = false;
+                await _states.SaveAsync(
                     state,
-                    runtime.Elapsed,
-                    noGold,
-                    retryOnNextStart: false,
-                    NextUtcDay());
+                    cancellationToken).ConfigureAwait(false);
+
+                if (state.ClaimedToday >=
+                    BountyCatalog.DailyClaimLimit)
+                {
+                    Write(
+                        "All 10 daily Bounties have been claimed.",
+                        MacroEventLevel.Success,
+                        "bounty_daily_complete");
+                    await _navigator.ReturnToLobbyAsync(
+                        window,
+                        detector,
+                        cancellationToken).ConfigureAwait(false);
+                    return Result(
+                        state,
+                        runtime.Elapsed,
+                        noGold,
+                        retryOnNextStart: false,
+                        NextUtcDay());
+                }
             }
 
             IReadOnlyList<BountyWorkRoute> routes =
@@ -169,10 +176,13 @@ public sealed class BountyMacroRunner
                     challengeAvailability);
             if (routes.Count == 0)
             {
-                await _navigator.ReturnToLobbyAsync(
-                    window,
-                    detector,
-                    cancellationToken).ConfigureAwait(false);
+                if (boardOpened)
+                {
+                    await _navigator.ReturnToLobbyAsync(
+                        window,
+                        detector,
+                        cancellationToken).ConfigureAwait(false);
+                }
                 DateTimeOffset? next =
                     NextEligible(
                         state,
@@ -205,10 +215,13 @@ public sealed class BountyMacroRunner
                 Describe(route),
                 25,
                 "bounty_objective");
-            await _navigator.ReturnToLobbyAsync(
-                window,
-                detector,
-                cancellationToken).ConfigureAwait(false);
+            if (boardOpened)
+            {
+                await _navigator.ReturnToLobbyAsync(
+                    window,
+                    detector,
+                    cancellationToken).ConfigureAwait(false);
+            }
             BountyRouteExecutionResult execution =
                 await executeRoute(
                     route,
@@ -237,6 +250,9 @@ public sealed class BountyMacroRunner
                 challengeNextEligibleAtUtc =
                     execution.NextEligibleAtUtc;
             }
+            boardReconciliationRequired =
+                BountyPlanner.HasClaimableBounty(
+                    state.Active);
             if (!execution.Completed)
             {
                 if (execution.ChallengeAvailability is not null)
@@ -264,11 +280,22 @@ public sealed class BountyMacroRunner
                 await _states.SaveAsync(
                     state,
                     cancellationToken).ConfigureAwait(false);
+                boardReconciliationRequired =
+                    BountyPlanner.HasClaimableBounty(
+                        state.Active);
             }
             Write(
                 $"Completed {Describe(route)}.",
                 MacroEventLevel.Success,
                 "bounty_objective_complete");
+            Write(
+                boardReconciliationRequired
+                    ? "A complete Bounty is ready to claim; reopening the Bounty Board."
+                    : "No whole Bounty is complete; continuing the next objective from the Lobby.",
+                MacroEventLevel.Information,
+                boardReconciliationRequired
+                    ? "bounty_claim_ready"
+                    : "bounty_objective_pending");
         }
     }
 
