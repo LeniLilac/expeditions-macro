@@ -16,6 +16,21 @@
         Drop="Window_Drop"
         DragOver="Window_DragOver"
         KeyDown="Window_KeyDown">
+    <Window.Resources>
+        <Style x:Key="InspectorModeButton"
+               TargetType="Button"
+               BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Height" Value="32" />
+            <Setter Property="MinWidth" Value="92" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Style.Triggers>
+                <Trigger Property="Tag" Value="Active">
+                    <Setter Property="Background" Value="{DynamicResource SelectedBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="68" />
@@ -54,16 +69,21 @@
                                MaxWidth="280"
                                HorizontalAlignment="Right"
                                Style="{StaticResource Caption}"
-                               Text="PNG, image folder, or Deep Debug ZIP"
+                               Text="Repository datasets, image folder, or Deep Debug ZIP"
                                TextTrimming="CharacterEllipsis"
                                TextWrapping="NoWrap"
                                ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
                 </StackPanel>
                 <StackPanel Grid.Column="2"
                             Orientation="Horizontal">
+                    <Button x:Name="OpenRepositoryDatasetsButton"
+                            Margin="0,0,8,0"
+                            Content="Repo datasets"
+                            Style="{StaticResource PrimaryButton}"
+                            Click="OpenRepositoryDatasets_Click"
+                            icons:ViewerIcon.Icon="Layers" />
                     <Button Margin="0,0,8,0"
                             Content="Open source"
-                            Style="{StaticResource PrimaryButton}"
                             Click="OpenSource_Click"
                             icons:ViewerIcon.Icon="FolderOpen" />
                     <Button Margin="0,0,8,0"
@@ -108,9 +128,34 @@
                           Background="{DynamicResource BorderBrush}"
                           ResizeDirection="Columns"
                           ResizeBehavior="PreviousAndNext" />
-            <controls:EvidencePane x:Name="EvidencePane"
-                                   Grid.Column="4"
-                                   SelectedCheckChanged="EvidencePane_SelectedCheckChanged" />
+            <Grid Grid.Column="4">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="42" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Border Padding="10,5"
+                        Background="{DynamicResource SidebarBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="0,0,0,1">
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="EvidenceModeButton"
+                                Content="Evidence"
+                                Style="{StaticResource InspectorModeButton}"
+                                Tag="Active"
+                                Click="EvidenceMode_Click" />
+                        <Button x:Name="AnnotationModeButton"
+                                Content="Annotate"
+                                Style="{StaticResource InspectorModeButton}"
+                                Click="AnnotationMode_Click" />
+                    </StackPanel>
+                </Border>
+                <Grid Grid.Row="1">
+                    <controls:EvidencePane x:Name="EvidencePane"
+                                           SelectedCheckChanged="EvidencePane_SelectedCheckChanged" />
+                    <controls:AnnotationPane x:Name="AnnotationPane"
+                                             Visibility="Collapsed" />
+                </Grid>
+            </Grid>
         </Grid>
 
         <Border Grid.Row="2"

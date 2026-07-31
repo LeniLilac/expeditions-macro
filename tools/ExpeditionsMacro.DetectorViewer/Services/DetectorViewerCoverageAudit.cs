@@ -1,5 +1,5 @@
-using System.Reflection;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using ExpeditionsMacro.Core.Imaging;
@@ -41,6 +41,8 @@ public static class DetectorViewerCoverageAudit
             "ExpeditionsMacro.Vision.Bounties.BountyBoardActionDetector",
             "ExpeditionsMacro.Vision.Bounties.BountyBoardDetector",
             "ExpeditionsMacro.Vision.Bounties.BountyBoardEventEntryDetector",
+            "ExpeditionsMacro.Vision.Bounties.BountyBoardHeaderRecognizer",
+            "ExpeditionsMacro.Vision.Bounties.BountyBoardOwnerDetector",
             "ExpeditionsMacro.Vision.Bounties.BountyNoGoldRecognizer",
             "ExpeditionsMacro.Vision.Bounties.BountyNumberRecognizer",
             "ExpeditionsMacro.Vision.Bounties.WaveCounterRecognizer",

@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "images": [
+    {
+      "image_path": "anime-expeditions/bounties/BountyBoard_DimmedSlot1_01.png",
+      "detector_id": "bounty.board",
+      "expected": "match",
+      "notes": "Change bounty board detection to just be the back\u002Bcalendar button, and the bounty board text in header\r\n\r\nadd ocr for header as fallback for img detection",
+      "regions": [
+        {
+          "id": "9d57ce3d-e753-438e-a88e-b55bc8235cae",
+          "label": "Back + Calendar owner rail",
+          "x": 8,
+          "y": 569,
+          "width": 175,
+          "height": 39,
+          "coordinate_summary": "X 8, Y 569, W 175, H 39"
+        },
+        {
+          "id": "2325fd02-d538-4a63-bed5-d219d2a40eec",
+          "label": "Bounty Board header",
+          "x": 210,
+          "y": 41,
+          "width": 120,
+          "height": 26,
+          "coordinate_summary": "X 210, Y 41, W 120, H 26"
+        }
+      ]
+    }
+  ]
+}

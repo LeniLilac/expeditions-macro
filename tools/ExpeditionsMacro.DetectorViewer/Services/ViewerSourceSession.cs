@@ -6,7 +6,8 @@ public sealed record LoadedViewerFrame(
     int Index,
     int FrameCount,
     string SourcePath,
-    FrameSourceKind SourceKind)
+    FrameSourceKind SourceKind,
+    IReadOnlyList<ViewerFrameRecord> Frames)
 {
     public string SourceKindLabel =>
         SourceKind switch
@@ -15,6 +16,8 @@ public sealed record LoadedViewerFrame(
                 "Single image",
             FrameSourceKind.Folder =>
                 "Image folder",
+            FrameSourceKind.RepositoryDatasets =>
+                "Repository datasets",
             _ => "Deep Debug archive",
         };
 }
@@ -27,16 +30,36 @@ public sealed class ViewerSourceSession : IDisposable
     public async Task<LoadedViewerFrame> OpenAsync(
         string path,
         IProgress<string>? progress,
+        CancellationToken cancellationToken) =>
+        await OpenCoreAsync(
+            () => FrameSequence.OpenAsync(
+                path,
+                progress,
+                cancellationToken),
+            cancellationToken);
+
+    public async Task<LoadedViewerFrame>
+        OpenRepositoryDatasetsAsync(
+            string datasetRoot,
+            IProgress<string>? progress,
+            CancellationToken cancellationToken) =>
+        await OpenCoreAsync(
+            () => FrameSequence
+                .OpenRepositoryDatasetsAsync(
+                    datasetRoot,
+                    progress,
+                    cancellationToken),
+            cancellationToken);
+
+    private async Task<LoadedViewerFrame> OpenCoreAsync(
+        Func<Task<FrameSequence>> openSource,
         CancellationToken cancellationToken)
     {
         FrameSequence? candidate = null;
         try
         {
             candidate =
-                await FrameSequence.OpenAsync(
-                    path,
-                    progress,
-                    cancellationToken);
+                await openSource();
             DecodedFrameCache cache = new();
             DecodedViewerFrame first =
                 await cache.GetAsync(
@@ -116,5 +139,6 @@ public sealed class ViewerSourceSession : IDisposable
             index,
             source.Frames.Count,
             source.SourcePath,
-            source.Kind);
+            source.Kind,
+            source.Frames);
 }

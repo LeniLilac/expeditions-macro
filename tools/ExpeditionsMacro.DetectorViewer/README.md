@@ -4,9 +4,12 @@ Detector Viewer is a standalone Windows inspection tool for the production visio
 
 ## Open a source
 
+- Choose **Repo datasets** or press Ctrl+D to index every supported image under the current checkout's `datasets` folder.
 - Choose **Open source** for a PNG, JPEG, BMP, TIFF, or Deep Debug ZIP.
 - Choose **Open folder** to index supported images recursively without loading the complete folder into memory.
 - Drop any supported source onto the window.
+- Type a filename into the frame picker to jump directly to a dataset image. The filename appears before its relative folder so prefix search remains useful across the complete corpus.
+- Changing frames automatically selects the strongest production detector associated with the fixture name or live positive evidence. A strong filename association remains selected when that detector fails, so broken fixtures are inspectable instead of hidden by the failure.
 - Use Left/Right to move between frames, `F` to fit, Ctrl+wheel to zoom, and middle-drag to pan.
 - Hover the image to inspect its canonical client coordinate and RGB/HSL values.
 
@@ -20,7 +23,19 @@ Production detectors require an 808 by 611 Roblox client frame. Other image size
 - **Unavailable** entries keep every detector visible in the catalog and state why a safe standalone detail path is not exposed.
 - A live action is the coordinate returned by the selected production detector for the selected frame. Static geometry never becomes an action.
 
-Detector Viewer is read-only. It neither controls Roblox nor changes detector decisions.
+Detector Viewer never controls Roblox or changes detector decisions. Its only write operation is the explicit repository annotation manifest described below.
+
+The repository button is available when the viewer runs anywhere beneath an Expeditions Macro checkout. Standalone copies outside a checkout can use **Open folder** and select a copied `datasets` directory instead.
+
+## Annotate detector fixtures
+
+1. Open **Repo datasets** and choose an image. The Viewer automatically selects its likely detector.
+2. Choose **Annotate** in the right pane.
+3. Set **Should match**, **Should not match**, or **Needs review**.
+4. Drag directly on the image to add one or more canonical detection regions.
+5. Select a region to rename or delete it, and add implementation notes when needed.
+
+Every edit is atomically autosaved to `datasets/detector-annotations.json`. Entries are keyed by repository-relative image path and detector ID, so one fixture can describe different expectations for multiple detectors. Coordinates always use the canonical 808 by 611 client frame. Annotation overlays are implementation guidance only; they never authorize input or alter production detector results.
 
 ## Validation commands
 

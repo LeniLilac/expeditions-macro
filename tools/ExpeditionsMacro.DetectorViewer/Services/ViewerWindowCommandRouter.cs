@@ -29,10 +29,19 @@ internal static class ViewerWindowCommandRouter
         KeyEventArgs args,
         Action openSource,
         Action openFolder,
+        Action openRepositoryDatasets,
         Action<int> loadFrame,
         int frameIndex,
         Action fit)
     {
+        if (args.Key == Key.D &&
+            Keyboard.Modifiers ==
+                ModifierKeys.Control)
+        {
+            openRepositoryDatasets();
+            args.Handled = true;
+            return;
+        }
         if (args.Key == Key.O &&
             Keyboard.Modifiers.HasFlag(
                 ModifierKeys.Control))

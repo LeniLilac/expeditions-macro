@@ -78,6 +78,116 @@ public sealed class BountyBoardDetectorTests
         }
     }
 
+    [Fact]
+    public void BoardOwnership_UsesOnlyAnnotatedHeaderAndButtonRail()
+    {
+        ImageFrame source = ImageCodec.Load(
+            Path.Combine(
+                TestPaths.BountyDatasets,
+                "BountyBoard_FieldOwnerVariant_01.png"));
+
+        BountyBoardMatch match =
+            BountyBoardDetector.Detect(source);
+
+        Assert.Equal(
+            BountyBoardState.Board,
+            match.State);
+        Assert.True(match.BoardButtonRailScore > 0);
+        Assert.True(match.BoardHeaderScore > 0);
+        Assert.Empty(match.Actions);
+    }
+
+    [Fact]
+    public void BoardOwnership_UsesBoundedTextFallbackForRecoloredHeader()
+    {
+        ImageFrame frame = ImageCodec.Load(
+            Path.Combine(
+                TestPaths.BountyDatasets,
+                "BountyBoard_DimmedSlot1_01.png"));
+        RecolorBrightHeaderInk(frame);
+
+        BountyBoardMatch match =
+            BountyBoardDetector.Detect(frame);
+
+        Assert.Equal(
+            BountyBoardState.Board,
+            match.State);
+        Assert.True(
+            match.BoardHeaderUsedTextFallback);
+        Assert.True(match.BoardHeaderScore > 0);
+    }
+
+    [Theory]
+    [InlineData(210, 41, 120, 26)]
+    [InlineData(8, 569, 175, 39)]
+    public void BoardOwnership_RequiresHeaderAndButtonRail(
+        int x,
+        int y,
+        int width,
+        int height)
+    {
+        ImageFrame frame = ImageCodec.Load(
+            Path.Combine(
+                TestPaths.BountyDatasets,
+                "BountyBoard_DimmedSlot1_01.png"));
+        Fill(
+            frame,
+            x,
+            y,
+            width,
+            height,
+            red: 0,
+            green: 0,
+            blue: 0);
+
+        BountyBoardMatch match =
+            BountyBoardDetector.Detect(frame);
+
+        Assert.NotEqual(
+            BountyBoardState.Board,
+            match.State);
+    }
+
+    [Fact]
+    [Trait("Category", "Golden")]
+    public void BoardOwnership_DoesNotMatchOtherRepositoryFixtures()
+    {
+        List<string> failures = [];
+        foreach (string file in
+                 Directory.EnumerateFiles(
+                     Path.Combine(
+                         TestPaths.RepositoryRoot,
+                         "datasets"),
+                     "*.png",
+                     SearchOption.AllDirectories))
+        {
+            if (file.StartsWith(
+                    TestPaths.BountyDatasets,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            ImageFrame frame = ImageCodec.Load(file);
+            if (frame.Width != 808 ||
+                frame.Height != 611)
+            {
+                continue;
+            }
+            if (BountyBoardDetector.Detect(frame).State ==
+                BountyBoardState.Board)
+            {
+                failures.Add(
+                    Path.GetRelativePath(
+                        TestPaths.RepositoryRoot,
+                        file));
+            }
+        }
+
+        Assert.True(
+            failures.Count == 0,
+            $"Bounty Board false matches:{Environment.NewLine}{string.Join(Environment.NewLine, failures)}");
+    }
+
     [Theory]
     [InlineData("EventHome.png", 234)]
     [InlineData("ActSelector.png", 234)]
@@ -210,6 +320,36 @@ public sealed class BountyBoardDetectorTests
                 frame.Pixels[pixel] = red;
                 frame.Pixels[pixel + 1] = green;
                 frame.Pixels[pixel + 2] = blue;
+            }
+        }
+    }
+
+    private static void RecolorBrightHeaderInk(
+        ImageFrame frame)
+    {
+        for (int y = 41; y < 67; y++)
+        {
+            for (int x = 210; x < 330; x++)
+            {
+                int pixel =
+                    (y * frame.Width + x) * 3;
+                byte red = frame.Pixels[pixel];
+                byte green = frame.Pixels[pixel + 1];
+                byte blue = frame.Pixels[pixel + 2];
+                int maximum = Math.Max(
+                    red,
+                    Math.Max(green, blue));
+                int minimum = Math.Min(
+                    red,
+                    Math.Min(green, blue));
+                if (maximum <= 210 ||
+                    maximum - minimum <= 40)
+                {
+                    continue;
+                }
+                frame.Pixels[pixel] = 80;
+                frame.Pixels[pixel + 1] = 170;
+                frame.Pixels[pixel + 2] = 255;
             }
         }
     }

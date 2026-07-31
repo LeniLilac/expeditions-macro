@@ -20,7 +20,10 @@ public readonly record struct BountyBoardMatch(
     IReadOnlyList<BountyNumberMatch> Numbers,
     bool NoGold,
     int? EventActionX = null,
-    int? EventActionY = null)
+    int? EventActionY = null,
+    double BoardButtonRailScore = 0,
+    double BoardHeaderScore = 0,
+    bool BoardHeaderUsedTextFallback = false)
 {
     public (int X, int Y)? EventAction =>
         EventActionX is int x &&
@@ -31,10 +34,6 @@ public readonly record struct BountyBoardMatch(
 
 public static class BountyBoardDetector
 {
-    private static readonly ScreenRegion BoardHeader =
-        new(205, 20, 125, 60);
-    private static readonly ScreenRegion BoardTopRail =
-        new(195, 210, 605, 20);
     private static readonly ScreenRegion RewardTitle =
         new(315, 230, 185, 45);
     private static readonly ScreenRegion RewardBackdrop =
@@ -78,25 +77,32 @@ public static class BountyBoardDetector
                     noGold > 0));
         }
 
-        BountyBoardEventEntryMatch? entry =
-            BountyBoardEventEntryDetector.Find(
-                image);
-        double board = BoardScore(
-            image,
-            entry?.Confidence ?? 0);
-        if (board >= 0.76)
+        BountyBoardOwnerMatch boardOwner =
+            BountyBoardOwnerDetector.Detect(image);
+        if (boardOwner.IsMatch)
         {
             return Trace(
                 new BountyBoardMatch(
                     BountyBoardState.Board,
-                    board,
+                    boardOwner.Confidence,
                     BountyBoardActionDetector
                         .Find(image),
                     BountyNumberRecognizer
                         .Detect(image),
-                    noGold > 0));
+                    noGold > 0,
+                    BoardButtonRailScore:
+                        boardOwner.ButtonRailScore,
+                    BoardHeaderScore:
+                        Math.Max(
+                            boardOwner.HeaderImageScore,
+                            boardOwner.HeaderTextScore),
+                    BoardHeaderUsedTextFallback:
+                        boardOwner.UsedTextFallback));
         }
 
+        BountyBoardEventEntryMatch? entry =
+            BountyBoardEventEntryDetector.Find(
+                image);
         return Trace(
             entry is BountyBoardEventEntryMatch eventEntry
                 ? new BountyBoardMatch(
@@ -109,7 +115,7 @@ public static class BountyBoardDetector
                     eventEntry.ActionY)
                 : new BountyBoardMatch(
                     BountyBoardState.None,
-                    board,
+                    0,
                     [],
                     [],
                     noGold > 0));
@@ -132,54 +138,6 @@ public static class BountyBoardDetector
 
     public static (int X, int Y)
         BoardBackAction => (55, 588);
-
-    private static double BoardScore(
-        ImageFrame image,
-        double eventEntry)
-    {
-        double headerGold =
-            ColorFraction(
-                image,
-                BoardHeader,
-                IsGold);
-        double headerBronze =
-            ColorFraction(
-                image,
-                BoardHeader,
-                IsBronze);
-        double railBronze =
-            ColorFraction(
-                image,
-                BoardTopRail,
-                IsBronze);
-        if (headerGold < 0.025 ||
-            headerBronze < 0.15 ||
-            railBronze < 0.14 ||
-            eventEntry < 0.78)
-        {
-            return 0;
-        }
-        return Math.Clamp(
-            0.76 +
-            0.06 * Ramp(
-                headerGold,
-                0.025,
-                0.08) +
-            0.06 * Ramp(
-                headerBronze,
-                0.15,
-                0.42) +
-            0.06 * Ramp(
-                railBronze,
-                0.14,
-                0.42) +
-            0.06 * Ramp(
-                eventEntry,
-                0.78,
-                0.94),
-            0,
-            1);
-    }
 
     private static double ConfirmationScore(
         ImageFrame image,
@@ -299,15 +257,6 @@ public static class BountyBoardDetector
         green < 205 &&
         blue < 90;
 
-    private static bool IsBronze(
-        byte red,
-        byte green,
-        byte blue) =>
-        red > 70 &&
-        green > 35 &&
-        red > green * 1.25 &&
-        green > blue * 1.15;
-
     private static bool IsNeutral(
         byte red,
         byte green,
@@ -351,6 +300,9 @@ public static class BountyBoardDetector
                 match.NoGold,
                 match.EventActionX,
                 match.EventActionY,
+                match.BoardButtonRailScore,
+                match.BoardHeaderScore,
+                match.BoardHeaderUsedTextFallback,
                 Actions = match.Actions.Select(
                     action => new
                     {

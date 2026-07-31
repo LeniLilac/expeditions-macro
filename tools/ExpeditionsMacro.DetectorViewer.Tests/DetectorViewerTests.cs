@@ -145,6 +145,240 @@ public sealed class DetectorViewerTests
     }
 
     [Fact]
+    public void RepositoryDatasetLocatorFindsCheckoutFromNestedPath()
+    {
+        using TestDirectory directory = new();
+        string datasets = Path.Combine(
+            directory.Path,
+            "datasets");
+        string nested = Path.Combine(
+            directory.Path,
+            "artifacts",
+            "viewer");
+        Directory.CreateDirectory(datasets);
+        Directory.CreateDirectory(nested);
+        File.WriteAllText(
+            Path.Combine(
+                directory.Path,
+                "ExpeditionsMacro.slnx"),
+            string.Empty);
+
+        RepositoryDatasetLocation? location =
+            RepositoryDatasetLocator.Find(
+                [nested]);
+
+        RepositoryDatasetLocation found =
+            Assert.IsType<RepositoryDatasetLocation>(
+                location);
+        Assert.Equal(
+            directory.Path,
+            found.RepositoryRoot);
+        Assert.Equal(datasets, found.DatasetRoot);
+    }
+
+    [Fact]
+    public async Task RepositoryDatasetSourceIndexesEveryRepoImage()
+    {
+        string datasetRoot = Path.Combine(
+            FindRepositoryRoot(),
+            "datasets");
+        int expected = Directory
+            .EnumerateFiles(
+                datasetRoot,
+                "*",
+                SearchOption.AllDirectories)
+            .Count(IsSupportedDatasetImage);
+
+        using FrameSequence source =
+            await FrameSequence
+                .OpenRepositoryDatasetsAsync(
+                    datasetRoot);
+
+        Assert.Equal(
+            FrameSourceKind.RepositoryDatasets,
+            source.Kind);
+        Assert.Equal(expected, source.Frames.Count);
+        Assert.All(
+            source.Frames,
+            frame =>
+                Assert.False(
+                    Path.IsPathRooted(
+                        frame.DisplayPath)));
+    }
+
+    [Fact]
+    public void FramePickerLabelStartsWithFilename()
+    {
+        FramePickerItem item = new(
+            7,
+            Path.Combine(
+                "Event",
+                "Villain",
+                "selected-home.png"));
+
+        Assert.StartsWith(
+            "selected-home.png",
+            item.Label,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            Path.Combine(
+                "Event",
+                "Villain"),
+            item.Label,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task DatasetFrameAutoSelectsOwningDetector()
+    {
+        string repository = FindRepositoryRoot();
+        string relative = Path.Combine(
+            "anime-expeditions",
+            "bounties",
+            "BountyBoard_DimmedSlot1_01.png");
+        byte[] bytes = await File.ReadAllBytesAsync(
+            Path.Combine(
+                repository,
+                "datasets",
+                relative));
+        DecodedViewerFrame frame =
+            ViewerFrameDecoder.Decode(bytes);
+        DetectorInspectionCatalogResult catalog =
+            await CreateCatalogAsync();
+        DetectorCatalogItem[] items = catalog.Definitions
+            .Select(definition =>
+                new DetectorCatalogItem(definition))
+            .ToArray();
+
+        DetectorFrameEvaluation? selected =
+            await DetectorFrameEvaluator
+                .SelectAutomaticAsync(
+                    items,
+                    frame.Image,
+                    relative,
+                    CancellationToken.None);
+
+        DetectorFrameEvaluation match =
+            Assert.IsType<DetectorFrameEvaluation>(
+                selected);
+        Assert.Equal("Bounty Board", match.Item.Name);
+    }
+
+    [Fact]
+    public void EditableFramePickerUsesThemedTemplate()
+    {
+        string theme = File.ReadAllText(
+            Path.Combine(
+                FindRepositoryRoot(),
+                "tools",
+                "ExpeditionsMacro.DetectorViewer",
+                "Themes",
+                "ComboBox.xaml"));
+
+        Assert.Contains(
+            "PART_EditableTextBox",
+            theme,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Background=\"{TemplateBinding Background}\"",
+            theme,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "Foreground=\"{TemplateBinding Foreground}\"",
+            theme,
+            StringComparison.Ordinal);
+        string application = File.ReadAllText(
+            Path.Combine(
+                FindRepositoryRoot(),
+                "tools",
+                "ExpeditionsMacro.DetectorViewer",
+                "App.xaml"));
+        Assert.True(
+            application.IndexOf(
+                "Themes/Dark.xaml",
+                StringComparison.Ordinal) <
+            application.IndexOf(
+                "Themes/ComboBox.xaml",
+            StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AnnotationStoreRoundTripsCanonicalRegions()
+    {
+        using TestDirectory directory = new();
+        DetectorAnnotationStore store =
+            DetectorAnnotationStore.Open(
+                directory.Path);
+        DetectorImageAnnotation annotation =
+            store.GetOrCreate(
+                "stages\\TeamUnits_01.png",
+                "team-units");
+        annotation.Expected =
+            DetectorExpectedResult.Match;
+        annotation.Notes =
+            "Use the stable Teams action and panel structure.";
+        annotation.Regions.Add(
+            new DetectorAnnotationRegion
+            {
+                Label = "Teams action",
+                X = 268,
+                Y = 410,
+                Width = 76,
+                Height = 38,
+            });
+
+        store.Save();
+        DetectorAnnotationStore reopened =
+            DetectorAnnotationStore.Open(
+                directory.Path);
+        DetectorImageAnnotation loaded =
+            reopened.GetOrCreate(
+                "stages/TeamUnits_01.png",
+                "team-units");
+
+        Assert.Equal(
+            DetectorExpectedResult.Match,
+            loaded.Expected);
+        Assert.Equal(annotation.Notes, loaded.Notes);
+        DetectorAnnotationRegion region =
+            Assert.Single(loaded.Regions);
+        Assert.Equal("Teams action", region.Label);
+        Assert.Equal(268, region.X);
+        Assert.True(
+            File.Exists(
+                Path.Combine(
+                    directory.Path,
+                    DetectorAnnotationStore.FileName)));
+    }
+
+    [Fact]
+    public void AnnotationGeometryClampsAndRejectsTinyDrags()
+    {
+        DetectorAnnotationRegion region =
+            Assert.IsType<DetectorAnnotationRegion>(
+                DetectorAnnotationGeometry.CreateRegion(
+                    900,
+                    700,
+                    -12,
+                    -8,
+                    808,
+                    611));
+
+        Assert.Equal(0, region.X);
+        Assert.Equal(0, region.Y);
+        Assert.Equal(808, region.Width);
+        Assert.Equal(611, region.Height);
+        Assert.Null(
+            DetectorAnnotationGeometry.CreateRegion(
+                10,
+                10,
+                11,
+                12,
+                808,
+                611));
+    }
+
+    [Fact]
     public async Task DeepDebugZipStreamsCapturedFrames()
     {
         using TestDirectory directory = new();
@@ -276,6 +510,17 @@ public sealed class DetectorViewerTests
         throw new DirectoryNotFoundException(
             "Could not locate the repository root.");
     }
+
+    private static bool IsSupportedDatasetImage(
+        string path) =>
+        Path.GetExtension(path)
+            .ToLowerInvariant() is
+            ".png" or
+            ".jpg" or
+            ".jpeg" or
+            ".bmp" or
+            ".tif" or
+            ".tiff";
 
     private static void WriteText(
         ZipArchive archive,

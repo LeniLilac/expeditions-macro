@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using ExpeditionsMacro.DetectorViewer.Models;
 using ExpeditionsMacro.Vision.Inspection;
@@ -18,10 +19,27 @@ public partial class FrameViewport : UserControl
     private double _panHorizontal;
     private double _panVertical;
     private bool _suppressFrameEvent;
+    private IReadOnlyList<FramePickerItem> _frameItems =
+        Array.Empty<FramePickerItem>();
+    private IReadOnlyList<DetectorAnnotationRegion> _annotations = [];
+    private Guid? _selectedAnnotationId;
+    private readonly AnnotationDrawingController
+        _annotationDrawing;
 
     public FrameViewport()
     {
         InitializeComponent();
+        _annotationDrawing =
+            new AnnotationDrawingController(
+                AnnotationCanvas,
+                ImageContent,
+                () =>
+                    (Brush)FindResource(
+                        "WarningBrush"));
+        _annotationDrawing.RegionCreated +=
+            region =>
+                AnnotationRegionCreated?.Invoke(
+                    region);
         UpdateNavigation();
     }
 
@@ -31,12 +49,30 @@ public partial class FrameViewport : UserControl
 
     public event EventHandler? PixelExited;
 
+    public event Action<DetectorAnnotationRegion>?
+        AnnotationRegionCreated;
+
     public int FrameIndex => _session.FrameIndex;
 
-    public void SetFrameSet(int frameCount)
+    public void SetFrameSet(
+        IReadOnlyList<string> displayPaths)
     {
+        ArgumentNullException.ThrowIfNull(
+            displayPaths);
+        _frameItems = displayPaths
+            .Select((path, index) =>
+                new FramePickerItem(
+                    index,
+                    path))
+            .ToArray();
+        int frameCount = _frameItems.Count;
         _session.ResetFrames(frameCount);
         _suppressFrameEvent = true;
+        FramePicker.ItemsSource = _frameItems;
+        FramePicker.SelectedIndex =
+            frameCount > 0
+                ? 0
+                : -1;
         FrameSlider.Minimum = 0;
         FrameSlider.Maximum =
             Math.Max(
@@ -60,9 +96,11 @@ public partial class FrameViewport : UserControl
         ImageContent.Width = bitmap.PixelWidth;
         ImageContent.Height = bitmap.PixelHeight;
         FrameImage.Source = bitmap;
+        _annotations = [];
+        _selectedAnnotationId = null;
+        RenderAnnotations();
         EmptyState.Visibility = Visibility.Collapsed;
         ImageScroller.Visibility = Visibility.Visible;
-        FrameNameText.Text = displayName;
         FrameNumberText.Text =
             $"Frame {index + 1:N0} / {frameCount:N0}";
         TimestampText.Text =
@@ -78,8 +116,27 @@ public partial class FrameViewport : UserControl
                 0,
                 frameCount - 1);
         FrameSlider.Value = index;
+        FramePicker.SelectedIndex = index;
+        if (FramePicker.SelectedIndex < 0)
+        {
+            FramePicker.Text = displayName;
+        }
         _suppressFrameEvent = false;
         UpdateNavigation();
+    }
+
+    public void SetAnnotations(
+        IReadOnlyList<DetectorAnnotationRegion> annotations,
+        Guid? selectedId = null)
+    {
+        _annotations = annotations ?? [];
+        _selectedAnnotationId = selectedId;
+        RenderAnnotations();
+    }
+
+    public void SetAnnotationMode(bool enabled)
+    {
+        _annotationDrawing.SetEnabled(enabled);
     }
 
     public void SetReport(
@@ -101,13 +158,20 @@ public partial class FrameViewport : UserControl
         EmptyMessageText.Text = message;
         EmptyState.Visibility = Visibility.Visible;
         ImageScroller.Visibility = Visibility.Collapsed;
-        FrameNameText.Text = title;
         FrameNumberText.Text = "No frame";
         TimestampText.Text = "Timestamp unavailable";
         FrameImage.Source = null;
         _report = null;
         OverlayCanvas.Children.Clear();
+        AnnotationCanvas.Children.Clear();
         _session.ResetFrames(0);
+        _frameItems =
+            Array.Empty<FramePickerItem>();
+        _suppressFrameEvent = true;
+        FramePicker.ItemsSource = null;
+        FramePicker.Text = title;
+        FramePicker.SelectedIndex = -1;
+        _suppressFrameEvent = false;
         UpdateNavigation();
     }
 
@@ -153,6 +217,8 @@ public partial class FrameViewport : UserControl
             _session.CanMoveNext;
         FrameSlider.IsEnabled =
             _session.FrameCount > 1;
+        FramePicker.IsEnabled =
+            _session.FrameCount > 0;
     }
 
     private void SetZoom(double zoom)
@@ -172,6 +238,16 @@ public partial class FrameViewport : UserControl
             _selectedRegions,
             GeometryCheckBox.IsChecked == true,
             LabelsCheckBox.IsChecked == true);
+
+    private void RenderAnnotations() =>
+        AnnotationOverlayRenderer.Render(
+            AnnotationCanvas,
+            _annotations,
+            _selectedAnnotationId,
+            (Brush)FindResource("AccentBrush"),
+            (Brush)FindResource("WarningBrush"),
+            (Brush)FindResource("SurfaceBrush"),
+            (Brush)FindResource("TextBrush"));
 
     private void PreviousButton_Click(
         object sender,
@@ -194,6 +270,19 @@ public partial class FrameViewport : UserControl
         {
             RequestFrame(
                 (int)Math.Round(e.NewValue));
+        }
+    }
+
+    private void FramePicker_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (!_suppressFrameEvent &&
+            FramePicker.SelectedItem is
+                FramePickerItem item &&
+            item.Index != _session.FrameIndex)
+        {
+            RequestFrame(item.Index);
         }
     }
 
@@ -309,6 +398,11 @@ public partial class FrameViewport : UserControl
     {
         Point point =
             e.GetPosition(ImageContent);
+        if (_annotationDrawing.Enabled &&
+            e.LeftButton == MouseButtonState.Pressed)
+        {
+            _annotationDrawing.Move(point);
+        }
         if (point.X >= 0 &&
             point.Y >= 0 &&
             point.X < ImageContent.Width &&
@@ -326,4 +420,31 @@ public partial class FrameViewport : UserControl
         PixelExited?.Invoke(
             this,
             EventArgs.Empty);
+
+    private void ImageContent_MouseLeftButtonDown(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (!_annotationDrawing.Enabled ||
+            FrameImage.Source is null)
+        {
+            return;
+        }
+        _annotationDrawing.Begin(
+            e.GetPosition(ImageContent));
+        e.Handled = true;
+    }
+
+    private void ImageContent_MouseLeftButtonUp(
+        object sender,
+        MouseButtonEventArgs e)
+    {
+        if (!_annotationDrawing.Enabled)
+        {
+            return;
+        }
+        _annotationDrawing.Complete(
+            e.GetPosition(ImageContent));
+        e.Handled = true;
+    }
 }
