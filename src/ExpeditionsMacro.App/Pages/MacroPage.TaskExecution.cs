@@ -1,3 +1,4 @@
+using ExpeditionsMacro.Automation.Bounties;
 using ExpeditionsMacro.Automation.Challenges;
 using ExpeditionsMacro.Automation.Discord;
 using ExpeditionsMacro.Automation.Scheduling;
@@ -22,6 +23,7 @@ public partial class MacroPage
         char cancelPlacementKey,
         MacroRunTotals macroTotals,
         ChallengeRotationState challengeRotation,
+        BountyOperationSession bountySession,
         IProgress<MacroProgress> progress,
         CancellationToken cancellationToken)
     {
@@ -97,6 +99,7 @@ public partial class MacroPage
                 cancelPlacementKey,
                 macroTotals,
                 challengeRotation,
+                bountySession,
                 progress,
                 cancellationToken),
             _ => throw new ArgumentOutOfRangeException(

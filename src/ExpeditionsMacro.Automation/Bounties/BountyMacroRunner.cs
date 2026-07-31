@@ -45,6 +45,7 @@ public sealed class BountyMacroRunner
     }
 
     public async Task<BountyRunResult> RunAsync(
+        BountyOperationSession operationSession,
         int parkedNonViableLimit,
         BountyChallengeAvailability
             challengeAvailability,
@@ -65,6 +66,8 @@ public sealed class BountyMacroRunner
             throw new ArgumentOutOfRangeException(
                 nameof(parkedNonViableLimit));
         }
+        ArgumentNullException.ThrowIfNull(
+            operationSession);
         ArgumentNullException.ThrowIfNull(detector);
         ArgumentNullException.ThrowIfNull(executeRoute);
 
@@ -75,8 +78,13 @@ public sealed class BountyMacroRunner
                 .ConfigureAwait(false))
             .AdvanceDay(DateTimeOffset.UtcNow);
         bool noGold = false;
+        bool initialBoardReconciliation =
+            operationSession
+                .InitialBoardReconciliationRequired;
         bool boardReconciliationRequired =
-            !BountyPlanner.HasExecutableWork(
+            BountyBoardReconciliationPolicy
+                .RequiresBoardProcessing(
+                operationSession,
                 state.Active,
                 challengeAvailability);
         RobloxWindow window =
@@ -126,8 +134,17 @@ public sealed class BountyMacroRunner
             bool boardOpened = false;
             if (boardReconciliationRequired)
             {
+                if (initialBoardReconciliation)
+                {
+                    Write(
+                        "Reconciling the live Bounty Board before trusting saved Bounty progress.",
+                        MacroEventLevel.Information,
+                        "bounty_initial_reconciliation");
+                }
                 Report(
-                    "Opening the Bounty Board.",
+                    initialBoardReconciliation
+                        ? "Reconciling the Bounty Board."
+                        : "Opening the Bounty Board.",
                     5,
                     "bounty_navigation");
                 await _navigator.OpenAsync(
@@ -152,6 +169,17 @@ public sealed class BountyMacroRunner
                 await _states.SaveAsync(
                     state,
                     cancellationToken).ConfigureAwait(false);
+                if (initialBoardReconciliation)
+                {
+                    operationSession
+                        .MarkInitialBoardReconciled();
+                    initialBoardReconciliation =
+                        false;
+                    Write(
+                        "Initial Bounty Board reconciliation completed; live claims and rerolls are saved.",
+                        MacroEventLevel.Success,
+                        "bounty_initial_reconciled");
+                }
 
                 if (state.ClaimedToday >=
                     BountyCatalog.DailyClaimLimit)
