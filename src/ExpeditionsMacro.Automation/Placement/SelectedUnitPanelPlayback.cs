@@ -16,6 +16,8 @@ internal sealed class SelectedUnitPanelPlayback(
     private const int HiddenTimeoutMilliseconds =
         (DismissSamples - 1) *
         PollMilliseconds;
+    private const int ActionHiddenTimeoutMilliseconds =
+        1000;
     private const int RequiredStableFrames = 2;
     private const int DismissAttempts = 8;
     private const int DismissSamples = 4;
@@ -108,8 +110,12 @@ internal sealed class SelectedUnitPanelPlayback(
     public Task<bool> WaitForHiddenAfterActionAsync(
         RobloxWindow window,
         CancellationToken cancellationToken) =>
-        WaitForHiddenAsync(
+        WaitForStateAsync(
             window,
+            static match => match.PanelVisible,
+            expectedVisible: false,
+            TimeSpan.FromMilliseconds(
+                ActionHiddenTimeoutMilliseconds),
             cancellationToken);
 
     private async Task<bool> WaitForHiddenAsync(

@@ -9,6 +9,7 @@ internal sealed class PlacementUnitActionPlayback
 {
     private const int DefaultActionKeyIntervalMilliseconds =
         100;
+    private const int SellAttempts = 3;
 
     private readonly IRobloxAutomation _automation;
     private readonly SelectedUnitPanelPlayback _selectedUnitPanel;
@@ -283,23 +284,44 @@ internal sealed class PlacementUnitActionPlayback
     {
         status?.Invoke(
             $"Step {playable.SourceIndex + 1}/{stepCount}: selling placed Unit {playable.UnitKey}.");
-        await TapActionKeyAsync(
-                window,
-                keys.Sell,
-                1,
-                ActionInterval(model),
-                cancellationToken)
-            .ConfigureAwait(false);
-        if (!await _selectedUnitPanel
-                .WaitForHiddenAfterActionAsync(
-                    window,
-                    cancellationToken)
-                .ConfigureAwait(false))
+        for (int attempt = 1;
+             attempt <= SellAttempts;
+             attempt++)
         {
-            throw new RobloxUiUnavailableException(
-                "The selected-unit panel remained open after Sell Unit was pressed.");
+            await TapActionKeyAsync(
+                    window,
+                    keys.Sell,
+                    1,
+                    ActionInterval(model),
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (await _selectedUnitPanel
+                    .WaitForHiddenAfterActionAsync(
+                        window,
+                        cancellationToken)
+                    .ConfigureAwait(false))
+            {
+                _states.Remove(playable.PlacementId);
+                return;
+            }
+            if (attempt == SellAttempts)
+            {
+                break;
+            }
+            if (!await _selectedUnitPanel
+                    .WaitForPanelVisibleAsync(
+                        window,
+                        cancellationToken)
+                    .ConfigureAwait(false))
+            {
+                throw new RobloxUiUnavailableException(
+                    "The selected-unit panel could not be reverified after Sell Unit was pressed, so the macro sent no retry.");
+            }
+            status?.Invoke(
+                $"Step {playable.SourceIndex + 1}/{stepCount}: Sell Unit was ignored; retrying verified input ({attempt + 1}/{SellAttempts}).");
         }
-        _states.Remove(playable.PlacementId);
+        throw new RobloxUiUnavailableException(
+            $"The selected-unit panel remained open after {SellAttempts} verified Sell Unit key attempts.");
     }
 
     private async Task DismissAsync(

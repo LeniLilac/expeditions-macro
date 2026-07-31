@@ -1,4 +1,5 @@
 using ExpeditionsMacro.Core.Models;
+using ExpeditionsMacro.Core.Runtime;
 
 namespace ExpeditionsMacro.Tests;
 
@@ -153,6 +154,110 @@ public sealed partial class PlacementPlaybackAttemptTests
         Assert.Contains(
             "verify:340,280",
             automation.Actions);
+        Assert.Equal(
+            1,
+            automation.Actions.Count(action =>
+                action == "letter:X"));
+    }
+
+    [Fact]
+    public async Task SellStep_IgnoredFirstPress_RetriesFromVerifiedPanel()
+    {
+        AttemptAutomation automation = new()
+        {
+            SellSucceedsOnAttempt = 2,
+        };
+        PlacementStep placement = Step(2, 340);
+        PlacementStep sell = placement with
+        {
+            Kind = MatchStepKind.SellUnit,
+            PlacementId = string.Empty,
+            TargetPlacementId =
+                placement.PlacementId,
+            X = 0,
+            Y = 0,
+            AutoUpgradePriority =
+                UnitAutoUpgradePriority.Off,
+        };
+
+        await PlayStepsAsync(
+            automation,
+            [placement, sell]);
+
+        Assert.Equal(
+            2,
+            automation.Actions.Count(action =>
+                action == "letter:X"));
+    }
+
+    [Fact]
+    public async Task SellStep_AllPressesIgnored_StopsAfterThreeAttempts()
+    {
+        AttemptAutomation automation = new()
+        {
+            SellSucceedsOnAttempt = int.MaxValue,
+        };
+        PlacementStep placement = Step(2, 340);
+        PlacementStep sell = placement with
+        {
+            Kind = MatchStepKind.SellUnit,
+            PlacementId = string.Empty,
+            TargetPlacementId =
+                placement.PlacementId,
+            X = 0,
+            Y = 0,
+            AutoUpgradePriority =
+                UnitAutoUpgradePriority.Off,
+        };
+
+        RobloxUiUnavailableException error =
+            await Assert.ThrowsAsync<
+                RobloxUiUnavailableException>(
+                () => PlayStepsAsync(
+                    automation,
+                    [placement, sell]));
+
+        Assert.Contains(
+            "3 verified Sell Unit key attempts",
+            error.Message,
+            StringComparison.Ordinal);
+        Assert.Equal(
+            3,
+            automation.Actions.Count(action =>
+                action == "letter:X"));
+    }
+
+    [Fact]
+    public async Task SellStep_CanceledAfterFirstPress_SendsNoRetry()
+    {
+        using CancellationTokenSource cancellation = new();
+        AttemptAutomation automation = new()
+        {
+            SellSucceedsOnAttempt = int.MaxValue,
+            CancelOnSellAttempt = 1,
+            PlacementCancellation = cancellation,
+        };
+        PlacementStep placement = Step(2, 340);
+        PlacementStep sell = placement with
+        {
+            Kind = MatchStepKind.SellUnit,
+            PlacementId = string.Empty,
+            TargetPlacementId =
+                placement.PlacementId,
+            X = 0,
+            Y = 0,
+            AutoUpgradePriority =
+                UnitAutoUpgradePriority.Off,
+        };
+
+        await Assert.ThrowsAnyAsync<
+            OperationCanceledException>(
+            () => PlayStepsAsync(
+                automation,
+                [placement, sell],
+                cancellationToken:
+                    cancellation.Token));
+
         Assert.Equal(
             1,
             automation.Actions.Count(action =>
