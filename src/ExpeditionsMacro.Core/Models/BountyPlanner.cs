@@ -214,6 +214,14 @@ public static class BountyPlanner
         return active.Any(IsComplete);
     }
 
+    public static bool HasExecutableWork(
+        IReadOnlyList<BountyActiveProgress> active,
+        BountyChallengeAvailability
+            challengeAvailability) =>
+        BuildRoutes(
+            active,
+            challengeAvailability).Count > 0;
+
     private static BountyActiveProgress Apply(
         BountyActiveProgress progress,
         BountyWorkRoute route,

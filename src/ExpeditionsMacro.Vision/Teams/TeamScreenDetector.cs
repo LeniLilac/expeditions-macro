@@ -240,10 +240,11 @@ public static class TeamScreenDetector
         int loadRows = LoadButtonRows.Count(
             region => ColorFraction(image, region, IsGreenButton) >=
                 MinimumVisibleLoadButtonFraction);
-        if (dark < 0.80 || loadRows < 2) return 0;
+        const double minimumDark = 0.78;
+        if (dark < minimumDark || loadRows < 2) return 0;
         return Math.Clamp(
-            0.45 * Ramp(dark, 0.80, 0.96) +
-            0.55 * Math.Min(1, loadRows / 2d),
+            0.25 * Ramp(dark, minimumDark, 0.96) +
+            0.75 * Math.Min(1, loadRows / 2d),
             0,
             1);
     }

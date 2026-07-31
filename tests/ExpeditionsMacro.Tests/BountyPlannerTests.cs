@@ -209,7 +209,7 @@ public sealed class BountyPlannerTests
     }
 
     [Fact]
-    public void PartialFieldRoutes_DoNotRequireBoardReconciliation()
+    public void ClaimableBounty_DoesNotInterruptRemainingActiveWork()
     {
         BountyActiveProgress[] active =
         [
@@ -245,6 +245,36 @@ public sealed class BountyPlannerTests
         Assert.True(
             BountyPlanner.HasClaimableBounty(
                 completed));
+        Assert.True(
+            BountyPlanner.HasExecutableWork(
+                completed,
+                BountyChallengeAvailability.Available));
+    }
+
+    [Fact]
+    public void BoardReconciliationCanResumeAfterEveryExecutableRouteCompletes()
+    {
+        BountyActiveProgress[] active =
+        [
+            Progress(
+                2,
+                ("fkf-30", 1),
+                ("sg-30", 1),
+                ("raid-spirit-city-act-1", 1)),
+            Progress(
+                4,
+                ("fkf-15", 1),
+                ("sg-30", 1),
+                ("raid-spirit-city-act-1", 1)),
+        ];
+
+        Assert.True(
+            BountyPlanner.HasClaimableBounty(
+                active));
+        Assert.False(
+            BountyPlanner.HasExecutableWork(
+                active,
+                BountyChallengeAvailability.Available));
     }
 
     [Fact]
