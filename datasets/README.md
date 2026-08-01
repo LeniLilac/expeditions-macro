@@ -1,6 +1,6 @@
 # Detector image dataset
 
-This repository includes 500 reviewed 808 by 611 Roblox client image fixtures used to build and regression-test the bundled Anime Expeditions detector pack and specialized UI detectors: 286 Expeditions fixtures, 81 selective Challenge fixtures, 60 Story/Raid/team/placement fixtures, 13 navigation variants, 12 resource-refuel fixtures, 16 game-settings fixtures, 19 Event fixtures, and 13 Bounty fixtures. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
+This repository includes 501 reviewed 808 by 611 Roblox client image fixtures used to build and regression-test the bundled Anime Expeditions detector pack and specialized UI detectors: 286 Expeditions fixtures, 81 selective Challenge fixtures, 60 Story/Raid/team/placement fixtures, 13 navigation variants, 12 resource-refuel fixtures, 16 game-settings fixtures, 19 Event fixtures, and 14 Bounty fixtures. The compiled pack in `detector-packs/` is sufficient to run the released application; these images are development and test fixtures.
 
 There is no camera-model, yaw-atlas, or automatic camera-region dataset. Beta.33 supports only deterministic Fast preparation, and the retired Camera Model workflow is retained solely as a deserialize-and-migrate compatibility boundary for public-beta user data.
 

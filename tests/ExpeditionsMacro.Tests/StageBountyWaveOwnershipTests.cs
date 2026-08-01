@@ -6,11 +6,15 @@ namespace ExpeditionsMacro.Tests;
 
 public sealed class StageBountyWaveOwnershipTests
 {
-    [Fact]
-    public void DetectOwnedBountyWave_RequiresGameplayHud()
+    [Theory]
+    [InlineData("WaveCounterLegacy.png")]
+    [InlineData("WaveCounterNoVoice.png")]
+    [InlineData("WaveCounterType3.png")]
+    public void DetectOwnedBountyWave_RequiresGameplayHud(
+        string fixture)
     {
         ImageFrame frame = ImageCodec.Load(
-            FixturePath("WaveCounterLegacy.png"));
+            FixturePath(fixture));
         ClearGameplayOwner(frame);
 
         Assert.Null(
@@ -21,6 +25,7 @@ public sealed class StageBountyWaveOwnershipTests
     [Theory]
     [InlineData("WaveCounterLegacy.png", 67)]
     [InlineData("WaveCounterNoVoice.png", 2)]
+    [InlineData("WaveCounterType3.png", 37)]
     public void DetectOwnedBountyWave_AcceptsReviewedLayouts(
         string fixture,
         int expectedWave)

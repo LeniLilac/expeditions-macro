@@ -4,6 +4,16 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.55] - 2026-07-31
+
+### Fixed
+
+- Infinite Bounty wave monitoring now recognizes the compact Roblox top-bar layout whose Wave counter is shifted left to `(386,28)`, while retaining gameplay-HUD ownership and ambiguity checks before a reading can authorize a safe exit.
+
+### Tests
+
+- Added a privacy-reviewed compact-layout fixture and coverage for every embedded wave at all three supported counter locations, one-pixel raster phase, inactive-anchor decoys, multi-layout ambiguity, and missing gameplay ownership. Passed 1,591 non-golden application tests, 120 golden-image and cross-state detector tests, 6 Deep Debug Viewer tests, 15 Detector Viewer tests, and all 90 dark/light main-app UI states.
+
 ## [1.3.0-beta.54] - 2026-07-31
 
 ### Added
@@ -1373,7 +1383,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.54...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.55...HEAD
+[1.3.0-beta.55]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.54...v1.3.0-beta.55
 [1.3.0-beta.54]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.53...v1.3.0-beta.54
 [1.3.0-beta.53]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.52...v1.3.0-beta.53
 [1.3.0-beta.52]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.51...v1.3.0-beta.52

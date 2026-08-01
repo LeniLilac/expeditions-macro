@@ -11,6 +11,8 @@ public sealed class WaveCounterRecognizerTests
     private const int LegacyCounterY = 48;
     private const int NoVoiceCounterX = 421;
     private const int NoVoiceCounterY = 28;
+    private const int TypeThreeCounterX = 386;
+    private const int TypeThreeCounterY = 28;
     private const int TemplateWidth = 16;
     private const int TemplateHeight = 11;
     private const int BytesPerTemplate = 22;
@@ -57,11 +59,21 @@ public sealed class WaveCounterRecognizerTests
     }
 
     [Theory]
-    [InlineData(-1, 0)]
-    [InlineData(1, 0)]
-    [InlineData(0, -1)]
-    [InlineData(0, 1)]
+    [InlineData(LegacyCounterX, LegacyCounterY, -1, 0)]
+    [InlineData(LegacyCounterX, LegacyCounterY, 1, 0)]
+    [InlineData(LegacyCounterX, LegacyCounterY, 0, -1)]
+    [InlineData(LegacyCounterX, LegacyCounterY, 0, 1)]
+    [InlineData(NoVoiceCounterX, NoVoiceCounterY, -1, 0)]
+    [InlineData(NoVoiceCounterX, NoVoiceCounterY, 1, 0)]
+    [InlineData(NoVoiceCounterX, NoVoiceCounterY, 0, -1)]
+    [InlineData(NoVoiceCounterX, NoVoiceCounterY, 0, 1)]
+    [InlineData(TypeThreeCounterX, TypeThreeCounterY, -1, 0)]
+    [InlineData(TypeThreeCounterX, TypeThreeCounterY, 1, 0)]
+    [InlineData(TypeThreeCounterX, TypeThreeCounterY, 0, -1)]
+    [InlineData(TypeThreeCounterX, TypeThreeCounterY, 0, 1)]
     public void Detect_ToleratesOnePixelCounterPhase(
+        int counterX,
+        int counterY,
         int offsetX,
         int offsetY)
     {
@@ -71,6 +83,8 @@ public sealed class WaveCounterRecognizerTests
                 WaveCounterRecognizer.Detect(
                     CreateTemplateFrame(
                         wave,
+                        counterX,
+                        counterY,
                         offsetX: offsetX,
                         offsetY: offsetY)));
 
@@ -81,7 +95,8 @@ public sealed class WaveCounterRecognizerTests
     [Theory]
     [InlineData(389, 48)]
     [InlineData(421, 28)]
-    public void Detect_RecognizesEveryWaveAtBothTopBarLayouts(
+    [InlineData(386, 28)]
+    public void Detect_RecognizesEveryWaveAtAllTopBarLayouts(
         int counterX,
         int counterY)
     {
@@ -115,6 +130,20 @@ public sealed class WaveCounterRecognizerTests
     }
 
     [Fact]
+    public void Detect_RecognizesReviewedTypeThreeLayout()
+    {
+        WaveCounterMatch match =
+            Assert.IsType<WaveCounterMatch>(
+                WaveCounterRecognizer.Detect(
+                    ExpeditionsMacro.Vision
+                        .Infrastructure
+                        .ImageCodec.Load(
+                            TypeThreeFixturePath())));
+
+        Assert.Equal(37, match.Wave);
+    }
+
+    [Fact]
     public void Detect_RecognizesReviewedLegacyLayout()
     {
         WaveCounterMatch match =
@@ -128,18 +157,42 @@ public sealed class WaveCounterRecognizerTests
         Assert.Equal(67, match.Wave);
     }
 
-    [Fact]
-    public void Detect_IgnoresInactiveAnchorGlyph()
+    [Theory]
+    [InlineData(
+        NoVoiceCounterX,
+        NoVoiceCounterY,
+        TypeThreeCounterX,
+        TypeThreeCounterY)]
+    [InlineData(
+        TypeThreeCounterX,
+        TypeThreeCounterY,
+        NoVoiceCounterX,
+        NoVoiceCounterY)]
+    [InlineData(
+        LegacyCounterX,
+        LegacyCounterY,
+        TypeThreeCounterX,
+        TypeThreeCounterY)]
+    [InlineData(
+        TypeThreeCounterX,
+        TypeThreeCounterY,
+        LegacyCounterX,
+        LegacyCounterY)]
+    public void Detect_IgnoresInactiveAnchorGlyph(
+        int activeX,
+        int activeY,
+        int inactiveX,
+        int inactiveY)
     {
         ImageFrame frame = CreateTemplateFrame(
             wave: 30,
-            counterX: NoVoiceCounterX,
-            counterY: NoVoiceCounterY);
+            counterX: activeX,
+            counterY: activeY);
         DrawTemplate(
             frame,
             wave: 62,
-            LegacyCounterX,
-            LegacyCounterY);
+            inactiveX,
+            inactiveY);
 
         WaveCounterMatch match =
             Assert.IsType<WaveCounterMatch>(
@@ -148,35 +201,57 @@ public sealed class WaveCounterRecognizerTests
         Assert.Equal(30, match.Wave);
     }
 
-    [Fact]
-    public void Detect_TwoOwnedCounterLayoutsAreAmbiguous()
+    [Theory]
+    [InlineData(
+        NoVoiceCounterX,
+        NoVoiceCounterY,
+        LegacyCounterX,
+        LegacyCounterY)]
+    [InlineData(
+        TypeThreeCounterX,
+        TypeThreeCounterY,
+        LegacyCounterX,
+        LegacyCounterY)]
+    [InlineData(
+        TypeThreeCounterX,
+        TypeThreeCounterY,
+        NoVoiceCounterX,
+        NoVoiceCounterY)]
+    public void Detect_TwoOwnedCounterLayoutsAreAmbiguous(
+        int firstX,
+        int firstY,
+        int secondX,
+        int secondY)
     {
         ImageFrame frame = CreateTemplateFrame(
             wave: 30,
-            counterX: NoVoiceCounterX,
-            counterY: NoVoiceCounterY);
+            counterX: firstX,
+            counterY: firstY);
         DrawCounterOwner(
             frame,
-            LegacyCounterX,
-            LegacyCounterY);
+            secondX,
+            secondY);
         DrawTemplate(
             frame,
             wave: 62,
-            LegacyCounterX,
-            LegacyCounterY);
+            secondX,
+            secondY);
 
         Assert.Null(
             WaveCounterRecognizer.Detect(frame));
     }
 
-    [Fact]
-    public void Detect_NoVoiceFixtureRetainsGameplayOwnerEvidence()
+    [Theory]
+    [InlineData("WaveCounterNoVoice.png")]
+    [InlineData("WaveCounterType3.png")]
+    public void Detect_FieldFixturesRetainGameplayOwnerEvidence(
+        string fixture)
     {
         ImageFrame image =
             ExpeditionsMacro.Vision
                 .Infrastructure
                 .ImageCodec.Load(
-                    NoVoiceFixturePath());
+                    FixturePath(fixture));
 
         Assert.True(
             StageGameplayHudDetector
@@ -327,18 +402,19 @@ public sealed class WaveCounterRecognizerTests
     }
 
     private static string NoVoiceFixturePath() =>
-        Path.Combine(
-            TestPaths.RepositoryRoot,
-            "datasets",
-            "anime-expeditions",
-            "bounties",
-            "WaveCounterNoVoice.png");
+        FixturePath("WaveCounterNoVoice.png");
 
     private static string LegacyFixturePath() =>
+        FixturePath("WaveCounterLegacy.png");
+
+    private static string TypeThreeFixturePath() =>
+        FixturePath("WaveCounterType3.png");
+
+    private static string FixturePath(string fixture) =>
         Path.Combine(
             TestPaths.RepositoryRoot,
             "datasets",
             "anime-expeditions",
             "bounties",
-            "WaveCounterLegacy.png");
+            fixture);
 }
