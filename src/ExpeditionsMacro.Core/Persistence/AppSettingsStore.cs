@@ -81,6 +81,13 @@ public sealed class AppSettingsStore
                 ResourceRefuelDebug = new(),
             };
         }
+        if (persistedSchemaVersion < 6)
+        {
+            migrated = migrated with
+            {
+                AutoCheckForUpdates = true,
+            };
+        }
         await SaveAsync(
             migrated,
             cancellationToken).ConfigureAwait(false);

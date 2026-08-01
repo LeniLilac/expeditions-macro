@@ -22,6 +22,7 @@ internal static class UiSnapshotRenderer
             RecordingsState)[] Pages =
     [
         ("Dashboard", "dashboard", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
+        ("Dashboard", "dashboard-update", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Dashboard", "dashboard-run-log", false, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Dashboard", "dashboard-controls", true, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
         ("Dashboard", "dashboard-controls-configured", true, false, MacroPlanSnapshotState.Empty, ManualRecordingsSnapshotState.Ready),
@@ -118,6 +119,11 @@ internal static class UiSnapshotRenderer
                         showAlternateState,
                         macroPlanState,
                         recordingsState);
+                    window.SetUpdateAvailableForSnapshot(
+                        string.Equals(
+                            file,
+                            "dashboard-update",
+                            StringComparison.OrdinalIgnoreCase));
                     Size size = SnapshotSize(key, file);
                     await File.WriteAllTextAsync(
                         progressPath,
@@ -188,6 +194,13 @@ internal static class UiSnapshotRenderer
         string file)
     {
         Size standard = new(1200, 780);
+        if (string.Equals(
+                file,
+                "dashboard-update",
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return new Size(960, 640);
+        }
         if (string.Equals(
                 file,
                 "placement-setup-medium-steps",

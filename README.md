@@ -45,6 +45,8 @@ It uses screen capture and ordinary Windows input. It does not inject into Roblo
 
 Extract the complete portable ZIP into its own folder, then run the root `ExpeditionsMacro.exe`. Keep the adjacent `ExpeditionsMacro` dependency folder beside the executable. Windows 10 or Windows 11 x64 is required. Release builds are self-contained; a separate .NET installation is not required.
 
+The app checks its matching official GitHub release channel when it starts unless that check is disabled under **Settings > Application updates**. A prerelease build follows prereleases; a stable build never opts into them. An available update is only a notice: the app downloads nothing until you choose **Download**, verifies the installer against both GitHub's release digest and `SHA256SUMS.txt`, then asks again before opening the normal installer. It never silently installs or restarts itself. A verified download remains available after restart if installation is canceled.
+
 Follow the [Expeditions Macro setup guide](https://docs.google.com/document/d/10NeDNa3BNEwPEpZj0oVQiR98_7GN67dmKS-OZwaxALM/edit?usp=sharing) for a visual walkthrough. Join the public [Expeditions Macro Discord](https://discord.gg/wE6XSVyXsN) for setup help, bug reports, plan sharing, and release announcements. Both links are available from the app sidebar.
 
 ## First-time setup

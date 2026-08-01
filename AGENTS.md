@@ -33,6 +33,7 @@ Expeditions Macro is a Windows-only .NET/WPF utility that automates repeatable A
 - Every owned UI wait must use fresh, observation-aware evidence while preserving its hard deadline and input-attempt cap. A manifest coordinate or other static fallback never authorizes input.
 - Macro Plan and Placement Setup authoring autosave every committed edit. Flush queued and in-flight writes before switching ownership, starting/exporting, or shutting down.
 - Webhook URLs are secrets: protect them with DPAPI and redact them from errors, logs, captures, tests, and release output.
+- Application updates may use only the unauthenticated official GitHub Releases channel. Require the exact semantic tag, release URL, four-asset inventory, sizes, direct URLs, GitHub SHA-256 digests, checksum manifest, and bounded trusted HTTPS redirects. Automatic checks are metadata-only; downloading and opening the installer require separate explicit consent, and a restart-recovered installer must be rehashed before launch.
 
 ## Architecture and source health
 

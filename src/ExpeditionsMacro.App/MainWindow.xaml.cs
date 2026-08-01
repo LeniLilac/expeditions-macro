@@ -31,6 +31,7 @@ public partial class MainWindow : Window
         _snapshotMode = snapshotMode;
         InitializeComponent();
         InitializeNavigationRail();
+        InitializeApplicationUpdates();
         _macroPage = new MacroPage(services);
         _macroPage.SetNativeDockingEnabled(
             !snapshotMode);
@@ -52,7 +53,10 @@ public partial class MainWindow : Window
         if (!snapshotMode)
         {
             Loaded += async (_, _) =>
+            {
                 await ShowPageAsync("Dashboard");
+                await StartApplicationUpdatesAsync();
+            };
         }
         StateChanged += Window_StateChanged;
         SourceInitialized +=
@@ -228,6 +232,7 @@ public partial class MainWindow : Window
                 Activate();
             }
             if (_closingAfterStop && _services.Coordinator.State == OperationState.Idle) Close();
+            UpdateApplicationUpdateBanner();
         });
     }
 
@@ -364,7 +369,8 @@ public partial class MainWindow : Window
 
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
-        if (!_macroPage.TryDetachRoblox(
+        if (_macroPage is not null &&
+            !_macroPage.TryDetachRoblox(
             out string pinningError))
         {
             e.Cancel = true;

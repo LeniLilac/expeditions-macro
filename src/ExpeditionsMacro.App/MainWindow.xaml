@@ -15,6 +15,7 @@
     <Grid Background="{DynamicResource CanvasBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="42" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -49,7 +50,65 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Row="1">
+        <Border x:Name="UpdateBanner"
+                Grid.Row="1"
+                Margin="12,10,12,0"
+                Padding="14,10"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource AccentBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Visibility="Collapsed">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock x:Name="UpdateBannerTitle"
+                               FontWeight="SemiBold"
+                               Text="Application update available" />
+                    <TextBlock x:Name="UpdateBannerDetail"
+                               Margin="0,3,18,0"
+                               Foreground="{DynamicResource MutedBrush}"
+                               Text="Download the verified installer when you are ready."
+                               TextWrapping="Wrap" />
+                    <ProgressBar x:Name="UpdateBannerProgress"
+                                 Height="3"
+                                 Margin="0,7,18,0"
+                                 Maximum="1"
+                                 Visibility="Collapsed" />
+                </StackPanel>
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Button x:Name="UpdateReleaseButton"
+                            Margin="0,0,8,0"
+                            icons:Lucide.Icon="ExternalLink"
+                            Content="Release notes"
+                            Click="UpdateRelease_Click" />
+                    <Button x:Name="UpdatePrimaryButton"
+                            Style="{StaticResource PrimaryButton}"
+                            icons:Lucide.Icon="Download"
+                            Content="Download"
+                            Click="UpdatePrimary_Click" />
+                    <Button x:Name="UpdateCancelButton"
+                            Margin="8,0,0,0"
+                            Content="Cancel"
+                            Visibility="Collapsed"
+                            Click="UpdateCancel_Click" />
+                    <Button Margin="8,0,0,0"
+                            Width="34"
+                            MinWidth="34"
+                            Style="{StaticResource IconButton}"
+                            icons:Lucide.Icon="X"
+                            ToolTip="Dismiss update notice"
+                            Click="UpdateDismiss_Click" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="NavigationColumn"
                                   Width="216" />

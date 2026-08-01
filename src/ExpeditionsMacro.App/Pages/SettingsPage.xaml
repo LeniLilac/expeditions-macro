@@ -13,6 +13,7 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <StackPanel Margin="0,0,0,28">
                 <TextBlock Style="{StaticResource PageTitle}" Text="Settings" />
@@ -43,6 +44,54 @@
                     </Grid.ColumnDefinitions>
                     <StackPanel>
                         <TextBlock Style="{StaticResource SectionTitle}"
+                                   Text="Application updates" />
+                        <TextBlock Margin="0,5,24,0"
+                                   Style="{StaticResource Caption}"
+                                   Text="Checks the official GitHub release channel. Downloads and installation always require your approval."
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <CheckBox x:Name="AutoCheckForUpdatesCheck"
+                                  Content="Check automatically when the app starts"
+                                  Checked="AutoCheckForUpdatesCheck_Changed"
+                                  Unchecked="AutoCheckForUpdatesCheck_Changed" />
+                        <TextBlock x:Name="UpdateChannelText"
+                                   Margin="50,4,0,0"
+                                   Style="{StaticResource Caption}"
+                                   Text="Prerelease channel" />
+                        <TextBlock x:Name="ApplicationUpdateStatusText"
+                                   Margin="0,12,0,0"
+                                   Style="{StaticResource Caption}"
+                                   Text="Updates have not been checked yet."
+                                   TextWrapping="Wrap" />
+                        <StackPanel Margin="0,10,0,0"
+                                    HorizontalAlignment="Right"
+                                    Orientation="Horizontal">
+                            <Button x:Name="CheckForUpdatesButton"
+                                    icons:Lucide.Icon="RefreshCw"
+                                    Content="Check now"
+                                    Click="CheckForUpdates_Click" />
+                            <Button x:Name="ApplicationUpdateActionButton"
+                                    Margin="8,0,0,0"
+                                    Style="{StaticResource PrimaryButton}"
+                                    icons:Lucide.Icon="Download"
+                                    Content="Download"
+                                    Visibility="Collapsed"
+                                    Click="ApplicationUpdateAction_Click" />
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Border Grid.Row="3"
+                    Style="{StaticResource SectionDivider}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="220" />
+                        <ColumnDefinition Width="420" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource SectionTitle}"
                                    Text="Experimental" />
                         <TextBlock Margin="0,5,24,0"
                                    Style="{StaticResource Caption}"
@@ -64,10 +113,10 @@
             </Border>
 
             <icons:SettingsKeyBindingsPanel x:Name="KeyBindingsPanel"
-                                             Grid.Row="3"
+                                             Grid.Row="4"
                                              Visibility="Collapsed" />
 
-            <Border Grid.Row="4" Style="{StaticResource SectionDivider}">
+            <Border Grid.Row="5" Style="{StaticResource SectionDivider}">
                 <StackPanel Width="640" HorizontalAlignment="Left">
                     <TextBlock Style="{StaticResource SectionTitle}" Text="UI scale calibration" />
                     <TextBlock Margin="0,5,0,0" Style="{StaticResource Caption}" TextWrapping="Wrap" Text="Compare Roblox's rendered interface with the standard detector scale. The overlay stays click-through while you adjust UI Scale in Roblox settings." />
@@ -79,7 +128,7 @@
                 </StackPanel>
             </Border>
 
-            <Border Grid.Row="5" Style="{StaticResource SectionDivider}">
+            <Border Grid.Row="6" Style="{StaticResource SectionDivider}">
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
                     <StackPanel>
@@ -97,7 +146,7 @@
             </Border>
 
             <Border x:Name="DiagnosticsSection"
-                    Grid.Row="6"
+                    Grid.Row="7"
                     Style="{StaticResource SectionDivider}">
                 <Grid>
                     <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="420" /></Grid.ColumnDefinitions>
@@ -149,7 +198,7 @@
                 </Grid>
             </Border>
 
-            <StackPanel Grid.Row="7" Width="640" HorizontalAlignment="Left">
+            <StackPanel Grid.Row="8" Width="640" HorizontalAlignment="Left">
                 <TextBlock Style="{StaticResource SectionTitle}" Text="Debug capture" />
                 <CheckBox x:Name="DebugModeCheck"
                           Margin="0,14,0,0"

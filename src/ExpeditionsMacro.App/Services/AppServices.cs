@@ -15,6 +15,7 @@ using ExpeditionsMacro.Automation.Scheduling;
 using ExpeditionsMacro.Automation.Settings;
 using ExpeditionsMacro.Automation.Stages;
 using ExpeditionsMacro.Automation.Teams;
+using ExpeditionsMacro.Automation.Updates;
 using ExpeditionsMacro.Core.Abstractions;
 using ExpeditionsMacro.Core.Models;
 using ExpeditionsMacro.Core.Persistence;
@@ -42,6 +43,10 @@ public sealed class AppServices : IDisposable
         Paths = new AppPaths();
         Paths.EnsureCreated();
         Log = new FileLogger(Paths.Logs);
+        ApplicationUpdates = new ApplicationUpdateSession(
+            new ApplicationUpdateService(Paths, ProductVersion.Current),
+            Log.Info,
+            Log.Warning);
         SettingsStore = new AppSettingsStore(Paths);
         PlacementModels = new PlacementModelRepository(Paths);
         ManualRecordings =
@@ -242,6 +247,7 @@ public sealed class AppServices : IDisposable
 
     public AppPaths Paths { get; }
     public FileLogger Log { get; }
+    public ApplicationUpdateSession ApplicationUpdates { get; }
     public AppSettingsStore SettingsStore { get; }
     public PlacementModelRepository PlacementModels { get; }
     public ManualInputRecordingRepository ManualRecordings { get; }
@@ -394,6 +400,7 @@ public sealed class AppServices : IDisposable
         if (Automation is IDisposable automation) automation.Dispose();
         Log.Info("Application closing.");
         Hotkey.Dispose();
+        ApplicationUpdates.Dispose();
         _discord.Dispose();
     }
 

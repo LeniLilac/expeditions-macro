@@ -4,6 +4,19 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- The app can check its matching official GitHub release channel at startup, show a non-modal update notice, download only with explicit consent, and open the verified installer only after a second confirmation. Automatic checks can be disabled in Settings.
+- Verified installer downloads survive an app restart or canceled installation under the local update staging directory.
+
+### Security
+
+- Application releases must match their semantic tag, stable/prerelease flag, release URL, exact four-asset inventory, declared sizes, direct GitHub URLs, GitHub SHA-256 digests, and `SHA256SUMS.txt` before an installer can be staged. Redirects are bounded to trusted HTTPS GitHub release hosts, partial/tampered/stale stages are removed, and ready installers are rehashed immediately before launch.
+
+### Tests
+
+- Added adversarial semantic-version, release-inventory, redirect, size/hash, cancellation, migration, restart-recovery, and staged-tampering coverage. Passed 1,566 non-golden application tests, 6 Deep Debug Viewer tests, 15 Detector Viewer tests, and all 90 dark/light main-app UI states.
+
 ## [1.3.0-beta.53] - 2026-07-31
 
 ### Added

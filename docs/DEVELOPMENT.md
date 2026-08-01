@@ -98,6 +98,8 @@ When a file approaches its budget:
 - Macro Plan and Placement Setup persist every committed authoring change automatically. Serialize writes, retain the source identifier and replacement ancestry captured with each edit, drain edits queued during an active save, and flush before plan/setup switches, execution, export, deletion, navigation, or shutdown.
 - Loading and programmatic UI synchronization must not enqueue authoring saves. A stale or failed completion must not overwrite newer status; failed writes remain visibly retryable.
 - Validate downloaded paths, hashes, sizes, versions, and compatibility before installation; retain rollback behavior.
+- Application updates may query only the official repository's unauthenticated GitHub Releases API. Validate the exact semantic tag, stable/prerelease flag, release URL, required asset inventory, declared sizes, direct download URLs, GitHub asset digests, checksum manifest, and bounded HTTPS redirect hosts before staging. Never execute a partial or restart-recovered installer without rehashing it.
+- Automatic update checks are metadata-only. Downloading and opening an installer are separate explicit user actions; the app must never silently install, restart, poll, or send authentication/telemetry with an update request.
 - Document network behavior in `PRIVACY.md`; do not add telemetry implicitly.
 - Discord messages use Components V2 and explicit `allowed_mentions`.
 - Test secrets must be visibly fake. Never place production or personal credentials in fixtures.
