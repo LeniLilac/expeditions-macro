@@ -297,6 +297,56 @@ public sealed class BountyNumberRecognizerTests
                 value.CenterX is >= 378 and <= 386);
     }
 
+    [Fact]
+    public void Detect_AcceptsClippedFirstSlotClaimNumberTen()
+    {
+        ImageFrame image = ImageCodec.Load(
+            Path.Combine(
+                TestPaths.BountyDatasets,
+                "BountyBoard_ClippedClaimTen_01.png"));
+
+        BountyBoardMatch board =
+            BountyBoardDetector.Detect(image);
+        Assert.Equal(
+            BountyBoardState.Board,
+            board.State);
+        Assert.Contains(
+            board.Actions,
+            value =>
+                value.Kind == BountyCardActionKind.Claim &&
+                value.X is >= 225 and <= 229);
+        Assert.Equal(
+            10,
+            BountyBoardLayout.NumberForSlot(
+                board,
+                slot: 1,
+                rightView: true));
+        Assert.Contains(
+            board.Numbers,
+            value =>
+                value.Number == 10 &&
+                value.CenterX is >= 254 and <= 258);
+    }
+
+    [Fact]
+    public void Detect_RejectsClippedClaimRasterBeyondReviewedPosition()
+    {
+        ImageFrame image = ImageCodec.Load(
+            Path.Combine(
+                TestPaths.BountyDatasets,
+                "BountyBoard_ClippedClaimTen_01.png"));
+
+        Assert.Empty(
+            BountyNumberRecognizer.Detect(
+                image,
+                [
+                    new BountyCardAction(
+                        BountyCardActionKind.Claim,
+                        228,
+                        356),
+                ]));
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(2)]

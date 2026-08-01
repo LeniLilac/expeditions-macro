@@ -23,7 +23,7 @@ public static class BountyNumberRecognizer
     private const double MinimumRasterSimilarityMargin = 0.03;
     private const double MinimumClearRasterSimilarity = 0.80;
     private const double MinimumClearRasterSimilarityMargin = 0.08;
-    private const int MaximumRasterPositionDistance = 4;
+    private const int MaximumRasterPositionDistance = 5;
     // The widest reviewed paper places its suffix 46 pixels left of the live action.
     private const int ActionWindowLeft = 54;
     private const int ActionWindowTop = 105;

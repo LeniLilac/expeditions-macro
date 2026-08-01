@@ -7,6 +7,7 @@ All notable changes to Expeditions Macro are documented here.
 ### Fixed
 
 - Back-to-Lobby detection now accepts the field-observed thicker high-contrast Roblox door glyph while retaining the existing fixed-offset geometry, complete door/arrow/handle proof, stable-frame requirement, and cross-state rejection coverage.
+- Completed Bounty claiming now recognizes the field-observed leftmost `#10` paper offset while retaining live Claim ownership, bounded title position, similarity, and runner-up separation requirements.
 
 ## [1.3.0-beta.56] - 2026-08-01
 
