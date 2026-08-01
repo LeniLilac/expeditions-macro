@@ -40,6 +40,12 @@ public sealed record AppSettings
 
     public const string DefaultAutoUpgradeUnitKey = "";
 
+    public const int MinimumDeepDebugFrameRetentionMinutes = 1;
+
+    public const int MaximumDeepDebugFrameRetentionMinutes = 120;
+
+    public const int DefaultDeepDebugFrameRetentionMinutes = 15;
+
     public const string
         DefaultToggleAutoUpgradePlacedUnitsKey = "";
 
@@ -80,6 +86,9 @@ public sealed record AppSettings
     public bool IncludeLogsInDiagnosticArchives { get; init; } = true;
 
     public bool DeepDebugEnabled { get; init; }
+
+    public int DeepDebugFrameRetentionMinutes { get; init; } =
+        DefaultDeepDebugFrameRetentionMinutes;
 
     public bool DebugModeEnabled { get; init; }
 
@@ -127,6 +136,13 @@ public sealed record AppSettings
     } = DefaultToggleAutoUpgradePlacedUnitsKey;
 
     public ResourceRefuelDebugSettings ResourceRefuelDebug { get; init; } = new();
+
+    public static int NormalizeDeepDebugFrameRetentionMinutes(
+        int value) =>
+        Math.Clamp(
+            value,
+            MinimumDeepDebugFrameRetentionMinutes,
+            MaximumDeepDebugFrameRetentionMinutes);
 
     public static int ParseShiftLockKey(
         int virtualKey,

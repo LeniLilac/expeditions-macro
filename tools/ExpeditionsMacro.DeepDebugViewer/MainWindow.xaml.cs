@@ -66,7 +66,9 @@ public partial class MainWindow : Window
             Filter = "Deep Debug ZIP (*.zip)|*.zip|All files (*.*)|*.*",
             CheckFileExists = true,
             Multiselect = false,
-            InitialDirectory = DefaultDiagnosticsDirectory(),
+            InitialDirectory =
+                DeepDebugViewerPresentation
+                    .DefaultDiagnosticsDirectory(),
         };
         if (dialog.ShowDialog(this) == true) await OpenArchiveAsync(dialog.FileName);
     }
@@ -98,18 +100,25 @@ public partial class MainWindow : Window
             _archive = opened;
             long cacheBudget = (CacheBudgetCombo.SelectedItem as CacheBudgetOption)?.Bytes ?? FrameBitmapCache.DefaultBudgetBytes;
             _frameCache = new FrameBitmapCache(opened, cacheBudget);
-            _currentFrameIndex = 0;
+            _currentFrameIndex =
+                DeepDebugViewerPresentation
+                    .FirstRetainedFrameIndex(opened);
             ArchivePathText.Text = opened.Path;
             OperationText.Text = opened.Manifest.Operation;
-            OutcomeText.Text = $"Outcome: {FriendlyOutcome(opened.Manifest.Outcome)}";
-            RuntimeText.Text = $"Runtime: {FormatRuntime(opened.Manifest.Runtime)}";
-            ArchiveCountText.Text = $"{opened.Frames.Count:N0} frames  ·  {opened.Events.Count:N0} events";
+            OutcomeText.Text =
+                $"Outcome: {DeepDebugViewerPresentation.FriendlyOutcome(opened.Manifest.Outcome)}";
+            RuntimeText.Text =
+                $"Runtime: {DeepDebugViewerPresentation.FormatRuntime(opened.Manifest.Runtime)}";
+            ArchiveCountText.Text =
+                DeepDebugViewerPresentation
+                    .ArchiveCounts(opened);
             TimelineSlider.Maximum = Math.Max(0, opened.Frames.Count - 1);
             SetBusy(false, opened.MalformedEventLines == 0
                 ? $"Indexed {opened.Frames.Count:N0} frames. Read-ahead is ready."
                 : $"Indexed {opened.Frames.Count:N0} frames; skipped {opened.MalformedEventLines:N0} malformed event lines.");
             UpdateCacheStatus();
-            await ShowFrameAsync(0);
+            await ShowFrameAsync(
+                _currentFrameIndex);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -162,8 +171,23 @@ public partial class MainWindow : Window
         catch (Exception error) when (error is IOException or InvalidDataException or NotSupportedException)
         {
             FrameImage.Source = null;
-            ShowPreviewMessage(error.Message, ViewerIconKind.CircleAlert, error: true);
-            StatusText.Text = $"Frame {target + 1:N0} is unavailable. Playback can continue.";
+            if (frame.PrunedByRetention)
+            {
+                ShowPreviewMessage(
+                    "This frame image was intentionally discarded because it is outside the configured rolling window. The full text timeline remains below.",
+                    ViewerIconKind.FileArchive);
+                StatusText.Text =
+                    $"Frame record {target + 1:N0} is outside the retained image window. Timeline navigation can continue.";
+            }
+            else
+            {
+                ShowPreviewMessage(
+                    error.Message,
+                    ViewerIconKind.CircleAlert,
+                    error: true);
+                StatusText.Text =
+                    $"Frame {target + 1:N0} is unavailable. Playback can continue.";
+            }
         }
     }
 
@@ -181,7 +205,7 @@ public partial class MainWindow : Window
         {
             _nearbyEvents.Add(new NearbyEventItem(
                 item.TimestampUtc.ToLocalTime().ToString("HH:mm:ss.fff", System.Globalization.CultureInfo.InvariantCulture),
-                $"{FriendlyToken(item.Category)} · {FriendlyToken(item.Action)}",
+                $"{DeepDebugViewerPresentation.FriendlyToken(item.Category)} · {DeepDebugViewerPresentation.FriendlyToken(item.Action)}",
                 string.IsNullOrWhiteSpace(item.Details) ? $"Sequence {item.Sequence:N0}" : item.Details,
                 string.Equals(item.FramePath, frame.Path, StringComparison.OrdinalIgnoreCase)));
         }
@@ -455,47 +479,8 @@ public partial class MainWindow : Window
             CacheUsageText.Text = "Cache 0 B / 10 GB";
             return;
         }
-        CacheUsageText.Text = $"Cache {FormatBytes(cache.CurrentBytes)} / {FormatBytes(cache.BudgetBytes)} · {cache.Count:N0} frames";
-    }
-
-    private static string DefaultDiagnosticsDirectory()
-    {
-        string path = System.IO.Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "ExpeditionsMacro",
-            "diagnostics");
-        return Directory.Exists(path) ? path : Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-    }
-
-    private static string FriendlyOutcome(string value) => value.ToLowerInvariant() switch
-    {
-        "success" => "Success",
-        "error" => "Error",
-        "canceled" => "Canceled",
-        _ => "Unknown",
-    };
-
-    private static string FormatRuntime(TimeSpan? runtime) => runtime is null
-        ? "unknown"
-        : runtime.Value.TotalHours >= 1
-            ? runtime.Value.ToString(@"hh\:mm\:ss", System.Globalization.CultureInfo.InvariantCulture)
-            : runtime.Value.ToString(@"mm\:ss\.fff", System.Globalization.CultureInfo.InvariantCulture);
-
-    private static string FriendlyToken(string value)
-    {
-        string spaced = value.Replace('_', ' ').Replace('.', ' ');
-        return System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(spaced);
-    }
-
-    private static string FormatBytes(long bytes)
-    {
-        const double gibibyte = 1024d * 1024 * 1024;
-        const double mebibyte = 1024d * 1024;
-        return bytes >= gibibyte
-            ? $"{bytes / gibibyte:0.##} GB"
-            : bytes >= mebibyte
-                ? $"{bytes / mebibyte:0.#} MB"
-                : $"{bytes / 1024d:0.#} KB";
+        CacheUsageText.Text =
+            $"Cache {DeepDebugViewerPresentation.FormatBytes(cache.CurrentBytes)} / {DeepDebugViewerPresentation.FormatBytes(cache.BudgetBytes)} · {cache.Count:N0} frames";
     }
 
     private sealed record NearbyEventItem(string Time, string Heading, string Details, bool IsCurrentFrame);

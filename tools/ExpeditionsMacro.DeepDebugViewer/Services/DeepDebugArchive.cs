@@ -16,7 +16,16 @@ public sealed record DeepDebugManifestSummary(
     TimeSpan? Runtime,
     int DeclaredFrames,
     int DeclaredEvents,
-    int DeclaredInputEvents);
+    int DeclaredInputEvents,
+    int? FrameRetentionMinutes,
+    int RetainedFrameImages,
+    int DiscardedFrameImages,
+    DateTimeOffset? FrameWindowStartedAtUtc)
+{
+    public bool UsesRollingFrameRetention =>
+        FrameRetentionMinutes is > 0 &&
+        FrameWindowStartedAtUtc is not null;
+}
 
 public sealed record DeepDebugTimelineEvent(
     long Sequence,
@@ -32,7 +41,10 @@ public sealed record DeepDebugFrameRecord(
     DateTimeOffset TimestampUtc,
     string Path,
     int EventIndex,
-    bool EntryExists);
+    bool EntryExists)
+{
+    public bool PrunedByRetention { get; init; }
+}
 
 public sealed class DeepDebugArchive : IDisposable
 {
@@ -123,7 +135,12 @@ public sealed class DeepDebugArchive : IDisposable
 
                 DeepDebugManifestSummary manifest = await ReadManifestAsync(entries, cancellationToken).ConfigureAwait(false);
                 progress?.Report("Indexing events and frames...");
-                ParsedTimeline timeline = await ReadTimelineAsync(entries, progress, cancellationToken).ConfigureAwait(false);
+                ParsedTimeline timeline = await ReadTimelineAsync(
+                        entries,
+                        manifest,
+                        progress,
+                        cancellationToken)
+                    .ConfigureAwait(false);
                 if (timeline.Frames.Count == 0)
                 {
                     timeline = timeline with { Frames = BuildFallbackFrames(entries) };
@@ -177,6 +194,11 @@ public sealed class DeepDebugArchive : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         if (!_entries.TryGetValue(NormalizePath(frame.Path), out ZipArchiveEntry? entry))
         {
+            if (frame.PrunedByRetention)
+            {
+                throw new InvalidDataException(
+                    $"Frame '{frame.Path}' is outside the archive's retained frame-image window. Its timeline record is still available.");
+            }
             throw new InvalidDataException($"Frame '{frame.Path}' is missing from the archive.");
         }
         if (entry.Length is <= 0 or > MaximumFrameBytes)
@@ -225,7 +247,20 @@ public sealed class DeepDebugArchive : IDisposable
     {
         if (!entries.TryGetValue("manifest.json", out ZipArchiveEntry? entry))
         {
-            return new DeepDebugManifestSummary("Deep Debug operation", "unknown", "unknown", null, null, null, 0, 0, 0);
+            return new DeepDebugManifestSummary(
+                "Deep Debug operation",
+                "unknown",
+                "unknown",
+                null,
+                null,
+                null,
+                0,
+                0,
+                0,
+                null,
+                0,
+                0,
+                null);
         }
 
         await using Stream stream = entry.Open();
@@ -240,11 +275,20 @@ public sealed class DeepDebugArchive : IDisposable
             GetTimeSpan(root, "runtime"),
             GetInt32(root, "frames"),
             GetInt32(root, "events"),
-            GetInt32(root, "input_events"));
+            GetInt32(root, "input_events"),
+            GetNullableInt32(
+                root,
+                "frame_retention_minutes"),
+            GetInt32(root, "retained_frame_images"),
+            GetInt32(root, "discarded_frame_images"),
+            GetDateTimeOffset(
+                root,
+                "frame_window_started_at_utc"));
     }
 
     private static async Task<ParsedTimeline> ReadTimelineAsync(
         IReadOnlyDictionary<string, ZipArchiveEntry> entries,
+        DeepDebugManifestSummary manifest,
         IProgress<string>? progress,
         CancellationToken cancellationToken)
     {
@@ -302,13 +346,22 @@ public sealed class DeepDebugArchive : IDisposable
         {
             DeepDebugTimelineEvent item = events[eventIndex];
             if (string.IsNullOrWhiteSpace(item.FramePath)) continue;
+            bool entryExists =
+                entries.ContainsKey(item.FramePath);
             frames.Add(new DeepDebugFrameRecord(
                 frames.Count,
                 item.Sequence,
                 item.TimestampUtc,
                 item.FramePath,
                 eventIndex,
-                entries.ContainsKey(item.FramePath)));
+                entryExists)
+            {
+                PrunedByRetention =
+                    !entryExists &&
+                    manifest.UsesRollingFrameRetention &&
+                    item.TimestampUtc <
+                    manifest.FrameWindowStartedAtUtc,
+            });
         }
         return new ParsedTimeline(events, frames, malformed);
     }
@@ -389,6 +442,16 @@ public sealed class DeepDebugArchive : IDisposable
 
     private static int GetInt32(JsonElement element, string property) =>
         element.TryGetProperty(property, out JsonElement value) && value.TryGetInt32(out int result) ? result : 0;
+
+    private static int? GetNullableInt32(
+        JsonElement element,
+        string property) =>
+        element.TryGetProperty(
+            property,
+            out JsonElement value) &&
+        value.TryGetInt32(out int result)
+            ? result
+            : null;
 
     private static long GetInt64(JsonElement element, string property, long fallback) =>
         element.TryGetProperty(property, out JsonElement value) && value.TryGetInt64(out long result) ? result : fallback;

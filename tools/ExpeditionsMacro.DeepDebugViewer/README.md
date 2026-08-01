@@ -20,6 +20,6 @@ Choose **Open archive** or drag a ZIP onto the window. The file picker starts in
 - Choose a decoded-frame cache budget from 2 GB through 20 GB. The default is 10 GB. The viewer budgets actual Pbgra32 pixel memory, reads ahead around the current frame, and reports cache usage live.
 - Choose **Clear cache** to release every cached frame. The frame currently displayed by WPF remains visible until another frame replaces it.
 
-The viewer indexes `events.jsonl` once but streams PNG entries from the ZIP as needed. It does not extract the archive or load every screenshot into memory. Missing and corrupt frames remain in the timeline and display an inline error without stopping playback. A malformed event line is skipped and reported in the status area.
+The viewer indexes the complete `events.jsonl` once but streams retained PNG entries from the ZIP as needed. It does not extract the archive or load every screenshot into memory. For rolling-retention archives it opens at the first retained image; older frame records remain navigable with an intentional-pruning notice and their nearby text events. Unexpectedly missing and corrupt frames retain a distinct inline error without stopping playback. A malformed event line is skipped and reported in the status area.
 
 Deep Debug archives are expected to be sanitized by the app. The viewer does not read application settings, webhooks, or models from outside the selected archive, and it defensively redacts Discord webhook URLs and Discord-style user IDs if either appears in an event payload.

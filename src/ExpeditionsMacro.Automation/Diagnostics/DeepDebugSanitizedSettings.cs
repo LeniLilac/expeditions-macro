@@ -13,6 +13,7 @@ internal sealed record DeepDebugSanitizedSettings(
     bool AutoCaptureOnMacroError,
     bool IncludeLogsInDiagnosticArchives,
     bool DeepDebugEnabled,
+    int DeepDebugFrameRetentionMinutes,
     bool DebugModeEnabled,
     bool ManualInputRecordingEnabled,
     bool AutoCheckUiScaleOnStart,
@@ -47,6 +48,8 @@ internal sealed record DeepDebugSanitizedSettings(
         settings.AutoCaptureOnMacroError,
         settings.IncludeLogsInDiagnosticArchives,
         settings.DeepDebugEnabled,
+        AppSettings.NormalizeDeepDebugFrameRetentionMinutes(
+            settings.DeepDebugFrameRetentionMinutes),
         settings.DebugModeEnabled,
         settings.ManualInputRecordingEnabled,
         settings.AutoCheckUiScaleOnStart,

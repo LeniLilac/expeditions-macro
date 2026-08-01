@@ -5,7 +5,7 @@ Detector Viewer is a standalone Windows inspection tool for the production visio
 ## Open a source
 
 - Choose **Repo datasets** or press Ctrl+D to index every supported image under the current checkout's `datasets` folder.
-- Choose **Open source** for a PNG, JPEG, BMP, TIFF, or Deep Debug ZIP.
+- Choose **Open source** for a PNG, JPEG, BMP, TIFF, or Deep Debug ZIP. Rolling-retention archives expose their retained PNG tail; use Deep Debug Viewer for the full text timeline and intentionally pruned frame records.
 - Choose **Open folder** to index supported images recursively without loading the complete folder into memory.
 - Drop any supported source onto the window.
 - Type a filename into the frame picker to jump directly to a dataset image. The filename appears before its relative folder so prefix search remains useful across the complete corpus.

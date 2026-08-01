@@ -131,6 +131,18 @@ public partial class MacroPage
                     teamSession,
                     progress,
                     cancellationToken),
+            BountyObjectiveKind.StoryActOneHard =>
+                ExecuteBountyStoryHardAsync(
+                    bountyTask,
+                    detector,
+                    webhook,
+                    playMenuKey,
+                    unitMenuKey,
+                    cancelPlacementKey,
+                    macroTotals,
+                    teamSession,
+                    progress,
+                    cancellationToken),
             BountyObjectiveKind.InfiniteWave =>
                 ExecuteBountyInfiniteAsync(
                     bountyTask,
@@ -194,6 +206,78 @@ public partial class MacroPage
                 .ConfigureAwait(false);
         StageRunResult result =
             await _services.Stages.RunRaidAsync(
+                    preset,
+                    models,
+                    detector,
+                    webhook,
+                    playMenuKey,
+                    unitMenuKey,
+                    progress,
+                    entry => DispatchLog(entry),
+                    cancellationToken,
+                    continueScheduledRoute:
+                        static (
+                            _,
+                            _,
+                            _,
+                            _) =>
+                            Task.FromResult(
+                                ScheduledTaskContinuation
+                                    .ReturnToLobby),
+                    macroTotals: macroTotals,
+                    cancelPlacementKey:
+                        cancelPlacementKey,
+                    teamSession:
+                        teamSession)
+                .ConfigureAwait(false);
+        return new()
+        {
+            Completed =
+                result.Outcome ==
+                StageRunOutcome.Victory,
+            NextEligibleAtUtc =
+                result.Outcome ==
+                StageRunOutcome.Victory
+                    ? null
+                    : DateTimeOffset.UtcNow +
+                        SafeSkipDelay,
+        };
+    }
+
+    private async Task<BountyRouteExecutionResult>
+        ExecuteBountyStoryHardAsync(
+        MacroTaskDefinition bountyTask,
+        IDetectorPack detector,
+        string webhook,
+        char playMenuKey,
+        char? unitMenuKey,
+        char cancelPlacementKey,
+        MacroRunTotals macroTotals,
+        TeamOperationSession teamSession,
+        IProgress<MacroProgress> progress,
+        CancellationToken cancellationToken)
+    {
+        MacroTaskDefinition task =
+            RouteTask(
+                bountyTask,
+                MacroTaskKind.Story,
+                new PlacementTarget
+                {
+                    Mode = PlacementTargetMode.Story,
+                    MapNumber =
+                        (int)ChallengeMapId.SchoolGrounds,
+                    StoryRunKind = StoryRunKind.Act,
+                    ActNumber = 1,
+                },
+                hardMode: true);
+        (StoryPreset preset,
+            StageRuntimeModels models) =
+            await BuildStorySetupAsync(
+                    task,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        StageRunResult result =
+            await _services.Stages.RunStoryAsync(
                     preset,
                     models,
                     detector,
@@ -387,7 +471,8 @@ public partial class MacroPage
     private static MacroTaskDefinition RouteTask(
         MacroTaskDefinition bountyTask,
         MacroTaskKind kind,
-        PlacementTarget? target) =>
+        PlacementTarget? target,
+        bool hardMode = false) =>
         new()
         {
             Id =
@@ -395,6 +480,7 @@ public partial class MacroPage
             Kind = kind,
             Name = $"Bounty {kind}",
             PlacementTarget = target,
+            HardMode = hardMode,
             DefeatRetries =
                 bountyTask.DefeatRetries,
         };

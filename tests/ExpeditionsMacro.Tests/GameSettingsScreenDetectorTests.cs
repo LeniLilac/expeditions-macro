@@ -364,6 +364,21 @@ public sealed class GameSettingsScreenDetectorTests
             4);
     }
 
+    [Fact]
+    public void UnitsScrollbar_AcceptsReviewedBrightBlueFieldVariant()
+    {
+        ImageFrame frame = Load(
+            "UnitsTopBrightScrollbar.png");
+
+        GameSettingsScrollbarThumb thumb =
+            GameSettingsScreenDetector
+                .FindUnitsScrollbarThumb(frame)!.Value;
+
+        Assert.True(thumb.IsAtTop);
+        Assert.InRange(thumb.X, 665, 671);
+        Assert.InRange(thumb.EndY - thumb.StartY + 1, 120, 220);
+    }
+
     [Theory]
     [InlineData("UnitsTop.png", 277, true)]
     [InlineData("UnitsBottom.png", 360, false)]

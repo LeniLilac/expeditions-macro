@@ -464,6 +464,46 @@ public sealed class DetectorViewerTests
     }
 
     [Fact]
+    public async Task DeepDebugZipMapsRetainedFrameAfterPrunedTimelineRecord()
+    {
+        using TestDirectory directory = new();
+        string path = Path.Combine(
+            directory.Path,
+            "deep-debug-rolling.zip");
+        using (FileStream file = File.Create(path))
+        using (ZipArchive archive = new(
+                   file,
+                   ZipArchiveMode.Create))
+        {
+            WriteText(
+                archive,
+                "manifest.json",
+                "{\"operation\":\"Rolling test\",\"frame_retention_minutes\":15,\"frame_window_started_at_utc\":\"2026-07-31T12:15:00Z\"}");
+            WriteText(
+                archive,
+                "events.jsonl",
+                "{\"sequence\":1,\"timestamp_utc\":\"2026-07-31T12:00:00Z\",\"category\":\"frame\",\"action\":\"old\",\"frame\":\"frames/frame-000000001.png\"}\n" +
+                "{\"sequence\":2,\"timestamp_utc\":\"2026-07-31T12:16:00Z\",\"category\":\"frame\",\"action\":\"retained\",\"frame\":\"frames/frame-000000002.png\"}\n");
+            WriteBytes(
+                archive,
+                "frames/frame-000000002.png",
+                OnePixelPng);
+        }
+
+        using FrameSequence source =
+            await FrameSequence.OpenAsync(path);
+        byte[] bytes =
+            await source.ReadFrameBytesAsync(0);
+
+        ViewerFrameRecord frame = Assert.Single(source.Frames);
+        Assert.EndsWith(
+            "frame-000000002.png",
+            frame.DisplayPath,
+            StringComparison.Ordinal);
+        Assert.Equal(OnePixelPng, bytes);
+    }
+
+    [Fact]
     public void PixelInspectorReportsCanonicalRgb()
     {
         var frame =

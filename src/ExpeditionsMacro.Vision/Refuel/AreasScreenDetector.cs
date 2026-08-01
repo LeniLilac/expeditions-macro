@@ -32,7 +32,7 @@ public static class AreasScreenDetector
     private const int ExpeditionsRow = 4;
 
     private static readonly ScreenRegion CloseSearch =
-        new(620, 130, 65, 70);
+        new(637, 145, 30, 40);
     private static readonly ScreenRegion HubTop =
         new(250, 200, 140, 15);
     private static readonly ScreenRegion HubLeft =

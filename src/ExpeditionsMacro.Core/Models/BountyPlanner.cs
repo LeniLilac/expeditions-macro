@@ -79,6 +79,7 @@ public static class BountyPlanner
         List<(BountyWorkRoute Route, int Coverage)> routes = [];
 
         AddRaidRoute();
+        AddStoryHardRoute();
         AddChallengeRoute();
         foreach (IGrouping<ChallengeMapId, (
                      BountyActiveProgress Active,
@@ -161,6 +162,31 @@ public static class BountyPlanner
                 new BountyWorkRoute
                 {
                     Kind = BountyObjectiveKind.RaidActOne,
+                    CoveredBounties = covered,
+                },
+                covered.Length));
+        }
+
+        void AddStoryHardRoute()
+        {
+            int[] covered = IncompleteObjectives()
+                .Where(value =>
+                    value.Objective.Kind ==
+                    BountyObjectiveKind.StoryActOneHard)
+                .Select(value => value.Active.Number)
+                .Distinct()
+                .Order()
+                .ToArray();
+            if (covered.Length == 0)
+            {
+                return;
+            }
+            routes.Add((
+                new BountyWorkRoute
+                {
+                    Kind =
+                        BountyObjectiveKind.StoryActOneHard,
+                    Map = ChallengeMapId.SchoolGrounds,
                     CoveredBounties = covered,
                 },
                 covered.Length));
@@ -263,6 +289,9 @@ public static class BountyPlanner
                 BountyObjectiveKind.RaidActOne =>
                     objective.Kind ==
                     BountyObjectiveKind.RaidActOne,
+                BountyObjectiveKind.StoryActOneHard =>
+                    objective.Kind ==
+                    BountyObjectiveKind.StoryActOneHard,
                 BountyObjectiveKind.InfiniteWave =>
                     objective.Kind ==
                         BountyObjectiveKind.InfiniteWave &&
@@ -300,6 +329,7 @@ public static class BountyPlanner
             BountyObjectiveKind.Challenge =>
                 route.ChallengeRuns * 20,
             BountyObjectiveKind.RaidActOne => 35,
+            BountyObjectiveKind.StoryActOneHard => 12,
             BountyObjectiveKind.InfiniteWave =>
                 route.TargetWave,
             _ => int.MaxValue,

@@ -1,6 +1,5 @@
 using System.IO.Compression;
 using System.Reflection;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Channels;
@@ -23,6 +22,7 @@ public sealed class DeepDebugSessionService
     private readonly Action<string> _warning;
     private readonly DeepDebugArchiveTextWriter _archiveText;
     private readonly DeepDebugArtifactResolver _artifacts;
+    private readonly Func<DateTimeOffset> _utcNow;
     private readonly object _gate = new();
     private DeepDebugSession? _active;
 
@@ -31,12 +31,30 @@ public sealed class DeepDebugSessionService
         Func<AppSettings> getSettings,
         Func<string?> getLogFilePath,
         Action<string> info,
-        Action<string> warning)
+        Action<string> warning) :
+        this(
+            paths,
+            getSettings,
+            getLogFilePath,
+            info,
+            warning,
+            static () => DateTimeOffset.UtcNow)
+    {
+    }
+
+    internal DeepDebugSessionService(
+        AppPaths paths,
+        Func<AppSettings> getSettings,
+        Func<string?> getLogFilePath,
+        Action<string> info,
+        Action<string> warning,
+        Func<DateTimeOffset> utcNow)
     {
         _paths = paths;
         _getSettings = getSettings;
         _info = info;
         _warning = warning;
+        _utcNow = utcNow;
         _archiveText = new DeepDebugArchiveTextWriter(
             getSettings,
             getLogFilePath);
@@ -128,7 +146,7 @@ public sealed class DeepDebugSessionService
         string relativePath = $"frames/frame-{frameIndex:D9}.png";
         Enqueue(session, new DeepDebugWriteItem(
             sequence,
-            DateTimeOffset.UtcNow,
+            _utcNow(),
             "frame",
             source,
             data,
@@ -144,7 +162,7 @@ public sealed class DeepDebugSessionService
         Interlocked.Increment(ref session.EventCount);
         Enqueue(session, new DeepDebugWriteItem(
             sequence,
-            DateTimeOffset.UtcNow,
+            _utcNow(),
             category,
             action,
             data,
@@ -219,13 +237,20 @@ public sealed class DeepDebugSessionService
             SingleWriter = false,
             AllowSynchronousContinuations = false,
         });
+        AppSettings settings = _getSettings();
         DeepDebugSession session = new(
             operation,
             context,
-            DateTimeOffset.UtcNow,
+            _utcNow(),
             staging,
-            channel);
-        session.WriterTask = Task.Run(() => WriteItemsAsync(session));
+            channel,
+            AppSettings.NormalizeDeepDebugFrameRetentionMinutes(
+                settings.DeepDebugFrameRetentionMinutes));
+        session.WriterTask = Task.Run(
+            () => DeepDebugSessionWriter.WriteAsync(
+                session,
+                CompactJson,
+                RedactText));
 
         lock (_gate)
         {
@@ -247,6 +272,7 @@ public sealed class DeepDebugSessionService
 
     private async Task<string> CompleteAsync(DeepDebugSession session, string outcome, Exception? error)
     {
+        DateTimeOffset completedAt = _utcNow();
         RecordEvent("session", "finished", new
         {
             Outcome = outcome,
@@ -266,6 +292,9 @@ public sealed class DeepDebugSessionService
         {
             session.WriterFailure ??= writerError;
         }
+        DeepDebugSessionWriter.PruneExpiredFrames(
+            session,
+            completedAt);
 
         try
         {
@@ -285,7 +314,6 @@ public sealed class DeepDebugSessionService
             .CopySanitizedRunLogAsync(session.StagingDirectory)
             .ConfigureAwait(false);
 
-        DateTimeOffset completedAt = DateTimeOffset.UtcNow;
         DeepDebugManifest manifest = new(
             session.Operation,
             outcome,
@@ -296,6 +324,13 @@ public sealed class DeepDebugSessionService
             Volatile.Read(ref session.FrameCount),
             Volatile.Read(ref session.EventCount),
             Volatile.Read(ref session.InputEventCount),
+            session.FrameRetentionMinutes,
+            session.RetainedFrames.Count,
+            Volatile.Read(
+                ref session.DiscardedFrameCount),
+            completedAt.AddMinutes(
+                -session.FrameRetentionMinutes),
+            "The text log and event timeline cover the full operation. Only PNG frame images inside the final rolling window are retained.",
             session.WriterFailure is null ? null : RedactText(session.WriterFailure.ToString()),
             error is null ? null : RedactText(error.ToString()),
             "Discord webhook values, protected webhook material, Discord user IDs, and the active Windows username/profile path are excluded.");
@@ -329,60 +364,6 @@ public sealed class DeepDebugSessionService
         return archive;
     }
 
-    private async Task WriteItemsAsync(DeepDebugSession session)
-    {
-        string eventsPath = Path.Combine(session.StagingDirectory, "events.jsonl");
-        try
-        {
-            await using FileStream stream = new(eventsPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
-            await using StreamWriter writer = new(stream, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-            await foreach (DeepDebugWriteItem item in session.Channel.Reader.ReadAllAsync().ConfigureAwait(false))
-            {
-                if (item.Frame is not null && item.FramePath is not null)
-                {
-                    string framePath = Path.Combine(session.StagingDirectory, item.FramePath.Replace('/', Path.DirectorySeparatorChar));
-                    ImageCodec.SavePng(framePath, item.Frame, compression: 1);
-                }
-
-                DeepDebugEventRecord record = new(
-                    item.Sequence,
-                    item.TimestampUtc,
-                    item.Category,
-                    item.Action,
-                    item.FramePath,
-                    item.Data);
-                string json;
-                try
-                {
-                    json = RedactText(
-                        JsonSerializer.Serialize(record, CompactJson));
-                }
-                catch (Exception serializationError)
-                {
-                    json = RedactText(
-                        JsonSerializer.Serialize(
-                            record with
-                            {
-                                Data = new
-                                {
-                                    SerializationError =
-                                        serializationError.Message,
-                                },
-                            },
-                            CompactJson));
-                }
-                await writer.WriteLineAsync(json).ConfigureAwait(false);
-            }
-            await writer.FlushAsync(CancellationToken.None).ConfigureAwait(false);
-        }
-        catch (Exception error)
-        {
-            session.WriterFailure = error;
-            session.Channel.Writer.TryComplete(error);
-            throw;
-        }
-    }
-
     private void Enqueue(DeepDebugSession session, DeepDebugWriteItem item)
     {
         if (session.WriterFailure is not null) return;
@@ -412,7 +393,7 @@ public sealed class DeepDebugSessionService
             OperatingSystem = Environment.OSVersion.VersionString,
             Framework = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
             ProcessArchitecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
-            CapturedAtUtc = DateTimeOffset.UtcNow,
+            CapturedAtUtc = _utcNow(),
         }).ConfigureAwait(false);
 
         ResolvedArtifacts artifacts =
@@ -491,65 +472,4 @@ public sealed class DeepDebugSessionService
         return options;
     }
 
-    private sealed class DeepDebugSession
-    {
-        public DeepDebugSession(
-            string operation,
-            DeepDebugOperationContext context,
-            DateTimeOffset startedAtUtc,
-            string stagingDirectory,
-            Channel<DeepDebugWriteItem> channel)
-        {
-            Operation = operation;
-            Context = context;
-            StartedAtUtc = startedAtUtc;
-            StagingDirectory = stagingDirectory;
-            Channel = channel;
-        }
-
-        public string Operation { get; }
-        public DeepDebugOperationContext Context { get; }
-        public DateTimeOffset StartedAtUtc { get; }
-        public string StagingDirectory { get; }
-        public Channel<DeepDebugWriteItem> Channel { get; }
-        public Task WriterTask { get; set; } = Task.CompletedTask;
-        public Exception? WriterFailure { get; set; }
-        public long Sequence;
-        public int FrameCount;
-        public int EventCount;
-        public int InputEventCount;
-        public HashSet<string> ReferencedPlacementModelIds { get; } = new(StringComparer.OrdinalIgnoreCase);
-        public HashSet<string> ReferencedDetectorPackIds { get; } = new(StringComparer.OrdinalIgnoreCase);
-    }
-
-    private sealed record DeepDebugWriteItem(
-        long Sequence,
-        DateTimeOffset TimestampUtc,
-        string Category,
-        string Action,
-        object? Data,
-        string? FramePath,
-        ImageFrame? Frame);
-
-    private sealed record DeepDebugEventRecord(
-        long Sequence,
-        DateTimeOffset TimestampUtc,
-        string Category,
-        string Action,
-        string? Frame,
-        object? Data);
-
-    private sealed record DeepDebugManifest(
-        string Operation,
-        string Outcome,
-        string AppVersion,
-        DateTimeOffset StartedAtUtc,
-        DateTimeOffset CompletedAtUtc,
-        TimeSpan Runtime,
-        int Frames,
-        int Events,
-        int InputEvents,
-        string? WriterFailure,
-        string? OperationError,
-        string SecretPolicy);
 }

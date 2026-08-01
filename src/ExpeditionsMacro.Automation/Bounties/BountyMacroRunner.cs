@@ -385,6 +385,8 @@ public sealed class BountyMacroRunner
         {
             BountyObjectiveKind.RaidActOne =>
                 "Spirit City Raid Act 1",
+            BountyObjectiveKind.StoryActOneHard =>
+                "School Grounds Story Act 1 Hard",
             BountyObjectiveKind.InfiniteWave =>
                 $"{Label(route.Map!.Value)} Infinite through wave {route.TargetWave + 2}",
             BountyObjectiveKind.Challenge =>

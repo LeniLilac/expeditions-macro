@@ -27,16 +27,6 @@
       "path": "src/ExpeditionsMacro.Windows/WindowsRobloxAutomation.cs",
       "maxLines": 766,
       "reason": "Existing Windows adapter debt; separate window, capture, keyboard, pointer, and diagnostics concerns."
-    },
-    {
-      "path": "src/ExpeditionsMacro.Automation/Diagnostics/DeepDebugSessionService.cs",
-      "maxLines": 555,
-      "reason": "Existing diagnostic lifecycle debt; split archive writing, manifest capture, and retention."
-    },
-    {
-      "path": "tools/ExpeditionsMacro.DeepDebugViewer/MainWindow.xaml.cs",
-      "maxLines": 512,
-      "reason": "Existing tool window-controller debt; extract playback and archive navigation controllers."
     }
   ],
   "projectDependencies": {

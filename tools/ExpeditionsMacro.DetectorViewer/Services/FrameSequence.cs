@@ -16,7 +16,10 @@ public sealed record ViewerFrameRecord(
     string StorageKey,
     string DisplayPath,
     DateTimeOffset? Timestamp,
-    bool Available);
+    bool Available)
+{
+    internal int? ArchiveFrameIndex { get; init; }
+}
 
 public sealed class FrameSequence : IDisposable
 {
@@ -83,14 +86,27 @@ public sealed class FrameSequence : IDisposable
             }
             ViewerFrameRecord[] frames =
                 archive.Frames
+                    .Where(frame =>
+                        frame.EntryExists)
                     .Select(frame =>
                         new ViewerFrameRecord(
-                            frame.Index,
+                            0,
                             frame.Path,
                             frame.Path,
                             frame.TimestampUtc,
-                            frame.EntryExists))
+                            frame.EntryExists)
+                        {
+                            ArchiveFrameIndex = frame.Index,
+                        })
+                    .Select((frame, index) =>
+                        frame with { Index = index })
                     .ToArray();
+            if (frames.Length == 0)
+            {
+                archive.Dispose();
+                throw new InvalidDataException(
+                    "The Deep Debug archive contains no retained PNG frame images. Its text timeline can still be opened in Deep Debug Viewer.");
+            }
             return new FrameSequence(
                 fullPath,
                 FrameSourceKind.DeepDebugArchive,
@@ -155,9 +171,11 @@ public sealed class FrameSequence : IDisposable
         ViewerFrameRecord frame = Frames[index];
         if (_archive is not null)
         {
+            int archiveFrameIndex =
+                frame.ArchiveFrameIndex ?? index;
             return await _archive
                 .ReadFrameBytesAsync(
-                    _archive.Frames[index],
+                    _archive.Frames[archiveFrameIndex],
                     cancellationToken)
                 .ConfigureAwait(false);
         }

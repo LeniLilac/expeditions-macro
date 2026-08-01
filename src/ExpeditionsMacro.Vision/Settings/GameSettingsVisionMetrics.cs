@@ -229,8 +229,8 @@ internal static class GameSettingsVisionMetrics
         byte green,
         byte blue) =>
         red <= 25 &&
-        green is >= 45 and <= 125 &&
-        blue is >= 80 and <= 180 &&
+        green is >= 45 and <= 175 &&
+        blue is >= 80 and <= 245 &&
         blue - green >= 25;
 
     public static bool IsNeutralTabSurface(

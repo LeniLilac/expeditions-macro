@@ -3,6 +3,7 @@ namespace ExpeditionsMacro.Core.Models;
 public enum BountyObjectiveKind
 {
     RaidActOne,
+    StoryActOneHard,
     InfiniteWave,
     Challenge,
 }
@@ -36,10 +37,20 @@ public sealed record BountyObjective
                     "Bounty Infinite objective is invalid.");
             }
         }
+        else if (Kind ==
+                 BountyObjectiveKind.StoryActOneHard)
+        {
+            if (Map != ChallengeMapId.SchoolGrounds ||
+                TargetWave != 0)
+            {
+                throw new InvalidDataException(
+                    "Bounty Story Hard objective is invalid.");
+            }
+        }
         else if (Map is not null || TargetWave != 0)
         {
             throw new InvalidDataException(
-                "Only Infinite Bounty objectives use a map and wave.");
+                "Bounty objective has unexpected map or wave data.");
         }
     }
 }
@@ -91,7 +102,12 @@ public static class BountyCatalog
             conditional: true,
             Infinite("rk-45", ChallengeMapId.RoseKingdom, 45),
             Challenge("challenge-1", 1)),
-        Skip(10),
+        Work(
+            10,
+            conditional: true,
+            Challenge("challenge-5", 5),
+            StoryActOneHard(),
+            Infinite("sg-15", ChallengeMapId.SchoolGrounds, 15)),
     ];
 
     public static IReadOnlyList<PlacementTarget>
@@ -150,6 +166,14 @@ public static class BountyCatalog
             Kind = BountyObjectiveKind.InfiniteWave,
             Map = map,
             TargetWave = wave,
+        };
+
+    private static BountyObjective StoryActOneHard() =>
+        new()
+        {
+            Key = "story-school-grounds-act-1-hard",
+            Kind = BountyObjectiveKind.StoryActOneHard,
+            Map = ChallengeMapId.SchoolGrounds,
         };
 
     private static BountyObjective Challenge(
