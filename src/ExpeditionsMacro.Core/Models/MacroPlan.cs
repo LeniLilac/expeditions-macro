@@ -48,7 +48,18 @@ public sealed record MacroTaskDefinition
     public ResourceRefuelTarget RefuelTarget { get; init; } =
         ResourceRefuelTarget.GoldMine;
     public int RefuelIntervalMinutes { get; init; } = 60;
-    public int BountyParkedNonViableLimit { get; init; }
+    // Beta 45 through 53 exposed a configurable parking limit. Bounty
+    // automation now always favors active overlap and rerolls every
+    // non-viable card, so accept the old field but discard it.
+    [JsonPropertyName("bounty_parked_non_viable_limit")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? LegacyBountyParkedNonViableLimit
+    {
+        get => null;
+        init
+        {
+        }
+    }
 
     public bool IsRecurring =>
         Kind is MacroTaskKind.Challenge or
@@ -98,11 +109,6 @@ public sealed record MacroTaskDefinition
             {
                 throw new InvalidDataException(
                     "Bounty tasks use the required Placement Setup routes automatically.");
-            }
-            if (BountyParkedNonViableLimit is < 0 or > 4)
-            {
-                throw new InvalidDataException(
-                    "Parked non-viable Bounties must be 0 through 4.");
             }
             return;
         }
@@ -187,6 +193,8 @@ public sealed record MacroTaskProgress
     public DateTimeOffset? LastAttemptAt { get; init; }
     public DateTimeOffset? LastCompletedAt { get; init; }
     public DateTimeOffset? NextEligibleAtUtc { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public ResourceRefuelTarget RefuelCompletedTargets { get; init; }
 }
 
 public sealed record MacroPlan
@@ -200,6 +208,7 @@ public sealed record MacroPlan
     public IReadOnlyList<MacroTaskProgress> Progress { get; init; } = [];
     public IReadOnlyList<MacroPlanLoopDefinition> Loops { get; init; } = [];
     public IReadOnlyList<MacroPlanLoopProgress> LoopStates { get; init; } = [];
+    public ChallengeRotationProgress? ChallengeRotation { get; init; }
 
     // Beta 29 wrote one loop and one progress object. Keep those fields
     // readable so existing local plans and share codes migrate in place.
@@ -292,6 +301,33 @@ public sealed record MacroPlan
             {
                 throw new InvalidDataException("Macro task progress cannot be negative.");
             }
+            MacroTaskDefinition task = Tasks.First(candidate =>
+                string.Equals(
+                    candidate.Id,
+                    value.TaskId,
+                    StringComparison.OrdinalIgnoreCase));
+            ResourceRefuelTarget refuel =
+                value.RefuelCompletedTargets;
+            if ((refuel & ~ResourceRefuelTarget.Both) != 0 ||
+                (refuel != ResourceRefuelTarget.None &&
+                 (task.Kind != MacroTaskKind.Utility ||
+                  (refuel & ~task.RefuelTarget) != 0 ||
+                  refuel == task.RefuelTarget)))
+            {
+                throw new InvalidDataException(
+                    "Saved refuel progress must describe an incomplete Utility cycle.");
+            }
+        }
+        if (ChallengeRotation is not null)
+        {
+            if (!Tasks.Any(task => task.Kind is
+                    MacroTaskKind.Challenge or
+                    MacroTaskKind.Bounty))
+            {
+                throw new InvalidDataException(
+                    "Challenge rotation progress requires a Challenge or Bounty task.");
+            }
+            ChallengeRotation.Validate();
         }
     }
 
@@ -338,6 +374,7 @@ public sealed record MacroPlan
         LoopStates = [],
         Loop = null,
         LoopProgress = new(),
+        ChallengeRotation = null,
         UpdatedAt = DateTimeOffset.UtcNow,
     };
 }

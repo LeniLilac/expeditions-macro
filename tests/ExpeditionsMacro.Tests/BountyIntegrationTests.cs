@@ -133,7 +133,6 @@ public sealed class BountyIntegrationTests
             Kind = MacroTaskKind.Bounty,
             Name = "Mythic Bounty Board",
             Priority = 1,
-            BountyParkedNonViableLimit = 2,
         };
 
     private static MacroPlan Plan(

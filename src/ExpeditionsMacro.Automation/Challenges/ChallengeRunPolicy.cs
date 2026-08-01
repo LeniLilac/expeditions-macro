@@ -127,6 +127,25 @@ public sealed class ChallengeRotationState
 {
     private readonly HashSet<ChallengeType> _attempted = [];
 
+    public ChallengeRotationState()
+    {
+    }
+
+    public ChallengeRotationState(
+        ChallengeRotationProgress? progress)
+    {
+        if (progress is null)
+        {
+            return;
+        }
+        progress.Validate();
+        Epoch = progress.Epoch;
+        PreviousAllCooldownEpoch =
+            progress.PreviousAllCooldownEpoch;
+        DailyLimitUntilUtc = progress.DailyLimitUntilUtc;
+        _attempted.UnionWith(progress.Attempted);
+    }
+
     public DateTimeOffset? Epoch { get; private set; }
 
     public DateTimeOffset? PreviousAllCooldownEpoch { get; private set; }
@@ -172,4 +191,12 @@ public sealed class ChallengeRotationState
         PreviousAllCooldownEpoch = current;
         return false;
     }
+
+    public ChallengeRotationProgress Snapshot() => new()
+    {
+        Epoch = Epoch,
+        Attempted = _attempted.Order().ToArray(),
+        PreviousAllCooldownEpoch = PreviousAllCooldownEpoch,
+        DailyLimitUntilUtc = DailyLimitUntilUtc,
+    };
 }

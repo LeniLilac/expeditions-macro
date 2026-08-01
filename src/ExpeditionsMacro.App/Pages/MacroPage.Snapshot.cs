@@ -201,7 +201,6 @@ public partial class MacroPage
                 .First(choice =>
                     choice.Value ==
                     MacroTaskKind.Bounty);
-        BountyParkedSlider.Value = 0;
         UpdateTaskTargetEditor();
     }
 

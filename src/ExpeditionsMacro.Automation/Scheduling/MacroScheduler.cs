@@ -10,7 +10,11 @@ public sealed record ScheduledTaskResult(
     TimeSpan Runtime,
     DateTimeOffset? NextEligibleAtUtc = null,
     bool Skipped = false,
-    bool SkipUntilSchedulerRestart = false);
+    bool SkipUntilSchedulerRestart = false,
+    ChallengeRotationProgress? ChallengeRotation = null);
+
+public sealed record ScheduledTaskCheckpoint(
+    ResourceRefuelTarget? RefuelCompletedTargets = null);
 
 public enum ScheduledTaskContinuation
 {
@@ -25,11 +29,32 @@ public sealed class MacroScheduler
 
     public MacroScheduler(MacroPlanRepository plans) => _plans = plans;
 
+    public Task RunAsync(
+        MacroPlan initialPlan,
+        Func<
+            MacroTaskDefinition,
+            Func<ScheduledTaskResult, CancellationToken, Task<ScheduledTaskContinuation>>,
+            CancellationToken,
+            Task<ScheduledTaskResult>> execute,
+        IProgress<MacroProgress>? progress = null,
+        Action<MacroPlan>? planChanged = null,
+        Action<MacroEvent>? log = null,
+        CancellationToken cancellationToken = default) =>
+        RunAsync(
+            initialPlan,
+            (task, record, _, token) =>
+                execute(task, record, token),
+            progress,
+            planChanged,
+            log,
+            cancellationToken);
+
     public async Task RunAsync(
         MacroPlan initialPlan,
         Func<
             MacroTaskDefinition,
             Func<ScheduledTaskResult, CancellationToken, Task<ScheduledTaskContinuation>>,
+            Func<ScheduledTaskCheckpoint, Task>,
             CancellationToken,
             Task<ScheduledTaskResult>> execute,
         IProgress<MacroProgress>? progress = null,
@@ -101,6 +126,9 @@ public sealed class MacroScheduler
                         ? after
                         : plan.ProgressFor(task.Id)).ToArray(),
                     UpdatedAt = completedAt,
+                    ChallengeRotation =
+                        result.ChallengeRotation ??
+                        plan.ChallengeRotation,
                 };
                 await SaveAsync(plan, planChanged, recordCancellationToken).ConfigureAwait(false);
                 LogResult(activeTask, result, log);
@@ -136,7 +164,48 @@ public sealed class MacroScheduler
                 return ScheduledTaskContinuation.RepeatStage;
             }
 
-            ScheduledTaskResult returned = await execute(next, RecordResultAsync, cancellationToken).ConfigureAwait(false);
+            async Task RecordCheckpointAsync(
+                ScheduledTaskCheckpoint checkpoint)
+            {
+                DateTimeOffset recordedAt =
+                    DateTimeOffset.UtcNow;
+                MacroTaskProgress before =
+                    plan.ProgressFor(activeTask.Id);
+                MacroTaskProgress after = ApplyCheckpoint(
+                    activeTask,
+                    before,
+                    checkpoint);
+                if (after == before)
+                {
+                    return;
+                }
+                plan = plan with
+                {
+                    Progress = plan.Tasks.Select(task =>
+                        string.Equals(
+                            task.Id,
+                            activeTask.Id,
+                            StringComparison.OrdinalIgnoreCase)
+                            ? after
+                            : plan.ProgressFor(task.Id)).ToArray(),
+                    UpdatedAt = recordedAt,
+                };
+                // A completed station is durable progress. Finish this small
+                // atomic write even when Stop was requested immediately after
+                // the station accepted its fuel.
+                await SaveAsync(
+                        plan,
+                        planChanged,
+                        CancellationToken.None)
+                    .ConfigureAwait(false);
+            }
+
+            ScheduledTaskResult returned = await execute(
+                    next,
+                    RecordResultAsync,
+                    RecordCheckpointAsync,
+                    cancellationToken)
+                .ConfigureAwait(false);
             if (!resultRecorded)
             {
                 await RecordResultAsync(returned, cancellationToken).ConfigureAwait(false);
@@ -218,6 +287,38 @@ public sealed class MacroScheduler
             // higher-priority camera/model problem cannot spin forever and starve
             // the rest of the plan.
             NextEligibleAtUtc = completed ? null : result.NextEligibleAtUtc,
+            RefuelCompletedTargets =
+                task.Kind == MacroTaskKind.Utility &&
+                !result.Skipped
+                    ? ResourceRefuelTarget.None
+                    : before.RefuelCompletedTargets,
+        };
+    }
+
+    internal static MacroTaskProgress ApplyCheckpoint(
+        MacroTaskDefinition task,
+        MacroTaskProgress before,
+        ScheduledTaskCheckpoint checkpoint)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+        ArgumentNullException.ThrowIfNull(before);
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        if (checkpoint.RefuelCompletedTargets is not
+                ResourceRefuelTarget completed)
+        {
+            return before;
+        }
+        if (task.Kind != MacroTaskKind.Utility ||
+            completed == ResourceRefuelTarget.None ||
+            (completed & ~task.RefuelTarget) != 0 ||
+            completed == task.RefuelTarget)
+        {
+            throw new InvalidDataException(
+                "A refuel checkpoint must describe an incomplete Utility cycle.");
+        }
+        return before with
+        {
+            RefuelCompletedTargets = completed,
         };
     }
 

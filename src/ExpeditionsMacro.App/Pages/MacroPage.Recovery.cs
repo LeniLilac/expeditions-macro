@@ -41,7 +41,9 @@ public partial class MacroPage
     {
         bool captureHistory = _services.Settings.AutoCaptureOnMacroError;
         MacroRunTotals macroTotals = new();
-        ChallengeRotationState challengeRotation = new();
+        ChallengeRotationState challengeRotation =
+            new(plan.ChallengeRotation);
+        RefuelTaskStateSession refuelStates = new(plan);
         BountyOperationSession bountySession =
             new();
         TeamOperationSession teamSession = new();
@@ -51,9 +53,10 @@ public partial class MacroPage
             await _services.RecoveringScheduler.RunAsync(
                 plan,
                 restartTarget,
-                (task, recordResult, token) => ExecuteTaskAsync(
+                (task, recordResult, recordCheckpoint, token) => ExecuteTaskAsync(
                     task,
                     recordResult,
+                    recordCheckpoint,
                     webhook,
                     discordUserId,
                     playMenuKey,
@@ -62,6 +65,7 @@ public partial class MacroPage
                     cancelPlacementKey,
                     macroTotals,
                     challengeRotation,
+                    refuelStates,
                     bountySession,
                     teamSession,
                     progress,

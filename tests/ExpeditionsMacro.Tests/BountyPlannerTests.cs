@@ -5,6 +5,13 @@ namespace ExpeditionsMacro.Tests;
 public sealed class BountyPlannerTests
 {
     [Fact]
+    public void AutomaticPolicy_ParksNoNonViableBounties() =>
+        Assert.Equal(
+            0,
+            BountyPlanner
+                .AutomaticParkedNonViableLimit);
+
+    [Fact]
     public void DailyChallengeLimit_WithZeroParking_StopsAfterAllFourViableBounties()
     {
         HashSet<int> observed =

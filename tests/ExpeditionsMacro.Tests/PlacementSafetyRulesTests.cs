@@ -94,6 +94,27 @@ public sealed class PlacementSafetyRulesTests
     }
 
     [Fact]
+    public void LegacyDuplicateCleanup_AllowsProgressiveRemovalButNoNewDuplicate()
+    {
+        int[] legacy =
+            [1, 2, 3, 4, 5, 1, 2, 3, 4, 5];
+
+        Assert.Null(
+            PlacementSafetyRules
+                .FindIntroducedDuplicateUnitSlot(
+                    PlacementTargetMode.Expedition,
+                    legacy,
+                    legacy[1..]));
+        Assert.Equal(
+            6,
+            PlacementSafetyRules
+                .FindIntroducedDuplicateUnitSlot(
+                    PlacementTargetMode.Expedition,
+                    legacy,
+                    [.. legacy, 6, 6]));
+    }
+
+    [Fact]
     public async Task Playback_SkipsHotbarRowBeforeInputAndPlacesNextRow()
     {
         PlacementModel model = ExpeditionModel(

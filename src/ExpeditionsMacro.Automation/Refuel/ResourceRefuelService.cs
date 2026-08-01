@@ -30,6 +30,10 @@ public sealed record ResourceRefuelRequest
     public bool OpenPlayWhenComplete { get; init; } = true;
 
     public bool ReturnToLobbyWhenComplete { get; init; }
+
+    public Func<ResourceRefuelTarget, Task>?
+        StationCompleted
+    { get; init; }
 }
 
 public sealed record ResourceRefuelResult(
@@ -112,6 +116,11 @@ public sealed class ResourceRefuelService
                 ReportNavigation,
                 cancellationToken).ConfigureAwait(false);
             completed |= target;
+            if (request.StationCompleted is not null)
+            {
+                await request.StationCompleted(target)
+                    .ConfigureAwait(false);
+            }
         }
 
         if (request.ReturnToLobbyWhenComplete)

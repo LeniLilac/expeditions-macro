@@ -181,8 +181,6 @@ public partial class MacroPage
                         ResourceRefuelTarget.GoldMine,
                     RefuelIntervalMinutes =
                         utility ? target : 60,
-                    BountyParkedNonViableLimit =
-                        (int)BountyParkedSlider.Value,
                 });
         definition.Validate();
         return definition;
@@ -268,8 +266,6 @@ public partial class MacroPage
                 CultureInfo.InvariantCulture);
         TaskHardModeCheck.IsChecked =
             definition.HardMode;
-        BountyParkedSlider.Value =
-            definition.BountyParkedNonViableLimit;
         TaskDifficultyCombo.SelectedItem =
             TaskDifficultyCombo.Items
                 .Cast<NamedChoice<int>>()
@@ -413,10 +409,6 @@ public partial class MacroPage
             utility || bounty
                 ? Visibility.Collapsed
                 : Visibility.Visible;
-        BountyTaskOptionsPanel.Visibility =
-            bounty
-                ? Visibility.Visible
-                : Visibility.Collapsed;
         TaskDefeatRetriesPanel.Visibility =
             retries
                 ? Visibility.Visible

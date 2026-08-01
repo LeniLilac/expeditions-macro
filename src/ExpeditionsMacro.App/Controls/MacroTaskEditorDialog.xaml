@@ -157,38 +157,6 @@
                         </StackPanel>
                     </Border>
 
-                    <Border x:Name="BountyTaskOptionsPanel"
-                            Margin="0,10,0,0"
-                            Padding="12"
-                            Background="{DynamicResource RaisedBrush}"
-                            BorderBrush="{DynamicResource BorderBrush}"
-                            BorderThickness="1"
-                            CornerRadius="5"
-                            Visibility="Collapsed">
-                        <StackPanel>
-                            <Slider x:Name="BountyParkedSlider"
-                                    Margin="2,0"
-                                    Minimum="0"
-                                    Maximum="4"
-                                    TickFrequency="1"
-                                    IsSnapToTickEnabled="True"
-                                    Value="0"
-                                    AutomationProperties.Name="Parked non-viable Bounties" />
-                            <Grid Margin="0,5,0,0">
-                                <TextBlock HorizontalAlignment="Left"
-                                           Style="{StaticResource Caption}"
-                                           Text="0 · faster, more Gold" />
-                                <TextBlock HorizontalAlignment="Right"
-                                           Style="{StaticResource Caption}"
-                                           Text="4 · slower, less Gold" />
-                            </Grid>
-                            <TextBlock Margin="0,10,0,0"
-                                       Style="{StaticResource Caption}"
-                                       TextWrapping="Wrap"
-                                       Text="Requires Spirit City Raid Act 1 and all five Story Infinite Placement Setups. Progress is stored locally for this Windows user." />
-                        </StackPanel>
-                    </Border>
-
                     <Border x:Name="FastTaskOptionsPanel"
                             Margin="0,10,0,0"
                             Padding="12"

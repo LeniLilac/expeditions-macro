@@ -63,7 +63,8 @@ public partial class MacroPage
         BountyRunResult result =
             await _services.Bounties.RunAsync(
                 bountySession,
-                task.BountyParkedNonViableLimit,
+                BountyPlanner
+                    .AutomaticParkedNonViableLimit,
                 availability,
                 nextChallenge,
                 detector,
@@ -100,7 +101,9 @@ public partial class MacroPage
             next,
             Skipped: true,
             SkipUntilSchedulerRestart:
-                result.RetryOnNextMacroStart);
+                result.RetryOnNextMacroStart,
+            ChallengeRotation:
+                challengeRotation.Snapshot());
     }
 
     private Task<BountyRouteExecutionResult>

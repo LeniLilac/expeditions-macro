@@ -10,8 +10,17 @@ public partial class PlacementModelsPage
 {
     private void RemoveRow_Click(
         object sender,
-        RoutedEventArgs e) =>
+        RoutedEventArgs e)
+    {
+        PlacementStepRow? clicked =
+            (sender as FrameworkElement)?.DataContext as
+                PlacementStepRow;
+        if (clicked is not null)
+        {
+            ActiveStepsSelector.SelectedItem = clicked;
+        }
         RemoveSelectedPlacementStep();
+    }
 
     private bool RemoveSelectedPlacementStep()
     {
@@ -59,7 +68,11 @@ public partial class PlacementModelsPage
                     .ToList();
         try
         {
-            ValidateTimeline(prospective);
+            ValidateTimeline(
+                prospective,
+                _steps.Select(candidate =>
+                        candidate.ToModel())
+                    .ToArray());
         }
         catch (Exception error) when (
             error is InvalidDataException or
@@ -157,6 +170,9 @@ public partial class PlacementModelsPage
         {
             ValidateTimeline(
                 ordered.Select(step =>
+                        step.ToModel())
+                    .ToArray(),
+                _steps.Select(step =>
                         step.ToModel())
                     .ToArray());
         }

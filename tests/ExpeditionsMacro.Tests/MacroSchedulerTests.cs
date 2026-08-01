@@ -540,13 +540,50 @@ public sealed class MacroSchedulerTests
             MacroScheduler scheduler = new(repository);
             MacroTaskDefinition first = Task("first", MacroTaskKind.Expedition, 1);
             MacroTaskDefinition second = Task("second", MacroTaskKind.Raid, 2);
-            MacroPlan plan = Plan(first, second) with
+            MacroTaskDefinition challenge = Task(
+                "challenge",
+                MacroTaskKind.Challenge,
+                3);
+            MacroTaskDefinition utility = Task(
+                "utility",
+                MacroTaskKind.Utility,
+                4) with
+            {
+                RefuelTarget = ResourceRefuelTarget.Both,
+            };
+            MacroPlan plan = Plan(
+                first,
+                second,
+                challenge,
+                utility) with
             {
                 Progress =
                 [
-                    new MacroTaskProgress { TaskId = first.Id, Victories = 4, Completed = true },
+                    new MacroTaskProgress
+                    {
+                        TaskId = first.Id,
+                        Victories = 4,
+                        Completed = true,
+                    },
                     new MacroTaskProgress { TaskId = second.Id, Defeats = 2 },
+                    new MacroTaskProgress
+                    {
+                        TaskId = challenge.Id,
+                    },
+                    new MacroTaskProgress
+                    {
+                        TaskId = utility.Id,
+                        RefuelCompletedTargets =
+                            ResourceRefuelTarget.GoldMine,
+                    },
                 ],
+                ChallengeRotation =
+                    new ChallengeRotationProgress
+                    {
+                        Epoch = DateTimeOffset.UtcNow,
+                        Attempted =
+                            [ChallengeType.Trait],
+                    },
             };
 
             MacroPlan reset = await scheduler.ResetProgressAsync(plan);
@@ -557,8 +594,13 @@ public sealed class MacroSchedulerTests
                 Assert.Equal(0, value.Victories);
                 Assert.Equal(0, value.Defeats);
                 Assert.False(value.Completed);
+                Assert.Equal(
+                    ResourceRefuelTarget.None,
+                    value.RefuelCompletedTargets);
             });
+            Assert.Null(reset.ChallengeRotation);
             Assert.Equal(reset.Progress, loaded.Progress);
+            Assert.Null(loaded.ChallengeRotation);
         }
         finally
         {

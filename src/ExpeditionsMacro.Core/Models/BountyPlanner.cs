@@ -9,6 +9,8 @@ public enum BountyChallengeAvailability
 
 public static class BountyPlanner
 {
+    public const int AutomaticParkedNonViableLimit = 0;
+
     public static bool HasEveryRetainableBounty(
         IReadOnlySet<int> observed,
         IReadOnlySet<int> unavailableToday,

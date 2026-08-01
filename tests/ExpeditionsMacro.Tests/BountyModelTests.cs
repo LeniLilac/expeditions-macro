@@ -6,17 +6,34 @@ namespace ExpeditionsMacro.Tests;
 public sealed class BountyModelTests
 {
     [Fact]
-    public void TaskDefinition_DefaultsParkingToZero()
+    public void LegacyParkingValue_IsDiscardedAndNotWrittenAgain()
     {
-        MacroTaskDefinition task = new()
-        {
-            Id = "bounty",
-            Kind = MacroTaskKind.Bounty,
-        };
+        const string json =
+            """
+            {
+              "id": "bounty",
+              "kind": "bounty",
+              "bounty_parked_non_viable_limit": 4
+            }
+            """;
 
-        Assert.Equal(
-            0,
-            task.BountyParkedNonViableLimit);
+        MacroTaskDefinition task =
+            System.Text.Json.JsonSerializer
+                .Deserialize<MacroTaskDefinition>(
+                    json,
+                    JsonFileStore.Options)!;
+        string normalized =
+            System.Text.Json.JsonSerializer.Serialize(
+                task,
+                JsonFileStore.Options);
+
+        task.Validate();
+        Assert.Null(
+            task.LegacyBountyParkedNonViableLimit);
+        Assert.DoesNotContain(
+            "bounty_parked_non_viable_limit",
+            normalized,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -76,21 +93,6 @@ public sealed class BountyModelTests
                     infinite.Map);
                 Assert.Equal(15, infinite.TargetWave);
             });
-    }
-
-    [Theory]
-    [InlineData(-1)]
-    [InlineData(5)]
-    public void TaskDefinition_RejectsParkingValuesOutsideZeroThroughFour(
-        int value)
-    {
-        MacroTaskDefinition task = Task() with
-        {
-            BountyParkedNonViableLimit = value,
-        };
-
-        Assert.Throws<InvalidDataException>(
-            task.Validate);
     }
 
     [Fact]
@@ -506,6 +508,5 @@ public sealed class BountyModelTests
             Id = "bounty",
             Kind = MacroTaskKind.Bounty,
             Name = "Mythic Bounty Board",
-            BountyParkedNonViableLimit = 2,
         };
 }

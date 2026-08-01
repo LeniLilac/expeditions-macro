@@ -94,6 +94,55 @@ public sealed class ChallengeRunPolicyTests
         Assert.Null(state.DailyLimitUntilUtc);
     }
 
+    [Fact]
+    public void PersistedRotation_RestoresAttemptsAndCooldownEvidence()
+    {
+        DateTimeOffset first = new(
+            2026,
+            7,
+            19,
+            20,
+            10,
+            0,
+            TimeSpan.Zero);
+        ChallengeRotationState original = new();
+        original.Advance(first);
+        original.MarkAttempted(ChallengeType.Trait);
+        Assert.False(original.ObserveAllCooldown(first));
+
+        ChallengeRotationState restored = new(
+            original.Snapshot());
+
+        Assert.Contains(
+            ChallengeType.Trait,
+            restored.Attempted);
+        Assert.Equal(
+            original.Epoch,
+            restored.Epoch);
+        Assert.Equal(
+            original.PreviousAllCooldownEpoch,
+            restored.PreviousAllCooldownEpoch);
+        Assert.True(restored.ObserveAllCooldown(
+            new DateTimeOffset(
+                2026,
+                7,
+                19,
+                20,
+                30,
+                5,
+                TimeSpan.Zero)));
+        Assert.Equal(
+            new DateTimeOffset(
+                2026,
+                7,
+                20,
+                0,
+                0,
+                0,
+                TimeSpan.Zero),
+            restored.DailyLimitUntilUtc);
+    }
+
     [Theory]
     [InlineData(true, 0, 3, "PlayMenu")]
     [InlineData(false, 0, 0, "PlayMenu")]
