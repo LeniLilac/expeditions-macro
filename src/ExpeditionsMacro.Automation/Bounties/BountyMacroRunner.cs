@@ -160,6 +160,7 @@ public sealed class BountyMacroRunner
                             parkedNonViableLimit,
                             challengeAvailability,
                             rerollEnabled: !noGold,
+                            _states.SaveAsync,
                             message => Write(message),
                             cancellationToken)
                         .ConfigureAwait(false);
@@ -219,7 +220,22 @@ public sealed class BountyMacroRunner
                         state,
                         challengeAvailability,
                         challengeNextEligibleAtUtc);
-                if (noGold)
+                bool rerollLimitReached =
+                    BountyRerollLimitPolicy
+                        .IsReached(state);
+                if (rerollLimitReached)
+                {
+                    next =
+                        BountyRerollLimitPolicy
+                            .NextEligibility(
+                                next,
+                                DateTimeOffset.UtcNow);
+                    Write(
+                        $"The {BountyCatalog.DailyRerollLimit}-reroll UTC-day safety limit is reached. Bounty rerolls resume after midnight UTC; other Macro Plan work may continue.",
+                        MacroEventLevel.Warning,
+                        "bounty_reroll_limit");
+                }
+                else if (noGold)
                 {
                     Write(
                         "Bounty work is complete for this macro session. Rerolling will retry on the next macro start.",
@@ -237,7 +253,11 @@ public sealed class BountyMacroRunner
                     state,
                     runtime.Elapsed,
                     noGold,
-                    retryOnNextStart: noGold,
+                    retryOnNextStart:
+                        BountyRerollLimitPolicy
+                            .ShouldRetryForGoldOnNextStart(
+                                state,
+                                noGold),
                     next);
             }
 

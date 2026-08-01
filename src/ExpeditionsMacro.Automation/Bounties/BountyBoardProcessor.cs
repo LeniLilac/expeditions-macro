@@ -7,18 +7,26 @@ namespace ExpeditionsMacro.Automation.Bounties;
 
 internal sealed record BountyBoardProcessingResult(
     BountyProgressState State,
-    bool GoldUnavailable);
+    bool GoldUnavailable,
+    bool RerollLimitReached);
 
 internal sealed class BountyBoardProcessor
 {
     private const int MaximumSlotCycles = 400;
+    private const int MaximumTotalCycles =
+        MaximumSlotCycles * 5;
 
-    private readonly BountyBoardNavigator _navigator;
+    private readonly IBountyBoardProcessorNavigator
+        _navigator;
+    private readonly BountyBoardSlotProcessor
+        _slotProcessor;
 
     public BountyBoardProcessor(
-        BountyBoardNavigator navigator)
+        IBountyBoardProcessorNavigator navigator)
     {
         _navigator = navigator;
+        _slotProcessor =
+            new BountyBoardSlotProcessor(navigator);
     }
 
     public async Task<BountyBoardProcessingResult>
@@ -30,9 +38,15 @@ internal sealed class BountyBoardProcessor
         BountyChallengeAvailability
             challengeAvailability,
         bool rerollEnabled,
+        Func<
+            BountyProgressState,
+            CancellationToken,
+            Task> persistState,
         Action<string>? log,
         CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(
+            persistState);
         await _navigator.ScrollAsync(
             window,
             detector,
@@ -48,25 +62,38 @@ internal sealed class BountyBoardProcessor
         if (state.ClaimedToday >=
             BountyCatalog.DailyClaimLimit)
         {
-            await _navigator.ScrollAsync(
+            await ScrollLeftAsync(
                 window,
                 detector,
-                right: false,
                 cancellationToken).ConfigureAwait(false);
             return new(
                 state,
-                GoldUnavailable: false);
+                GoldUnavailable: false,
+                RerollLimitReached: false);
+        }
+        if (BountyRerollLimitPolicy.IsReached(
+                state))
+        {
+            LogRerollLimit(log);
+            await ScrollLeftAsync(
+                window,
+                detector,
+                cancellationToken).ConfigureAwait(false);
+            return new(
+                state,
+                GoldUnavailable: false,
+                RerollLimitReached: true);
         }
         if (!rerollEnabled)
         {
-            await _navigator.ScrollAsync(
+            await ScrollLeftAsync(
                 window,
                 detector,
-                right: false,
                 cancellationToken).ConfigureAwait(false);
             return new(
                 state,
-                GoldUnavailable: true);
+                GoldUnavailable: true,
+                RerollLimitReached: false);
         }
 
         (_, IReadOnlyList<BountyLiveSlot> liveSlots) =
@@ -79,15 +106,20 @@ internal sealed class BountyBoardProcessor
         HashSet<int> observed = [];
         HashSet<int> unavailableToday =
             state.UnavailableNumbersToday.ToHashSet();
+        Queue<BountySlotWorkItem> pending = new(
+            liveSlots
+                .Where(value =>
+                    value.Action.Kind ==
+                    BountyCardActionKind.Reroll)
+                .Select(value =>
+                    new BountySlotWorkItem(
+                        value.Slot)));
         int parked = 0;
+        int totalCycles = 0;
         bool noGold = false;
+        bool rerollLimitReached = false;
         bool retentionTargetReached = false;
-        foreach (int slot in liveSlots
-                     .Where(value =>
-                         value.Action.Kind ==
-                         BountyCardActionKind.Reroll)
-                     .Select(value =>
-                         value.Slot))
+        while (pending.Count > 0)
         {
             retentionTargetReached =
                 BountyPlanner.HasEveryRetainableBounty(
@@ -96,26 +128,60 @@ internal sealed class BountyBoardProcessor
                     parked,
                     parkedLimit,
                     challengeAvailability);
-            if (noGold ||
-                retentionTargetReached)
+            if (retentionTargetReached)
             {
                 break;
             }
-            (state, parked, noGold) =
-                await ProcessSlotAsync(
+            if (++totalCycles >
+                MaximumTotalCycles)
+            {
+                throw new RobloxUiUnavailableException(
+                    $"Bounty board exceeded its bounded {MaximumTotalCycles}-cycle reroll budget.");
+            }
+
+            BountySlotWorkItem work =
+                pending.Dequeue();
+            work.BeginCycle(MaximumSlotCycles);
+            BountySlotCycleResult cycle =
+                await _slotProcessor.ProcessCycleAsync(
                         window,
                         detector,
                         state,
-                        slot,
+                        work,
                         rightView: true,
                         parked,
                         parkedLimit,
                         challengeAvailability,
                         unavailableToday,
                         observed,
+                        persistState,
                         log,
                         cancellationToken)
                     .ConfigureAwait(false);
+            state = cycle.State;
+            parked = cycle.Parked;
+            switch (cycle.Disposition)
+            {
+                case BountySlotCycleDisposition.Retry:
+                    pending.Enqueue(work);
+                    break;
+                case BountySlotCycleDisposition
+                    .GoldUnavailable:
+                    noGold = true;
+                    break;
+                case BountySlotCycleDisposition
+                    .RerollLimitReached:
+                    rerollLimitReached = true;
+                    break;
+                case BountySlotCycleDisposition.Retained:
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+            if (noGold || rerollLimitReached)
+            {
+                break;
+            }
         }
 
         retentionTargetReached =
@@ -131,17 +197,21 @@ internal sealed class BountyBoardProcessor
             log?.Invoke(
                 "Bounty slot scanning stopped because every Mythic retained by the current parking and Challenge policy is already active.");
         }
-        await _navigator.ScrollAsync(
+        if (rerollLimitReached)
+        {
+            LogRerollLimit(log);
+        }
+        await ScrollLeftAsync(
             window,
             detector,
-            right: false,
             cancellationToken).ConfigureAwait(false);
 
         IReadOnlyList<BountyActiveProgress> reconciled =
             state.Active
                 .Where(active =>
                     observed.Contains(active.Number) ||
-                    noGold)
+                    noGold ||
+                    rerollLimitReached)
                 .ToArray();
         return new(
             state with
@@ -150,7 +220,8 @@ internal sealed class BountyBoardProcessor
                 UpdatedAtUtc =
                     DateTimeOffset.UtcNow,
             },
-            noGold);
+            noGold,
+            rerollLimitReached);
     }
 
     private async Task<BountyProgressState>
@@ -229,196 +300,18 @@ internal sealed class BountyBoardProcessor
             DateTimeOffset.UtcNow);
     }
 
-    private async Task<(
-        BountyProgressState State,
-        int Parked,
-        bool NoGold)> ProcessSlotAsync(
+    private Task ScrollLeftAsync(
         RobloxWindow window,
         IDetectorPack detector,
-        BountyProgressState state,
-        int slot,
-        bool rightView,
-        int parked,
-        int parkedLimit,
-        BountyChallengeAvailability
-            challengeAvailability,
-        IReadOnlySet<int> unavailableToday,
-        ISet<int> observed,
-        Action<string>? log,
-        CancellationToken cancellationToken)
-    {
-        BountyRerollEvidenceTracker evidence = new();
-        for (int cycle = 1;
-             cycle <= MaximumSlotCycles;
-             cycle++)
-        {
-            BountyBoardMatch result =
-                await _navigator.ClickRerollAsync(
-                        window,
-                        detector,
-                        slot,
-                        rightView,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-            if (result.NoGold)
-            {
-                log?.Invoke(
-                    "Bounty rerolling stopped because the game reported that 1,000 Gold is unavailable.");
-                return (state, parked, true);
-            }
-            if (result.State ==
-                BountyBoardState.Board)
-            {
-                if (evidence.ObserveOrdinaryReroll())
-                {
-                    log?.Invoke(
-                        $"Bounty slot {slot} showed no Mythic confirmation after {BountyRerollEvidenceTracker.OrdinaryRerollLimit} consecutive rerolls; Gold is treated as unavailable.");
-                    return (state, parked, true);
-                }
-                continue;
-            }
-            if (result.State !=
-                BountyBoardState
-                    .RerollConfirmation)
-            {
-                throw new RobloxUiUnavailableException(
-                    $"Bounty slot {slot} reached an unexpected reroll state.");
-            }
+        CancellationToken cancellationToken) =>
+        _navigator.ScrollAsync(
+            window,
+            detector,
+            right: false,
+            cancellationToken);
 
-            await _navigator.CancelRerollAsync(
-                window,
-                detector,
-                cancellationToken).ConfigureAwait(false);
-            BountyBoardMatch board =
-                await _navigator.WaitForBoardAsync(
-                    window,
-                    detector,
-                    cancellationToken).ConfigureAwait(false);
-            int number =
-                BountyBoardLayout.NumberForSlot(
-                    board,
-                    slot,
-                    rightView) ??
-                throw new RobloxUiUnavailableException(
-                    $"The Mythic number in Bounty slot {slot} could not be recognized.");
-            if (evidence.ObserveConfirmedMythic(
-                    number))
-            {
-                log?.Invoke(
-                    "Bounty rerolling stopped after the same confirmed Mythic remained unchanged four times.");
-                return (state, parked, true);
-            }
-
-            bool reroll =
-                BountyPlanner.ShouldReroll(
-                    number,
-                    unavailableToday,
-                    parked,
-                    parkedLimit,
-                    challengeAvailability);
-            if (!reroll)
-            {
-                BountyDefinition definition =
-                    BountyCatalog.For(number);
-                observed.Add(number);
-                state = AddActive(
-                    state,
-                    number);
-                if (definition.AlwaysReroll)
-                {
-                    parked++;
-                    log?.Invoke(
-                        $"Parked Mythic Bounty #{number} ({parked}/{parkedLimit}) to save reroll Gold.");
-                }
-                else if (definition.ChallengeConditional &&
-                         challengeAvailability ==
-                         BountyChallengeAvailability.Cooldown)
-                {
-                    log?.Invoke(
-                        $"Parked Mythic Bounty #{number} until the next regular Challenge reset.");
-                }
-                else
-                {
-                    log?.Invoke(
-                        $"Kept viable Mythic Bounty #{number}.");
-                }
-                return (state, parked, false);
-            }
-
-            evidence.MarkMythicRerolled(
-                number);
-            BountyBoardMatch confirmation =
-                await _navigator.ClickRerollAsync(
-                        window,
-                        detector,
-                        slot,
-                        rightView,
-                        cancellationToken)
-                    .ConfigureAwait(false);
-            if (confirmation.NoGold)
-            {
-                return (state, parked, true);
-            }
-            if (confirmation.State !=
-                BountyBoardState
-                    .RerollConfirmation)
-            {
-                throw new RobloxUiUnavailableException(
-                    "A verified Mythic reroll did not reopen its confirmation.");
-            }
-            try
-            {
-                await _navigator.ConfirmRerollAsync(
-                    window,
-                    detector,
-                    cancellationToken)
-                    .ConfigureAwait(false);
-            }
-            catch (BountyGoldUnavailableException)
-            {
-                return (state, parked, true);
-            }
-            state = RemoveActive(
-                state,
-                number);
-            log?.Invoke(
-                $"Rerolled non-viable Mythic Bounty #{number}.");
-        }
-
-        throw new RobloxUiUnavailableException(
-            $"Bounty slot {slot} exceeded its bounded {MaximumSlotCycles}-cycle reroll budget without reaching a retained card.");
-    }
-
-    private static BountyProgressState AddActive(
-        BountyProgressState state,
-        int number)
-    {
-        if (state.Active.Any(active =>
-                active.Number == number))
-        {
-            return state;
-        }
-        return state with
-        {
-            Active =
-            [
-                .. state.Active,
-                new BountyActiveProgress
-                {
-                    Number = number,
-                },
-            ],
-        };
-    }
-
-    private static BountyProgressState RemoveActive(
-        BountyProgressState state,
-        int number) =>
-        state with
-        {
-            Active = state.Active
-                .Where(active =>
-                    active.Number != number)
-                .ToArray(),
-        };
+    private static void LogRerollLimit(
+        Action<string>? log) =>
+        log?.Invoke(
+            $"Bounty rerolling stopped at the {BountyCatalog.DailyRerollLimit}-reroll UTC-day safety limit. Active Bounty work may continue; new rerolls resume after midnight UTC.");
 }

@@ -67,6 +67,7 @@ public sealed record BountyDefinition(
 public static class BountyCatalog
 {
     public const int DailyClaimLimit = 10;
+    public const int DailyRerollLimit = 750;
 
     public static IReadOnlyList<BountyDefinition> All { get; } =
     [
@@ -205,6 +206,7 @@ public sealed record BountyProgressState
     public DateTimeOffset DailyEpochUtc { get; init; } =
         UtcDay(DateTimeOffset.UtcNow);
     public int ClaimedToday { get; init; }
+    public int RerollsToday { get; init; }
     public IReadOnlyList<int> UnavailableNumbersToday { get; init; } = [];
     public IReadOnlyList<BountyActiveProgress> Active { get; init; } = [];
     public DateTimeOffset UpdatedAtUtc { get; init; } =
@@ -219,9 +221,29 @@ public sealed record BountyProgressState
             {
                 DailyEpochUtc = day,
                 ClaimedToday = 0,
+                RerollsToday = 0,
                 UnavailableNumbersToday = [],
                 UpdatedAtUtc = now.ToUniversalTime(),
             };
+    }
+
+    public BountyProgressState RecordReroll(
+        DateTimeOffset now)
+    {
+        BountyProgressState current =
+            AdvanceDay(now);
+        if (current.RerollsToday >=
+            BountyCatalog.DailyRerollLimit)
+        {
+            throw new InvalidOperationException(
+                "The daily Bounty reroll safety limit has been reached.");
+        }
+        return current with
+        {
+            RerollsToday =
+                current.RerollsToday + 1,
+            UpdatedAtUtc = now.ToUniversalTime(),
+        };
     }
 
     public BountyProgressState RecordClaim(
@@ -265,6 +287,12 @@ public sealed record BountyProgressState
         {
             throw new InvalidDataException(
                 "Bounty daily claim progress is invalid.");
+        }
+        if (RerollsToday is < 0 or >
+            BountyCatalog.DailyRerollLimit)
+        {
+            throw new InvalidDataException(
+                "Bounty daily reroll progress is invalid.");
         }
         if (UnavailableNumbersToday.Count >
                 ClaimedToday ||

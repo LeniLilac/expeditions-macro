@@ -24,6 +24,12 @@ public static class BountyNumberRecognizer
     private const double MinimumClearRasterSimilarity = 0.80;
     private const double MinimumClearRasterSimilarityMargin = 0.08;
     private const int MaximumRasterPositionDistance = 4;
+    private const int ClippedClaimMinimumCardAnchorX = 250;
+    private const int ClippedClaimMaximumCardAnchorX = 280;
+    private const int ClippedClaimMinimumHorizontalOffset = -5;
+    private const int ClippedClaimMaximumHorizontalOffset = -3;
+    private const int ClippedClaimMinimumVerticalOffset = 0;
+    private const int ClippedClaimMaximumVerticalOffset = 2;
     // The widest reviewed paper places its suffix 46 pixels left of the live action.
     private const int ActionWindowLeft = 54;
     private const int ActionWindowTop = 105;
@@ -145,8 +151,9 @@ public static class BountyNumberRecognizer
                     rasterMargin >=
                         MinimumClearRasterSimilarityMargin;
                 if ((highSimilarity || clearIdentity) &&
-                    rasterMatch.PositionDistance <=
-                        MaximumRasterPositionDistance)
+                    IsRasterPositionOwned(
+                        rasterMatch,
+                        action))
                 {
                     match = rasterMatch;
                     accepted = true;
@@ -336,6 +343,36 @@ public static class BountyNumberRecognizer
             .ThenByDescending(candidate =>
                 candidate.Template.Width)
             .ToArray();
+
+    private static bool IsRasterPositionOwned(
+        Candidate candidate,
+        BountyCardAction action)
+    {
+        if (candidate.PositionDistance <=
+            MaximumRasterPositionDistance)
+        {
+            return true;
+        }
+
+        int horizontalOffset =
+            candidate.LocalX +
+            candidate.Template.Width / 2 -
+            ExpectedGlyphCenter;
+        int verticalOffset =
+            candidate.LocalY -
+            ExpectedGlyphTop;
+        return candidate.Template.Number == 10 &&
+            action.Kind == BountyCardActionKind.Claim &&
+            action.CardAnchorX is >=
+                ClippedClaimMinimumCardAnchorX and <=
+                ClippedClaimMaximumCardAnchorX &&
+            horizontalOffset is >=
+                ClippedClaimMinimumHorizontalOffset and <=
+                ClippedClaimMaximumHorizontalOffset &&
+            verticalOffset is >=
+                ClippedClaimMinimumVerticalOffset and <=
+                ClippedClaimMaximumVerticalOffset;
+    }
 
     private static BountyNumberMatch[]
         CollapseSameCardMatches(

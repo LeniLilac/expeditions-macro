@@ -4,6 +4,23 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.57] - 2026-08-01
+
+### Fixed
+
+- Back-to-Lobby detection now accepts the field-observed thicker high-contrast Roblox door glyph while retaining the existing fixed-offset geometry, complete door/arrow/handle proof, stable-frame requirement, and cross-state rejection coverage.
+- Completed Bounty claiming now recognizes the field-observed leftmost `#10` paper offset while retaining live Claim ownership, bounded title position, similarity, and runner-up separation requirements.
+- Bounty Board processing now observes every live physical slot once before retrying an unresolved slot, so an ordinary card in an earlier slot cannot starve a viable Mythic in slot five.
+
+### Safety
+
+- Bounty rerolling now has a persistent limit of 750 acknowledged paid rerolls per UTC day. Every increment is saved before another paid input, the macro sends no 751st reroll, active Bounty work remains executable, and unrelated Macro Plan tasks may continue until the limit resets at midnight UTC.
+
+### Tests
+
+- Added privacy-reviewed high-contrast Lobby-door and clipped completed-`#10` fixtures, deterministic raster-variation and cross-state negatives, bounded slot-five scheduling coverage, UTC-reset and legacy-state persistence coverage, and exact 749/750 reroll-limit boundaries.
+- Passed 1,625 non-golden application tests, 120 golden-image and cross-state detector tests, 6 Deep Debug Viewer tests, 15 Detector Viewer tests, and all 90 dark/light main-app UI states.
+
 ## [1.3.0-beta.56] - 2026-08-01
 
 ### Fixed
@@ -1394,7 +1411,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.56...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.57...HEAD
+[1.3.0-beta.57]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.56...v1.3.0-beta.57
 [1.3.0-beta.56]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.55...v1.3.0-beta.56
 [1.3.0-beta.55]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.54...v1.3.0-beta.55
 [1.3.0-beta.54]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.53...v1.3.0-beta.54
