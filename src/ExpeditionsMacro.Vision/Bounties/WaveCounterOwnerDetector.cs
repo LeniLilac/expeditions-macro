@@ -17,12 +17,14 @@ public static class WaveCounterOwnerDetector
     [
         new(389, 48, 16, 11),
         new(421, 28, 16, 11),
+        new(386, 28, 16, 11),
     ];
 
     private static readonly ScreenRegion[] CounterOwnershipRegions =
     [
         new(372, 43, 44, 22),
         new(404, 23, 44, 22),
+        new(369, 23, 44, 22),
     ];
 
     public static WaveCounterOwnerMatch? Detect(
