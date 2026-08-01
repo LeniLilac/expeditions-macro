@@ -35,7 +35,7 @@ public sealed class TeamSelectionServiceTests
             $"click:{automation.UnitsTeamsAction.X},{automation.UnitsTeamsAction.Y}",
         ];
         TeamScrollbarThumb initialThumb = TeamScreenDetector.FindScrollbarThumb(automation.InitialTeamFrame)!.Value;
-        if (teamSlot != 1)
+        if (teamSlot > 2)
         {
             int dragEndY = teamSlot >= 7
                 ? TeamScreenDetector.BottomScrollbarDragLimitY
@@ -43,13 +43,14 @@ public sealed class TeamSelectionServiceTests
             expected.Add(
                 $"drag:{initialThumb.X},{initialThumb.CenterY}->{initialThumb.X},{dragEndY}");
         }
-        int targetCenterY =
-            TeamScreenDetector.ScrollThumbTargetCenterY(teamSlot, initialThumb.CenterY);
+        ImageFrame loadFrame = teamSlot == 2
+            ? automation.InitialTeamFrame
+            : automation.AlignedTeamFrame;
         (int X, int Y) loadAction =
-            TeamScreenDetector.AlignedLoadTeamAction(
-                automation.AlignedTeamFrame,
+            TeamScreenDetector.VisibleLoadTeamAction(
+                loadFrame,
                 teamSlot,
-                targetCenterY)!.Value;
+                initialThumb.CenterY)!.Value;
         expected.AddRange(
             [
                 $"click:{loadAction.X},{loadAction.Y}",
@@ -188,6 +189,49 @@ public sealed class TeamSelectionServiceTests
         Assert.Equal(2, automation.Actions.Count(action => action.StartsWith("drag:", StringComparison.Ordinal)));
     }
 
+    [Fact]
+    public async Task Select_LoadsTeamTwoFromTheVisibleSecondRowWithoutScrolling()
+    {
+        FakeAutomation automation = new(
+            teamSlot: 2,
+            equipmentFixture: "TeamEquipmentConfirm_01.png");
+        TeamSelectionService service = new(automation);
+
+        await service.SelectAsync(
+            automation.Window,
+            teamSlot: 2,
+            unitMenuKey: 'u');
+
+        Assert.DoesNotContain(
+            automation.Actions,
+            action => action.StartsWith("drag:", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData(4, "TeamList_Aligned_Team3_01.png")]
+    [InlineData(5, "TeamList_Aligned_Team4_01.png")]
+    public async Task Select_LoadsAStableVisibleSecondRowWithoutAnotherDrag(
+        int teamSlot,
+        string settledFixture)
+    {
+        FakeAutomation automation = new(
+            teamSlot,
+            equipmentFixture: "TeamEquipmentConfirm_01.png",
+            settledDragFixtures: [settledFixture]);
+        TeamSelectionService service = new(automation);
+
+        await service.SelectAsync(
+            automation.Window,
+            teamSlot,
+            unitMenuKey: 'u');
+
+        Assert.Single(
+            automation.Actions,
+            action => action.StartsWith(
+                "drag:",
+                StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData(7)]
     [InlineData(8)]
@@ -262,7 +306,7 @@ public sealed class TeamSelectionServiceTests
     }
 
     [Fact]
-    public async Task Select_AcceptsAStableNearTargetScrollbarUndershoot()
+    public async Task Select_UsesTheRequestedTeamFromAStableVisibleRow()
     {
         FakeAutomation automation = new(
             teamSlot: 3,
@@ -281,14 +325,19 @@ public sealed class TeamSelectionServiceTests
             unitMenuKey: 'u');
 
         Assert.Equal(
-            2,
+            1,
             automation.Actions.Count(action =>
                 action.StartsWith(
                     "drag:",
                     StringComparison.Ordinal)));
-        Assert.Contains(
-            "click:579,288",
-            automation.Actions);
+        TeamScrollbarThumb top = TeamScreenDetector.FindScrollbarThumb(
+            LoadFixture(
+                "TeamList_Aligned_Team1_Current_01.png"))!.Value;
+        (int X, int Y) action = TeamScreenDetector.VisibleLoadTeamAction(
+            LoadFixture("TeamList_Aligned_Team2_01.png"),
+            teamSlot: 3,
+            top.CenterY)!.Value;
+        Assert.Contains($"click:{action.X},{action.Y}", automation.Actions);
     }
 
     [Fact]
@@ -332,7 +381,7 @@ public sealed class TeamSelectionServiceTests
             equipmentFixture: "TeamEquipmentConfirm_01.png",
             settledDragFixtures:
             [
-                "TeamList_Aligned_Team2_01.png",
+                "TeamList_Aligned_Team1_Current_01.png",
                 "TeamList_Aligned_Team3_01.png",
             ]);
         DateTimeOffset now = DateTimeOffset.UnixEpoch;
@@ -365,6 +414,35 @@ public sealed class TeamSelectionServiceTests
         Assert.Contains(
             $"click:{action.X},{action.Y}",
             automation.Actions);
+    }
+
+    [Fact]
+    public async Task Select_InspectsTheSettledListAfterTheFinalBoundedDrag()
+    {
+        FakeAutomation automation = new(
+            teamSlot: 3,
+            equipmentFixture: "TeamEquipmentConfirm_01.png",
+            settledDragFixtures:
+            [
+                "TeamList_Aligned_Team1_Current_01.png",
+                "TeamList_Aligned_Team1_Current_01.png",
+                "TeamList_Aligned_Team1_Current_01.png",
+                "TeamList_Aligned_Team1_Current_01.png",
+                "TeamList_Aligned_Team3_01.png",
+            ]);
+        TeamSelectionService service = new(automation);
+
+        await service.SelectAsync(
+            automation.Window,
+            teamSlot: 3,
+            unitMenuKey: 'u');
+
+        Assert.Equal(
+            5,
+            automation.Actions.Count(action =>
+                action.StartsWith(
+                    "drag:",
+                    StringComparison.Ordinal)));
     }
 
     [Fact]
@@ -552,10 +630,10 @@ public sealed class TeamSelectionServiceTests
 
             (int X, int Y)? alignedAction =
                 State == TeamScreenState.Teams
-                    ? TeamScreenDetector.AlignedLoadTeamAction(
+                    ? TeamScreenDetector.VisibleLoadTeamAction(
                         _teamFrame,
                         _teamSlot,
-                        TargetCenterY)
+                        TopCenterY)
                     : null;
             State = State switch
             {
@@ -640,6 +718,10 @@ public sealed class TeamSelectionServiceTests
             }
         }
 
+        private int TopCenterY =>
+            TeamScreenDetector.FindScrollbarThumb(
+                _topTeamFrame)!.Value.CenterY;
+
         private static string TeamFixture(int teamSlot) => teamSlot switch
         {
             1 => "TeamList_Aligned_Team1_Current_01.png",
@@ -663,4 +745,7 @@ public sealed class TeamSelectionServiceTests
 
         private static ImageFrame Load(string name) => ImageCodec.Load(Path.Combine(TestPaths.StageDatasets, name));
     }
+
+    private static ImageFrame LoadFixture(string name) =>
+        ImageCodec.Load(Path.Combine(TestPaths.StageDatasets, name));
 }

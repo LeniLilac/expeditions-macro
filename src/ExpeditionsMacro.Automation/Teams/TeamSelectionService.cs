@@ -97,7 +97,6 @@ public sealed class TeamSelectionService
                 window,
                 cancellationToken)
                 .ConfigureAwait(false);
-        int targetCenterY = TeamScreenDetector.ScrollThumbTargetCenterY(teamSlot, topThumb.CenterY);
 
         TimeoutException? lastTimeout = null;
         for (int attempt = 0; attempt < LoadClickAttempts; attempt++)
@@ -105,7 +104,7 @@ public sealed class TeamSelectionService
             (int loadX, int loadY) = await AlignLoadTeamActionAsync(
                 window,
                 teamSlot,
-                targetCenterY,
+                topThumb.CenterY,
                 cancellationToken).ConfigureAwait(false);
             EnsureFocus(window);
             await _automation.ClickClientAsync(window, loadX, loadY, cancellationToken).ConfigureAwait(false);
@@ -236,7 +235,7 @@ public sealed class TeamSelectionService
     private async Task<(int X, int Y)> AlignLoadTeamActionAsync(
         RobloxWindow window,
         int teamSlot,
-        int targetCenterY,
+        int topThumbCenterY,
         CancellationToken cancellationToken)
     {
         ObservationWaitBudget budget = new(
@@ -244,9 +243,17 @@ public sealed class TeamSelectionService
             TeamAlignmentDragAttempts,
             _utcNow);
         int dragAttempts = 0;
-        while (dragAttempts < TeamAlignmentDragAttempts &&
-               budget.ShouldObserve())
+        bool postDragObservationPending = false;
+        while (budget.ShouldObserve(
+                   confirmationPending:
+                       postDragObservationPending))
         {
+            postDragObservationPending = false;
+            TeamScrollbarThumb thumb =
+                await WaitForStableTeamListAsync(
+                    window,
+                    TimeSpan.FromSeconds(3),
+                    cancellationToken).ConfigureAwait(false);
             ImageFrame image = CaptureClient(window);
             TeamScreenMatch state = TeamScreenDetector.Detect(image);
             if (state.State != TeamScreenState.Teams)
@@ -255,14 +262,32 @@ public sealed class TeamSelectionService
                     $"The Unit Team list was lost while aligning Team {teamSlot}. Last state: {state.State} ({state.Confidence:P0}).");
             }
 
-            (int X, int Y)? action = TeamScreenDetector.AlignedLoadTeamAction(
+            (int X, int Y)? action = TeamScreenDetector.VisibleLoadTeamAction(
                 image,
                 teamSlot,
-                targetCenterY);
-            if (action is not null) return action.Value;
+                topThumbCenterY);
+            if (action is not null)
+            {
+                action = await WaitForVisibleLoadActionAsync(
+                    window,
+                    teamSlot,
+                    topThumbCenterY,
+                    TimeSpan.FromSeconds(3),
+                    cancellationToken).ConfigureAwait(false);
+                if (action is not null) return action.Value;
+                budget.MarkObserved();
+                continue;
+            }
 
-            TeamScrollbarThumb thumb = TeamScreenDetector.FindScrollbarThumb(image) ??
-                throw new RobloxUiUnavailableException("The Unit Team scrollbar could not be located.");
+            if (dragAttempts >= TeamAlignmentDragAttempts)
+            {
+                break;
+            }
+
+            int targetCenterY =
+                TeamScreenDetector.ScrollThumbTargetCenterY(
+                    teamSlot,
+                    topThumbCenterY);
             int dragEndY = teamSlot switch
             {
                 1 => TeamScreenDetector.TopScrollbarDragLimitY,
@@ -278,14 +303,7 @@ public sealed class TeamSelectionService
                 dragEndY,
                 cancellationToken).ConfigureAwait(false);
             dragAttempts++;
-
-            action = await WaitForAlignedLoadActionAsync(
-                window,
-                teamSlot,
-                targetCenterY,
-                TimeSpan.FromSeconds(3),
-                cancellationToken).ConfigureAwait(false);
-            if (action is not null) return action.Value;
+            postDragObservationPending = true;
             budget.MarkObserved();
         }
 
@@ -293,10 +311,10 @@ public sealed class TeamSelectionService
             $"Team {teamSlot} could not be aligned to a fully visible Load Team button after {dragAttempts} bounded drag attempts.");
     }
 
-    private async Task<(int X, int Y)?> WaitForAlignedLoadActionAsync(
+    private async Task<(int X, int Y)?> WaitForVisibleLoadActionAsync(
         RobloxWindow window,
         int teamSlot,
-        int targetCenterY,
+        int topThumbCenterY,
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
@@ -313,7 +331,10 @@ public sealed class TeamSelectionService
             ImageFrame image = CaptureClient(window);
             TeamScreenMatch state = TeamScreenDetector.Detect(image);
             (int X, int Y)? action = state.State == TeamScreenState.Teams
-                ? TeamScreenDetector.AlignedLoadTeamAction(image, teamSlot, targetCenterY)
+                ? TeamScreenDetector.VisibleLoadTeamAction(
+                    image,
+                    teamSlot,
+                    topThumbCenterY)
                 : null;
             if (action is not null)
             {

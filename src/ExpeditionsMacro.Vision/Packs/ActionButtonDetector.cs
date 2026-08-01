@@ -106,6 +106,11 @@ internal static class ActionButtonDetector
         ["gameplay_stage_info"] = new(new ScreenRegion(685, 330, 123, 90), ButtonColor.Yellow, 757, 364, 58, 38, 65, 105, 17, 38, 0.30),
         ["challenge_victory_party"] = new(new ScreenRegion(125, 395, 365, 80), ButtonColor.Purple, 304, 437, 100, 35, 250, 350, 16, 42, 0.25),
         ["challenge_victory_close"] = new(new ScreenRegion(625, 125, 90, 80), ButtonColor.Red, 670, 155, 48, 35, 14, 34, 14, 34, 0.35, 0.40),
+        // The broader Unit Inventory close profile must cover both retained
+        // panel widths. Unit Teams has a narrower field-owned close band so
+        // the active-match Stage control to its right cannot steal the
+        // scrollbar anchor.
+        ["team_list_close"] = new(new ScreenRegion(608, 145, 62, 65), ButtonColor.Red, 634, 178, 30, 28, 14, 36, 14, 36, 0.35, 0.40),
         ["team_close"] = new(new ScreenRegion(610, 100, 110, 110), ButtonColor.Red, 660, 150, 55, 65, 14, 36, 14, 36, 0.35, 0.40),
         ["units_unequip_all"] = new(new ScreenRegion(105, 405, 155, 70), ButtonColor.Red, 180, 442, 48, 35, 85, 135, 18, 42, 0.30),
         ["units_teams"] = new(new ScreenRegion(215, 405, 165, 70), ButtonColor.Purple, 294, 442, 48, 35, 85, 135, 18, 42, 0.25),
