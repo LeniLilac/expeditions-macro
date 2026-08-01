@@ -49,10 +49,6 @@ public partial class MacroPage
         TaskEditorDialog.TaskTargetText;
     private Border FastTaskOptionsPanel =>
         TaskEditorDialog.FastTaskOptionsPanel;
-    private Border BountyTaskOptionsPanel =>
-        TaskEditorDialog.BountyTaskOptionsPanel;
-    private Slider BountyParkedSlider =>
-        TaskEditorDialog.BountyParkedSlider;
     private StackPanel TaskDefeatRetriesPanel =>
         TaskEditorDialog.TaskDefeatRetriesPanel;
     private TextBox TaskDefeatRetriesText =>

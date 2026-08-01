@@ -28,6 +28,7 @@ public partial class MainWindow
         object? sender,
         EventArgs e)
     {
+        DisposeApplicationUpdates();
         if (_windowSource is not null &&
             _windowHook is not null)
         {

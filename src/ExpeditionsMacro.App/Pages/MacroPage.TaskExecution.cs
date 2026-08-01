@@ -16,6 +16,7 @@ public partial class MacroPage
     private Task<ScheduledTaskResult> ExecuteTaskAsync(
         MacroTaskDefinition task,
         Func<ScheduledTaskResult, CancellationToken, Task<ScheduledTaskContinuation>> recordResult,
+        Func<ScheduledTaskCheckpoint, Task> recordCheckpoint,
         string webhook,
         string discordUserId,
         char playMenuKey,
@@ -24,6 +25,7 @@ public partial class MacroPage
         char cancelPlacementKey,
         MacroRunTotals macroTotals,
         ChallengeRotationState challengeRotation,
+        RefuelTaskStateSession refuelStates,
         BountyOperationSession bountySession,
         TeamOperationSession teamSession,
         IProgress<MacroProgress> progress,
@@ -94,6 +96,8 @@ public partial class MacroPage
                 cancellationToken),
             MacroTaskKind.Utility => ExecuteUtilityAsync(
                 task,
+                recordCheckpoint,
+                refuelStates,
                 playMenuKey,
                 areasMenuKey,
                 progress,
@@ -186,18 +190,24 @@ public partial class MacroPage
         ChallengeRunSummary result = summary
             ?? throw new InvalidOperationException(
                 "Challenge task returned without a run summary.");
+        ChallengeRotationProgress persistedRotation =
+            challengeRotation.Snapshot();
         return result.Completed > 0
             ? new ScheduledTaskResult(
                 result.Victories,
                 result.Defeats,
-                result.Runtime)
+                result.Runtime,
+                ChallengeRotation:
+                    persistedRotation)
             : new ScheduledTaskResult(
                 0,
                 0,
                 result.Runtime,
                 result.WaitingUntilUtc
                     ?? DateTimeOffset.UtcNow + SafeSkipDelay,
-                Skipped: true);
+                Skipped: true,
+                ChallengeRotation:
+                    persistedRotation);
     }
 
     private async Task<ScheduledTaskResult> ExecuteExpeditionAsync(

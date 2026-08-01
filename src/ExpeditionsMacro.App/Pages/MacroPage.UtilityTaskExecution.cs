@@ -13,6 +13,9 @@ public partial class MacroPage
     private async Task<ScheduledTaskResult>
         ExecuteUtilityAsync(
         MacroTaskDefinition task,
+        Func<ScheduledTaskCheckpoint, Task>
+            recordCheckpoint,
+        RefuelTaskStateSession refuelStates,
         char playMenuKey,
         char? areasMenuKey,
         IProgress<MacroProgress> progress,
@@ -36,6 +39,24 @@ public partial class MacroPage
                     cancellationToken)
                 .ConfigureAwait(false);
         Stopwatch runtime = Stopwatch.StartNew();
+        ResourceRefuelTarget pending =
+            refuelStates.Pending(task);
+        if (pending == ResourceRefuelTarget.None)
+        {
+            // A full target set is never persisted, but fail safe if a future
+            // schema or interrupted write provides one.
+            refuelStates.Complete(task.Id);
+            pending = task.RefuelTarget;
+        }
+        if (pending != task.RefuelTarget)
+        {
+            DispatchLog(new MacroEvent(
+                DateTimeOffset.Now,
+                MacroEventLevel.Information,
+                $"Resuming {task.Name}; {RefuelTargetLabel(pending)} remains.",
+                "resource_refuel_resumed"));
+        }
+
         ResourceRefuelResult result =
             await _services.ResourceRefuel.RunAsync(
                     new ResourceRefuelRequest
@@ -43,13 +64,26 @@ public partial class MacroPage
                         Start =
                             ResourceRefuelStart
                                 .SharedNavigation,
-                        Targets = task.RefuelTarget,
+                        Targets = pending,
                         Settings = _services.Settings
                             .ResourceRefuelDebug,
                         AreasMenuKey = areasKey,
                         PlayMenuKey = playMenuKey,
                         OpenPlayWhenComplete = false,
                         ReturnToLobbyWhenComplete = true,
+                        StationCompleted = async target =>
+                        {
+                            if (refuelStates.TryRecordPartial(
+                                    task,
+                                    target,
+                                    out ResourceRefuelTarget completed))
+                            {
+                                await recordCheckpoint(
+                                        new ScheduledTaskCheckpoint(
+                                            completed))
+                                    .ConfigureAwait(false);
+                            }
+                        },
                     },
                     detector,
                     progress,
@@ -57,6 +91,7 @@ public partial class MacroPage
                     cancellationToken)
                 .ConfigureAwait(false);
         runtime.Stop();
+        refuelStates.Complete(task.Id);
 
         DateTimeOffset nextEligible =
             result.CompletedAtUtc.AddMinutes(
@@ -73,4 +108,15 @@ public partial class MacroPage
             runtime.Elapsed,
             nextEligible);
     }
+
+    private static string RefuelTargetLabel(
+        ResourceRefuelTarget target) =>
+        target switch
+        {
+            ResourceRefuelTarget.GoldMine =>
+                "Gold Mine",
+            ResourceRefuelTarget.ResourceDrill =>
+                "Resource Drill",
+            _ => "the remaining resource station",
+        };
 }

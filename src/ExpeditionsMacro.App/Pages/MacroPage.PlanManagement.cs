@@ -9,6 +9,9 @@ namespace ExpeditionsMacro.App.Pages;
 
 public partial class MacroPage
 {
+    private ChallengeRotationProgress?
+        _challengeRotationProgress;
+
     private async Task<MacroPlan>
         SavePlanInternalAsync()
     {
@@ -41,6 +44,12 @@ public partial class MacroPage
             Loops = loops,
             LoopStates =
                 LoopEditor.ProgressFor(loops),
+            ChallengeRotation =
+                tasks.Any(task => task.Kind is
+                    MacroTaskKind.Challenge or
+                    MacroTaskKind.Bounty)
+                    ? _challengeRotationProgress
+                    : null,
             UpdatedAt = DateTimeOffset.UtcNow,
         };
         plan.Validate();
@@ -259,6 +268,7 @@ public partial class MacroPage
             EmptyTasksText.Visibility =
                 Visibility.Visible;
             LoopEditor.Apply([], []);
+            _challengeRotationProgress = null;
             ResetTaskEditor();
             ApplyTotals();
         });
@@ -287,6 +297,8 @@ public partial class MacroPage
             LoopEditor.Apply(
                 plan.EffectiveLoops(),
                 plan.EffectiveLoopStates());
+            _challengeRotationProgress =
+                plan.ChallengeRotation;
             ResetTaskEditor();
             ApplyTotals();
         });
@@ -298,6 +310,8 @@ public partial class MacroPage
     {
         LoopEditor.UpdateProgress(
             plan.EffectiveLoopStates());
+        _challengeRotationProgress =
+            plan.ChallengeRotation;
         Dictionary<string, MacroTaskProgress>
             progress = plan.Progress.ToDictionary(
                 value => value.TaskId,

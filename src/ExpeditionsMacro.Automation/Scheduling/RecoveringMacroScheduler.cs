@@ -21,12 +21,44 @@ public sealed class RecoveringMacroScheduler
         _recovery = recovery;
     }
 
+    public Task RunAsync(
+        MacroPlan initialPlan,
+        RobloxPrivateServerLaunchTarget? restartTarget,
+        Func<
+            MacroTaskDefinition,
+            Func<ScheduledTaskResult, CancellationToken, Task<ScheduledTaskContinuation>>,
+            CancellationToken,
+            Task<ScheduledTaskResult>> execute,
+        IProgress<MacroProgress>? progress = null,
+        Action<MacroPlan>? planChanged = null,
+        Action<MacroEvent>? log = null,
+        CancellationToken cancellationToken = default,
+        Func<Exception, CancellationToken, Task>?
+            recoverableFailure = null,
+        Func<CancellationToken, Task>?
+            prepareSession = null,
+        RobloxPrivateServerLaunchTarget?
+            startupRestartTarget = null) =>
+        RunAsync(
+            initialPlan,
+            restartTarget,
+            (task, record, _, token) =>
+                execute(task, record, token),
+            progress,
+            planChanged,
+            log,
+            cancellationToken,
+            recoverableFailure,
+            prepareSession,
+            startupRestartTarget);
+
     public async Task RunAsync(
         MacroPlan initialPlan,
         RobloxPrivateServerLaunchTarget? restartTarget,
         Func<
             MacroTaskDefinition,
             Func<ScheduledTaskResult, CancellationToken, Task<ScheduledTaskContinuation>>,
+            Func<ScheduledTaskCheckpoint, Task>,
             CancellationToken,
             Task<ScheduledTaskResult>> execute,
         IProgress<MacroProgress>? progress = null,

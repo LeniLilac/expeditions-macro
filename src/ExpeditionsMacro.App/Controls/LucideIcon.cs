@@ -22,6 +22,7 @@ public enum LucideIconKind
     Compass,
     Copy,
     Crosshair,
+    Download,
     ExternalLink,
     Eye,
     EyeOff,
@@ -176,6 +177,10 @@ public sealed class LucideIcon : Control
         [LucideIconKind.Compass] = Group(Circle(12, 12, 10), Path("m16.24 7.76-1.804 5.411a2 2 0 0 1-1.265 1.265L7.76 16.24l1.804-5.411a2 2 0 0 1 1.265-1.265z")),
         [LucideIconKind.Copy] = Group(Rectangle(8, 8, 14, 14, 2), Path("M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2")),
         [LucideIconKind.Crosshair] = Group(Circle(12, 12, 10), Line(22, 12, 18, 12), Line(6, 12, 2, 12), Line(12, 6, 12, 2), Line(12, 22, 12, 18)),
+        [LucideIconKind.Download] = Group(
+            Path("M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"),
+            Path("m7 10 5 5 5-5"),
+            Path("M12 15V3")),
         [LucideIconKind.ExternalLink] = Group(Path("M15 3h6v6"), Path("M10 14 21 3"), Path("M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6")),
         [LucideIconKind.Eye] = Group(Path("M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"), Circle(12, 12, 3)),
         [LucideIconKind.EyeOff] = Group(

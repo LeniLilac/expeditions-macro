@@ -34,7 +34,8 @@ internal sealed class DeepDebugSession
     public int FrameRetentionMinutes { get; }
 
     public PriorityQueue<DeepDebugRetainedFrame, long>
-        RetainedFrames { get; } = new();
+        RetainedFrames
+    { get; } = new();
 
     public DateTimeOffset LatestFrameTimestampUtc { get; set; }
 

@@ -27,6 +27,7 @@ The portable ZIP root must contain only `ExpeditionsMacro.exe` and one `Expediti
 2. Create the signed or annotated version tag used by the release workflow.
 3. Confirm CI and the tag-triggered Release workflow pass for the exact commit. Both stable and silent workflows rerun the shared release preflight before building.
 4. Confirm the GitHub Release contains the installer, portable ZIP, checksums, and dependency inventory, and that package verification passed for the detector data embedded in the application.
+   The in-app updater treats this exact four-asset set as a security contract. The tag, release prerelease flag, filenames, browser download URLs, positive sizes, GitHub `sha256:` asset digests, and `SHA256SUMS.txt` installer entry must all agree. Do not add release assets, rename one, publish before GitHub has calculated digests, or replace bytes under an existing tag; fix forward with a new version.
 5. Confirm the Discord release announcement only when the requested workflow is not a silent release.
 
 Local test ZIPs may be built with a prerelease version without publishing, but they must still pass repository policy, package checksum verification, and a packaged-app smoke test before delivery.

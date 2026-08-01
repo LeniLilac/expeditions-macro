@@ -29,8 +29,14 @@ public partial class SettingsPage : UserControl, IAppPage
         ThemeCombo.ItemsSource = Enum.GetValues<AppTheme>();
         DataPath.Text = services.Paths.Root;
         KeyBindingsPanel.Initialize(services);
+        InitializeApplicationUpdateControls();
         KeyBindingsPanel.BindingsChanged += (_, _) => UpdateKeyBindingDiagnostics();
-        _services.Coordinator.StateChanged += (_, _) => Dispatcher.BeginInvoke(UpdateCaptureState);
+        _services.Coordinator.StateChanged += (_, _) =>
+            Dispatcher.BeginInvoke(() =>
+            {
+                UpdateCaptureState();
+                UpdateApplicationUpdateState();
+            });
         Unloaded += (_, _) =>
         {
             CloseUiScaleOverlay();
@@ -78,6 +84,8 @@ public partial class SettingsPage : UserControl, IAppPage
         ManualRecordingsCheck.IsChecked =
             _services.Settings
                 .ManualInputRecordingEnabled;
+        AutoCheckForUpdatesCheck.IsChecked =
+            _services.Settings.AutoCheckForUpdates;
         _loading = false;
         VersionText.Text = ProductVersion.Current;
         RobloxText.Text = _services.Automation.FindWindow() is { } window
@@ -87,6 +95,7 @@ public partial class SettingsPage : UserControl, IAppPage
         UpdateKeyBindingDiagnostics();
         UpdateDeepDebugStatus();
         UpdateCaptureState();
+        UpdateApplicationUpdateState();
         return Task.CompletedTask;
     }
 

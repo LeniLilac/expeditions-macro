@@ -44,6 +44,8 @@ internal static class BountyBoardOwnerDetector
 
     private const double MinimumBackNeutralFraction = 0.78;
     private const double MinimumBackGlyphFraction = 0.025;
+    private const double MinimumBrightBackSurfaceFraction = 0.58;
+    private const double MinimumDarkBackGlyphFraction = 0.025;
     private const double MinimumCalendarBlueFraction = 0.68;
     private const double MinimumCalendarGlyphFraction = 0.05;
     private const double MinimumHeaderGoldFraction = 0.10;
@@ -81,6 +83,10 @@ internal static class BountyBoardOwnerDetector
             image,
             BackInterior,
             IsBrightNeutral);
+        double darkBackGlyph = ColorFraction(
+            image,
+            BackInterior,
+            IsDarkNeutral);
         double calendarBlue = ColorFraction(
             image,
             CalendarInterior,
@@ -89,24 +95,39 @@ internal static class BountyBoardOwnerDetector
             image,
             CalendarInterior,
             IsBrightNeutral);
-        if (backNeutral < MinimumBackNeutralFraction ||
-            backGlyph < MinimumBackGlyphFraction ||
+        bool legacyBack =
+            backNeutral >= MinimumBackNeutralFraction &&
+            backGlyph >= MinimumBackGlyphFraction;
+        bool brightBack =
+            backGlyph >= MinimumBrightBackSurfaceFraction &&
+            darkBackGlyph >= MinimumDarkBackGlyphFraction;
+        if ((!legacyBack && !brightBack) ||
             calendarBlue < MinimumCalendarBlueFraction ||
             calendarGlyph < MinimumCalendarGlyphFraction)
         {
             return 0;
         }
 
+        double backScore = legacyBack
+            ? 0.06 * Ramp(
+                  backNeutral,
+                  MinimumBackNeutralFraction,
+                  0.94) +
+              0.04 * Ramp(
+                  backGlyph,
+                  MinimumBackGlyphFraction,
+                  0.07)
+            : 0.06 * Ramp(
+                  backGlyph,
+                  MinimumBrightBackSurfaceFraction,
+                  0.76) +
+              0.04 * Ramp(
+                  darkBackGlyph,
+                  MinimumDarkBackGlyphFraction,
+                  0.06);
         return Math.Clamp(
             0.78 +
-            0.06 * Ramp(
-                backNeutral,
-                MinimumBackNeutralFraction,
-                0.94) +
-            0.04 * Ramp(
-                backGlyph,
-                MinimumBackGlyphFraction,
-                0.07) +
+            backScore +
             0.08 * Ramp(
                 calendarBlue,
                 MinimumCalendarBlueFraction,
@@ -253,6 +274,21 @@ internal static class BountyBoardOwnerDetector
             Math.Min(green, blue));
         return minimum > 150 &&
             maximum - minimum < 70;
+    }
+
+    private static bool IsDarkNeutral(
+        byte red,
+        byte green,
+        byte blue)
+    {
+        int maximum = Math.Max(
+            red,
+            Math.Max(green, blue));
+        int minimum = Math.Min(
+            red,
+            Math.Min(green, blue));
+        return maximum < 100 &&
+            maximum - minimum < 35;
     }
 
     private static bool IsTitleGold(

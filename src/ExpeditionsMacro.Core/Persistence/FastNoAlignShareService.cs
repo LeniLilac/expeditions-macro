@@ -38,6 +38,7 @@ public sealed class FastNoAlignShareService
             Progress = [],
             LoopStates = [],
             LoopProgress = new(),
+            ChallengeRotation = null,
         };
         portable.Validate();
 

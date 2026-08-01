@@ -24,8 +24,7 @@ public sealed class MacroTaskRow
     {
         MacroTaskKind.Utility =>
             $"Every {Definition.RefuelIntervalMinutes} min",
-        MacroTaskKind.Bounty =>
-            $"Park {Definition.BountyParkedNonViableLimit} non-viable",
+        MacroTaskKind.Bounty => string.Empty,
         _ when Definition.IsRecurring => "Every reset",
         _ =>
             Definition.CompleteOnRuntimeDefeat

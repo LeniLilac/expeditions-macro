@@ -413,9 +413,7 @@ public partial class MacroPage : UserControl, IAppPage
         left.BossesBeforeExtract == right.BossesBeforeExtract &&
         left.RefuelTarget == right.RefuelTarget &&
         left.RefuelIntervalMinutes ==
-            right.RefuelIntervalMinutes &&
-        left.BountyParkedNonViableLimit ==
-            right.BountyParkedNonViableLimit;
+            right.RefuelIntervalMinutes;
 
     private static int ParsePositiveInt(TextBox field, string label) =>
         int.TryParse(field.Text.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) && value > 0

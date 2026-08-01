@@ -105,7 +105,7 @@ public sealed class AppSettingsStoreTests
                 await File.ReadAllTextAsync(
                     paths.SettingsFile);
             Assert.Contains(
-                "\"schema_version\": 5",
+                "\"schema_version\": 6",
                 normalized,
                 StringComparison.Ordinal);
 

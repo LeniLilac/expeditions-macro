@@ -22,10 +22,18 @@ public sealed class ResourceRefuelServiceTests
             automation,
             recovery);
 
+        List<ResourceRefuelTarget> completed = [];
         ResourceRefuelResult result = await service.RunAsync(
             Request(
                 ResourceRefuelStart.CurrentLobby,
-                ResourceRefuelTarget.Both),
+                ResourceRefuelTarget.Both) with
+            {
+                StationCompleted = target =>
+                {
+                    completed.Add(target);
+                    return Task.CompletedTask;
+                },
+            },
             new LobbyDetectorPack());
 
         Assert.Equal(
@@ -48,6 +56,12 @@ public sealed class ResourceRefuelServiceTests
         Assert.Equal(1, automation.PlayPresses);
         Assert.Equal(2, automation.MaxClicks);
         Assert.Equal(2, automation.ConfirmClicks);
+        Assert.Equal(
+            [
+                ResourceRefuelTarget.GoldMine,
+                ResourceRefuelTarget.ResourceDrill,
+            ],
+            completed);
         AssertNoCaptureDuringBlindRoutes(automation.Events);
     }
 

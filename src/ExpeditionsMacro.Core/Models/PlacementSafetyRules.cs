@@ -46,6 +46,37 @@ public static class PlacementSafetyRules
         return null;
     }
 
+    public static int? FindIntroducedDuplicateUnitSlot(
+        PlacementTargetMode mode,
+        IEnumerable<int> previousUnitSlots,
+        IEnumerable<int> prospectiveUnitSlots)
+    {
+        ArgumentNullException.ThrowIfNull(
+            previousUnitSlots);
+        ArgumentNullException.ThrowIfNull(
+            prospectiveUnitSlots);
+        if (mode != PlacementTargetMode.Expedition)
+        {
+            return null;
+        }
+
+        Dictionary<int, int> previousCounts =
+            CountSlots(previousUnitSlots);
+        foreach ((int slot, int count) in
+                 CountSlots(prospectiveUnitSlots))
+        {
+            previousCounts.TryGetValue(
+                slot,
+                out int previousCount);
+            if (count > 1 &&
+                count > Math.Max(1, previousCount))
+            {
+                return slot;
+            }
+        }
+        return null;
+    }
+
     public static string? GetPlaybackSkipReason(
         PlacementModel model,
         PlacementStep step)
@@ -102,5 +133,17 @@ public static class PlacementSafetyRules
             }
         }
         return -1;
+    }
+
+    private static Dictionary<int, int> CountSlots(
+        IEnumerable<int> unitSlots)
+    {
+        Dictionary<int, int> counts = [];
+        foreach (int slot in unitSlots)
+        {
+            counts[slot] =
+                counts.GetValueOrDefault(slot) + 1;
+        }
+        return counts;
     }
 }

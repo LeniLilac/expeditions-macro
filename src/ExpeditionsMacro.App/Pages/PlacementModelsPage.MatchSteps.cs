@@ -324,40 +324,13 @@ public partial class PlacementModelsPage
             }
             prospective[index] = candidate;
         }
-        ValidateTimeline(prospective);
-    }
-
-    private void ValidateTimeline(
-        IReadOnlyList<PlacementStep> steps)
-    {
-        PlacementStep[] normalized =
-            PlacementTimelinePolicy
-                .NormalizeSteps(steps)
-                .ToArray();
-        foreach (PlacementStep step in normalized)
-        {
-            step.Validate(808, 611);
-        }
-        PlacementAuthoringRules.ValidateMinimumSpacing(
-            normalized);
-        PlacementAuthoringRules.ValidateBeforeStartSafety(
-            normalized);
-        PlacementAuthoringRules
-            .ValidateMatchStepReferences(normalized);
-
-        if (CurrentFastTarget().Mode ==
-                PlacementTargetMode.Expedition &&
-            PlacementSafetyRules.FindDuplicateUnitSlot(
-                PlacementTargetMode.Expedition,
-                normalized.Where(step =>
-                        step.Kind ==
-                        MatchStepKind.Placement)
-                    .Select(step => step.UnitKey)) is int
-                duplicate)
-        {
-            throw new InvalidOperationException(
-                $"Expedition setups allow one placement for Unit {duplicate}.");
-        }
+        ValidateTimeline(
+            prospective,
+            existing is null
+                ? null
+                : _steps.Select(row =>
+                        row.ToModel())
+                    .ToArray());
     }
 
     private void ApplyMatchStep(

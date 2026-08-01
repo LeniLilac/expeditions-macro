@@ -4,6 +4,32 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.54] - 2026-07-31
+
+### Added
+
+- The app can check its matching official GitHub release channel at startup, show a non-modal update notice, download only with explicit consent, and open the verified installer only after a second confirmation. Automatic checks can be disabled in Settings.
+- Verified installer downloads survive an app restart or canceled installation under the local update staging directory.
+- Challenge rotation evidence and partial combined Gold Mine/Resource Drill completion now persist across user stop/start, while Reset progress still clears them deliberately.
+
+### Changed
+
+- Bounty tasks now always use zero parked non-viable Bounties. The parking control and summary were removed, and legacy saved values are discarded when a plan is normalized.
+
+### Fixed
+
+- A full or bright Bounty Board Back control no longer prevents ownership when the independent Bounty Board and Calendar structure is present.
+- Legacy Expedition Placement Setups with duplicate unit slots can be repaired one row at a time; deleting or reordering a row is no longer blocked by unrelated duplicate debt that remains elsewhere in the setup.
+- Combined Gold Mine/Resource Drill runs checkpoint the first verified station before continuing, so restarting resumes the unfinished station instead of repeating both.
+
+### Security
+
+- Application releases must match their semantic tag, stable/prerelease flag, release URL, exact four-asset inventory, declared sizes, direct GitHub URLs, GitHub SHA-256 digests, and `SHA256SUMS.txt` before an installer can be staged. Redirects are bounded to trusted HTTPS GitHub release hosts, partial/tampered/stale stages are removed, and ready installers are rehashed immediately before launch.
+
+### Tests
+
+- Added adversarial semantic-version, release-inventory, redirect, size/hash, cancellation, migration, restart-recovery, staged-tampering, recurring-state, legacy-placement-debt, and field-derived Bounty Board coverage. Passed 1,572 non-golden application tests, 120 golden-image and cross-state detector tests, 6 Deep Debug Viewer tests, 15 Detector Viewer tests, and all 90 dark/light main-app UI states.
+
 ## [1.3.0-beta.53] - 2026-07-31
 
 ### Added
@@ -1347,7 +1373,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.53...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.54...HEAD
+[1.3.0-beta.54]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.53...v1.3.0-beta.54
 [1.3.0-beta.53]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.52...v1.3.0-beta.53
 [1.3.0-beta.52]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.51...v1.3.0-beta.52
 [1.3.0-beta.51]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.50...v1.3.0-beta.51

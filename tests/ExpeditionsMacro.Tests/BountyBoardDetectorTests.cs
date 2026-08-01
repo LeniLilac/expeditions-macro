@@ -98,6 +98,69 @@ public sealed class BountyBoardDetectorTests
     }
 
     [Fact]
+    public void BoardOwnership_AcceptsFieldBrightBackVariant()
+    {
+        ImageFrame frame = LoadBounty(
+            "BountyBoard_BrightBackOwner_01.png");
+
+        BountyBoardMatch match =
+            BountyBoardDetector.Detect(frame);
+
+        Assert.Equal(
+            BountyBoardState.Board,
+            match.State);
+        Assert.True(match.BoardButtonRailScore > 0);
+        Assert.True(match.BoardHeaderScore > 0);
+        Assert.Contains(
+            match.Actions,
+            action => action.Kind ==
+                BountyCardActionKind.Reroll);
+    }
+
+    [Fact]
+    public void BrightBackVariant_RequiresItsDarkGlyph()
+    {
+        ImageFrame frame = LoadBounty(
+            "BountyBoard_BrightBackOwner_01.png");
+        Fill(
+            frame,
+            18,
+            578,
+            81,
+            20,
+            red: 225,
+            green: 225,
+            blue: 225);
+
+        BountyBoardMatch match =
+            BountyBoardDetector.Detect(frame);
+
+        Assert.NotEqual(
+            BountyBoardState.Board,
+            match.State);
+    }
+
+    [Fact]
+    public void BrightBackVariant_ToleratesOneMissingRasterRow()
+    {
+        ImageFrame frame = LoadBounty(
+            "BountyBoard_BrightBackOwner_01.png");
+        Fill(
+            frame,
+            18,
+            586,
+            81,
+            1,
+            red: 0,
+            green: 0,
+            blue: 0);
+
+        Assert.Equal(
+            BountyBoardState.Board,
+            BountyBoardDetector.Detect(frame).State);
+    }
+
+    [Fact]
     public void BoardOwnership_UsesBoundedTextFallbackForRecoloredHeader()
     {
         ImageFrame frame = ImageCodec.Load(
@@ -295,6 +358,13 @@ public sealed class BountyBoardDetectorTests
         ImageCodec.Load(
             Path.Combine(
                 TestPaths.EventDatasets,
+                name));
+
+    private static ImageFrame LoadBounty(
+        string name) =>
+        ImageCodec.Load(
+            Path.Combine(
+                TestPaths.BountyDatasets,
                 name));
 
     private static void Fill(
