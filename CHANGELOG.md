@@ -4,6 +4,18 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.58] - 2026-08-01
+
+### Fixed
+
+- Saved-team loading now recognizes the Unit Teams panel during an active match even when the separate red Stage control is visible beside it. The Team-list scrollbar remains anchored to the real panel Close control instead of the unrelated Stage action.
+- Team selection now uses a requested Team from any fully visible row. Team 2 no longer scrolls from the initial second row, and settled Team 4/5 layouts no longer wait through unnecessary correction drags.
+
+### Tests
+
+- Added a privacy-reviewed in-match Team-list fixture with the Stage-control decoy, direct Team 2 selection, Team 4/5 under-travel, clipped-row rejection, final-drag observation, and complete cross-state negative coverage.
+- Passed 1,635 non-golden application tests, 120 golden-image and cross-state detector tests, 6 Deep Debug Viewer tests, 15 Detector Viewer tests, and all 90 dark/light main-app UI states.
+
 ## [1.3.0-beta.57] - 2026-08-01
 
 ### Fixed
@@ -1411,7 +1423,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.57...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.58...HEAD
+[1.3.0-beta.58]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.57...v1.3.0-beta.58
 [1.3.0-beta.57]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.56...v1.3.0-beta.57
 [1.3.0-beta.56]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.55...v1.3.0-beta.56
 [1.3.0-beta.55]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.54...v1.3.0-beta.55

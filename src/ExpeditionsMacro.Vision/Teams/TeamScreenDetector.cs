@@ -128,7 +128,7 @@ public static class TeamScreenDetector
     {
         Validate(image);
         (int X, int Y)? closeAction =
-            ActionButtonDetector.ActionFor(image, "team_close");
+            ActionButtonDetector.ActionFor(image, "team_list_close");
         if (closeAction is null) return null;
 
         // GB-014: both reviewed panel widths keep the scrollbar three to nine
@@ -180,6 +180,48 @@ public static class TeamScreenDetector
         }
 
         int row = teamSlot <= 6 ? 0 : teamSlot - 6;
+        return LoadTeamActionAtRow(image, row);
+    }
+
+    public static (int X, int Y)? VisibleLoadTeamAction(
+        ImageFrame image,
+        int teamSlot,
+        int topThumbCenterY)
+    {
+        Validate(image);
+        ValidateTeamSlot(teamSlot);
+        TeamScrollbarThumb? thumb = FindScrollbarThumb(image);
+        if (thumb is null) return null;
+
+        int firstVisibleSlot = 0;
+        int nearestDistance = int.MaxValue;
+        for (int slot = 1; slot <= 6; slot++)
+        {
+            int distance = Math.Abs(
+                thumb.Value.CenterY -
+                ScrollThumbTargetCenterY(
+                    slot,
+                    topThumbCenterY));
+            if (distance >= nearestDistance) continue;
+            nearestDistance = distance;
+            firstVisibleSlot = slot;
+        }
+
+        if (nearestDistance > NearTargetThumbTolerancePixels)
+        {
+            return null;
+        }
+
+        int row = teamSlot - firstVisibleSlot;
+        return row is >= 0 and < 3
+            ? LoadTeamActionAtRow(image, row)
+            : null;
+    }
+
+    private static (int X, int Y)? LoadTeamActionAtRow(
+        ImageFrame image,
+        int row)
+    {
         ScreenRegion buttonRegion = AlignedLoadButtonRows[row];
         (int MinX, int MinY, int MaxX, int MaxY, int Count)? bounds = GreenBounds(image, buttonRegion);
         if (bounds is null ||
@@ -224,7 +266,7 @@ public static class TeamScreenDetector
     {
         double header = ColorFraction(image, Header, IsGold);
         double dark = DarkFraction(image, TeamsPanel);
-        double close = ActionButtonDetector.Score(image, "team_close");
+        double close = ActionButtonDetector.Score(image, "team_list_close");
         int loadRows = LoadButtonRows.Count(
             region => ColorFraction(image, region, IsGreenButton) >=
                 MinimumVisibleLoadButtonFraction);

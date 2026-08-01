@@ -11,6 +11,7 @@ public sealed class TeamScreenDetectorTests
     [InlineData("TeamUnits_CurrentGreenDecoys_01.png", TeamScreenState.Units)]
     [InlineData("TeamUnits_DenseRoster_01.png", TeamScreenState.Units)]
     [InlineData("TeamList_01.png", TeamScreenState.Teams)]
+    [InlineData("TeamList_InMatch_StageControlDecoy_01.png", TeamScreenState.Teams)]
     [InlineData("TeamList_Top_BackgroundDecoy_01.png", TeamScreenState.Teams)]
     [InlineData("TeamList_Aligned_Team1_Current_01.png", TeamScreenState.Teams)]
     [InlineData("TeamList_Aligned_Team2_01.png", TeamScreenState.Teams)]
@@ -126,6 +127,28 @@ public sealed class TeamScreenDetectorTests
         Assert.Null(TeamScreenDetector.FindScrollbarThumb(image));
     }
 
+    [Fact]
+    public void InMatchStageControl_DoesNotStealTheTeamScrollbarAnchor()
+    {
+        ImageFrame image = Load(
+            "TeamList_InMatch_StageControlDecoy_01.png");
+
+        TeamScreenMatch match = TeamScreenDetector.Detect(image);
+        TeamScrollbarThumb thumb =
+            TeamScreenDetector.FindScrollbarThumb(image)!.Value;
+
+        Assert.Equal(TeamScreenState.Teams, match.State);
+        Assert.InRange(match.Confidence, 0.70, 1);
+        Assert.InRange(thumb.X, 624, 632);
+        Assert.InRange(thumb.CenterY, 238, 242);
+        Assert.Equal(
+            (579, 351),
+            TeamScreenDetector.VisibleLoadTeamAction(
+                image,
+                teamSlot: 2,
+                topThumbCenterY: thumb.CenterY));
+    }
+
     [Theory]
     [InlineData("TeamUnits_DenseRoster_01.png", TeamScreenState.Units)]
     [InlineData("TeamList_Aligned_Team1_Current_01.png", TeamScreenState.Teams)]
@@ -221,6 +244,29 @@ public sealed class TeamScreenDetectorTests
     }
 
     [Theory]
+    [InlineData("TeamList_Aligned_Team1_Current_01.png", 2, 345, 357)]
+    [InlineData("TeamList_Aligned_Team2_01.png", 3, 345, 357)]
+    [InlineData("TeamList_Aligned_Team3_01.png", 4, 345, 357)]
+    [InlineData("TeamList_Aligned_Team4_01.png", 5, 345, 357)]
+    public void StableList_MapsTheRequestedFullyVisibleSecondRow(
+        string fileName,
+        int teamSlot,
+        int minimumActionY,
+        int maximumActionY)
+    {
+        ImageFrame image = Load(fileName);
+
+        (int X, int Y) action =
+            TeamScreenDetector.VisibleLoadTeamAction(
+                image,
+                teamSlot,
+                TeamScreenDetector.TopScrollbarCenterY)!.Value;
+
+        Assert.InRange(action.X, 575, 585);
+        Assert.InRange(action.Y, minimumActionY, maximumActionY);
+    }
+
+    [Theory]
     [InlineData(7, 320, 335)]
     [InlineData(8, 408, 420)]
     public void BottomAlignedRows_MapTeamsSevenAndEight(int teamSlot, int minimumY, int maximumY)
@@ -241,6 +287,19 @@ public sealed class TeamScreenDetectorTests
     {
         ImageFrame image = Load("TeamList_Aligned_Team1_Current_01.png");
 
+        Assert.Equal(
+            (579, 351),
+            TeamScreenDetector.VisibleLoadTeamAction(
+                image,
+                teamSlot: 2,
+                topThumbCenterY:
+                    TeamScreenDetector.TopScrollbarCenterY));
+        Assert.Null(
+            TeamScreenDetector.VisibleLoadTeamAction(
+                image,
+                teamSlot: 3,
+                topThumbCenterY:
+                    TeamScreenDetector.TopScrollbarCenterY));
         Assert.Null(TeamScreenDetector.AlignedLoadTeamAction(
             image,
             teamSlot: 3,
