@@ -14,6 +14,8 @@ The Board itself is owned by the stable header plus the two-button rail. The per
 
 `WaveCounterNoVoice.png` is a privacy-safe derivative of a canonical no-voice match capture. It retains only the top status badges, bottom hotbar, and right-side Unit Manager/Stage Info controls on an opaque black canvas. The wave digit remains at its observed `(421,28)` origin, and the other retained regions provide independent gameplay-HUD ownership without preserving the world, player identity, or Settings contents.
 
+`WaveCounterNoVoiceBrightScene.png` is a privacy-safe derivative of a beta.55 Infinite run whose supported `(421,28)` counter was rejected on every observation. The faint pill transparency preserves the bright map underneath, while the retained top status group, bottom hotbar, and right-side Unit Manager/Stage Info controls contain no account identity. It protects local rail contrast without allowing the changing scene to own the counter.
+
 `WaveCounterLegacy.png` combines the field-captured retained top status layout with the same privacy-safe gameplay-owner regions. The wave digit remains at `(389,48)`. Both wave fixtures preserve the dark counter pill, blue Wave badge, neutral Wave label, and independently owned Stage controls; no account identity or private overlay is retained.
 
 `WaveCounterType3.png` is a privacy-safe derivative of a third canonical top-bar layout. It retains the field-captured status pills with the wave digit at `(386,28)` plus the same independent gameplay-owner regions. The missing optional top-bar control shifts the status group left without changing the glyph scale; world and identity pixels outside those bounded regions are blacked out.

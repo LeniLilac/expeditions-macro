@@ -157,6 +157,71 @@ public sealed class WaveCounterRecognizerTests
         Assert.Equal(67, match.Wave);
     }
 
+    [Fact]
+    public void Detect_RecognizesReviewedBrightNoVoiceLayout()
+    {
+        WaveCounterMatch match =
+            Assert.IsType<WaveCounterMatch>(
+                WaveCounterRecognizer.Detect(
+                    ExpeditionsMacro.Vision
+                        .Infrastructure
+                        .ImageCodec.Load(
+                            BrightNoVoiceFixturePath())));
+
+        Assert.Equal(1, match.Wave);
+    }
+
+    [Fact]
+    public void Detect_RecognizesTranslucentPillAgainstBrightScene()
+    {
+        ImageFrame frame = CreateFrame();
+        DrawPillBands(
+            frame,
+            NoVoiceCounterX,
+            NoVoiceCounterY,
+            background: 190,
+            rail: 110);
+        DrawCounterOwner(
+            frame,
+            NoVoiceCounterX,
+            NoVoiceCounterY);
+        DrawTemplate(
+            frame,
+            wave: 30,
+            NoVoiceCounterX,
+            NoVoiceCounterY);
+
+        WaveCounterMatch match =
+            Assert.IsType<WaveCounterMatch>(
+                WaveCounterRecognizer.Detect(frame));
+
+        Assert.Equal(30, match.Wave);
+    }
+
+    [Fact]
+    public void Detect_RejectsBadgeAndLabelWithoutPillContrast()
+    {
+        ImageFrame frame = CreateFrame();
+        DrawPillBands(
+            frame,
+            NoVoiceCounterX,
+            NoVoiceCounterY,
+            background: 150,
+            rail: 150);
+        DrawCounterOwner(
+            frame,
+            NoVoiceCounterX,
+            NoVoiceCounterY);
+        DrawTemplate(
+            frame,
+            wave: 30,
+            NoVoiceCounterX,
+            NoVoiceCounterY);
+
+        Assert.Null(
+            WaveCounterOwnerDetector.Detect(frame));
+    }
+
     [Theory]
     [InlineData(
         NoVoiceCounterX,
@@ -244,6 +309,7 @@ public sealed class WaveCounterRecognizerTests
     [Theory]
     [InlineData("WaveCounterNoVoice.png")]
     [InlineData("WaveCounterType3.png")]
+    [InlineData("WaveCounterNoVoiceBrightScene.png")]
     public void Detect_FieldFixturesRetainGameplayOwnerEvidence(
         string fixture)
     {
@@ -373,6 +439,70 @@ public sealed class WaveCounterRecognizerTests
         }
     }
 
+    private static void DrawPillBands(
+        ImageFrame frame,
+        int counterX,
+        int counterY,
+        byte background,
+        byte rail)
+    {
+        FillRegion(
+            frame,
+            counterX - 3,
+            counterY - 8,
+            width: 30,
+            height: 5,
+            background);
+        FillRegion(
+            frame,
+            counterX - 3,
+            counterY - 3,
+            width: 30,
+            height: 5,
+            rail);
+        FillRegion(
+            frame,
+            counterX - 3,
+            counterY + 9,
+            width: 30,
+            height: 5,
+            rail);
+        FillRegion(
+            frame,
+            counterX - 3,
+            counterY + 14,
+            width: 30,
+            height: 5,
+            background);
+    }
+
+    private static void FillRegion(
+        ImageFrame frame,
+        int left,
+        int top,
+        int width,
+        int height,
+        byte value)
+    {
+        for (int y = top;
+             y < top + height;
+             y++)
+        {
+            for (int x = left;
+                 x < left + width;
+                 x++)
+            {
+                SetPixel(
+                    frame,
+                    x,
+                    y,
+                    value,
+                    value,
+                    value);
+            }
+        }
+    }
+
     private static void SetPixel(
         ImageFrame frame,
         int x,
@@ -409,6 +539,10 @@ public sealed class WaveCounterRecognizerTests
 
     private static string TypeThreeFixturePath() =>
         FixturePath("WaveCounterType3.png");
+
+    private static string BrightNoVoiceFixturePath() =>
+        FixturePath(
+            "WaveCounterNoVoiceBrightScene.png");
 
     private static string FixturePath(string fixture) =>
         Path.Combine(

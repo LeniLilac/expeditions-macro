@@ -4,6 +4,17 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.56] - 2026-08-01
+
+### Fixed
+
+- Infinite Bounty wave monitoring now owns the translucent Wave counter relative to its immediate local background instead of requiring a fixed absolute-darkness total. Bright map scenery beneath the supported no-voice counter can no longer suppress every reading, while a bright region without the independent pill, blue Wave badge, and neutral label remains rejected.
+
+### Tests
+
+- Added a privacy-reviewed beta.55 bright-scene fixture plus local-contrast positives and missing-pill negatives. Replayed all 46 supplied gameplay observations: the corrected detector owned the counter in 46/46 frames, compared with 0/46 previously, while transient or ambiguous digits remained safely unknown.
+- Passed 1,597 non-golden application tests, 120 golden-image and cross-state detector tests, 6 Deep Debug Viewer tests, 15 Detector Viewer tests, and all 90 dark/light main-app UI states.
+
 ## [1.3.0-beta.55] - 2026-07-31
 
 ### Fixed
@@ -1383,7 +1394,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.55...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.56...HEAD
+[1.3.0-beta.56]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.55...v1.3.0-beta.56
 [1.3.0-beta.55]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.54...v1.3.0-beta.55
 [1.3.0-beta.54]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.53...v1.3.0-beta.54
 [1.3.0-beta.53]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.52...v1.3.0-beta.53

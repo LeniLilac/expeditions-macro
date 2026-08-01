@@ -10,8 +10,11 @@ public readonly record struct WaveCounterOwnerMatch(
 public static class WaveCounterOwnerDetector
 {
     private const int MinimumBlueBadgePixels = 24;
-    private const int MinimumDarkRailPixels = 128;
+    private const int MinimumRailPixels = 128;
     private const int MinimumLabelPixels = 12;
+    private const int BaseRailLuminance = 80;
+    private const int MaximumRailLuminance = 130;
+    private const int MinimumLocalContrast = 15;
 
     private static readonly ScreenRegion[] CounterRegions =
     [
@@ -25,6 +28,34 @@ public static class WaveCounterOwnerDetector
         new(372, 43, 44, 22),
         new(404, 23, 44, 22),
         new(369, 23, 44, 22),
+    ];
+
+    private static readonly ScreenRegion[] TopRailRegions =
+    [
+        new(386, 45, 30, 5),
+        new(418, 25, 30, 5),
+        new(383, 25, 30, 5),
+    ];
+
+    private static readonly ScreenRegion[] TopBackgroundRegions =
+    [
+        new(386, 40, 30, 5),
+        new(418, 20, 30, 5),
+        new(383, 20, 30, 5),
+    ];
+
+    private static readonly ScreenRegion[] BottomRailRegions =
+    [
+        new(386, 57, 30, 5),
+        new(418, 37, 30, 5),
+        new(383, 37, 30, 5),
+    ];
+
+    private static readonly ScreenRegion[] BottomBackgroundRegions =
+    [
+        new(386, 62, 30, 5),
+        new(418, 42, 30, 5),
+        new(383, 42, 30, 5),
     ];
 
     public static WaveCounterOwnerMatch? Detect(
@@ -42,7 +73,11 @@ public static class WaveCounterOwnerDetector
             metrics[index] = MeasureOwner(
                 image,
                 CounterRegions[index],
-                CounterOwnershipRegions[index]);
+                CounterOwnershipRegions[index],
+                TopRailRegions[index],
+                TopBackgroundRegions[index],
+                BottomRailRegions[index],
+                BottomBackgroundRegions[index]);
             if (!metrics[index].Owned)
             {
                 continue;
@@ -75,7 +110,11 @@ public static class WaveCounterOwnerDetector
     private static CounterOwnerMetrics MeasureOwner(
         ImageFrame image,
         ScreenRegion counter,
-        ScreenRegion ownership)
+        ScreenRegion ownership,
+        ScreenRegion topRailRegion,
+        ScreenRegion topBackgroundRegion,
+        ScreenRegion bottomRailRegion,
+        ScreenRegion bottomBackgroundRegion)
     {
         int blueBadgePixels = 0;
         for (int y = counter.Y - 2;
@@ -100,38 +139,36 @@ public static class WaveCounterOwnerDetector
             }
         }
 
-        int darkTopPixels = CountDarkPixels(
+        RailMetrics topRail = MeasureRail(
             image,
-            new ScreenRegion(
-                counter.X - 3,
-                counter.Y - 3,
-                30,
-                5));
-        int darkBottomPixels = CountDarkPixels(
+            topRailRegion,
+            topBackgroundRegion);
+        RailMetrics bottomRail = MeasureRail(
             image,
-            new ScreenRegion(
-                counter.X - 3,
-                counter.Y + 9,
-                30,
-                5));
+            bottomRailRegion,
+            bottomBackgroundRegion);
         int labelPixels = CountLabelPixels(
             image,
             counter);
         bool owned =
             blueBadgePixels >=
                 MinimumBlueBadgePixels &&
-            darkTopPixels >=
-                MinimumDarkRailPixels &&
-            darkBottomPixels >=
-                MinimumDarkRailPixels &&
+            topRail.Pixels >=
+                MinimumRailPixels &&
+            bottomRail.Pixels >=
+                MinimumRailPixels &&
             labelPixels >= MinimumLabelPixels;
         return new CounterOwnerMetrics(
             owned,
             counter.X,
             counter.Y,
             blueBadgePixels,
-            darkTopPixels,
-            darkBottomPixels,
+            topRail.Pixels,
+            topRail.Threshold,
+            topRail.BackgroundLuminance,
+            bottomRail.Pixels,
+            bottomRail.Threshold,
+            bottomRail.BackgroundLuminance,
             labelPixels);
     }
 
@@ -174,33 +211,82 @@ public static class WaveCounterOwnerDetector
         return count;
     }
 
-    private static int CountDarkPixels(
+    private static RailMetrics MeasureRail(
         ImageFrame image,
-        ScreenRegion region)
+        ScreenRegion rail,
+        ScreenRegion background)
     {
+        int backgroundLuminance =
+            MaximumRowLuminance(
+                image,
+                background);
+        int threshold = Math.Clamp(
+            backgroundLuminance -
+                MinimumLocalContrast,
+            BaseRailLuminance,
+            MaximumRailLuminance);
         int count = 0;
-        for (int y = region.Y;
-             y < region.Bottom;
+        for (int y = rail.Y;
+             y < rail.Bottom;
              y++)
         {
-            for (int x = region.X;
-                 x < region.Right;
+            for (int x = rail.X;
+                 x < rail.Right;
                  x++)
             {
-                int pixel =
-                    (y * image.Width + x) * 3;
-                int luminance =
-                    (299 * image.Pixels[pixel] +
-                     587 * image.Pixels[pixel + 1] +
-                     114 * image.Pixels[pixel + 2]) /
-                    1000;
-                if (luminance < 80)
+                if (Luminance(
+                        image,
+                        x,
+                        y) < threshold)
                 {
                     count++;
                 }
             }
         }
-        return count;
+        return new RailMetrics(
+            count,
+            threshold,
+            backgroundLuminance);
+    }
+
+    private static int MaximumRowLuminance(
+        ImageFrame image,
+        ScreenRegion region)
+    {
+        int maximum = 0;
+        for (int y = region.Y;
+             y < region.Bottom;
+             y++)
+        {
+            int row = 0;
+            for (int x = region.X;
+                 x < region.Right;
+                 x++)
+            {
+                row += Luminance(
+                    image,
+                    x,
+                    y);
+            }
+            maximum = Math.Max(
+                maximum,
+                row / region.Width);
+        }
+        return maximum;
+    }
+
+    private static int Luminance(
+        ImageFrame image,
+        int x,
+        int y)
+    {
+        int pixel =
+            (y * image.Width + x) * 3;
+        return
+            (299 * image.Pixels[pixel] +
+             587 * image.Pixels[pixel + 1] +
+             114 * image.Pixels[pixel + 2]) /
+            1000;
     }
 
     private readonly record struct CounterOwnerMetrics(
@@ -208,7 +294,16 @@ public static class WaveCounterOwnerDetector
         int CounterX,
         int CounterY,
         int BlueBadgePixels,
-        int DarkTopPixels,
-        int DarkBottomPixels,
+        int TopRailPixels,
+        int TopRailThreshold,
+        int TopBackgroundLuminance,
+        int BottomRailPixels,
+        int BottomRailThreshold,
+        int BottomBackgroundLuminance,
         int LabelPixels);
+
+    private readonly record struct RailMetrics(
+        int Pixels,
+        int Threshold,
+        int BackgroundLuminance);
 }
