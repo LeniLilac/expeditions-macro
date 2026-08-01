@@ -72,28 +72,32 @@ public static class MatchLobbyDoorButtonDetector
                 Offset(LocalSearch, expectedMinimumX));
         WhiteComponent door = components
             .Where(component =>
-                component.Count is >= 68 and <= 84 &&
-                component.Width is >= 15 and <= 16 &&
-                component.Height is >= 18 and <= 20 &&
+                component.Count >= 60 &&
+                component.Width is >= 15 and <= 17 &&
+                component.Height is >= 18 and <= 21 &&
                 Math.Abs(
                     component.MinimumX -
                     expectedMinimumX) <= 1 &&
-                component.MinimumY is >= 25 and <= 26)
+                component.MinimumY is >= 24 and <= 26 &&
+                component.FillRatio is >= 0.20 and <= 0.55)
             .OrderByDescending(component => component.Count)
             .FirstOrDefault();
         WhiteComponent arrow = components
             .Where(component =>
-                component.Count is >= 17 and <= 24 &&
-                component.Width is >= 7 and <= 8 &&
-                component.Height is >= 7 and <= 8 &&
+                component.Count >= 16 &&
+                component.Width is >= 7 and <= 9 &&
+                component.Height is >= 7 and <= 9 &&
                 component.MinimumX - expectedMinimumX
-                    is >= 13 and <= 14 &&
-                component.MinimumY is >= 38 and <= 39)
+                    is >= 12 and <= 15 &&
+                component.MinimumY is >= 37 and <= 40 &&
+                component.FillRatio is >= 0.25 and <= 0.70)
             .OrderByDescending(component => component.Count)
             .FirstOrDefault();
+        DoorStructure structure =
+            MeasureDoorStructure(image, expectedMinimumX);
         if (door.Count == 0 ||
             arrow.Count == 0 ||
-            !HasDoorHandle(image, expectedMinimumX))
+            !structure.IsComplete)
         {
             return default;
         }
@@ -108,10 +112,17 @@ public static class MatchLobbyDoorButtonDetector
             contrast >= 100;
         if (!visible) return default;
 
+        double structureScore =
+            (structure.TopEdge +
+             structure.LeftJamb +
+             structure.InnerJamb +
+             structure.OuterJamb +
+             structure.Handle) / 5;
         double geometry =
-            0.55 * Ramp(door.Count, 68, 77) +
-            0.25 * Ramp(arrow.Count, 17, 20) +
-            0.20 * Ramp(contrast, 100, 180);
+            0.35 * structureScore +
+            0.25 * Ramp(door.FillRatio, 0.20, 0.35) +
+            0.15 * Ramp(arrow.FillRatio, 0.25, 0.40) +
+            0.25 * Ramp(contrast, 100, 180);
         return new MatchLobbyDoorButtonMatch(
             true,
             Math.Clamp(geometry, 0, 1),
@@ -120,16 +131,120 @@ public static class MatchLobbyDoorButtonDetector
             layout);
     }
 
-    private static bool HasDoorHandle(
+    private static DoorStructure MeasureDoorStructure(
         ImageFrame image,
         int expectedMinimumX)
     {
-        int count = 0;
-        for (int y = 34; y <= 38; y++)
+        double topEdge = StrongestHorizontalCoverage(
+            image,
+            expectedMinimumX - 1,
+            expectedMinimumX + 15,
+            24,
+            27,
+            15);
+        double leftJamb = StrongestVerticalCoverage(
+            image,
+            expectedMinimumX - 1,
+            expectedMinimumX + 1,
+            26,
+            41);
+        double innerJamb = StrongestVerticalCoverage(
+            image,
+            expectedMinimumX + 8,
+            expectedMinimumX + 11,
+            28,
+            43);
+        double outerJamb = StrongestVerticalCoverage(
+            image,
+            expectedMinimumX + 13,
+            expectedMinimumX + 16,
+            25,
+            35);
+        double handle = StrongestVerticalCoverage(
+            image,
+            expectedMinimumX + 5,
+            expectedMinimumX + 8,
+            34,
+            38);
+        double interiorFill = WhiteFraction(
+            image,
+            new ScreenRegion(
+                expectedMinimumX + 3,
+                29,
+                5,
+                5));
+        return new DoorStructure(
+            topEdge,
+            leftJamb,
+            innerJamb,
+            outerJamb,
+            handle,
+            interiorFill);
+    }
+
+    private static double StrongestHorizontalCoverage(
+        ImageFrame image,
+        int minimumX,
+        int maximumX,
+        int minimumY,
+        int maximumY,
+        int sampleWidth)
+    {
+        int strongest = 0;
+        for (int y = minimumY; y <= maximumY; y++)
         {
-            for (int x = expectedMinimumX + 5;
-                 x <= expectedMinimumX + 8;
+            for (int x = minimumX;
+                 x <= maximumX - sampleWidth + 1;
                  x++)
+            {
+                int count = 0;
+                for (int sampleX = x;
+                     sampleX < x + sampleWidth;
+                     sampleX++)
+                {
+                    if (IsOpaqueWhite(image, sampleX, y))
+                    {
+                        count++;
+                    }
+                }
+                strongest = Math.Max(strongest, count);
+            }
+        }
+        return strongest / (double)sampleWidth;
+    }
+
+    private static double StrongestVerticalCoverage(
+        ImageFrame image,
+        int minimumX,
+        int maximumX,
+        int minimumY,
+        int maximumY)
+    {
+        int strongest = 0;
+        for (int x = minimumX; x <= maximumX; x++)
+        {
+            int count = 0;
+            for (int y = minimumY; y <= maximumY; y++)
+            {
+                if (IsOpaqueWhite(image, x, y))
+                {
+                    count++;
+                }
+            }
+            strongest = Math.Max(strongest, count);
+        }
+        return strongest /
+            (double)(maximumY - minimumY + 1);
+    }
+
+    private static double WhiteFraction(
+        ImageFrame image,
+        ScreenRegion region)
+    {
+        int count = 0;
+        for (int y = region.Y; y < region.Bottom; y++)
+        {
+            for (int x = region.X; x < region.Right; x++)
             {
                 if (IsOpaqueWhite(image, x, y))
                 {
@@ -137,7 +252,7 @@ public static class MatchLobbyDoorButtonDetector
                 }
             }
         }
-        return count is >= 2 and <= 7;
+        return count / (double)(region.Width * region.Height);
     }
 
     private static IReadOnlyList<WhiteComponent>
@@ -308,5 +423,25 @@ public static class MatchLobbyDoorButtonDetector
 
         public int Height =>
             MaximumY - MinimumY + 1;
+
+        public double FillRatio =>
+            Count / (double)(Width * Height);
+    }
+
+    private readonly record struct DoorStructure(
+        double TopEdge,
+        double LeftJamb,
+        double InnerJamb,
+        double OuterJamb,
+        double Handle,
+        double InteriorFill)
+    {
+        public bool IsComplete =>
+            TopEdge >= 0.80 &&
+            LeftJamb >= 0.80 &&
+            InnerJamb >= 0.75 &&
+            OuterJamb >= 0.70 &&
+            Handle >= 0.60 &&
+            InteriorFill <= 0.16;
     }
 }

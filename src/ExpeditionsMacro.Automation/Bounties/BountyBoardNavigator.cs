@@ -7,7 +7,8 @@ using ExpeditionsMacro.Vision.Bounties;
 
 namespace ExpeditionsMacro.Automation.Bounties;
 
-internal sealed partial class BountyBoardNavigator
+internal sealed partial class BountyBoardNavigator :
+    IBountyBoardProcessorNavigator
 {
     private static readonly TimeSpan PollInterval =
         TimeSpan.FromMilliseconds(180);
@@ -307,9 +308,11 @@ internal sealed partial class BountyBoardNavigator
             cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task ConfirmRerollAsync(
+    public async Task<BountyBoardMatch> ConfirmRerollAsync(
         RobloxWindow window,
         IDetectorPack detector,
+        int slot,
+        bool rightView,
         CancellationToken cancellationToken)
     {
         BountyBoardMatch confirmation =
@@ -347,6 +350,27 @@ internal sealed partial class BountyBoardNavigator
         {
             throw new BountyGoldUnavailableException();
         }
+        (BountyBoardMatch stableBoard,
+            IReadOnlyList<BountyLiveSlot> stableSlots) =
+            await WaitForLiveSlotsAsync(
+                    window,
+                    detector,
+                    rightView,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        if (stableBoard.NoGold)
+        {
+            throw new BountyGoldUnavailableException();
+        }
+        if (!stableSlots.Any(value =>
+                value.Slot == slot &&
+                value.Action.Kind ==
+                    BountyCardActionKind.Reroll))
+        {
+            throw new RobloxUiUnavailableException(
+                $"Confirmed Bounty slot {slot} did not settle to a stable live Reroll action.");
+        }
+        return stableBoard;
     }
 
     private async Task<BountyBoardMatch>

@@ -297,6 +297,137 @@ public sealed class BountyNumberRecognizerTests
                 value.CenterX is >= 378 and <= 386);
     }
 
+    [Fact]
+    public void Detect_AcceptsClippedFirstSlotClaimNumberTen()
+    {
+        ImageFrame image = ImageCodec.Load(
+            Path.Combine(
+                TestPaths.BountyDatasets,
+                "BountyBoard_ClippedClaimTen_01.png"));
+
+        BountyBoardMatch board =
+            BountyBoardDetector.Detect(image);
+        Assert.Equal(
+            BountyBoardState.Board,
+            board.State);
+        Assert.Contains(
+            board.Actions,
+            value =>
+                value.Kind == BountyCardActionKind.Claim &&
+                value.X is >= 225 and <= 229);
+        Assert.Equal(
+            10,
+            BountyBoardLayout.NumberForSlot(
+                board,
+                slot: 1,
+                rightView: true));
+        Assert.Contains(
+            board.Numbers,
+            value =>
+                value.Number == 10 &&
+                value.CenterX is >= 254 and <= 258);
+    }
+
+    [Theory]
+    [InlineData(-1, 0)]
+    [InlineData(1, 0)]
+    [InlineData(0, -1)]
+    [InlineData(0, 1)]
+    public void Detect_AcceptsClippedClaimRasterPhaseVariation(
+        int offsetX,
+        int offsetY)
+    {
+        ImageFrame image = ImageCodec.Load(
+            Path.Combine(
+                TestPaths.BountyDatasets,
+                "BountyBoard_ClippedClaimTen_01.png"));
+        ShiftWhiteGlyph(
+            image,
+            left: 248,
+            top: 260,
+            width: 17,
+            height: 7,
+            offsetX,
+            offsetY);
+
+        BountyNumberMatch match = Assert.Single(
+            BountyNumberRecognizer.Detect(
+                image,
+                [
+                    new BountyCardAction(
+                        BountyCardActionKind.Claim,
+                        227,
+                        356),
+                ]));
+
+        Assert.Equal(10, match.Number);
+    }
+
+    [Fact]
+    public void Detect_RejectsClippedClaimRasterBeyondReviewedBand()
+    {
+        ImageFrame image = ImageCodec.Load(
+            Path.Combine(
+                TestPaths.BountyDatasets,
+                "BountyBoard_ClippedClaimTen_01.png"));
+
+        Assert.Empty(
+            BountyNumberRecognizer.Detect(
+                image,
+                [
+                    new BountyCardAction(
+                        BountyCardActionKind.Claim,
+                        229,
+                        356),
+                ]));
+    }
+
+    [Fact]
+    public void Detect_RejectsClippedClaimRasterOutsideLeftmostCard()
+    {
+        ImageFrame image = ImageCodec.Load(
+            Path.Combine(
+                TestPaths.BountyDatasets,
+                "BountyBoard_ClippedClaimTen_01.png"));
+        ShiftWhiteGlyph(
+            image,
+            left: 248,
+            top: 260,
+            width: 17,
+            height: 7,
+            offsetX: 48,
+            offsetY: 0);
+
+        Assert.Empty(
+            BountyNumberRecognizer.Detect(
+                image,
+                [
+                    new BountyCardAction(
+                        BountyCardActionKind.Claim,
+                        275,
+                        356),
+                ]));
+    }
+
+    [Fact]
+    public void Detect_RejectsClippedRasterWithoutClaimOwnership()
+    {
+        ImageFrame image = ImageCodec.Load(
+            Path.Combine(
+                TestPaths.BountyDatasets,
+                "BountyBoard_ClippedClaimTen_01.png"));
+
+        Assert.Empty(
+            BountyNumberRecognizer.Detect(
+                image,
+                [
+                    new BountyCardAction(
+                        BountyCardActionKind.Reroll,
+                        267,
+                        356),
+                ]));
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
@@ -497,6 +628,53 @@ public sealed class BountyNumberRecognizerTests
             left + localX,
             top + localY,
             0);
+    }
+
+    private static void ShiftWhiteGlyph(
+        ImageFrame image,
+        int left,
+        int top,
+        int width,
+        int height,
+        int offsetX,
+        int offsetY)
+    {
+        List<(int X, int Y)> pixels = [];
+        for (int y = top; y < top + height; y++)
+        {
+            for (int x = left; x < left + width; x++)
+            {
+                int pixel =
+                    (y * image.Width + x) * 3;
+                byte red = image.Pixels[pixel];
+                byte green = image.Pixels[pixel + 1];
+                byte blue = image.Pixels[pixel + 2];
+                if (red > 185 &&
+                    green > 185 &&
+                    blue > 185 &&
+                    Math.Max(
+                        red,
+                        Math.Max(green, blue)) -
+                    Math.Min(
+                        red,
+                        Math.Min(green, blue)) < 35)
+                {
+                    pixels.Add((x, y));
+                    image.Pixels[pixel] = 0;
+                    image.Pixels[pixel + 1] = 0;
+                    image.Pixels[pixel + 2] = 0;
+                }
+            }
+        }
+
+        foreach ((int x, int y) in pixels)
+        {
+            SetPixel(
+                image,
+                x + offsetX,
+                y + offsetY,
+                255);
+        }
     }
 
     private static void SetPixel(
