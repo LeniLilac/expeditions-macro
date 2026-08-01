@@ -10,6 +10,7 @@ public sealed class StageBountyWaveOwnershipTests
     [InlineData("WaveCounterLegacy.png")]
     [InlineData("WaveCounterNoVoice.png")]
     [InlineData("WaveCounterType3.png")]
+    [InlineData("WaveCounterNoVoiceBrightScene.png")]
     public void DetectOwnedBountyWave_RequiresGameplayHud(
         string fixture)
     {
@@ -26,6 +27,7 @@ public sealed class StageBountyWaveOwnershipTests
     [InlineData("WaveCounterLegacy.png", 67)]
     [InlineData("WaveCounterNoVoice.png", 2)]
     [InlineData("WaveCounterType3.png", 37)]
+    [InlineData("WaveCounterNoVoiceBrightScene.png", 1)]
     public void DetectOwnedBountyWave_AcceptsReviewedLayouts(
         string fixture,
         int expectedWave)
