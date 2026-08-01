@@ -72,7 +72,9 @@ public static class MatchLobbyDoorButtonDetector
                 Offset(LocalSearch, expectedMinimumX));
         WhiteComponent door = components
             .Where(component =>
-                component.Count is >= 68 and <= 84 &&
+                (component.Count is
+                    (>= 68 and <= 84) or
+                    (>= 120 and <= 140)) &&
                 component.Width is >= 15 and <= 16 &&
                 component.Height is >= 18 and <= 20 &&
                 Math.Abs(
@@ -83,7 +85,9 @@ public static class MatchLobbyDoorButtonDetector
             .FirstOrDefault();
         WhiteComponent arrow = components
             .Where(component =>
-                component.Count is >= 17 and <= 24 &&
+                (component.Count is
+                    (>= 17 and <= 24) or
+                    (>= 25 and <= 30)) &&
                 component.Width is >= 7 and <= 8 &&
                 component.Height is >= 7 and <= 8 &&
                 component.MinimumX - expectedMinimumX
@@ -91,8 +95,13 @@ public static class MatchLobbyDoorButtonDetector
                 component.MinimumY is >= 38 and <= 39)
             .OrderByDescending(component => component.Count)
             .FirstOrDefault();
-        if (door.Count == 0 ||
-            arrow.Count == 0 ||
+        bool normalGlyph =
+            door.Count is >= 68 and <= 84 &&
+            arrow.Count is >= 17 and <= 24;
+        bool highContrastGlyph =
+            door.Count is >= 120 and <= 140 &&
+            arrow.Count is >= 25 and <= 30;
+        if (!(normalGlyph || highContrastGlyph) ||
             !HasDoorHandle(image, expectedMinimumX))
         {
             return default;

@@ -4,6 +4,10 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+### Fixed
+
+- Back-to-Lobby detection now accepts the field-observed thicker high-contrast Roblox door glyph while retaining the existing fixed-offset geometry, complete door/arrow/handle proof, stable-frame requirement, and cross-state rejection coverage.
+
 ## [1.3.0-beta.56] - 2026-08-01
 
 ### Fixed

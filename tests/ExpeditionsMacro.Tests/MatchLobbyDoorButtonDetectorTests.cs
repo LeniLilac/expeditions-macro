@@ -15,6 +15,10 @@ public sealed class MatchLobbyDoorButtonDetectorTests
         "MatchLobbyDoor_VoiceChat.png",
         MatchLobbyDoorLayout.VoiceChat,
         314)]
+    [InlineData(
+        "MatchLobbyDoor_HighContrastNoVoice.png",
+        MatchLobbyDoorLayout.NoVoiceChat,
+        270)]
     public void ReviewedTopBars_ReportTheDoorAtItsLiveOffset(
         string fileName,
         MatchLobbyDoorLayout expectedLayout,
@@ -32,11 +36,13 @@ public sealed class MatchLobbyDoorButtonDetectorTests
         Assert.Equal(35, match.ActionY);
     }
 
-    [Fact]
-    public void MissingArrow_RejectsOtherwiseLiveTopBar()
+    [Theory]
+    [InlineData("MatchLobbyDoor_NoVoiceChat.png")]
+    [InlineData("MatchLobbyDoor_HighContrastNoVoice.png")]
+    public void MissingArrow_RejectsOtherwiseLiveTopBar(
+        string fileName)
     {
-        ImageFrame image = LoadNavigation(
-            "MatchLobbyDoor_NoVoiceChat.png");
+        ImageFrame image = LoadNavigation(fileName);
         for (int y = 37; y <= 46; y++)
         {
             for (int x = 272; x <= 281; x++)
