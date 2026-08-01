@@ -1,6 +1,6 @@
 # Resource-refuel fixtures
 
-This directory contains eleven reviewed 808 by 611 Roblox client captures for
+This directory contains twelve reviewed 808 by 611 Roblox client captures for
 the Areas, Gold Mine, and Resource Drill detectors.
 
 The original six frames come from the passive 419-frame diagnostic capture
@@ -15,6 +15,7 @@ identity. No fixture contains desktop chrome, chat, notifications, webhook
 data, private-server links, or other secrets.
 
 - `AreasMenu_01.png`: Areas opened on its default Upgrade section.
+- `AreasMenu_UpgradeSelected_RedScene_01.png`: Upgrade selected over a red scene whose unrelated red pixels must not expand the owned Close control.
 - `AreasExpeditions_01.png`: Expeditions selected with Expeditions Hub ready.
 - `AreasLobby_01.png`: Lobby category selected with its live Spawn card.
 - `GoldMine_01.png`: Gold Mine station panel with Add Fuel available.
@@ -27,8 +28,9 @@ data, private-server links, or other secrets.
 - `ResourceDrill_AddFuel_01.png`: Resource Drill Add Fuel quantity dialog.
 
 Detector regression coverage also derives in-memory variants from these reviewed
-captures. Areas ownership follows the five-row category rail and the live target
-card frame; decorative panel borders and mutable page contents are not
+captures. Areas ownership follows the five-row category rail, the bounded local
+Close-control band, and the live target card frame; decorative panel borders,
+nearby red world/player pixels, and mutable page contents are not
 authorization. Ordinary station ownership requires the station accent, red
 Close component, both Building Stats bars, the Rewards frame, and a live Add
 Fuel control. The Add Fuel dialog is independently owned by live Max, Confirm,

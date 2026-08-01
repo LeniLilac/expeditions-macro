@@ -1,6 +1,6 @@
 # Startup game-settings fixtures
 
-These fifteen 808 by 611 Roblox client captures reproduce the startup
+These sixteen 808 by 611 Roblox client captures reproduce the startup
 settings-normalization flow:
 
 - a fully loaded Lobby with the no-voice Settings gear closed;
@@ -9,6 +9,7 @@ settings-normalization flow:
 - the settled panel at UI Scale 0.80, 1.00, and 1.20;
 - the Gameplay, Graphics, Units, and two observed Misc page layouts;
 - both the top and bottom Units scrollbar positions.
+- the brighter blue top Units scrollbar observed on another supported client.
 
 The fixtures were selected from reviewed local diagnostic archives on
 2026-07-25 and 2026-07-27. Only representative client frames were retained. The source
@@ -58,3 +59,9 @@ Toggle evidence may move only within the reviewed two-pixel vertical
 neighborhood; the returned click coordinate remains the canonical control
 center. Tests keep unrelated nearby pixels negative so this tolerance cannot
 move the action or authorize a different row.
+
+`UnitsTopBrightScrollbar.png` preserves the same owned Units page and bounded
+vertical scrollbar run with a brighter blue raster. The wider color range is
+accepted only after complete Settings/Units ownership and the existing
+multi-column, 120-row run proof; isolated bright blue page artwork cannot own a
+scroll action.

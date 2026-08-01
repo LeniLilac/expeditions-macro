@@ -40,6 +40,44 @@ public sealed class BountyModelTests
                 value.Key == "fkf-30");
     }
 
+    [Fact]
+    public void MythicTen_IsViableWithFiveChallengesStoryHardAndSchoolInfinite()
+    {
+        BountyDefinition bounty =
+            BountyCatalog.For(10);
+
+        Assert.False(bounty.AlwaysReroll);
+        Assert.True(bounty.ChallengeConditional);
+        Assert.Collection(
+            bounty.Objectives,
+            challenge =>
+            {
+                Assert.Equal(
+                    BountyObjectiveKind.Challenge,
+                    challenge.Kind);
+                Assert.Equal(5, challenge.RequiredCount);
+            },
+            story =>
+            {
+                Assert.Equal(
+                    BountyObjectiveKind.StoryActOneHard,
+                    story.Kind);
+                Assert.Equal(
+                    ChallengeMapId.SchoolGrounds,
+                    story.Map);
+            },
+            infinite =>
+            {
+                Assert.Equal(
+                    BountyObjectiveKind.InfiniteWave,
+                    infinite.Kind);
+                Assert.Equal(
+                    ChallengeMapId.SchoolGrounds,
+                    infinite.Map);
+                Assert.Equal(15, infinite.TargetWave);
+            });
+    }
+
     [Theory]
     [InlineData(-1)]
     [InlineData(5)]

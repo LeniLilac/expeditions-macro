@@ -56,8 +56,67 @@ public sealed class DeepDebugArchiveTests
         Assert.Equal(1, opened.MalformedEventLines);
         DeepDebugFrameRecord frame = Assert.Single(opened.Frames);
         Assert.False(frame.EntryExists);
+        Assert.False(frame.PrunedByRetention);
         InvalidDataException error = await Assert.ThrowsAsync<InvalidDataException>(() => opened.ReadFrameBytesAsync(frame));
         Assert.Contains("missing", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ArchiveMarksFramesOutsideDeclaredRollingWindowAsIntentionallyPruned()
+    {
+        using TestDirectory directory = new();
+        string path = Path.Combine(
+            directory.Path,
+            "deep-debug-retention.zip");
+        using (FileStream file = File.Create(path))
+        using (ZipArchive archive = new(
+                   file,
+                   ZipArchiveMode.Create))
+        {
+            WriteEntry(
+                archive,
+                "manifest.json",
+                "{\"operation\":\"Macro plan\",\"outcome\":\"error\",\"frames\":2,\"frame_retention_minutes\":15,\"retained_frame_images\":1,\"discarded_frame_images\":1,\"frame_window_started_at_utc\":\"2026-07-22T12:15:00Z\"}");
+            WriteEntry(
+                archive,
+                "events.jsonl",
+                string.Join(
+                    '\n',
+                    Event(
+                        1,
+                        "2026-07-22T12:00:00Z",
+                        "frame",
+                        "old",
+                        "frames/frame-000000001.png",
+                        new { }),
+                    Event(
+                        2,
+                        "2026-07-22T12:20:00Z",
+                        "frame",
+                        "new",
+                        "frames/frame-000000002.png",
+                        new { })));
+            WriteBytes(
+                archive,
+                "frames/frame-000000002.png",
+                OnePixelPng);
+        }
+
+        using DeepDebugArchive opened =
+            await DeepDebugArchive.OpenAsync(path);
+
+        Assert.Equal(2, opened.Frames.Count);
+        Assert.True(opened.Manifest.UsesRollingFrameRetention);
+        Assert.True(opened.Frames[0].PrunedByRetention);
+        Assert.False(opened.Frames[1].PrunedByRetention);
+        InvalidDataException error =
+            await Assert.ThrowsAsync<InvalidDataException>(
+                () => opened.ReadFrameBytesAsync(
+                    opened.Frames[0]));
+        Assert.Contains(
+            "retained frame-image window",
+            error.Message,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using ExpeditionsMacro.App.Services;
 using ExpeditionsMacro.App.Windows;
 using ExpeditionsMacro.Automation.Diagnostics;
@@ -68,6 +69,11 @@ public partial class SettingsPage : UserControl, IAppPage
         AutoCaptureOnErrorCheck.IsChecked = _services.Settings.AutoCaptureOnMacroError;
         IncludeLogsCheck.IsChecked = _services.Settings.IncludeLogsInDiagnosticArchives;
         DeepDebugCheck.IsChecked = _services.Settings.DeepDebugEnabled;
+        DeepDebugFrameRetentionText.Text =
+            AppSettings.NormalizeDeepDebugFrameRetentionMinutes(
+                    _services.Settings
+                        .DeepDebugFrameRetentionMinutes)
+                .ToString(CultureInfo.InvariantCulture);
         DebugModeCheck.IsChecked = _services.Settings.DebugModeEnabled;
         ManualRecordingsCheck.IsChecked =
             _services.Settings
@@ -144,9 +150,13 @@ public partial class SettingsPage : UserControl, IAppPage
         bool enable = DeepDebugCheck.IsChecked == true;
         if (enable)
         {
+            int retention =
+                AppSettings.NormalizeDeepDebugFrameRetentionMinutes(
+                    _services.Settings
+                        .DeepDebugFrameRetentionMinutes);
             MessageBoxResult confirmation = MessageBox.Show(
                 Window.GetWindow(this),
-                "Deep debug saves every detector frame and input event, plus the selected settings, presets, detector pack, and referenced Placement Setups. A single long run can create a multi-gigabyte ZIP, slow automation, and fill the disk. Files are not deleted automatically.\n\nWebhook values and Discord user IDs are excluded.\n\nEnable deep debug logging?",
+                $"Deep debug saves the complete text timeline for the entire operation. PNG frame images retain only the final {retention} minutes. Selected settings, presets, detector packs, and referenced Placement Setups are also included. Long windows can still slow automation and consume substantial disk space. Archives are not deleted automatically.\n\nWebhook values and Discord user IDs are excluded.\n\nEnable deep debug logging?",
                 "Enable deep debug logging?",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Warning,
@@ -177,6 +187,82 @@ public partial class SettingsPage : UserControl, IAppPage
         finally
         {
             UpdateCaptureState();
+        }
+    }
+
+    private async void DeepDebugFrameRetentionText_LostKeyboardFocus(
+        object sender,
+        KeyboardFocusChangedEventArgs e) =>
+        await SaveDeepDebugFrameRetentionAsync();
+
+    private async void DeepDebugFrameRetentionText_PreviewKeyDown(
+        object sender,
+        KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+        {
+            return;
+        }
+        e.Handled = true;
+        await SaveDeepDebugFrameRetentionAsync();
+        Keyboard.ClearFocus();
+    }
+
+    private async Task SaveDeepDebugFrameRetentionAsync()
+    {
+        if (_loading)
+        {
+            return;
+        }
+        if (!int.TryParse(
+                DeepDebugFrameRetentionText.Text,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out int minutes) ||
+            minutes is <
+                AppSettings.MinimumDeepDebugFrameRetentionMinutes or >
+                AppSettings.MaximumDeepDebugFrameRetentionMinutes)
+        {
+            DeepDebugFrameRetentionText.Text =
+                AppSettings.NormalizeDeepDebugFrameRetentionMinutes(
+                        _services.Settings
+                            .DeepDebugFrameRetentionMinutes)
+                    .ToString(CultureInfo.InvariantCulture);
+            DeepDebugStatusText.Text =
+                $"Enter a frame-image history from {AppSettings.MinimumDeepDebugFrameRetentionMinutes} to {AppSettings.MaximumDeepDebugFrameRetentionMinutes} minutes.";
+            DeepDebugStatusText.Foreground =
+                (System.Windows.Media.Brush)FindResource(
+                    "ErrorBrush");
+            return;
+        }
+
+        DeepDebugFrameRetentionText.IsEnabled = false;
+        try
+        {
+            await _services.UpdateSettingsAsync(
+                settings => settings with
+                {
+                    DeepDebugFrameRetentionMinutes =
+                        minutes,
+                });
+            UpdateDeepDebugStatus();
+        }
+        catch (Exception error)
+        {
+            DeepDebugFrameRetentionText.Text =
+                AppSettings.NormalizeDeepDebugFrameRetentionMinutes(
+                        _services.Settings
+                            .DeepDebugFrameRetentionMinutes)
+                    .ToString(CultureInfo.InvariantCulture);
+            DeepDebugStatusText.Text =
+                $"Frame-image history could not be saved: {error.Message}";
+            DeepDebugStatusText.Foreground =
+                (System.Windows.Media.Brush)FindResource(
+                    "ErrorBrush");
+        }
+        finally
+        {
+            DeepDebugFrameRetentionText.IsEnabled = true;
         }
     }
 
@@ -214,9 +300,13 @@ public partial class SettingsPage : UserControl, IAppPage
 
     private void UpdateDeepDebugStatus()
     {
+        int retention =
+            AppSettings.NormalizeDeepDebugFrameRetentionMinutes(
+                _services.Settings
+                    .DeepDebugFrameRetentionMinutes);
         DeepDebugStatusText.Text = _services.Settings.DeepDebugEnabled
-            ? "Deep debug is enabled. Every completed, canceled, or failed operation will produce a ZIP in Diagnostics."
-            : "Deep debug is disabled.";
+            ? $"Deep debug is enabled. Text covers the full operation; frame images retain the final {retention} minutes."
+            : $"Deep debug is disabled. If enabled, frame images will retain the final {retention} minutes.";
         DeepDebugStatusText.Foreground = (System.Windows.Media.Brush)FindResource(
             _services.Settings.DeepDebugEnabled ? "ErrorBrush" : "MutedBrush");
     }

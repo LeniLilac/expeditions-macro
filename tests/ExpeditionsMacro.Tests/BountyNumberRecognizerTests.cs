@@ -271,6 +271,32 @@ public sealed class BountyNumberRecognizerTests
                 rightView: true));
     }
 
+    [Fact]
+    public void Detect_AcceptsReviewedNumberNineRasterVariantAfterCancel()
+    {
+        ImageFrame image = ImageCodec.Load(
+            Path.Combine(
+                TestPaths.BountyDatasets,
+                "BountyBoard_NumberRasterVariant_04.png"));
+
+        BountyBoardMatch board =
+            BountyBoardDetector.Detect(image);
+        Assert.Equal(
+            BountyBoardState.Board,
+            board.State);
+        Assert.Equal(
+            9,
+            BountyBoardLayout.NumberForSlot(
+                board,
+                slot: 2,
+                rightView: true));
+        Assert.Contains(
+            board.Numbers,
+            value =>
+                value.Number == 9 &&
+                value.CenterX is >= 378 and <= 386);
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(2)]

@@ -9,6 +9,7 @@ public sealed class ResourceRefuelDetectorTests
 {
     [Theory]
     [InlineData("AreasMenu_01.png", AreasScreenState.Menu, 198, 312)]
+    [InlineData("AreasMenu_UpgradeSelected_RedScene_01.png", AreasScreenState.Menu, 198, 305)]
     [InlineData("AreasExpeditions_01.png", AreasScreenState.Expeditions, 322, 264)]
     [InlineData("AreasLobby_01.png", AreasScreenState.Lobby, 318, 388)]
     public void AreasFixtures_MapTheirVerifiedNextAction(
@@ -28,6 +29,7 @@ public sealed class ResourceRefuelDetectorTests
 
     [Theory]
     [InlineData("AreasMenu_01.png", 258)]
+    [InlineData("AreasMenu_UpgradeSelected_RedScene_01.png", 251)]
     [InlineData("AreasExpeditions_01.png", 252)]
     [InlineData("AreasLobby_01.png", 252)]
     public void EveryOwnedAreasSurface_ExposesLobbyCategoryAction(

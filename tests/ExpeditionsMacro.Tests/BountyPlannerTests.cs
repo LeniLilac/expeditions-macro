@@ -76,7 +76,7 @@ public sealed class BountyPlannerTests
     [Fact]
     public void ConditionalBounty_WaitsForOrdinaryCooldown_ButRerollsAtDailyLimit()
     {
-        foreach (int number in new[] { 7, 9 })
+        foreach (int number in new[] { 7, 9, 10 })
         {
             Assert.False(
                 BountyPlanner.ShouldReroll(
@@ -98,7 +98,7 @@ public sealed class BountyPlannerTests
     [Fact]
     public void ViableBounties_NeverConsumeTheParkingBudget()
     {
-        foreach (int number in new[] { 2, 4, 5, 6 })
+        foreach (int number in new[] { 2, 4, 5, 6, 10 })
         {
             Assert.False(
                 BountyPlanner.ShouldReroll(
@@ -115,7 +115,7 @@ public sealed class BountyPlannerTests
     {
         HashSet<int> unavailableToday = [5];
         HashSet<int> observed =
-            [2, 4, 6, 7, 9];
+            [2, 4, 6, 7, 9, 10];
 
         Assert.True(
             BountyPlanner.HasEveryRetainableBounty(
@@ -147,6 +147,7 @@ public sealed class BountyPlannerTests
                         6,
                         7,
                         9,
+                        10,
                     },
                 unavailableToday:
                     new HashSet<int> { 1 },
@@ -177,6 +178,86 @@ public sealed class BountyPlannerTests
         Assert.Equal(ChallengeMapId.RoseKingdom, infinite.Map);
         Assert.Equal(45, infinite.TargetWave);
         Assert.Equal(new[] { 5, 9 }, infinite.CoveredBounties);
+    }
+
+    [Fact]
+    public void MythicTen_PlansStoryHardChallengesAndOverlappingSchoolInfinite()
+    {
+        BountyActiveProgress[] active =
+        [
+            Active(2),
+            Active(10),
+        ];
+
+        IReadOnlyList<BountyWorkRoute> routes =
+            BountyPlanner.BuildRoutes(
+                active,
+                BountyChallengeAvailability.Available);
+
+        Assert.Contains(
+            routes,
+            route =>
+                route.Kind ==
+                    BountyObjectiveKind.StoryActOneHard &&
+                route.CoveredBounties.SequenceEqual(
+                    new[] { 10 }));
+        Assert.Contains(
+            routes,
+            route =>
+                route.Kind ==
+                    BountyObjectiveKind.Challenge &&
+                route.ChallengeRuns == 5 &&
+                route.CoveredBounties.SequenceEqual(
+                    new[] { 10 }));
+        BountyWorkRoute school = Assert.Single(
+            routes,
+            route =>
+                route.Kind ==
+                    BountyObjectiveKind.InfiniteWave &&
+                route.Map ==
+                    ChallengeMapId.SchoolGrounds);
+        Assert.Equal(30, school.TargetWave);
+        Assert.Equal(
+            new[] { 2, 10 },
+            school.CoveredBounties);
+    }
+
+    [Fact]
+    public void CompletingMythicTenRoutesMarksAllThreeObjectives()
+    {
+        IReadOnlyList<BountyActiveProgress> progress =
+            [Active(10)];
+        progress = BountyPlanner.ApplyCompletedRoute(
+            progress,
+            new BountyWorkRoute
+            {
+                Kind =
+                    BountyObjectiveKind.StoryActOneHard,
+                Map = ChallengeMapId.SchoolGrounds,
+                CoveredBounties = [10],
+            });
+        progress = BountyPlanner.ApplyCompletedRoute(
+            progress,
+            new BountyWorkRoute
+            {
+                Kind = BountyObjectiveKind.InfiniteWave,
+                Map = ChallengeMapId.SchoolGrounds,
+                TargetWave = 15,
+                CoveredBounties = [10],
+            });
+        progress = BountyPlanner.ApplyCompletedRoute(
+            progress,
+            new BountyWorkRoute
+            {
+                Kind = BountyObjectiveKind.Challenge,
+                ChallengeRuns = 5,
+                CoveredBounties = [10],
+            },
+            completedChallengeRuns: 5);
+
+        Assert.True(
+            BountyPlanner.IsComplete(
+                Assert.Single(progress)));
     }
 
     [Fact]

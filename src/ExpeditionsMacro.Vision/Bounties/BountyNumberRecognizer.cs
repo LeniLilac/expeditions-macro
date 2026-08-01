@@ -46,6 +46,12 @@ public static class BountyNumberRecognizer
         Create(10, 17, "JGJIxvnMppD4I1tClIQ4"),
     ];
 
+    private static readonly Template[]
+        ReviewedExactVariants =
+    [
+        Create(9, 12, "JE7yfkvxPyzhEgc="),
+    ];
+
     public static IReadOnlyList<BountyNumberMatch> Detect(
         ImageFrame image)
     {
@@ -95,32 +101,35 @@ public static class BountyNumberRecognizer
                         template));
             }
 
-            Candidate[] ranked = candidates
-                .OrderBy(candidate =>
-                    candidate.Distance)
-                .ThenBy(candidate =>
-                    candidate.PositionDistance)
-                .ThenByDescending(candidate =>
-                    candidate.Template.Width)
-                .ToArray();
+            Candidate[] reviewedVariants =
+                ReviewedExactVariants
+                    .Select(template =>
+                        BestCandidate(
+                            mask,
+                            left,
+                            top,
+                            template))
+                    .Where(candidate =>
+                        candidate.PositionDistance <=
+                            MaximumRasterPositionDistance)
+                    .ToArray();
+            Candidate[] ranked =
+                BestDistanceCandidatePerNumber(
+                    candidates.Concat(
+                        reviewedVariants));
             Candidate match = ranked[0];
             int margin =
                 ranked[1].Distance -
                 match.Distance;
             bool accepted =
                 match.Distance <=
-                MaximumPixelDistance &&
+                    MaximumPixelDistance &&
                 margin >= MinimumDistanceMargin;
             if (!accepted)
             {
-                Candidate[] rasterRanked = candidates
-                    .OrderByDescending(candidate =>
-                        candidate.Similarity)
-                    .ThenBy(candidate =>
-                        candidate.PositionDistance)
-                    .ThenByDescending(candidate =>
-                        candidate.Template.Width)
-                    .ToArray();
+                Candidate[] rasterRanked =
+                    BestRasterCandidatePerNumber(
+                        candidates);
                 Candidate rasterMatch = rasterRanked[0];
                 double rasterMargin =
                     rasterMatch.Similarity -
@@ -281,6 +290,52 @@ public static class BountyNumberRecognizer
         }
         return best!.Value;
     }
+
+    private static Candidate[]
+        BestDistanceCandidatePerNumber(
+        IEnumerable<Candidate> candidates) =>
+        candidates
+            .GroupBy(candidate =>
+                candidate.Template.Number)
+            .Select(group =>
+                group
+                    .OrderBy(candidate =>
+                        candidate.Distance)
+                    .ThenBy(candidate =>
+                        candidate.PositionDistance)
+                    .ThenByDescending(candidate =>
+                        candidate.Template.Width)
+                    .First())
+            .OrderBy(candidate =>
+                candidate.Distance)
+            .ThenBy(candidate =>
+                candidate.PositionDistance)
+            .ThenByDescending(candidate =>
+                candidate.Template.Width)
+            .ToArray();
+
+    private static Candidate[]
+        BestRasterCandidatePerNumber(
+        IEnumerable<Candidate> candidates) =>
+        candidates
+            .GroupBy(candidate =>
+                candidate.Template.Number)
+            .Select(group =>
+                group
+                    .OrderByDescending(candidate =>
+                        candidate.Similarity)
+                    .ThenBy(candidate =>
+                        candidate.PositionDistance)
+                    .ThenByDescending(candidate =>
+                        candidate.Template.Width)
+                    .First())
+            .OrderByDescending(candidate =>
+                candidate.Similarity)
+            .ThenBy(candidate =>
+                candidate.PositionDistance)
+            .ThenByDescending(candidate =>
+                candidate.Template.Width)
+            .ToArray();
 
     private static BountyNumberMatch[]
         CollapseSameCardMatches(

@@ -4,6 +4,27 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.53] - 2026-07-31
+
+### Added
+
+- Deep Debug can retain only the final 1–120 minutes of captured PNG frames while preserving the complete operation event trace and sanitized text log. The default frame-retention window is 15 minutes.
+- Mythic Bounty #10 is now viable with five Challenges, School Grounds Story Act 1 on Hard, and School Grounds Infinite through wave 15.
+
+### Changed
+
+- Deep Debug manifests report total, retained, and discarded frame counts plus the configured retention policy. Deep Debug Viewer and Detector Viewer preserve the complete event timeline while distinguishing intentionally pruned frames from missing archive data.
+
+### Fixed
+
+- Mythic Bounty suffix recognition now accepts the reviewed post-Cancel `#9` rasterization without bypassing the existing action ownership, similarity, and runner-up ambiguity gates.
+- Areas-menu detection no longer loses ownership when a red scene overlaps the selected Upgrade page; the detector scores the bounded Close-control band instead of unrelated scene pixels.
+- Units settings detection now accepts the reviewed bright-blue scrollbar rendering only after the complete Units page structure and a long aligned scrollbar run are proven.
+
+### Tests
+
+- Passed 1,518 non-golden application tests, 120 golden-image and cross-state detector tests, 6 Deep Debug Viewer tests, 15 Detector Viewer tests, and all 88 main-app dark/light UI snapshot states.
+
 ## [1.3.0-beta.52] - 2026-07-31
 
 ### Fixed
@@ -1326,7 +1347,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.52...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.53...HEAD
+[1.3.0-beta.53]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.52...v1.3.0-beta.53
 [1.3.0-beta.52]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.51...v1.3.0-beta.52
 [1.3.0-beta.51]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.50...v1.3.0-beta.51
 [1.3.0-beta.50]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.49...v1.3.0-beta.50
