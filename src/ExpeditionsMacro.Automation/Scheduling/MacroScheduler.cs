@@ -77,6 +77,7 @@ public sealed class MacroScheduler
             plan = await PrepareLoopAsync(
                     plan,
                     now,
+                    sessionExcluded,
                     progress,
                     planChanged,
                     log,
@@ -89,7 +90,10 @@ public sealed class MacroScheduler
                     sessionExcluded);
             if (next is null)
             {
-                DateTimeOffset? wake = NextWake(plan, now);
+                DateTimeOffset? wake = NextWake(
+                    plan,
+                    now,
+                    sessionExcluded);
                 string message = wake is null
                     ? "Every finite task is complete. Waiting for the task list to change."
                     : $"No task is currently eligible. Waiting until {wake.Value.LocalDateTime:t}.";
@@ -136,6 +140,7 @@ public sealed class MacroScheduler
                 plan = await PrepareLoopAsync(
                         plan,
                         DateTimeOffset.UtcNow,
+                        sessionExcluded,
                         progress,
                         planChanged,
                         log,
@@ -235,7 +240,10 @@ public sealed class MacroScheduler
         DateTimeOffset now,
         ISet<string>? excluded = null) =>
         MacroPlanLoopPolicy
-            .ActiveTasks(plan, now)
+            .ActiveTasks(
+                plan,
+                now,
+                excluded)
             .Select((task, index) => new { Task = task, Index = index, Progress = plan.ProgressFor(task.Id) })
             .Where(value => value.Task.IsRecurring || !value.Progress.Completed)
             .Where(value =>
@@ -361,12 +369,20 @@ public sealed class MacroScheduler
         Progress = plan.Tasks.Select(task => plan.ProgressFor(task.Id)).ToArray(),
     };
 
-    private static DateTimeOffset? NextWake(MacroPlan plan, DateTimeOffset now) =>
+    private static DateTimeOffset? NextWake(
+        MacroPlan plan,
+        DateTimeOffset now,
+        ISet<string> excluded) =>
         MacroPlanLoopPolicy
-            .ActiveTasks(plan, now)
+            .ActiveTasks(
+                plan,
+                now,
+                excluded)
             .Where(task =>
                 task.IsRecurring ||
                 !plan.ProgressFor(task.Id).Completed)
+            .Where(task =>
+                !excluded.Contains(task.Id))
             .Select(task => plan.ProgressFor(task.Id).NextEligibleAtUtc)
             .Where(value => value > now)
             .OrderBy(value => value)
@@ -375,13 +391,17 @@ public sealed class MacroScheduler
     private async Task<MacroPlan> PrepareLoopAsync(
         MacroPlan plan,
         DateTimeOffset now,
+        ISet<string> excluded,
         IProgress<MacroProgress>? progress,
         Action<MacroPlan>? planChanged,
         Action<MacroEvent>? log,
         CancellationToken cancellationToken)
     {
         MacroPlanLoopEvaluation evaluation =
-            MacroPlanLoopPolicy.Prepare(plan, now);
+            MacroPlanLoopPolicy.Prepare(
+                plan,
+                now,
+                excluded);
         if (!evaluation.Changed)
         {
             return plan;

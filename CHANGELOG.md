@@ -4,6 +4,17 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.59] - 2026-08-03
+
+### Fixed
+
+- When insufficient Gold excludes Bounty for the current scheduler run, that exclusion now participates in loop traversal and wake-time selection. A Bounty before a trailing Forever loop can no longer leave untouched Event or Expedition tasks idle while the scheduler waits for Challenge or Utility.
+
+### Tests
+
+- Added an exact Bounty-no-Gold regression proving that a trailing Forever loop continues to its eligible task while Bounty remains excluded for the current scheduler run.
+- Passed 1,636 non-golden application tests, 120 golden-image and cross-state detector tests, 6 Deep Debug Viewer tests, and 15 Detector Viewer tests.
+
 ## [1.3.0-beta.58] - 2026-08-01
 
 ### Fixed
@@ -1423,7 +1434,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.58...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.59...HEAD
+[1.3.0-beta.59]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.58...v1.3.0-beta.59
 [1.3.0-beta.58]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.57...v1.3.0-beta.58
 [1.3.0-beta.57]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.56...v1.3.0-beta.57
 [1.3.0-beta.56]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.55...v1.3.0-beta.56
