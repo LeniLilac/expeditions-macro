@@ -4,6 +4,17 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.60] - 2026-08-03
+
+### Fixed
+
+- A scheduled Challenge task whose daily-limit deadline was already persisted now closes the verified Challenge selector and returns a skipped result to the scheduler. Lower-priority Bounty, Utility, Event, and Expedition work can continue instead of waiting inside the Challenge runner until midnight UTC.
+
+### Tests
+
+- Added an exact persisted-daily-limit regression that first reproduced the midnight wait and now proves the verified selector-close handoff reaches the shared game-mode selector without waiting.
+- Passed 1,637 non-golden application tests, 120 golden-image and cross-state detector tests, 6 Deep Debug Viewer tests, and 15 Detector Viewer tests.
+
 ## [1.3.0-beta.59] - 2026-08-03
 
 ### Fixed
@@ -1434,7 +1445,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.59...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.60...HEAD
+[1.3.0-beta.60]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.59...v1.3.0-beta.60
 [1.3.0-beta.59]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.58...v1.3.0-beta.59
 [1.3.0-beta.58]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.57...v1.3.0-beta.58
 [1.3.0-beta.57]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.56...v1.3.0-beta.57

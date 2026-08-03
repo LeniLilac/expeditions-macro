@@ -259,6 +259,52 @@ public sealed partial class ChallengeMacroRunner
             confidence);
     }
 
+    private async Task<bool>
+        TryPrepareSchedulerHandoffAsync(
+        bool returnWhenUnavailable,
+        RobloxWindow window,
+        ChallengePreset preset,
+        IDetectorPack detector,
+        DateTimeOffset waitUntil,
+        Action<
+            string,
+            MacroEventLevel,
+            string?,
+            double?> log,
+        Action<
+            string,
+            int,
+            string,
+            string?,
+            double?> report,
+        CancellationToken cancellationToken)
+    {
+        if (!returnWhenUnavailable)
+        {
+            return false;
+        }
+
+        log(
+            $"Challenge rotation is unavailable until {waitUntil:HH:mm} UTC. Preparing shared navigation for the next scheduled task.",
+            MacroEventLevel.Information,
+            null,
+            null);
+        await PrepareSchedulerHandoffAsync(
+                window,
+                preset,
+                detector,
+                log,
+                report,
+                cancellationToken)
+            .ConfigureAwait(false);
+        log(
+            "Challenge handoff is ready. Returning control to the task scheduler.",
+            MacroEventLevel.Success,
+            "game_mode_selector",
+            null);
+        return true;
+    }
+
     private async Task CompleteScheduledChallengeRunAsync(
         RobloxWindow window,
         ChallengePreset preset,

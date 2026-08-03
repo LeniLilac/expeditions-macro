@@ -145,6 +145,9 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
                 {
                     waitingUntil = dailyUntil;
                     PublishSummary();
+                    if (await TryPrepareSchedulerHandoffAsync(
+                            returnWhenUnavailable, window, preset, detector, dailyUntil, Write, Report, cancellationToken).ConfigureAwait(false))
+                        return;
                     await WaitUntilAsync(window, dailyUntil, dailyLimit: true, Write, Report, cancellationToken).ConfigureAwait(false);
                     waitingUntil = null;
                     PublishSummary();
@@ -290,13 +293,9 @@ public sealed partial class ChallengeMacroRunner : IGameModeWorkflow
                     victories,
                     defeats,
                     new DiscordRunTarget(0, 0, "Regular Challenge rotation"));
-                if (returnWhenUnavailable)
-                {
-                    Write($"Challenge rotation is unavailable until {waitUntil:HH:mm} UTC. Preparing shared navigation for the next scheduled task.");
-                    await PrepareSchedulerHandoffAsync(window, preset, detector, Write, Report, cancellationToken).ConfigureAwait(false);
-                    Write("Challenge handoff is ready. Returning control to the task scheduler.", MacroEventLevel.Success, "game_mode_selector", null);
+                if (await TryPrepareSchedulerHandoffAsync(
+                        returnWhenUnavailable, window, preset, detector, waitUntil, Write, Report, cancellationToken).ConfigureAwait(false))
                     return;
-                }
                 await WaitUntilAsync(window, waitUntil, dailyLimit, Write, Report, cancellationToken).ConfigureAwait(false);
                 waitingUntil = null;
                 PublishSummary();
