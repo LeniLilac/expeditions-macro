@@ -20,7 +20,7 @@
   "lineDebt": [
     {
       "path": "src/ExpeditionsMacro.Automation/Challenges/ChallengeMacroRunner.cs",
-      "maxLines": 595,
+      "maxLines": 594,
       "reason": "Existing mode-runner orchestration debt; extract state-specific workflow services when touched."
     },
     {
