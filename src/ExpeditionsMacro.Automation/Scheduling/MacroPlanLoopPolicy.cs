@@ -127,7 +127,8 @@ internal static class MacroPlanLoopPolicy
 
     public static MacroPlanLoopEvaluation Prepare(
         MacroPlan source,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        ISet<string>? excluded = null)
     {
         MacroPlan plan = Normalize(source);
         bool changed = !ReferenceEquals(plan, source);
@@ -135,7 +136,10 @@ internal static class MacroPlanLoopPolicy
         while (plan.EffectiveLoops().Count != 0)
         {
             LoopSearchResult result =
-                FindNext(plan, now);
+                FindNext(
+                    plan,
+                    now,
+                    excluded);
             if (result.Tasks.Count != 0 ||
                 result.LoopToAdvance is null)
             {
@@ -157,38 +161,49 @@ internal static class MacroPlanLoopPolicy
     public static IReadOnlyList<MacroTaskDefinition>
         ActiveTasks(
         MacroPlan plan,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        ISet<string>? excluded = null)
     {
         if (plan.EffectiveLoops().Count == 0)
         {
             return plan.Tasks;
         }
-        return FindNext(plan, now).Tasks;
+        return FindNext(
+            plan,
+            now,
+            excluded).Tasks;
     }
 
     private static LoopSearchResult FindNext(
         MacroPlan plan,
-        DateTimeOffset now) =>
+        DateTimeOffset now,
+        ISet<string>? excluded) =>
         SearchContainer(
             plan,
             0,
             plan.Tasks.Count - 1,
             MacroPlanLoopTree.Build(plan),
-            now);
+            now,
+            excluded);
 
     private static LoopSearchResult SearchContainer(
         MacroPlan plan,
         int start,
         int stop,
         IReadOnlyList<MacroPlanLoopNode> children,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        ISet<string>? excluded)
     {
         int cursor = start;
         foreach (MacroPlanLoopNode child in children)
         {
             IReadOnlyList<MacroTaskDefinition> before =
                 Slice(plan.Tasks, cursor, child.Start - 1);
-            if (!ScopeComplete(plan, before, now))
+            if (!ScopeComplete(
+                    plan,
+                    before,
+                    now,
+                    excluded))
             {
                 return new LoopSearchResult(
                     before,
@@ -206,7 +221,8 @@ internal static class MacroPlanLoopPolicy
                         child.Start,
                         child.Stop,
                         child.Children,
-                        now);
+                        now,
+                        excluded);
                 if (nested.Tasks.Count != 0 ||
                     nested.LoopToAdvance is not null)
                 {
@@ -221,7 +237,11 @@ internal static class MacroPlanLoopPolicy
 
         IReadOnlyList<MacroTaskDefinition> after =
             Slice(plan.Tasks, cursor, stop);
-        return ScopeComplete(plan, after, now)
+        return ScopeComplete(
+                plan,
+                after,
+                now,
+                excluded)
             ? new LoopSearchResult([], null)
             : new LoopSearchResult(after, null);
     }
@@ -330,10 +350,17 @@ internal static class MacroPlanLoopPolicy
     private static bool ScopeComplete(
         MacroPlan plan,
         IReadOnlyList<MacroTaskDefinition> tasks,
-        DateTimeOffset now) =>
+        DateTimeOffset now,
+        ISet<string>? excluded) =>
         tasks
             .All(task =>
             {
+                // GB-035: an insufficient-Gold Bounty exclusion must
+                // not block lower-priority work or a following loop.
+                if (excluded?.Contains(task.Id) == true)
+                {
+                    return true;
+                }
                 MacroTaskProgress progress =
                     plan.ProgressFor(task.Id);
                 return task.IsRecurring

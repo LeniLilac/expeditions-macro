@@ -126,6 +126,84 @@ public sealed class BountyIntegrationTests
         }
     }
 
+    [Fact]
+    public async Task NoGold_BeforeForeverLoop_DoesNotBlockLoopTasks()
+    {
+        string root =
+            TestPaths.NewTemporaryDirectory();
+        try
+        {
+            MacroTaskDefinition bounty = Bounty();
+            MacroTaskDefinition story = new()
+            {
+                Id = "story",
+                Kind = MacroTaskKind.Story,
+                PresetId = "story-preset",
+                Name = "Story",
+                Priority = 2,
+            };
+            MacroPlan plan = Plan(
+                bounty,
+                story) with
+            {
+                Loops =
+                [
+                    new MacroPlanLoopDefinition
+                    {
+                        StartTaskId = story.Id,
+                        StopTaskId = story.Id,
+                        Forever = true,
+                    },
+                ],
+            };
+            MacroScheduler scheduler = new(
+                new MacroPlanRepository(
+                    new AppPaths(root)));
+            List<string> executed = [];
+            using CancellationTokenSource stopped =
+                new(TimeSpan.FromSeconds(2));
+
+            await Assert.ThrowsAnyAsync<
+                OperationCanceledException>(
+                () => scheduler.RunAsync(
+                    plan,
+                    (task, _, token) =>
+                    {
+                        executed.Add(task.Id);
+                        if (task.Kind ==
+                            MacroTaskKind.Bounty)
+                        {
+                            return Task.FromResult(
+                                new ScheduledTaskResult(
+                                    0,
+                                    0,
+                                    TimeSpan.FromSeconds(5),
+                                    Skipped: true,
+                                    SkipUntilSchedulerRestart:
+                                        true));
+                        }
+                        stopped.Cancel();
+                        token.ThrowIfCancellationRequested();
+                        return Task.FromResult(
+                            new ScheduledTaskResult(
+                                0,
+                                0,
+                                TimeSpan.Zero));
+                    },
+                    cancellationToken:
+                        stopped.Token));
+
+            Assert.Equal(
+                new[] { "bounty", "story" },
+                executed);
+        }
+        finally
+        {
+            TestPaths.DeleteTemporaryDirectory(
+                root);
+        }
+    }
+
     private static MacroTaskDefinition Bounty() =>
         new()
         {
