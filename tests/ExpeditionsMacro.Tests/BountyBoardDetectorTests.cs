@@ -79,6 +79,47 @@ public sealed class BountyBoardDetectorTests
     }
 
     [Fact]
+    public void RightViewReroll_WinsATieWithTheAdjacentPinControl()
+    {
+        BountyBoardMatch match =
+            BountyBoardDetector.Detect(
+                LoadBounty(
+                    "BountyBoard_RightRerollPinTie_01.png"));
+
+        Assert.Equal(
+            BountyBoardState.Board,
+            match.State);
+        BountyCardAction reroll = Assert.Single(
+            match.Actions);
+        Assert.Equal(
+            BountyCardActionKind.Reroll,
+            reroll.Kind);
+        Assert.InRange(
+            reroll.X,
+            758,
+            764);
+        Assert.DoesNotContain(
+            match.Actions,
+            action => action.X is >= 676 and <= 684);
+
+        IReadOnlyList<BountyLiveSlot> slots =
+            BountyBoardLayout.LiveSlots(
+                match,
+                rightView: true);
+        Assert.Equal(
+            [5],
+            slots.Select(value =>
+                value.Slot));
+        Assert.Equal(
+            BountyClaimSettlement.Dimmed,
+            BountyBoardLiveActionObserver
+                .ClaimSettlementInRequestedView(
+                    match,
+                    slot: 4,
+                    rightView: true));
+    }
+
+    [Fact]
     public void BoardOwnership_UsesOnlyAnnotatedHeaderAndButtonRail()
     {
         ImageFrame source = ImageCodec.Load(
