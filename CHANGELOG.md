@@ -4,6 +4,17 @@ All notable changes to Expeditions Macro are documented here.
 
 ## [Unreleased]
 
+## [1.3.0-beta.61] - 2026-08-03
+
+### Fixed
+
+- Bounty Board action detection now resolves an equal left/right column match by the closest bounded alignment. A neighboring gold pin can no longer hide the live right-view Reroll action after claims, so recovery resumes instead of restarting Roblox ten times and stopping the plan.
+
+### Tests
+
+- Added the privacy-reviewed beta.60 recovery frame that reproduced the pin-versus-Reroll tie and verifies the claimed slot settles dimmed while the remaining right-view Reroll stays live.
+- Passed all 1,758 application tests, 6 Deep Debug Viewer tests, and 15 Detector Viewer tests.
+
 ## [1.3.0-beta.60] - 2026-08-03
 
 ### Fixed
@@ -1445,7 +1456,8 @@ All notable changes to Expeditions Macro are documented here.
 - Dark, light, and system themes; F6 start/stop; local logs; detector-pack updates; portable and installer releases.
 - Reproducible detector fixtures with full golden-image regression coverage in public CI.
 
-[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.60...HEAD
+[Unreleased]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.61...HEAD
+[1.3.0-beta.61]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.60...v1.3.0-beta.61
 [1.3.0-beta.60]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.59...v1.3.0-beta.60
 [1.3.0-beta.59]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.58...v1.3.0-beta.59
 [1.3.0-beta.58]: https://github.com/LeniLilac/expeditions-macro/compare/v1.3.0-beta.57...v1.3.0-beta.58

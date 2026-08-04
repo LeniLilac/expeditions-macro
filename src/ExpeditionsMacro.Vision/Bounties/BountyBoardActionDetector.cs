@@ -82,11 +82,29 @@ internal static class BountyBoardActionDetector
                 image,
                 yellow,
                 RightActionColumns);
-        return (right.Count > left.Count
+        bool useRight =
+            right.Count > left.Count ||
+            right.Count == left.Count &&
+            AlignmentDistance(
+                right,
+                RightActionColumns) <
+            AlignmentDistance(
+                left,
+                LeftActionColumns);
+        return (useRight
                 ? right
                 : left)
             .ToList();
     }
+
+    private static int AlignmentDistance(
+        IReadOnlyList<Component> components,
+        IReadOnlyList<int> columns) =>
+        components.Sum(component =>
+            columns.Min(column =>
+                Math.Abs(
+                    column -
+                    component.CenterX)));
 
     private static IReadOnlyList<Component>
         MatchColumns(
