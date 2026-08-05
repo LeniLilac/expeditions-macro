@@ -25,7 +25,7 @@
                            Margin="0,2,0,0"
                            FontSize="11"
                            Foreground="{DynamicResource FaintBrush}"
-                           Text="{Binding Row.Status}"
+                           Text="{Binding Status}"
                            TextTrimming="CharacterEllipsis" />
                 <Button x:Name="DisclosureButton"
                         Grid.Column="1"
